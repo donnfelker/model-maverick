@@ -2319,7 +2319,9 @@ dependencies = [
 name = "maverick-config"
 version = "0.1.0"
 dependencies = [
+ "parity-support",
  "serde",
+ "serde_json",
  "serde_norway",
  "thiserror",
  "tracing",
