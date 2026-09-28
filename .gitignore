@@ -17,6 +17,7 @@ venv/
 __pycache__/
 
 # Build outputs
+target/
 dist/
 build/
 *.exe
@@ -36,3 +37,13 @@ logs/
 # Coverage
 coverage/
 *.lcov
+
+# Rust / Cargo
+/target
+**/*.rs.bk
+# Cargo.lock is committed: this workspace ships binaries (maverick, maverick-proxy).
+# insta review leftovers
+**/*.pending-snap
+# cargo-mutants output
+/mutants.out
+/mutants.out.old

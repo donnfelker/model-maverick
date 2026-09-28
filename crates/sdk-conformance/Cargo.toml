@@ -1,0 +1,18 @@
+[package]
+name = "sdk-conformance"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "sdk_conformance"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sdk-conformance"
+path = "src/main.rs"
+
+[lints]
+workspace = true

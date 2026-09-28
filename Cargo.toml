@@ -1,0 +1,71 @@
+[workspace]
+members = [
+    "crates/maverick",
+    "crates/maverick-alerts",
+    "crates/maverick-api",
+    "crates/maverick-config",
+    "crates/maverick-core",
+    "crates/maverick-domain",
+    "crates/maverick-jobs",
+    "crates/maverick-providers",
+    "crates/maverick-proxy",
+    "crates/maverick-runner",
+    "crates/maverick-store",
+    "crates/parity-support",
+    "crates/sdk-conformance",
+]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/modelmaverick/modelmaverick"
+rust-version = "1.98.1"
+
+[workspace.dependencies]
+aes-gcm = "0.11.1"
+axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "json", "matched-path", "original-uri", "query", "tokio", "tracing"] }
+graphile_worker = { version = "0.13.5", default-features = false, features = ["driver-sqlx", "runtime-tokio", "tls-rustls"] }
+hkdf = "0.13.0"
+hmac = "0.13.0"
+insta = { version = "1.48.0", features = ["json", "redactions", "yaml"] }
+jsonschema = { version = "0.58.2", default-features = false }
+maverick-alerts = { path = "crates/maverick-alerts" }
+maverick-api = { path = "crates/maverick-api" }
+maverick-config = { path = "crates/maverick-config" }
+maverick-core = { path = "crates/maverick-core" }
+maverick-domain = { path = "crates/maverick-domain" }
+maverick-jobs = { path = "crates/maverick-jobs" }
+maverick-providers = { path = "crates/maverick-providers" }
+maverick-runner = { path = "crates/maverick-runner" }
+maverick-store = { path = "crates/maverick-store" }
+opentelemetry = "0.33.0"
+opentelemetry-otlp = { version = "0.33.0", default-features = false, features = ["http-proto", "metrics", "trace"] }
+parity-support = { path = "crates/parity-support" }
+proptest = "1.11.0"
+rand = "0.10.3"
+reqwest = { version = "0.12.24", default-features = false, features = ["gzip", "http2", "json", "rustls-tls", "stream"] }
+rmcp = { version = "3.5.0", default-features = false, features = ["macros", "server", "transport-io", "transport-streamable-http-server"] }
+sdk-conformance = { path = "crates/sdk-conformance" }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+serde_yaml_ng = "0.10.0"
+sha2 = "0.11.0"
+sqlx = { version = "0.9.0", default-features = false, features = ["json", "macros", "migrate", "postgres", "runtime-tokio", "tls-rustls", "uuid"] }
+subtle = "2.6.1"
+testcontainers = { version = "0.28.0", default-features = false, features = ["aws-lc-rs"] }
+tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
+tower = { version = "0.5.3", features = ["limit", "timeout", "util"] }
+tower-http = { version = "0.7.1", features = ["catch-panic", "compression-full", "cors", "decompression-full", "request-id", "trace", "util"] }
+tracing = "0.1.45"
+tracing-opentelemetry = { version = "0.34.0", default-features = false, features = ["metrics", "tracing-log"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
+ulid = { version = "3.0.0", features = ["serde"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+undocumented_unsafe_blocks = "deny"
