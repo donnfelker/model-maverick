@@ -83,7 +83,8 @@ run_fast() {
     run_logged fast deny cargo deny check --hide-inclusion-graph -A duplicate -A license-not-encountered
     run_sqlx_check
 
-    if [[ -x scripts/check-instrumentation.sh ]]; then
+    if git ls-files --error-unmatch scripts/check-instrumentation.sh >/dev/null 2>&1 &&
+        [[ -x scripts/check-instrumentation.sh ]]; then
         run_logged fast instrument scripts/check-instrumentation.sh
     else
         log_dir fast
