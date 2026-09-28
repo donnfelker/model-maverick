@@ -1,0 +1,101 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "update tenants\n         set classification_quota_override = $2,\n             updated_at = now()\n         where id = $1\n         returning id, name, status, prompt_hmac_key, created_at, updated_at,\n                   classification_quota_override",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tenants",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tenants",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tenants",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "prompt_hmac_key",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "tenants",
+            "name": "prompt_hmac_key"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "tenants",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "tenants",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "classification_quota_override",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "tenants",
+            "name": "classification_quota_override"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "764c44055242479d8af1659d178d3514dab870b5501225e535669af975cf8381"
+}

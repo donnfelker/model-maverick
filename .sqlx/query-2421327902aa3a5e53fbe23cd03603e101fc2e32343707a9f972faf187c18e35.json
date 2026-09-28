@@ -1,0 +1,242 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select id, provider, model_id, endpoint, settings as \"settings: _\", status,\n                  pricing as \"pricing: _\", quality_source_column_id, cold_start_until,\n                  deprecation_date, created_at, updated_at,\n                  execution_aliases as \"execution_aliases: _\", retention_mode,\n                  retention_verified_at, retention_valid_until, retention_source,\n                  execution_alias_retention as \"execution_alias_retention: _\",\n                  param_constraints as \"param_constraints: _\"\n           from model_columns\n           order by id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "provider",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "provider"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "model_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "model_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "endpoint",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "endpoint"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "settings: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "settings"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "pricing: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "pricing"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "quality_source_column_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "quality_source_column_id"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "cold_start_until",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "cold_start_until"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "deprecation_date",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "deprecation_date"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "execution_aliases: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "execution_aliases"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "retention_mode",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "retention_mode"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "retention_verified_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "retention_verified_at"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "retention_valid_until",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "retention_valid_until"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "retention_source",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "retention_source"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "execution_alias_retention: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "execution_alias_retention"
+          }
+        }
+      },
+      {
+        "ordinal": 18,
+        "name": "param_constraints: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "param_constraints"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "2421327902aa3a5e53fbe23cd03603e101fc2e32343707a9f972faf187c18e35"
+}

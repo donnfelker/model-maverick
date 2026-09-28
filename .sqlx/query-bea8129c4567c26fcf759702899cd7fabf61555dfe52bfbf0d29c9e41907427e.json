@@ -1,0 +1,218 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select id, capability, domain_tags, difficulty_tier,\n                  difficulty_knobs as \"difficulty_knobs: _\", prompt,\n                  attachments as \"attachments: _\", temperature, max_tokens,\n                  grader_specs as \"grader_specs: _\",\n                  dimension_weights as \"dimension_weights: _\", pass_threshold,\n                  smoke_member, corpus_version, active, created_at, updated_at\n           from tasks\n           where active\n           order by id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tasks",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "capability",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tasks",
+            "name": "capability"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "domain_tags",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "tasks",
+            "name": "domain_tags"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "difficulty_tier",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "tasks",
+            "name": "difficulty_tier"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "difficulty_knobs: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "tasks",
+            "name": "difficulty_knobs"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "prompt",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tasks",
+            "name": "prompt"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "attachments: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "tasks",
+            "name": "attachments"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "temperature",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "tasks",
+            "name": "temperature"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "max_tokens",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "tasks",
+            "name": "max_tokens"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "grader_specs: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "tasks",
+            "name": "grader_specs"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "dimension_weights: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "tasks",
+            "name": "dimension_weights"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "pass_threshold",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "tasks",
+            "name": "pass_threshold"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "smoke_member",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "tasks",
+            "name": "smoke_member"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "corpus_version",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tasks",
+            "name": "corpus_version"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "active",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "tasks",
+            "name": "active"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "tasks",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "tasks",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "bea8129c4567c26fcf759702899cd7fabf61555dfe52bfbf0d29c9e41907427e"
+}

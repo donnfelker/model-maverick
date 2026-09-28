@@ -1,0 +1,260 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "insert into model_columns (\n             id, provider, model_id, endpoint, settings, status, pricing,\n             quality_source_column_id, cold_start_until, deprecation_date, execution_aliases,\n             retention_mode, retention_verified_at, retention_valid_until, retention_source,\n             execution_alias_retention, param_constraints\n           )\n           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, coalesce($11::jsonb, '{}'),\n                   coalesce($12, 'unknown'), $13, $14, $15,\n                   coalesce($16::jsonb, '{}'), coalesce($17::jsonb, '{}'))\n           returning id, provider, model_id, endpoint, settings as \"settings: _\", status,\n                     pricing as \"pricing: _\", quality_source_column_id, cold_start_until,\n                     deprecation_date, created_at, updated_at,\n                     execution_aliases as \"execution_aliases: _\", retention_mode,\n                     retention_verified_at, retention_valid_until, retention_source,\n                     execution_alias_retention as \"execution_alias_retention: _\",\n                     param_constraints as \"param_constraints: _\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "provider",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "provider"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "model_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "model_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "endpoint",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "endpoint"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "settings: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "settings"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "pricing: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "pricing"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "quality_source_column_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "quality_source_column_id"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "cold_start_until",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "cold_start_until"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "deprecation_date",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "deprecation_date"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "execution_aliases: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "execution_aliases"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "retention_mode",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "retention_mode"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "retention_verified_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "retention_verified_at"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "retention_valid_until",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "retention_valid_until"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "retention_source",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "retention_source"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "execution_alias_retention: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "execution_alias_retention"
+          }
+        }
+      },
+      {
+        "ordinal": 18,
+        "name": "param_constraints: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "param_constraints"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb",
+        "Text",
+        "Jsonb",
+        "Text",
+        "Date",
+        "Date",
+        "Jsonb",
+        "Text",
+        "Timestamptz",
+        "Timestamptz",
+        "Text",
+        "Jsonb",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "dc828cb8105f3f688e9eda7eb1790688b079626df0543f90559250922533e18e"
+}
