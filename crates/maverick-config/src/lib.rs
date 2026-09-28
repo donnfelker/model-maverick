@@ -1,4 +1,1151 @@
-//! Configuration loading and validation for the engine.
+#![recursion_limit = "256"]
+
+//! Typed startup configuration with the engine's exact environment contract.
 //!
-//! Reads environment and YAML config, validates it, and hands typed config to the
-//! binaries. Package 2b fills this in. The skeleton is intentionally empty.
+//! The loader takes an injected lookup so callers and tests do not depend on the
+//! process environment. Secret fields have redacted `Debug` implementations.
+
+use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::time::Duration;
+
+const POSITIVE_INT: &str = "must be a positive integer";
+const NON_NEGATIVE_INT: &str = "must be a non-negative integer";
+const FINITE_NUMBER: &str = "must be a finite number";
+const NON_NEGATIVE_NUMBER: &str = "must not be negative";
+const LISTEN_SHAPE: &str = "must be a listen address like \":8080\" or \"host:port\"";
+const PORT_RANGE: &str = "port must be a number between 0 and 65535";
+const TOKEN_LIST: &str = "must be a comma-separated list of \"label:secret\" pairs";
+const COLUMN_LIST: &str =
+    "must be a comma-separated list of column identifiers with no empty entries";
+const CRON: &str = "must be a 5-field cron expression like \"0 3 * * *\"";
+const DURATION: &str = "must be a positive duration like \"120s\"";
+
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InternalToken {
+    pub label: String,
+    pub secret: String,
+}
+
+impl fmt::Debug for InternalToken {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("InternalToken")
+            .field("label", &self.label)
+            .field("secret", &"<redacted>")
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KeyRingEntry {
+    pub version: u32,
+    pub key: [u8; 32],
+}
+
+impl fmt::Debug for KeyRingEntry {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("KeyRingEntry")
+            .field("version", &self.version)
+            .field("key", &"<redacted>")
+            .finish()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProviderLimit {
+    pub max_concurrency: u32,
+    pub rpm_limit: u32,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProviderLimits {
+    pub anthropic: ProviderLimit,
+    pub openai: ProviderLimit,
+    pub google: ProviderLimit,
+    pub xai: ProviderLimit,
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct Config {
+    pub database_url: String,
+    pub public_addr: String,
+    pub internal_addr: String,
+    pub internal_tokens: Vec<InternalToken>,
+    pub capture_master_key: [u8; 32],
+    pub capture_master_key_hex: String,
+    pub anthropic_api_key: String,
+    pub openai_api_key: String,
+    pub google_api_key: String,
+    pub xai_api_key: String,
+    pub classifier_column: String,
+    pub classifier_zero_retention_column: Option<String>,
+    pub classifier_deadline: Duration,
+    pub classifier_daily_quota: u32,
+    pub classifier_daily_spend_cap_usd: f64,
+    pub judge_pool: Vec<String>,
+    pub runner_repeats: u32,
+    pub runner_timeout: Duration,
+    pub provider_limits: ProviderLimits,
+    pub batch_job_timeout: Duration,
+    pub batch_lease_ttl: Duration,
+    pub batch_heartbeat_interval: Duration,
+    pub analytics_job_timeout: Duration,
+    pub spend_nightly_cap_usd: f64,
+    pub spend_weekly_cap_usd: f64,
+    pub scoring_alpha: f64,
+    pub scoring_lambda_var: f64,
+    pub scoring_lambda_amb: f64,
+    pub scoring_min_nights: u32,
+    pub ranking_band_quality: f64,
+    pub ranking_band_balanced: f64,
+    pub ranking_band_cost: f64,
+    pub ranking_noise_band: f64,
+    pub ranking_availability_floor: f64,
+    pub ceiling_buffer: f64,
+    pub catalog_cold_start_nights: u32,
+    pub ratelimit_rpm: u32,
+    pub history_retention_days: u32,
+    pub capture_max_window_minutes: u32,
+    pub capture_retention_hours: u32,
+    pub capture_master_key_version: u32,
+    pub capture_previous_master_key: Option<KeyRingEntry>,
+    pub smtp_url: String,
+    pub alerts_webhook_url: String,
+    pub alerts_webhook_secret: String,
+    pub cron_prediction_lock: String,
+    pub cron_nightly: String,
+    pub cron_weekly: String,
+    pub cron_latency_probes: String,
+    pub cron_price_sync: String,
+    pub cron_catalog_sync: String,
+    pub cron_capture_expiry: String,
+    pub cron_history_prune: String,
+    pub otel_exporter_endpoint: String,
+    pub otel_service_name: String,
+}
+
+impl fmt::Debug for Config {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Config")
+            .field("database_url", &self.database_url)
+            .field("public_addr", &self.public_addr)
+            .field("internal_addr", &self.internal_addr)
+            .field("internal_tokens", &self.internal_tokens)
+            .field("capture_master_key", &"<redacted>")
+            .field("capture_master_key_hex", &"<redacted>")
+            .field("anthropic_api_key", &"<redacted>")
+            .field("openai_api_key", &"<redacted>")
+            .field("google_api_key", &"<redacted>")
+            .field("xai_api_key", &"<redacted>")
+            .field("classifier_column", &self.classifier_column)
+            .field(
+                "classifier_zero_retention_column",
+                &self.classifier_zero_retention_column,
+            )
+            .field("classifier_deadline", &self.classifier_deadline)
+            .field("classifier_daily_quota", &self.classifier_daily_quota)
+            .field(
+                "classifier_daily_spend_cap_usd",
+                &self.classifier_daily_spend_cap_usd,
+            )
+            .field("judge_pool", &self.judge_pool)
+            .field("runner_repeats", &self.runner_repeats)
+            .field("runner_timeout", &self.runner_timeout)
+            .field("provider_limits", &self.provider_limits)
+            .field("batch_job_timeout", &self.batch_job_timeout)
+            .field("batch_lease_ttl", &self.batch_lease_ttl)
+            .field("batch_heartbeat_interval", &self.batch_heartbeat_interval)
+            .field("analytics_job_timeout", &self.analytics_job_timeout)
+            .field("spend_nightly_cap_usd", &self.spend_nightly_cap_usd)
+            .field("spend_weekly_cap_usd", &self.spend_weekly_cap_usd)
+            .field("scoring_alpha", &self.scoring_alpha)
+            .field("scoring_lambda_var", &self.scoring_lambda_var)
+            .field("scoring_lambda_amb", &self.scoring_lambda_amb)
+            .field("scoring_min_nights", &self.scoring_min_nights)
+            .field("ranking_band_quality", &self.ranking_band_quality)
+            .field("ranking_band_balanced", &self.ranking_band_balanced)
+            .field("ranking_band_cost", &self.ranking_band_cost)
+            .field("ranking_noise_band", &self.ranking_noise_band)
+            .field(
+                "ranking_availability_floor",
+                &self.ranking_availability_floor,
+            )
+            .field("ceiling_buffer", &self.ceiling_buffer)
+            .field("catalog_cold_start_nights", &self.catalog_cold_start_nights)
+            .field("ratelimit_rpm", &self.ratelimit_rpm)
+            .field("history_retention_days", &self.history_retention_days)
+            .field(
+                "capture_max_window_minutes",
+                &self.capture_max_window_minutes,
+            )
+            .field("capture_retention_hours", &self.capture_retention_hours)
+            .field(
+                "capture_master_key_version",
+                &self.capture_master_key_version,
+            )
+            .field(
+                "capture_previous_master_key",
+                &self.capture_previous_master_key,
+            )
+            .field("smtp_url", &self.smtp_url)
+            .field("alerts_webhook_url", &self.alerts_webhook_url)
+            .field("alerts_webhook_secret", &"<redacted>")
+            .field("cron_prediction_lock", &self.cron_prediction_lock)
+            .field("cron_nightly", &self.cron_nightly)
+            .field("cron_weekly", &self.cron_weekly)
+            .field("cron_latency_probes", &self.cron_latency_probes)
+            .field("cron_price_sync", &self.cron_price_sync)
+            .field("cron_catalog_sync", &self.cron_catalog_sync)
+            .field("cron_capture_expiry", &self.cron_capture_expiry)
+            .field("cron_history_prune", &self.cron_history_prune)
+            .field("otel_exporter_endpoint", &self.otel_exporter_endpoint)
+            .field("otel_service_name", &self.otel_service_name)
+            .finish()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConfigIssue {
+    pub var: String,
+    pub reason: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ConfigError {
+    issues: Vec<ConfigIssue>,
+}
+
+impl ConfigError {
+    pub fn issues(&self) -> &[ConfigIssue] {
+        &self.issues
+    }
+
+    pub fn into_issues(self) -> Vec<ConfigIssue> {
+        self.issues
+    }
+}
+
+impl fmt::Display for ConfigError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "invalid configuration: ")?;
+        for (index, issue) in self.issues.iter().enumerate() {
+            if index > 0 {
+                write!(formatter, "; ")?;
+            }
+            write!(formatter, "{}: {}", issue.var, issue.reason)?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for ConfigError {}
+
+impl Config {
+    pub fn load() -> Result<Self, ConfigError> {
+        load_env()
+    }
+
+    pub fn load_with<F>(lookup: F) -> Result<Self, ConfigError>
+    where
+        F: Fn(&str) -> Option<String>,
+    {
+        load_with(lookup)
+    }
+}
+
+pub fn load_env() -> Result<Config, ConfigError> {
+    load_with(|name| std::env::var(name).ok())
+}
+
+pub fn load_with<F>(lookup: F) -> Result<Config, ConfigError>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let mut issues = Vec::new();
+    let database_url = required(&lookup, "MAVERICK_DATABASE_URL", &mut issues);
+    let public_addr = listen_addr(&lookup, "MAVERICK_PUBLIC_ADDR", ":8080", &mut issues);
+    let internal_addr = listen_addr(&lookup, "MAVERICK_INTERNAL_ADDR", ":8081", &mut issues);
+    let internal_tokens = internal_tokens(&lookup, &mut issues);
+    let (capture_master_key, capture_master_key_hex) = master_key(&lookup, &mut issues);
+    let anthropic_api_key = optional(&lookup, "MAVERICK_ANTHROPIC_API_KEY", "");
+    let openai_api_key = optional(&lookup, "MAVERICK_OPENAI_API_KEY", "");
+    let google_api_key = optional(&lookup, "MAVERICK_GOOGLE_API_KEY", "");
+    let xai_api_key = optional(&lookup, "MAVERICK_XAI_API_KEY", "");
+    let classifier_column = optional(
+        &lookup,
+        "MAVERICK_CLASSIFIER_COLUMN",
+        "claude-haiku-4-5/direct",
+    );
+    let judge_pool = column_list(
+        &lookup,
+        "MAVERICK_JUDGE_POOL",
+        &["gemini-3.1-pro/direct", "gpt-5.5/direct"],
+        &mut issues,
+    );
+    let runner_repeats = positive_int(&lookup, "MAVERICK_RUNNER_REPEATS", 3, &mut issues);
+    let runner_timeout = duration(
+        &lookup,
+        "MAVERICK_RUNNER_TIMEOUT",
+        Duration::from_secs(120),
+        Duration::from_secs(600),
+        &mut issues,
+    );
+
+    let anthropic = provider_limit(&lookup, "ANTHROPIC", &mut issues);
+    let openai = provider_limit(&lookup, "OPENAI", &mut issues);
+    let google = provider_limit(&lookup, "GOOGLE", &mut issues);
+    let xai = provider_limit(&lookup, "XAI", &mut issues);
+    let batch_job_timeout = duration(
+        &lookup,
+        "MAVERICK_BATCH_JOB_TIMEOUT",
+        Duration::from_secs(6 * 60 * 60),
+        Duration::from_secs(24 * 60 * 60),
+        &mut issues,
+    );
+    let spend_nightly_cap_usd = non_negative_float(
+        &lookup,
+        "MAVERICK_SPEND_NIGHTLY_CAP_USD",
+        100.0,
+        &mut issues,
+    );
+    let spend_weekly_cap_usd =
+        non_negative_float(&lookup, "MAVERICK_SPEND_WEEKLY_CAP_USD", 500.0, &mut issues);
+    let scoring_alpha = unit_interval(&lookup, "MAVERICK_SCORING_ALPHA", 0.3, &mut issues);
+    let scoring_lambda_var =
+        non_negative_float(&lookup, "MAVERICK_SCORING_LAMBDA_VAR", 0.5, &mut issues);
+    let scoring_lambda_amb =
+        non_negative_float(&lookup, "MAVERICK_SCORING_LAMBDA_AMB", 0.25, &mut issues);
+    let scoring_min_nights = positive_int(&lookup, "MAVERICK_SCORING_MIN_NIGHTS", 3, &mut issues);
+    let ranking_band_quality =
+        non_negative_float(&lookup, "MAVERICK_RANKING_BAND_QUALITY", 0.0, &mut issues);
+    let ranking_band_balanced =
+        non_negative_float(&lookup, "MAVERICK_RANKING_BAND_BALANCED", 1.5, &mut issues);
+    let ranking_band_cost =
+        non_negative_float(&lookup, "MAVERICK_RANKING_BAND_COST", 5.5, &mut issues);
+    let ranking_noise_band =
+        non_negative_float(&lookup, "MAVERICK_RANKING_NOISE_BAND", 0.75, &mut issues);
+    let ceiling_buffer = non_negative_float(&lookup, "MAVERICK_CEILING_BUFFER", 0.05, &mut issues);
+    let catalog_cold_start_nights = positive_int(
+        &lookup,
+        "MAVERICK_CATALOG_COLD_START_NIGHTS",
+        5,
+        &mut issues,
+    );
+    let ratelimit_rpm = positive_int(&lookup, "MAVERICK_RATELIMIT_RPM", 300, &mut issues);
+    let history_retention_days =
+        positive_int(&lookup, "MAVERICK_HISTORY_RETENTION_DAYS", 365, &mut issues);
+    let capture_max_window_minutes = positive_int(
+        &lookup,
+        "MAVERICK_CAPTURE_MAX_WINDOW_MINUTES",
+        1440,
+        &mut issues,
+    );
+    let capture_retention_hours =
+        positive_int(&lookup, "MAVERICK_CAPTURE_RETENTION_HOURS", 72, &mut issues);
+    let smtp_url = optional(&lookup, "MAVERICK_SMTP_URL", "");
+    let alerts_webhook_url = optional(&lookup, "MAVERICK_ALERTS_WEBHOOK_URL", "");
+    let alerts_webhook_secret = optional(&lookup, "MAVERICK_ALERTS_WEBHOOK_SECRET", "");
+    let cron_prediction_lock = cron(
+        &lookup,
+        "MAVERICK_CRON_PREDICTION_LOCK",
+        "50 2 * * *",
+        &mut issues,
+    );
+    let cron_nightly = cron(&lookup, "MAVERICK_CRON_NIGHTLY", "0 3 * * *", &mut issues);
+    let cron_weekly = cron(&lookup, "MAVERICK_CRON_WEEKLY", "0 4 * * 0", &mut issues);
+    let cron_latency_probes = cron(
+        &lookup,
+        "MAVERICK_CRON_LATENCY_PROBES",
+        "0 * * * *",
+        &mut issues,
+    );
+    let cron_price_sync = cron(
+        &lookup,
+        "MAVERICK_CRON_PRICE_SYNC",
+        "0 6 * * *",
+        &mut issues,
+    );
+    let cron_catalog_sync = cron(
+        &lookup,
+        "MAVERICK_CRON_CATALOG_SYNC",
+        "10 6 * * *",
+        &mut issues,
+    );
+    let cron_capture_expiry = cron(
+        &lookup,
+        "MAVERICK_CRON_CAPTURE_EXPIRY",
+        "0 * * * *",
+        &mut issues,
+    );
+    let cron_history_prune = cron(
+        &lookup,
+        "MAVERICK_CRON_HISTORY_PRUNE",
+        "0 5 * * *",
+        &mut issues,
+    );
+
+    let classifier_zero_retention_column =
+        optional_opt(&lookup, "MAVERICK_CLASSIFIER_ZERO_RETENTION_COLUMN");
+    let classifier_deadline = duration(
+        &lookup,
+        "MAVERICK_CLASSIFIER_DEADLINE",
+        Duration::from_millis(1500),
+        Duration::from_secs(60),
+        &mut issues,
+    );
+    let classifier_daily_quota = non_negative_int(
+        &lookup,
+        "MAVERICK_CLASSIFIER_DAILY_QUOTA",
+        1000,
+        &mut issues,
+    );
+    let classifier_daily_spend_cap_usd = non_negative_float(
+        &lookup,
+        "MAVERICK_CLASSIFIER_DAILY_SPEND_CAP_USD",
+        5.0,
+        &mut issues,
+    );
+    let capture_master_key_version = positive_int(
+        &lookup,
+        "MAVERICK_CAPTURE_MASTER_KEY_VERSION",
+        1,
+        &mut issues,
+    );
+    let capture_previous_master_key =
+        previous_key(&lookup, "MAVERICK_CAPTURE_PREVIOUS_MASTER_KEY", &mut issues);
+    let ranking_availability_floor = unit_interval(
+        &lookup,
+        "MAVERICK_RANKING_AVAILABILITY_FLOOR",
+        0.9,
+        &mut issues,
+    );
+    let batch_lease_ttl = duration(
+        &lookup,
+        "MAVERICK_BATCH_LEASE_TTL",
+        Duration::from_secs(60),
+        Duration::from_secs(60 * 60),
+        &mut issues,
+    );
+    let batch_heartbeat_interval = duration(
+        &lookup,
+        "MAVERICK_BATCH_HEARTBEAT_INTERVAL",
+        Duration::from_secs(15),
+        Duration::from_secs(60 * 60),
+        &mut issues,
+    );
+    let analytics_job_timeout = duration(
+        &lookup,
+        "MAVERICK_ANALYTICS_JOB_TIMEOUT",
+        Duration::from_secs(15 * 60),
+        Duration::from_secs(24 * 60 * 60),
+        &mut issues,
+    );
+    let otel_exporter_endpoint = optional(&lookup, "MAVERICK_OTEL_EXPORTER_ENDPOINT", "");
+    let otel_service_name = optional(&lookup, "MAVERICK_OTEL_SERVICE_NAME", "maverick");
+
+    if issues.is_empty() {
+        Ok(Config {
+            database_url,
+            public_addr,
+            internal_addr,
+            internal_tokens,
+            capture_master_key,
+            capture_master_key_hex,
+            anthropic_api_key,
+            openai_api_key,
+            google_api_key,
+            xai_api_key,
+            classifier_column,
+            classifier_zero_retention_column,
+            classifier_deadline,
+            classifier_daily_quota,
+            classifier_daily_spend_cap_usd,
+            judge_pool,
+            runner_repeats,
+            runner_timeout,
+            provider_limits: ProviderLimits {
+                anthropic,
+                openai,
+                google,
+                xai,
+            },
+            batch_job_timeout,
+            batch_lease_ttl,
+            batch_heartbeat_interval,
+            analytics_job_timeout,
+            spend_nightly_cap_usd,
+            spend_weekly_cap_usd,
+            scoring_alpha,
+            scoring_lambda_var,
+            scoring_lambda_amb,
+            scoring_min_nights,
+            ranking_band_quality,
+            ranking_band_balanced,
+            ranking_band_cost,
+            ranking_noise_band,
+            ranking_availability_floor,
+            ceiling_buffer,
+            catalog_cold_start_nights,
+            ratelimit_rpm,
+            history_retention_days,
+            capture_max_window_minutes,
+            capture_retention_hours,
+            capture_master_key_version,
+            capture_previous_master_key,
+            smtp_url,
+            alerts_webhook_url,
+            alerts_webhook_secret,
+            cron_prediction_lock,
+            cron_nightly,
+            cron_weekly,
+            cron_latency_probes,
+            cron_price_sync,
+            cron_catalog_sync,
+            cron_capture_expiry,
+            cron_history_prune,
+            otel_exporter_endpoint,
+            otel_service_name,
+        })
+    } else {
+        Err(ConfigError { issues })
+    }
+}
+
+fn present<F>(lookup: &F, name: &str) -> Option<String>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    lookup(name).filter(|value| !value.is_empty())
+}
+
+fn optional<F>(lookup: &F, name: &str, default: &str) -> String
+where
+    F: Fn(&str) -> Option<String>,
+{
+    present(lookup, name).unwrap_or_else(|| default.to_string())
+}
+
+fn optional_opt<F>(lookup: &F, name: &str) -> Option<String>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    present(lookup, name)
+}
+
+fn required<F>(lookup: &F, name: &str, issues: &mut Vec<ConfigIssue>) -> String
+where
+    F: Fn(&str) -> Option<String>,
+{
+    match present(lookup, name) {
+        Some(value) => value,
+        None => {
+            issue(issues, name, "required but not set");
+            String::new()
+        }
+    }
+}
+
+fn issue(issues: &mut Vec<ConfigIssue>, var: &str, reason: &str) {
+    issues.push(ConfigIssue {
+        var: var.to_string(),
+        reason: reason.to_string(),
+    });
+}
+
+fn listen_addr<F>(lookup: &F, name: &str, default: &str, issues: &mut Vec<ConfigIssue>) -> String
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let value = optional(lookup, name, default);
+    let port = if let Some(rest) = value.strip_prefix('[') {
+        let Some(end) = rest.find("]:") else {
+            issue(issues, name, LISTEN_SHAPE);
+            return value;
+        };
+        &rest[end + 2..]
+    } else {
+        let Some((host, port)) = value.rsplit_once(':') else {
+            issue(issues, name, LISTEN_SHAPE);
+            return value;
+        };
+        if host.contains(':') {
+            issue(issues, name, LISTEN_SHAPE);
+            return value;
+        }
+        port
+    };
+    if port
+        .parse::<i64>()
+        .map_or(true, |port| !(0..=65535).contains(&port))
+    {
+        issue(issues, name, PORT_RANGE);
+    }
+    value
+}
+
+fn internal_tokens<F>(lookup: &F, issues: &mut Vec<ConfigIssue>) -> Vec<InternalToken>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let Some(value) = present(lookup, "MAVERICK_INTERNAL_TOKENS") else {
+        issue(issues, "MAVERICK_INTERNAL_TOKENS", "required but not set");
+        return Vec::new();
+    };
+    let mut parsed = Vec::new();
+    for entry in value.split(',') {
+        let entry = entry.trim();
+        let Some((label, secret)) = entry.split_once(':') else {
+            issue(issues, "MAVERICK_INTERNAL_TOKENS", TOKEN_LIST);
+            return Vec::new();
+        };
+        if label.is_empty() || secret.is_empty() {
+            issue(issues, "MAVERICK_INTERNAL_TOKENS", TOKEN_LIST);
+            return Vec::new();
+        }
+        parsed.push(InternalToken {
+            label: label.to_string(),
+            secret: secret.to_string(),
+        });
+    }
+    parsed
+}
+
+fn master_key<F>(lookup: &F, issues: &mut Vec<ConfigIssue>) -> ([u8; 32], String)
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let Some(value) = present(lookup, "MAVERICK_CAPTURE_MASTER_KEY") else {
+        issue(
+            issues,
+            "MAVERICK_CAPTURE_MASTER_KEY",
+            "required but not set",
+        );
+        return ([0; 32], String::new());
+    };
+    let Some(bytes) = decode_hex(&value) else {
+        issue(
+            issues,
+            "MAVERICK_CAPTURE_MASTER_KEY",
+            "must be 64 hex characters encoding a 32-byte key",
+        );
+        return ([0; 32], String::new());
+    };
+    if bytes.len() != 32 {
+        issue(
+            issues,
+            "MAVERICK_CAPTURE_MASTER_KEY",
+            "must be 64 hex characters encoding a 32-byte key",
+        );
+        return ([0; 32], String::new());
+    }
+    let mut key = [0_u8; 32];
+    key.copy_from_slice(&bytes);
+    (key, bytes_to_hex(&key))
+}
+
+fn decode_hex(value: &str) -> Option<Vec<u8>> {
+    if value.len() % 2 != 0 {
+        return None;
+    }
+    let mut output = Vec::with_capacity(value.len() / 2);
+    for pair in value.as_bytes().chunks_exact(2) {
+        output.push((hex_digit(pair[0])? << 4) | hex_digit(pair[1])?);
+    }
+    Some(output)
+}
+
+fn hex_digit(value: u8) -> Option<u8> {
+    match value {
+        b'0'..=b'9' => Some(value - b'0'),
+        b'a'..=b'f' => Some(value - b'a' + 10),
+        b'A'..=b'F' => Some(value - b'A' + 10),
+        _ => None,
+    }
+}
+
+fn bytes_to_hex(value: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(value.len() * 2);
+    for byte in value {
+        output.push(HEX[(byte >> 4) as usize] as char);
+        output.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    output
+}
+
+fn column_list<F>(
+    lookup: &F,
+    name: &str,
+    default: &[&str],
+    issues: &mut Vec<ConfigIssue>,
+) -> Vec<String>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let Some(value) = present(lookup, name) else {
+        return default.iter().map(|entry| (*entry).to_string()).collect();
+    };
+    let entries = value
+        .split(',')
+        .map(str::trim)
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    if entries.iter().any(String::is_empty) {
+        issue(issues, name, COLUMN_LIST);
+        Vec::new()
+    } else {
+        entries
+    }
+}
+
+fn provider_limit<F>(lookup: &F, provider: &str, issues: &mut Vec<ConfigIssue>) -> ProviderLimit
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let max_name = format!("MAVERICK_PROVIDERS_{provider}_MAX_CONCURRENCY");
+    let rpm_name = format!("MAVERICK_PROVIDERS_{provider}_RPM_LIMIT");
+    ProviderLimit {
+        max_concurrency: positive_int(lookup, &max_name, 8, issues),
+        rpm_limit: non_negative_int(lookup, &rpm_name, 0, issues),
+    }
+}
+
+fn positive_int<F>(lookup: &F, name: &str, default: u32, issues: &mut Vec<ConfigIssue>) -> u32
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let Some(value) = present(lookup, name) else {
+        return default;
+    };
+    match value.parse::<i64>() {
+        Ok(parsed) if parsed > 0 && parsed <= i64::from(u32::MAX) => parsed as u32,
+        _ => {
+            issue(issues, name, POSITIVE_INT);
+            default
+        }
+    }
+}
+
+fn non_negative_int<F>(lookup: &F, name: &str, default: u32, issues: &mut Vec<ConfigIssue>) -> u32
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let Some(value) = present(lookup, name) else {
+        return default;
+    };
+    match value.parse::<i64>() {
+        Ok(parsed) if parsed >= 0 && parsed <= i64::from(u32::MAX) => parsed as u32,
+        _ => {
+            issue(issues, name, NON_NEGATIVE_INT);
+            default
+        }
+    }
+}
+
+fn float<F>(lookup: &F, name: &str, default: f64, issues: &mut Vec<ConfigIssue>) -> f64
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let Some(value) = present(lookup, name) else {
+        return default;
+    };
+    match parse_float(&value) {
+        Some(value) if value.is_finite() => value,
+        _ => {
+            issue(issues, name, FINITE_NUMBER);
+            default
+        }
+    }
+}
+
+fn parse_float(value: &str) -> Option<f64> {
+    if let Ok(parsed) = value.parse::<f64>() {
+        return Some(parsed);
+    }
+    let (sign, unsigned) = if let Some(value) = value.strip_prefix('-') {
+        (-1.0, value)
+    } else if let Some(value) = value.strip_prefix('+') {
+        (1.0, value)
+    } else {
+        (1.0, value)
+    };
+    let unsigned = unsigned
+        .strip_prefix("0x")
+        .or_else(|| unsigned.strip_prefix("0X"))?;
+    let (mantissa, exponent) = unsigned
+        .split_once('p')
+        .or_else(|| unsigned.split_once('P'))?;
+    let exponent = exponent.parse::<i32>().ok()?;
+    let (whole, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+    if whole.is_empty() && fraction.is_empty() {
+        return None;
+    }
+    let mut digits = 0.0;
+    for digit in whole.bytes().chain(fraction.bytes()) {
+        digits = digits * 16.0 + f64::from(hex_digit(digit)?);
+    }
+    let scale = 16_f64.powi(-(fraction.len() as i32));
+    Some(sign * digits * scale * 2_f64.powi(exponent))
+}
+
+fn non_negative_float<F>(lookup: &F, name: &str, default: f64, issues: &mut Vec<ConfigIssue>) -> f64
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let value = float(lookup, name, default, issues);
+    let parsed = present(lookup, name).and_then(|raw| parse_float(&raw));
+    if parsed.is_some_and(|raw| raw.is_finite()) && value < 0.0 {
+        issue(issues, name, NON_NEGATIVE_NUMBER);
+        default
+    } else {
+        value
+    }
+}
+
+fn unit_interval<F>(lookup: &F, name: &str, default: f64, issues: &mut Vec<ConfigIssue>) -> f64
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let value = float(lookup, name, default, issues);
+    let parsed = present(lookup, name).and_then(|raw| parse_float(&raw));
+    if parsed.is_some_and(|raw| raw.is_finite()) && !(value > 0.0 && value <= 1.0) {
+        issue(issues, name, "must be a number in (0, 1]");
+        default
+    } else {
+        value
+    }
+}
+
+fn duration<F>(
+    lookup: &F,
+    name: &str,
+    default: Duration,
+    max: Duration,
+    issues: &mut Vec<ConfigIssue>,
+) -> Duration
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let Some(value) = present(lookup, name) else {
+        return default;
+    };
+    let Some(parsed) = parse_duration(&value) else {
+        issue(issues, name, DURATION);
+        return default;
+    };
+    if parsed.is_zero() {
+        issue(issues, name, DURATION);
+        return default;
+    }
+    if parsed > max {
+        let reason = if max == Duration::from_secs(600) {
+            "must not exceed 10m0s"
+        } else if max == Duration::from_secs(24 * 60 * 60) {
+            "must not exceed 24h0m0s"
+        } else {
+            "must not exceed configured maximum"
+        };
+        issue(issues, name, reason);
+        return default;
+    }
+    parsed
+}
+
+fn parse_duration(value: &str) -> Option<Duration> {
+    if value == "0" {
+        return Some(Duration::ZERO);
+    }
+    let mut rest = value;
+    let negative = rest.starts_with('-');
+    if negative || rest.starts_with('+') {
+        rest = &rest[1..];
+    }
+    if rest.is_empty() {
+        return None;
+    }
+    let mut total_seconds = 0.0;
+    while !rest.is_empty() {
+        let number_end = rest
+            .char_indices()
+            .find(|(_, character)| !character.is_ascii_digit() && *character != '.')
+            .map_or(rest.len(), |(index, _)| index);
+        if number_end == 0 {
+            return None;
+        }
+        let number = rest[..number_end].parse::<f64>().ok()?;
+        rest = &rest[number_end..];
+        let multiplier = if rest.starts_with("ns") {
+            rest = &rest[2..];
+            1e-9
+        } else if rest.starts_with("us") {
+            rest = &rest[2..];
+            1e-6
+        } else if rest.starts_with("µs") || rest.starts_with("μs") {
+            rest = &rest["µs".len()..];
+            1e-6
+        } else if rest.starts_with("ms") {
+            rest = &rest[2..];
+            1e-3
+        } else if rest.starts_with('s') {
+            rest = &rest[1..];
+            1.0
+        } else if rest.starts_with('m') {
+            rest = &rest[1..];
+            60.0
+        } else if rest.starts_with('h') {
+            rest = &rest[1..];
+            3600.0
+        } else {
+            return None;
+        };
+        total_seconds += number * multiplier;
+    }
+    if negative {
+        total_seconds = -total_seconds;
+    }
+    if !total_seconds.is_finite() || total_seconds <= 0.0 {
+        return Some(Duration::ZERO);
+    }
+    let nanos = total_seconds * 1_000_000_000.0;
+    if nanos > u64::MAX as f64 {
+        return None;
+    }
+    Some(Duration::from_nanos(nanos as u64))
+}
+
+fn cron<F>(lookup: &F, name: &str, default: &str, issues: &mut Vec<ConfigIssue>) -> String
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let value = optional(lookup, name, default);
+    if value.split_whitespace().count() != 5 {
+        issue(issues, name, CRON);
+    }
+    value
+}
+
+fn previous_key<F>(lookup: &F, name: &str, issues: &mut Vec<ConfigIssue>) -> Option<KeyRingEntry>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let value = present(lookup, name)?;
+    let Some((version, key)) = value.split_once(':') else {
+        issue(issues, name, "must be in the form \"version:hex\"");
+        return None;
+    };
+    let Ok(version) = version.parse::<u32>() else {
+        issue(issues, name, "must be in the form \"version:hex\"");
+        return None;
+    };
+    let Some(key) = decode_hex(key) else {
+        issue(issues, name, "must be in the form \"version:hex\"");
+        return None;
+    };
+    if version == 0 || key.len() != 32 {
+        issue(issues, name, "must be in the form \"version:hex\"");
+        return None;
+    }
+    let mut bytes = [0_u8; 32];
+    bytes.copy_from_slice(&key);
+    Some(KeyRingEntry {
+        version,
+        key: bytes,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use parity_support::fixture;
+    use serde_json::{Map, Value, json};
+
+    /// parity: config.TestLoadDefaults
+    /// parity: config.TestLoadOverrides
+    /// parity: config.TestLoadRequiredMissing
+    /// parity: config.TestLoadEmptyRequiredIsMissing
+    /// parity: config.TestLoadMalformedValues/public_addr_without_port
+    /// parity: config.TestLoadMalformedValues/public_addr_non-numeric_port
+    /// parity: config.TestLoadMalformedValues/internal_addr_port_out_of_range
+    /// parity: config.TestLoadMalformedValues/tokens_missing_separator
+    /// parity: config.TestLoadMalformedValues/tokens_empty_label
+    /// parity: config.TestLoadMalformedValues/tokens_empty_secret
+    /// parity: config.TestLoadMalformedValues/master_key_not_hex
+    /// parity: config.TestLoadMalformedValues/master_key_too_short
+    /// parity: config.TestLoadMalformedValues/judge_pool_empty_entry
+    /// parity: config.TestLoadMalformedValues/nightly_cap_not_a_number
+    /// parity: config.TestLoadMalformedValues/nightly_cap_negative
+    /// parity: config.TestLoadMalformedValues/alpha_not_a_number
+    /// parity: config.TestLoadMalformedValues/alpha_above_one
+    /// parity: config.TestLoadMalformedValues/alpha_zero
+    /// parity: config.TestLoadMalformedValues/lambda_var_not_a_number
+    /// parity: config.TestLoadMalformedValues/noise_band_NaN
+    /// parity: config.TestLoadMalformedValues/rpm_non-numeric
+    /// parity: config.TestLoadMalformedValues/rpm_zero
+    /// parity: config.TestLoadMalformedValues/rpm_negative
+    /// parity: config.TestLoadMalformedValues/retention_days_float
+    /// parity: config.TestLoadMalformedValues/capture_max_window_zero
+    /// parity: config.TestLoadMalformedValues/capture_retention_hours_negative
+    /// parity: config.TestLoadMalformedValues/capture_expiry_cron_free_text
+    /// parity: config.TestLoadMalformedValues/history_prune_cron_too_few_fields
+    /// parity: config.TestLoadMalformedValues/min_nights_non-numeric
+    /// parity: config.TestLoadMalformedValues/cold_start_nights_zero
+    /// parity: config.TestLoadMalformedValues/cron_too_few_fields
+    /// parity: config.TestLoadMalformedValues/cron_free_text
+    /// parity: config.TestLoadMalformedValues/runner_repeats_zero
+    /// parity: config.TestLoadMalformedValues/runner_timeout_not_a_duration
+    /// parity: config.TestLoadMalformedValues/runner_timeout_zero
+    /// parity: config.TestLoadMalformedValues/runner_timeout_above_cap
+    /// parity: config.TestLoadMalformedValues/batch_job_timeout_not_a_duration
+    /// parity: config.TestLoadMalformedValues/batch_job_timeout_zero
+    /// parity: config.TestLoadMalformedValues/batch_job_timeout_negative
+    /// parity: config.TestLoadMalformedValues/batch_job_timeout_above_cap
+    /// parity: config.TestLoadMalformedValues/provider_max_concurrency_zero
+    /// parity: config.TestLoadMalformedValues/provider_rpm_negative
+    /// parity: config.TestLoadMalformedValues/provider_rpm_non-numeric
+    /// parity: config.TestLoadReportsAllIssuesAtOnce
+    /// parity: config.TestLoadMalformedValues
+    #[test]
+    fn config_fixture_matches() {
+        let fixture = fixture("store", "config_load.json").expect("config fixture");
+        for case in fixture["cases"].as_array().expect("cases") {
+            let mut env = Map::new();
+            for (key, value) in case["env"].as_object().expect("env") {
+                env.insert(key.clone(), value.clone());
+            }
+            let result =
+                load_with(|name| env.get(name).and_then(Value::as_str).map(str::to_string));
+            match (case["ok"].as_bool().expect("ok"), result) {
+                (true, Ok(config)) => assert_eq!(parity_view(&config), case["config"]),
+                (false, Err(error)) => {
+                    let expected = case["issues"].as_array().expect("issues");
+                    let actual = error
+                        .issues()
+                        .iter()
+                        .map(|issue| json!({"var": issue.var, "reason": issue.reason}))
+                        .collect::<Vec<_>>();
+                    assert_eq!(actual, *expected, "case {}", case["id"]);
+                    assert_eq!(error.to_string(), case["error_text"]);
+                }
+                (true, Err(error)) => panic!("{} unexpectedly failed: {error}", case["id"]),
+                (false, Ok(_)) => panic!("{} unexpectedly succeeded", case["id"]),
+            }
+        }
+    }
+
+    #[test]
+    fn rust_only_config_defaults_and_key_ring() {
+        let env = Map::from_iter([
+            ("MAVERICK_DATABASE_URL".to_string(), json!("postgres://db")),
+            (
+                "MAVERICK_INTERNAL_TOKENS".to_string(),
+                json!("rails:secret"),
+            ),
+            (
+                "MAVERICK_CAPTURE_MASTER_KEY".to_string(),
+                json!("ab".repeat(32)),
+            ),
+            (
+                "MAVERICK_CAPTURE_PREVIOUS_MASTER_KEY".to_string(),
+                json!(format!("2:{}", "cd".repeat(32))),
+            ),
+            ("MAVERICK_CLASSIFIER_DEADLINE".to_string(), json!("1.5s")),
+            (
+                "MAVERICK_RANKING_AVAILABILITY_FLOOR".to_string(),
+                json!("0.95"),
+            ),
+        ]);
+        let config = load_with(|name| env.get(name).and_then(Value::as_str).map(str::to_string))
+            .expect("rust config");
+        assert_eq!(config.classifier_deadline, Duration::from_millis(1500));
+        assert_eq!(config.ranking_availability_floor, 0.95);
+        assert_eq!(config.capture_master_key_version, 1);
+        assert_eq!(
+            config.capture_previous_master_key.as_ref().unwrap().version,
+            2
+        );
+        assert_eq!(config.classifier_daily_quota, 1000);
+        assert_eq!(config.classifier_daily_spend_cap_usd, 5.0);
+    }
+
+    #[test]
+    fn parser_edges_cover_ipv6_and_go_hex_floats() {
+        let mut issues = Vec::new();
+        let address = listen_addr(
+            &|name| (name == "MAVERICK_PUBLIC_ADDR").then(|| "[::1]:1".to_string()),
+            "MAVERICK_PUBLIC_ADDR",
+            ":8080",
+            &mut issues,
+        );
+        assert_eq!(address, "[::1]:1");
+        assert!(issues.is_empty());
+
+        assert_eq!(parse_float("0x1p4"), Some(16.0));
+        assert_eq!(parse_float("0x1.8p-2"), Some(0.375));
+        assert_eq!(parse_float("-0x1.8p2"), Some(-6.0));
+    }
+
+    fn parity_view(config: &Config) -> Value {
+        json!({
+            "alerts_webhook_secret": config.alerts_webhook_secret,
+            "alerts_webhook_url": config.alerts_webhook_url,
+            "anthropic_api_key": config.anthropic_api_key,
+            "batch_job_timeout_seconds": json_number(config.batch_job_timeout.as_secs_f64()),
+            "capture_master_key_hex": config.capture_master_key_hex,
+            "capture_max_window_minutes": config.capture_max_window_minutes,
+            "capture_retention_hours": config.capture_retention_hours,
+            "catalog_cold_start_nights": config.catalog_cold_start_nights,
+            "ceiling_buffer": json_number(config.ceiling_buffer),
+            "classifier_column": config.classifier_column,
+            "cron_capture_expiry": config.cron_capture_expiry,
+            "cron_catalog_sync": config.cron_catalog_sync,
+            "cron_history_prune": config.cron_history_prune,
+            "cron_latency_probes": config.cron_latency_probes,
+            "cron_nightly": config.cron_nightly,
+            "cron_prediction_lock": config.cron_prediction_lock,
+            "cron_price_sync": config.cron_price_sync,
+            "cron_weekly": config.cron_weekly,
+            "database_url": config.database_url,
+            "google_api_key": config.google_api_key,
+            "history_retention_days": config.history_retention_days,
+            "internal_addr": config.internal_addr,
+            "internal_tokens": config.internal_tokens,
+            "judge_pool": config.judge_pool,
+            "openai_api_key": config.openai_api_key,
+            "provider_limits": {
+                "anthropic": config.provider_limits.anthropic,
+                "google": config.provider_limits.google,
+                "openai": config.provider_limits.openai,
+                "xai": config.provider_limits.xai,
+            },
+            "public_addr": config.public_addr,
+            "ranking_band_balanced": json_number(config.ranking_band_balanced),
+            "ranking_band_cost": json_number(config.ranking_band_cost),
+            "ranking_band_quality": json_number(config.ranking_band_quality),
+            "ranking_noise_band": json_number(config.ranking_noise_band),
+            "ratelimit_rpm": config.ratelimit_rpm,
+            "runner_repeats": config.runner_repeats,
+            "runner_timeout_seconds": json_number(config.runner_timeout.as_secs_f64()),
+            "scoring_alpha": json_number(config.scoring_alpha),
+            "scoring_lambda_amb": json_number(config.scoring_lambda_amb),
+            "scoring_lambda_var": json_number(config.scoring_lambda_var),
+            "scoring_min_nights": config.scoring_min_nights,
+            "smtp_url": config.smtp_url,
+            "spend_nightly_cap_usd": json_number(config.spend_nightly_cap_usd),
+            "spend_weekly_cap_usd": json_number(config.spend_weekly_cap_usd),
+            "xai_api_key": config.xai_api_key,
+        })
+    }
+
+    fn json_number(value: f64) -> Value {
+        if value == 0.0 && value.is_sign_negative() {
+            json!(value)
+        } else if value.fract() == 0.0 {
+            json!(value as i64)
+        } else {
+            json!(value)
+        }
+    }
+}
