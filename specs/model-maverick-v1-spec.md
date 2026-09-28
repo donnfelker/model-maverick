@@ -870,7 +870,7 @@ Exactly one pool must be `is_default: true`. Columns are referenced by `column_i
 
 ### 9.9 Health
 
-`GET /up` → `200` when the process can reach Postgres (Kamal health check). `GET /health/detail` (internal listener only) → component statuses: db, river queues, provider client config, active matrix_version, last batch times.
+`GET /up` → `200` when the process can reach Postgres (Kamal health check). `GET /health/detail` (internal listener only) → component statuses: db, job queue, provider client config, active matrix_version, last batch times. (changed 2026-09-28 for the Rust port, `parity/DIVERGENCES.md` D35: the component is `job_queue`, with statuses `no_workers | stale | ok`, and `unknown` when the database or the queue read fails; data comes from graphile_worker; `last_batch_times` maps job kind to the latest `batches.completed_at`. The Go engine reported `river_queues`, which also had `paused`.)
 
 ### 9.10 POST /v1/telemetry
 
