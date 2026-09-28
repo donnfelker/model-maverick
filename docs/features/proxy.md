@@ -67,6 +67,13 @@ proves nothing about the product it's demonstrating.
   trial demonstration; production traffic graduates to a client SDK or a
   gateway plugin.
 
+## Nice to have (not planned)
+
+- A "graduation link" response header that points trial users to the
+  production integration path (a client SDK or a gateway plugin). Removed
+  from the v1 requirements by the owner on 2026-09-28 as premature: the SDKs
+  and a public docs page do not exist yet. Revisit when they do.
+
 ## Dependencies
 
 - A separate binary and a separate deployable from `maverick` — no database,

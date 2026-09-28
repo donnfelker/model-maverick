@@ -18,14 +18,14 @@ The Go source is not in this directory, and you do not need it. Do not try to fi
 | Specifications | Complete. The Rust changes were adopted on 2026-09-28. |
 | Exact behavior of the Go engine | Complete: `reference/engine-reference.md` |
 | Test data for all 675 Go tests | Complete: `parity/`. `parity/manifest/` maps each test. |
-| Approved differences from Go | Complete: `parity/DIVERGENCES.md` (D1 to D37; D26 to D37 added 2026-09-28 by owner approval) |
+| Approved differences from Go | Complete: `parity/DIVERGENCES.md` (D1 to D39; D26 to D39 added 2026-09-28 by owner approval) |
 | Rust source code | Not started |
 
 ## 3. Read these documents, in this order
 
 1. `AGENTS.md`: rules, stack, and order of authority.
 2. `plans/master-plan.md`: read all of it. §7.0 is the port program. §8 is the build order.
-3. `parity/DIVERGENCES.md`: the 37 places where Rust must not do what Go did.
+3. `parity/DIVERGENCES.md`: the 39 places where Rust must not do what Go did.
 4. `parity/README.md`: how to use the test data.
 5. `specs/model-maverick-v1-spec.md`: the engine contract. Read the parts for each work package when you start that package.
 6. `reference/engine-reference.md`: the exact behavior. Read the part for each work package when you start that package. It is long (about 4,300 lines). Search it, and do not read it from start to end.
