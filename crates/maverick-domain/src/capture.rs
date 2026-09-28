@@ -309,15 +309,12 @@ fn decode_hex(value: &str) -> Option<Vec<u8>> {
     if bytes.len() % 2 != 0 {
         return None;
     }
-    let mut out = Vec::with_capacity(bytes.len() / 2);
-    let mut i = 0;
-    while i < bytes.len() {
-        let hi = hex_digit(bytes[i])?;
-        let lo = hex_digit(bytes[i + 1])?;
-        out.push((hi << 4) + lo);
-        i += 2;
-    }
-    Some(out)
+    // `chunks_exact(2)` is a bounded iterator over byte pairs, so there is no manual
+    // index to advance (and no way to mutate the step into a non-terminating loop).
+    bytes
+        .chunks_exact(2)
+        .map(|pair| Some((hex_digit(pair[0])? << 4) + hex_digit(pair[1])?))
+        .collect()
 }
 
 fn hex_digit(c: u8) -> Option<u8> {
