@@ -1,0 +1,285 @@
+{
+  "description": "MCP server (internal/mcp) exact wire data captured from the streamable HTTP transport (go-sdk v1.6.1). Server name 'model-maverick', version 'v1'. SSE framing: each JSON-RPC response is sent as 'event: message\\ndata: <json>\\n\\n' with Content-Type text/event-stream.",
+  "initialize": {
+    "request_body_exact": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"clientInfo\":{\"name\":\"contract-test\",\"version\":\"v1\"},\"protocolVersion\":\"2025-11-25\",\"capabilities\":{\"roots\":{\"listChanged\":true}}}}",
+    "response_status": 200,
+    "response_headers_subset": {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      "Connection": "keep-alive",
+      "Mcp-Session-Id": "<random 26-char base32 session id>"
+    },
+    "response_body_exact": "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":{\"logging\":{},\"tools\":{\"listChanged\":true}},\"protocolVersion\":\"2025-11-25\",\"serverInfo\":{\"name\":\"model-maverick\",\"version\":\"v1\"}}}\n\n",
+    "result": {
+      "capabilities": {
+        "logging": {},
+        "tools": {
+          "listChanged": true
+        }
+      },
+      "protocolVersion": "2025-11-25",
+      "serverInfo": {
+        "name": "model-maverick",
+        "version": "v1"
+      }
+    }
+  },
+  "initialized_notification": {
+    "response_status": 202,
+    "response_body": ""
+  },
+  "tools_list": {
+    "request_body_exact": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}",
+    "response_body_exact": "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"tools\":[{\"description\":\"Read the banded policy table (which model column serves each capability and difficulty band, with ceilings and pass rates), mirroring GET /v1/policies.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"capability\":{\"type\":\"string\",\"description\":\"one of the ten v1 capabilities; absent returns all ten\"},\"pool\":{\"type\":\"string\",\"description\":\"pool to report on, default the tenant default pool\"}},\"additionalProperties\":false},\"name\":\"get_policy\"},{\"description\":\"List the model column catalog visible to the tenant (provider, model, endpoint, settings, status, pricing, deprecation), mirroring GET /v1/models.\",\"inputSchema\":{\"type\":\"object\",\"additionalProperties\":false},\"name\":\"list_models\"},{\"description\":\"Recommend the best model column for a workload, mirroring POST /v1/recommend. Prefer the declared workload form ({capability, difficulty?, domain_tags?}) whenever you already know the capability: it is faster and nothing leaves the session. Use the prompt form ({prompt}) only when the capability is unknown and classification is needed.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"workload\":{\"type\":[\"null\",\"object\"],\"properties\":{\"capability\":{\"type\":[\"null\",\"string\"],\"description\":\"declared form: one of the ten v1 capabilities\"},\"difficulty\":{\"type\":[\"null\",\"integer\"],\"description\":\"declared form: difficulty tier 1-5, default 3\"},\"domain_tags\":{\"type\":[\"null\",\"array\"],\"items\":{\"type\":\"string\"},\"description\":\"declared form: domain tags such as legal or medical\"},\"prompt\":{\"type\":[\"null\",\"string\"],\"description\":\"prompt form: the raw prompt to classify\"}},\"additionalProperties\":false},\"pool\":{\"type\":\"string\",\"description\":\"pool to recommend from, default the tenant default pool\"},\"allowed_models\":{\"type\":[\"null\",\"array\"],\"items\":{\"type\":\"string\"},\"description\":\"restrict candidates to these model ids\"},\"mode\":{\"type\":\"string\",\"description\":\"quality, balanced, or cost; default balanced\"},\"constraints\":{\"type\":[\"null\",\"object\"],\"properties\":{\"max_cost_per_run\":{\"type\":[\"null\",\"number\"],\"description\":\"preference: maximum cost per run in USD\"},\"max_latency_ms\":{\"type\":[\"null\",\"integer\"],\"description\":\"preference: maximum p95 latency in milliseconds\",\"minimum\":-2147483648,\"maximum\":2147483647}},\"additionalProperties\":false}},\"required\":[\"workload\"],\"additionalProperties\":false},\"name\":\"recommend_model\"}]}}\n\n",
+    "result": {
+      "tools": [
+        {
+          "description": "Read the banded policy table (which model column serves each capability and difficulty band, with ceilings and pass rates), mirroring GET /v1/policies.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "capability": {
+                "type": "string",
+                "description": "one of the ten v1 capabilities; absent returns all ten"
+              },
+              "pool": {
+                "type": "string",
+                "description": "pool to report on, default the tenant default pool"
+              }
+            },
+            "additionalProperties": false
+          },
+          "name": "get_policy"
+        },
+        {
+          "description": "List the model column catalog visible to the tenant (provider, model, endpoint, settings, status, pricing, deprecation), mirroring GET /v1/models.",
+          "inputSchema": {
+            "type": "object",
+            "additionalProperties": false
+          },
+          "name": "list_models"
+        },
+        {
+          "description": "Recommend the best model column for a workload, mirroring POST /v1/recommend. Prefer the declared workload form ({capability, difficulty?, domain_tags?}) whenever you already know the capability: it is faster and nothing leaves the session. Use the prompt form ({prompt}) only when the capability is unknown and classification is needed.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "workload": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "capability": {
+                    "type": [
+                      "null",
+                      "string"
+                    ],
+                    "description": "declared form: one of the ten v1 capabilities"
+                  },
+                  "difficulty": {
+                    "type": [
+                      "null",
+                      "integer"
+                    ],
+                    "description": "declared form: difficulty tier 1-5, default 3"
+                  },
+                  "domain_tags": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "declared form: domain tags such as legal or medical"
+                  },
+                  "prompt": {
+                    "type": [
+                      "null",
+                      "string"
+                    ],
+                    "description": "prompt form: the raw prompt to classify"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "pool": {
+                "type": "string",
+                "description": "pool to recommend from, default the tenant default pool"
+              },
+              "allowed_models": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                },
+                "description": "restrict candidates to these model ids"
+              },
+              "mode": {
+                "type": "string",
+                "description": "quality, balanced, or cost; default balanced"
+              },
+              "constraints": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "max_cost_per_run": {
+                    "type": [
+                      "null",
+                      "number"
+                    ],
+                    "description": "preference: maximum cost per run in USD"
+                  },
+                  "max_latency_ms": {
+                    "type": [
+                      "null",
+                      "integer"
+                    ],
+                    "description": "preference: maximum p95 latency in milliseconds",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "workload"
+            ],
+            "additionalProperties": false
+          },
+          "name": "recommend_model"
+        }
+      ]
+    }
+  },
+  "session_delete": {
+    "method": "DELETE",
+    "path": "/mcp",
+    "response_status": 204
+  },
+  "tool_error_cases": [
+    {
+      "go_test": "api.TestMCPRecommendModelBadArgs",
+      "request_body_exact": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"recommend_model\",\"arguments\":{\"workload\":{\"capability\":\"factual_qa\"},\"model\":\"x\"}}}",
+      "response_result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "validating \"arguments\": validating root: unexpected additional properties [\"model\"]"
+          }
+        ],
+        "isError": true
+      }
+    },
+    {
+      "go_test": "api.TestMCPRecommendModelBadArgs",
+      "request_body_exact": "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"recommend_model\",\"arguments\":{\"workload\":{\"capability\":\"factual_qa\",\"difficulty\":2.5}}}}",
+      "response_result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "validating \"arguments\": validating root: validating /properties/workload: validating /properties/workload/properties/difficulty: type: 2.5 has type \"number\", want one of \"null, integer\""
+          }
+        ],
+        "isError": true
+      }
+    },
+    {
+      "go_test": "api.TestMCPRecommendModelBadArgs",
+      "request_body_exact": "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"recommend_model\",\"arguments\":{}}}",
+      "response_result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "validating \"arguments\": validating root: required: missing properties: [\"workload\"]"
+          }
+        ],
+        "isError": true
+      }
+    },
+    {
+      "go_test": "api.TestMCPRecommendModelBadArgs",
+      "request_body_exact": "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"recommend_model\",\"arguments\":{\"workload\":{\"capability\":\"factual_qa\",\"prompt\":\"hi\"}}}}",
+      "response_result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "invalid_request: workload must carry exactly one of capability or prompt (spec §8.1)"
+          }
+        ],
+        "isError": true
+      }
+    },
+    {
+      "go_test": "api.TestMCPRecommendModelBadArgs",
+      "request_body_exact": "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"recommend_model\",\"arguments\":{\"workload\":{\"prompt\":\"\"}}}}",
+      "response_result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "invalid_request: workload.prompt must not be empty"
+          }
+        ],
+        "isError": true
+      }
+    },
+    {
+      "go_test": "api.TestMCPRecommendModelBadArgs",
+      "request_body_exact": "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"recommend_model\",\"arguments\":{\"workload\":{\"capability\":\"poetry\"}}}}",
+      "response_result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "invalid_request: workload.capability \"poetry\" is not a v1 capability"
+          }
+        ],
+        "isError": true
+      }
+    },
+    {
+      "go_test": "api.TestMCPRecommendModelBadArgs",
+      "request_body_exact": "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"tools/call\",\"params\":{\"name\":\"recommend_model\",\"arguments\":{\"workload\":{\"capability\":\"factual_qa\"},\"pool\":\"nope\"}}}",
+      "response_result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "unknown_pool: pool \"nope\" is not configured for this tenant"
+          }
+        ],
+        "isError": true
+      }
+    },
+    {
+      "go_test": "api.TestMCPRecommendModelBadArgs",
+      "request_body_exact": "{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"tools/call\",\"params\":{\"name\":\"recommend_model\",\"arguments\":{\"workload\":{\"capability\":\"factual_qa\"},\"mode\":\"turbo\"}}}",
+      "response_result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "invalid_request: mode \"turbo\" is not one of quality, balanced, cost"
+          }
+        ],
+        "isError": true
+      }
+    },
+    {
+      "go_test": "api.TestMCPRecommendModelBadArgs",
+      "request_body_exact": "{\"jsonrpc\":\"2.0\",\"id\":10,\"method\":\"tools/call\",\"params\":{\"name\":\"get_policy\",\"arguments\":{\"capability\":\"poetry\"}}}",
+      "response_result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "invalid_request: capability \"poetry\" is not a v1 capability"
+          }
+        ],
+        "isError": true
+      }
+    }
+  ]
+}

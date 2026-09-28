@@ -1,0 +1,315 @@
+{
+  "description": "cmd/maverick corpus calibrate: tierFindings(series) and printCalibrationReport outputs. series is sorted ascending by tier; ewma_input_float64 is the value the test wrote, ewma_stored_float32_as_float64 is that value rounded to float32 (the aggregates.ewma column is real) then widened, which is what the arithmetic uses. expected_findings are exact (kind, tier, detail). Report stdout strings are exact bytes.",
+  "source": "cmd/maverick (Go oracle, captured 2026-09-28)",
+  "report_clean_single_column": "tier calibration report (capability-matrix design 5.3)\nlatest pass_rate aggregates per cell, measured cells only\n\ncapability: structured_extraction\n\n  column anthropic/cal-mono@direct (col_mono)\n    TIER  PASS%  N  AS_OF\n    1     95.0   5  2026-07-05\n    2     90.0   5  2026-07-05\n    3     80.0   5  2026-07-05\n    4     70.0   5  2026-07-05\n    5     60.0   5  2026-07-05\n\nfindings:\n  none: every measured column is monotone within the 15.0-point threshold\n\n0 finding(s) across 1 measured (capability, column) series\n",
+  "report_crafted_grid": {
+    "aggregates_note": "latest pass_rate rows as ListLatestAggregatesByDimension would return them; columns: provider anthropic, endpoint direct, model_id cal-*",
+    "stdout": "tier calibration report (capability-matrix design 5.3)\nlatest pass_rate aggregates per cell, measured cells only\n\ncapability: factual_qa\n\n  column anthropic/cal-outlier@direct (col_outlier)\n    TIER  PASS%  N  AS_OF\n    1     95.0   5  2026-07-05\n    2     80.0   5  2026-07-05\n    3     45.0   5  2026-07-05\n    4     42.0   5  2026-07-05\n    5     40.0   5  2026-07-05\n\ncapability: structured_extraction\n\n  column anthropic/cal-inverted@direct (col_inverted)\n    TIER  PASS%  N  AS_OF\n    1     90.0   5  2026-07-05\n    2     70.0   5  2026-07-05\n    3     78.0   5  2026-07-05\n    4     65.0   5  2026-07-05\n    5     55.0   5  2026-07-05\n\n  column anthropic/cal-mono@direct (col_mono)\n    TIER  PASS%  N  AS_OF\n    1     95.0   5  2026-07-05\n    2     90.0   5  2026-07-05\n    3     80.0   5  2026-07-05\n    4     70.0   5  2026-07-05\n    5     60.0   5  2026-07-05\n\nfindings:\n  OUTLIER factual_qa anthropic/cal-outlier@direct (col_outlier): tier 3 pass rate 45.0 is -16.0 points off the tier trend (expected 61.0 from tiers 2 and 4, threshold 15.0)\n  INVERSION structured_extraction anthropic/cal-inverted@direct (col_inverted): tier 3 pass rate 78.0 > tier 2 pass rate 70.0 (+8.0 points; expected monotone decreasing)\n\n2 finding(s): 1 inversion(s), 1 outlier(s) across 3 measured (capability, column) series\n"
+  },
+  "report_empty": "tier calibration report (capability-matrix design 5.3)\nno data: no measured pass_rate aggregates\n",
+  "tier_findings": [
+    {
+      "id": "gap-outlier-flagged",
+      "go_test": "main.TestTierFindingsInterpolatesAcrossTierGaps",
+      "series": [
+        {
+          "tier": 1,
+          "ewma_input_float64": 0.9,
+          "ewma_stored_float32_as_float64": 0.8999999761581421,
+          "measured": true
+        },
+        {
+          "tier": 3,
+          "ewma_input_float64": 0.499,
+          "ewma_stored_float32_as_float64": 0.49900001287460327,
+          "measured": true
+        },
+        {
+          "tier": 5,
+          "ewma_input_float64": 0.4,
+          "ewma_stored_float32_as_float64": 0.4000000059604645,
+          "measured": true
+        }
+      ],
+      "expected_findings": [
+        {
+          "kind": "OUTLIER",
+          "tier": 3,
+          "detail": "tier 3 pass rate 49.9 is -15.1 points off the tier trend (expected 65.0 from tiers 1 and 5, threshold 15.0)"
+        }
+      ]
+    },
+    {
+      "id": "gap-inside-threshold",
+      "go_test": "main.TestTierFindingsInterpolatesAcrossTierGaps",
+      "series": [
+        {
+          "tier": 1,
+          "ewma_input_float64": 0.9,
+          "ewma_stored_float32_as_float64": 0.8999999761581421,
+          "measured": true
+        },
+        {
+          "tier": 3,
+          "ewma_input_float64": 0.501,
+          "ewma_stored_float32_as_float64": 0.5009999871253967,
+          "measured": true
+        },
+        {
+          "tier": 5,
+          "ewma_input_float64": 0.4,
+          "ewma_stored_float32_as_float64": 0.4000000059604645,
+          "measured": true
+        }
+      ],
+      "expected_findings": []
+    },
+    {
+      "id": "uneven-neighbors",
+      "go_test": "main.TestTierFindingsInterpolatesAcrossTierGaps",
+      "series": [
+        {
+          "tier": 1,
+          "ewma_input_float64": 0.9,
+          "ewma_stored_float32_as_float64": 0.8999999761581421,
+          "measured": true
+        },
+        {
+          "tier": 2,
+          "ewma_input_float64": 0.52,
+          "ewma_stored_float32_as_float64": 0.5199999809265137,
+          "measured": true
+        },
+        {
+          "tier": 5,
+          "ewma_input_float64": 0.1,
+          "ewma_stored_float32_as_float64": 0.10000000149011612,
+          "measured": true
+        }
+      ],
+      "expected_findings": [
+        {
+          "kind": "OUTLIER",
+          "tier": 2,
+          "detail": "tier 2 pass rate 52.0 is -18.0 points off the tier trend (expected 70.0 from tiers 1 and 5, threshold 15.0)"
+        }
+      ]
+    },
+    {
+      "id": "inversion-across-gap",
+      "go_test": "main.TestTierFindingsFlagsInversionAcrossTierGaps",
+      "series": [
+        {
+          "tier": 2,
+          "ewma_input_float64": 0.6,
+          "ewma_stored_float32_as_float64": 0.6000000238418579,
+          "measured": true
+        },
+        {
+          "tier": 4,
+          "ewma_input_float64": 0.7,
+          "ewma_stored_float32_as_float64": 0.699999988079071,
+          "measured": true
+        }
+      ],
+      "expected_findings": [
+        {
+          "kind": "INVERSION",
+          "tier": 4,
+          "detail": "tier 4 pass rate 70.0 > tier 2 pass rate 60.0 (+10.0 points; expected monotone decreasing)"
+        }
+      ]
+    },
+    {
+      "id": "single-tier",
+      "go_test": "main.TestTierFindingsSingleTierAndEqualRatesAreClean",
+      "series": [
+        {
+          "tier": 3,
+          "ewma_input_float64": 0.5,
+          "ewma_stored_float32_as_float64": 0.5,
+          "measured": true
+        }
+      ],
+      "expected_findings": []
+    },
+    {
+      "id": "flat",
+      "go_test": "main.TestTierFindingsSingleTierAndEqualRatesAreClean",
+      "series": [
+        {
+          "tier": 1,
+          "ewma_input_float64": 0.7,
+          "ewma_stored_float32_as_float64": 0.699999988079071,
+          "measured": true
+        },
+        {
+          "tier": 2,
+          "ewma_input_float64": 0.7,
+          "ewma_stored_float32_as_float64": 0.699999988079071,
+          "measured": true
+        }
+      ],
+      "expected_findings": []
+    },
+    {
+      "id": "crafted-inverted",
+      "go_test": "main.TestCraftedGridDeviations",
+      "series": [
+        {
+          "tier": 1,
+          "ewma_input_float64": 0.9,
+          "ewma_stored_float32_as_float64": 0.8999999761581421,
+          "measured": true
+        },
+        {
+          "tier": 2,
+          "ewma_input_float64": 0.7,
+          "ewma_stored_float32_as_float64": 0.699999988079071,
+          "measured": true
+        },
+        {
+          "tier": 3,
+          "ewma_input_float64": 0.78,
+          "ewma_stored_float32_as_float64": 0.7799999713897705,
+          "measured": true
+        },
+        {
+          "tier": 4,
+          "ewma_input_float64": 0.65,
+          "ewma_stored_float32_as_float64": 0.6499999761581421,
+          "measured": true
+        },
+        {
+          "tier": 5,
+          "ewma_input_float64": 0.55,
+          "ewma_stored_float32_as_float64": 0.550000011920929,
+          "measured": true
+        }
+      ],
+      "expected_findings": [
+        {
+          "kind": "INVERSION",
+          "tier": 3,
+          "detail": "tier 3 pass rate 78.0 > tier 2 pass rate 70.0 (+8.0 points; expected monotone decreasing)"
+        }
+      ]
+    },
+    {
+      "id": "crafted-outlier",
+      "go_test": "main.TestCraftedGridDeviations",
+      "series": [
+        {
+          "tier": 1,
+          "ewma_input_float64": 0.95,
+          "ewma_stored_float32_as_float64": 0.949999988079071,
+          "measured": true
+        },
+        {
+          "tier": 2,
+          "ewma_input_float64": 0.8,
+          "ewma_stored_float32_as_float64": 0.800000011920929,
+          "measured": true
+        },
+        {
+          "tier": 3,
+          "ewma_input_float64": 0.45,
+          "ewma_stored_float32_as_float64": 0.44999998807907104,
+          "measured": true
+        },
+        {
+          "tier": 4,
+          "ewma_input_float64": 0.42,
+          "ewma_stored_float32_as_float64": 0.41999998688697815,
+          "measured": true
+        },
+        {
+          "tier": 5,
+          "ewma_input_float64": 0.4,
+          "ewma_stored_float32_as_float64": 0.4000000059604645,
+          "measured": true
+        }
+      ],
+      "expected_findings": [
+        {
+          "kind": "OUTLIER",
+          "tier": 3,
+          "detail": "tier 3 pass rate 45.0 is -16.0 points off the tier trend (expected 61.0 from tiers 2 and 4, threshold 15.0)"
+        }
+      ]
+    },
+    {
+      "id": "crafted-mono",
+      "go_test": "main.TestRunCorpusCalibrateNamesTheInversionAndTheOutlierAndNothingElse",
+      "series": [
+        {
+          "tier": 1,
+          "ewma_input_float64": 0.95,
+          "ewma_stored_float32_as_float64": 0.949999988079071,
+          "measured": true
+        },
+        {
+          "tier": 2,
+          "ewma_input_float64": 0.9,
+          "ewma_stored_float32_as_float64": 0.8999999761581421,
+          "measured": true
+        },
+        {
+          "tier": 3,
+          "ewma_input_float64": 0.8,
+          "ewma_stored_float32_as_float64": 0.800000011920929,
+          "measured": true
+        },
+        {
+          "tier": 4,
+          "ewma_input_float64": 0.7,
+          "ewma_stored_float32_as_float64": 0.699999988079071,
+          "measured": true
+        },
+        {
+          "tier": 5,
+          "ewma_input_float64": 0.6,
+          "ewma_stored_float32_as_float64": 0.6000000238418579,
+          "measured": true
+        }
+      ],
+      "expected_findings": []
+    },
+    {
+      "id": "probe-both-kinds-same-tier-order",
+      "go_test": "",
+      "series": [
+        {
+          "tier": 1,
+          "ewma_input_float64": 0.5,
+          "ewma_stored_float32_as_float64": 0.5,
+          "measured": true
+        },
+        {
+          "tier": 2,
+          "ewma_input_float64": 0.9,
+          "ewma_stored_float32_as_float64": 0.8999999761581421,
+          "measured": true
+        },
+        {
+          "tier": 3,
+          "ewma_input_float64": 0.4,
+          "ewma_stored_float32_as_float64": 0.4000000059604645,
+          "measured": true
+        }
+      ],
+      "expected_findings": [
+        {
+          "kind": "INVERSION",
+          "tier": 2,
+          "detail": "tier 2 pass rate 90.0 > tier 1 pass rate 50.0 (+40.0 points; expected monotone decreasing)"
+        },
+        {
+          "kind": "OUTLIER",
+          "tier": 2,
+          "detail": "tier 2 pass rate 90.0 is +45.0 points off the tier trend (expected 45.0 from tiers 1 and 3, threshold 15.0)"
+        }
+      ]
+    }
+  ]
+}

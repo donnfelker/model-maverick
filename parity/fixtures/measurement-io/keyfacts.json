@@ -1,0 +1,763 @@
+{
+  "about": "key_facts grader. Error strings are exact Go output except '{SPEC_SCHEMA_URL}' / '{TASK_SCHEMA_URL}', which Go renders as 'file://<process cwd>/spec.schema.json#' (cwd-dependent, see QUIRK in behavior doc). Text after the 'jsonschema validation failed with' marker is santhosh-tekuri/jsonschema v6 library wording; parity requirement is the prefix up to and including '<kind> spec: ' plus the pass/fail decision, and 'contains' checks named in go_test_expect.",
+  "go_tests": {
+    "keyfacts.TestKind": {
+      "expect_kind": "key_facts"
+    },
+    "keyfacts.TestValidateSpecAccepts": {
+      "spec": {
+        "facts": [
+          {
+            "id": "party_acme",
+            "any_of": [
+              "Acme Corp",
+              "Acme Corporation"
+            ],
+            "weight": 1
+          },
+          {
+            "id": "term_24mo",
+            "any_of": [
+              "\\b24[- ]months?\\b"
+            ],
+            "regex": true
+          }
+        ],
+        "forbidden_facts": [
+          {
+            "id": "distractor_2019_date",
+            "any_of": [
+              "2019-06-15"
+            ],
+            "weight": 1
+          },
+          {
+            "id": "fabricated_citation",
+            "any_of": [
+              "Smith v. Jones"
+            ],
+            "autofail": true
+          }
+        ]
+      },
+      "expect": "valid"
+    }
+  },
+  "validate_spec_rejects": [
+    {
+      "id": "not json",
+      "go_test": "keyfacts.TestValidateSpecRejects/not_json",
+      "spec_raw": "{\"facts\"",
+      "expect_error_contains": "key_facts spec",
+      "go_error": "key_facts spec: unexpected EOF"
+    },
+    {
+      "id": "neither list",
+      "go_test": "keyfacts.TestValidateSpecRejects/neither_list",
+      "spec_raw": "{}",
+      "expect_error_contains": "key_facts spec",
+      "go_error": "key_facts spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '': 'anyOf' failed\n  - at '': missing property 'facts'\n  - at '': missing property 'forbidden_facts'"
+    },
+    {
+      "id": "empty facts",
+      "go_test": "keyfacts.TestValidateSpecRejects/empty_facts",
+      "spec_raw": "{\"facts\": []}",
+      "expect_error_contains": "key_facts spec",
+      "go_error": "key_facts spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/facts': minItems: got 0, want 1"
+    },
+    {
+      "id": "fact without id",
+      "go_test": "keyfacts.TestValidateSpecRejects/fact_without_id",
+      "spec_raw": "{\"facts\": [{\"any_of\": [\"a\"]}]}",
+      "expect_error_contains": "key_facts spec",
+      "go_error": "key_facts spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/facts/0': missing property 'id'"
+    },
+    {
+      "id": "bad id shape",
+      "go_test": "keyfacts.TestValidateSpecRejects/bad_id_shape",
+      "spec_raw": "{\"facts\": [{\"id\": \"Party Acme\", \"any_of\": [\"a\"]}]}",
+      "expect_error_contains": "key_facts spec",
+      "go_error": "key_facts spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/facts/0/id': 'Party Acme' does not match pattern '^[a-z][a-z0-9_]*$'"
+    },
+    {
+      "id": "empty any_of",
+      "go_test": "keyfacts.TestValidateSpecRejects/empty_any_of",
+      "spec_raw": "{\"facts\": [{\"id\": \"a\", \"any_of\": []}]}",
+      "expect_error_contains": "key_facts spec",
+      "go_error": "key_facts spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/facts/0/any_of': minItems: got 0, want 1"
+    },
+    {
+      "id": "zero weight",
+      "go_test": "keyfacts.TestValidateSpecRejects/zero_weight",
+      "spec_raw": "{\"facts\": [{\"id\": \"a\", \"any_of\": [\"x\"], \"weight\": 0}]}",
+      "expect_error_contains": "key_facts spec",
+      "go_error": "key_facts spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/facts/0/weight': exclusiveMinimum: got 0, want 0"
+    },
+    {
+      "id": "duplicate id within facts",
+      "go_test": "keyfacts.TestValidateSpecRejects/duplicate_id_within_facts",
+      "spec_raw": "{\"facts\": [{\"id\": \"a\", \"any_of\": [\"x\"]}, {\"id\": \"a\", \"any_of\": [\"y\"]}]}",
+      "expect_error_contains": "duplicate fact id",
+      "go_error": "key_facts spec: duplicate fact id \"a\""
+    },
+    {
+      "id": "duplicate id across lists",
+      "go_test": "keyfacts.TestValidateSpecRejects/duplicate_id_across_lists",
+      "spec_raw": "{\"facts\": [{\"id\": \"a\", \"any_of\": [\"x\"]}], \"forbidden_facts\": [{\"id\": \"a\", \"any_of\": [\"y\"]}]}",
+      "expect_error_contains": "duplicate fact id",
+      "go_error": "key_facts spec: duplicate fact id \"a\""
+    },
+    {
+      "id": "bad regex form",
+      "go_test": "keyfacts.TestValidateSpecRejects/bad_regex_form",
+      "spec_raw": "{\"facts\": [{\"id\": \"a\", \"any_of\": [\"(\"], \"regex\": true}]}",
+      "expect_error_contains": "facts[0].any_of[0]",
+      "go_error": "key_facts spec: facts[0].any_of[0]: error parsing regexp: missing closing ): `(`"
+    },
+    {
+      "id": "whitespace-only literal form",
+      "go_test": "keyfacts.TestValidateSpecRejects/whitespace-only_literal_form",
+      "spec_raw": "{\"facts\": [{\"id\": \"a\", \"any_of\": [\"   \"]}]}",
+      "expect_error_contains": "normalizes to empty",
+      "go_error": "key_facts spec: facts[0].any_of[0]: normalizes to empty"
+    },
+    {
+      "id": "unknown field",
+      "go_test": "keyfacts.TestValidateSpecRejects/unknown_field",
+      "spec_raw": "{\"facts\": [{\"id\": \"a\", \"any_of\": [\"x\"], \"alias\": true}]}",
+      "expect_error_contains": "key_facts spec",
+      "go_error": "key_facts spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/facts/0': additional properties 'alias' not allowed"
+    },
+    {
+      "id": "autofail on required fact",
+      "go_test": "keyfacts.TestValidateSpecRejects/autofail_on_required_fact",
+      "spec_raw": "{\"facts\": [{\"id\": \"a\", \"any_of\": [\"x\"], \"autofail\": true}]}",
+      "expect_error_contains": "autofail applies only to forbidden_facts",
+      "go_error": "key_facts spec: facts[0]: autofail applies only to forbidden_facts (cmd §4)"
+    }
+  ],
+  "normalize_search": [
+    {
+      "in": "24  MONTH",
+      "out": "24 month",
+      "go_test": "keyfacts.TestNormalizeSearch"
+    },
+    {
+      "in": "Acme\n\tCorp",
+      "out": "acme corp",
+      "go_test": "keyfacts.TestNormalizeSearch"
+    },
+    {
+      "in": "  already  spaced  ",
+      "out": "already spaced",
+      "go_test": "keyfacts.TestNormalizeSearch"
+    },
+    {
+      "in": "İ",
+      "out": "i",
+      "probe": true
+    },
+    {
+      "in": "Straße",
+      "out": "straße",
+      "probe": true
+    },
+    {
+      "in": "a b",
+      "out": "a b",
+      "probe": true
+    },
+    {
+      "in": "x​y",
+      "out": "x​y",
+      "probe": true
+    }
+  ],
+  "grade_probes": [
+    {
+      "spec": "{\"forbidden_facts\":[{\"id\":\"trap_a\",\"any_of\":[\"alpha\"],\"weight\":1},{\"id\":\"trap_b\",\"any_of\":[\"beta\"],\"weight\":1}]}",
+      "output": "alpha and beta are both here",
+      "dimensions": {
+        "hallucination_free": 0
+      },
+      "detail_exact_bytes": "{\"forbidden_facts\":[{\"id\":\"trap_a\",\"found\":true,\"weight\":1,\"matched_form\":\"alpha\"},{\"id\":\"trap_b\",\"found\":true,\"weight\":1,\"matched_form\":\"beta\"}]}",
+      "go_test": "keyfacts.TestHallucinationFreeClamped"
+    },
+    {
+      "spec": "{\"facts\":[{\"id\":\"a\",\"any_of\":[\"acme corp\"]}]}",
+      "output": "ACMECORP and acme  corp",
+      "dimensions": {
+        "fact_coverage": 1
+      },
+      "detail_exact_bytes": "{\"facts\":[{\"id\":\"a\",\"found\":true,\"weight\":1,\"matched_form\":\"acme corp\"}]}"
+    },
+    {
+      "spec": "{\"facts\":[{\"id\":\"a\",\"any_of\":[\"Acme\"]}]}",
+      "output": "Acmeville",
+      "dimensions": {
+        "fact_coverage": 1
+      },
+      "detail_exact_bytes": "{\"facts\":[{\"id\":\"a\",\"found\":true,\"weight\":1,\"matched_form\":\"Acme\"}]}"
+    },
+    {
+      "spec": "{\"facts\":[{\"id\":\"a\",\"any_of\":[\"(?i)acme\"],\"regex\":true}]}",
+      "output": "ACME",
+      "dimensions": {
+        "fact_coverage": 1
+      },
+      "detail_exact_bytes": "{\"facts\":[{\"id\":\"a\",\"found\":true,\"weight\":1,\"matched_form\":\"(?i)acme\"}]}"
+    },
+    {
+      "spec": "{\"facts\":[{\"id\":\"a\",\"any_of\":[\"acme\"],\"regex\":true}]}",
+      "output": "ACME",
+      "dimensions": {
+        "fact_coverage": 0
+      },
+      "detail_exact_bytes": "{\"facts\":[{\"id\":\"a\",\"found\":false,\"weight\":1}]}"
+    },
+    {
+      "spec": "{\"facts\":[{\"id\":\"a\",\"any_of\":[\"x\"],\"weight\":0.25},{\"id\":\"b\",\"any_of\":[\"y\"],\"weight\":0.5}]}",
+      "output": "y",
+      "dimensions": {
+        "fact_coverage": 0.6666666666666666
+      },
+      "detail_exact_bytes": "{\"facts\":[{\"id\":\"a\",\"found\":false,\"weight\":0.25},{\"id\":\"b\",\"found\":true,\"weight\":0.5,\"matched_form\":\"y\"}]}"
+    },
+    {
+      "spec": "{\"forbidden_facts\":[{\"id\":\"t\",\"any_of\":[\"z\"],\"weight\":0.3}]}",
+      "output": "z",
+      "dimensions": {
+        "hallucination_free": 0.7
+      },
+      "detail_exact_bytes": "{\"forbidden_facts\":[{\"id\":\"t\",\"found\":true,\"weight\":0.3,\"matched_form\":\"z\"}]}"
+    }
+  ],
+  "fixture_results": [
+    {
+      "file": "all_facts_found.yaml",
+      "description": "every required fact found through one of its accepted surface forms",
+      "spec_json": {
+        "facts": [
+          {
+            "any_of": [
+              "Acme Corp",
+              "Acme Corporation"
+            ],
+            "id": "party_acme",
+            "weight": 1
+          },
+          {
+            "any_of": [
+              "24 month",
+              "two-year",
+              "24-month"
+            ],
+            "id": "term_24mo",
+            "weight": 1
+          }
+        ]
+      },
+      "output": "The agreement is between Acme Corporation and Beta LLC and runs for a\n24-month term.",
+      "dimensions": {
+        "fact_coverage": 1
+      },
+      "detail": {
+        "facts": [
+          {
+            "id": "party_acme",
+            "found": true,
+            "weight": 1,
+            "matched_form": "Acme Corp"
+          },
+          {
+            "id": "term_24mo",
+            "found": true,
+            "weight": 1,
+            "matched_form": "24-month"
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"facts\":[{\"id\":\"party_acme\",\"found\":true,\"weight\":1,\"matched_form\":\"Acme Corp\"},{\"id\":\"term_24mo\",\"found\":true,\"weight\":1,\"matched_form\":\"24-month\"}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "bad_spec_duplicate_ids.yaml",
+      "description": "a fact id reused by a forbidden fact is rejected at validation",
+      "spec_json": {
+        "facts": [
+          {
+            "any_of": [
+              "Acme Corp"
+            ],
+            "id": "party_acme"
+          }
+        ],
+        "forbidden_facts": [
+          {
+            "any_of": [
+              "Acme GmbH"
+            ],
+            "id": "party_acme"
+          }
+        ]
+      },
+      "output": "irrelevant",
+      "validate_error": "key_facts spec: duplicate fact id \"party_acme\"",
+      "failure_counter": 0
+    },
+    {
+      "file": "envelope_companion_example.yaml",
+      "description": "the cmd §8.1 key_facts envelope — fact_coverage renames to completeness via weight_dimensions",
+      "spec_json": {
+        "facts": [
+          {
+            "any_of": [
+              "Acme Corp",
+              "Acme Corporation"
+            ],
+            "id": "party_acme",
+            "weight": 1
+          },
+          {
+            "any_of": [
+              "24 month",
+              "two-year",
+              "24-month"
+            ],
+            "id": "term_24mo",
+            "weight": 1
+          }
+        ],
+        "forbidden_facts": [
+          {
+            "any_of": [
+              "2019-06-15"
+            ],
+            "id": "distractor_2019_date",
+            "weight": 1
+          }
+        ]
+      },
+      "output": "The services agreement is between Acme Corp and Beta LLC, with a two-year\nterm beginning 2025-03-01.",
+      "dimensions": {
+        "fact_coverage": 1,
+        "hallucination_free": 1
+      },
+      "detail": {
+        "facts": [
+          {
+            "id": "party_acme",
+            "found": true,
+            "weight": 1,
+            "matched_form": "Acme Corp"
+          },
+          {
+            "id": "term_24mo",
+            "found": true,
+            "weight": 1,
+            "matched_form": "two-year"
+          }
+        ],
+        "forbidden_facts": [
+          {
+            "id": "distractor_2019_date",
+            "found": false,
+            "weight": 1
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"facts\":[{\"id\":\"party_acme\",\"found\":true,\"weight\":1,\"matched_form\":\"Acme Corp\"},{\"id\":\"term_24mo\",\"found\":true,\"weight\":1,\"matched_form\":\"two-year\"}],\"forbidden_facts\":[{\"id\":\"distractor_2019_date\",\"found\":false,\"weight\":1}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "forbidden_absent.yaml",
+      "description": "no forbidden facts in the output leaves hallucination_free at 1",
+      "spec_json": {
+        "facts": [
+          {
+            "any_of": [
+              "Acme Corp"
+            ],
+            "id": "party_acme"
+          }
+        ],
+        "forbidden_facts": [
+          {
+            "any_of": [
+              "2019-06-15"
+            ],
+            "id": "distractor_2019_date"
+          }
+        ]
+      },
+      "output": "Acme Corp signed the agreement effective 2025-03-01.",
+      "dimensions": {
+        "fact_coverage": 1,
+        "hallucination_free": 1
+      },
+      "detail": {
+        "facts": [
+          {
+            "id": "party_acme",
+            "found": true,
+            "weight": 1,
+            "matched_form": "Acme Corp"
+          }
+        ],
+        "forbidden_facts": [
+          {
+            "id": "distractor_2019_date",
+            "found": false,
+            "weight": 1
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"facts\":[{\"id\":\"party_acme\",\"found\":true,\"weight\":1,\"matched_form\":\"Acme Corp\"}],\"forbidden_facts\":[{\"id\":\"distractor_2019_date\",\"found\":false,\"weight\":1}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "forbidden_autofail_marker.yaml",
+      "description": "a present forbidden fact with autofail true records the cmd §4 autofail marker in the detail",
+      "spec_json": {
+        "forbidden_facts": [
+          {
+            "any_of": [
+              "Smith v. Jones (2021)"
+            ],
+            "autofail": true,
+            "id": "fabricated_citation",
+            "weight": 1
+          },
+          {
+            "any_of": [
+              "2019-06-15"
+            ],
+            "id": "distractor_2019_date",
+            "weight": 1
+          }
+        ]
+      },
+      "output": "As held in Smith v. Jones (2021), the filing deadline is jurisdictional.",
+      "dimensions": {
+        "hallucination_free": 0
+      },
+      "detail": {
+        "forbidden_facts": [
+          {
+            "id": "fabricated_citation",
+            "found": true,
+            "weight": 1,
+            "matched_form": "Smith v. Jones (2021)",
+            "autofail": true
+          },
+          {
+            "id": "distractor_2019_date",
+            "found": false,
+            "weight": 1
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"forbidden_facts\":[{\"id\":\"fabricated_citation\",\"found\":true,\"weight\":1,\"matched_form\":\"Smith v. Jones (2021)\",\"autofail\":true},{\"id\":\"distractor_2019_date\",\"found\":false,\"weight\":1}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "forbidden_fact_present.yaml",
+      "description": "a present forbidden fact (weight 1) zeroes hallucination_free while coverage stands",
+      "spec_json": {
+        "facts": [
+          {
+            "any_of": [
+              "Acme Corp",
+              "Acme Corporation"
+            ],
+            "id": "party_acme",
+            "weight": 1
+          }
+        ],
+        "forbidden_facts": [
+          {
+            "any_of": [
+              "2019-06-15"
+            ],
+            "id": "distractor_2019_date",
+            "weight": 1
+          }
+        ]
+      },
+      "output": "Acme Corp signed the agreement effective 2019-06-15.",
+      "dimensions": {
+        "fact_coverage": 1,
+        "hallucination_free": 0
+      },
+      "detail": {
+        "facts": [
+          {
+            "id": "party_acme",
+            "found": true,
+            "weight": 1,
+            "matched_form": "Acme Corp"
+          }
+        ],
+        "forbidden_facts": [
+          {
+            "id": "distractor_2019_date",
+            "found": true,
+            "weight": 1,
+            "matched_form": "2019-06-15"
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"facts\":[{\"id\":\"party_acme\",\"found\":true,\"weight\":1,\"matched_form\":\"Acme Corp\"}],\"forbidden_facts\":[{\"id\":\"distractor_2019_date\",\"found\":true,\"weight\":1,\"matched_form\":\"2019-06-15\"}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "forbidden_only_spec.yaml",
+      "description": "a pure hallucination-trap spec emits only hallucination_free",
+      "spec_json": {
+        "forbidden_facts": [
+          {
+            "any_of": [
+              "Smith v. Jones"
+            ],
+            "id": "fabricated_citation"
+          }
+        ]
+      },
+      "output": "No case law supports this claim.",
+      "dimensions": {
+        "hallucination_free": 1
+      },
+      "detail": {
+        "forbidden_facts": [
+          {
+            "id": "fabricated_citation",
+            "found": false,
+            "weight": 1
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"forbidden_facts\":[{\"id\":\"fabricated_citation\",\"found\":false,\"weight\":1}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "fractional_forbidden_weights.yaml",
+      "description": "forbidden facts subtract their weight — fractional weights leave a partial score",
+      "spec_json": {
+        "facts": [
+          {
+            "any_of": [
+              "Acme Corp"
+            ],
+            "id": "party_acme"
+          }
+        ],
+        "forbidden_facts": [
+          {
+            "any_of": [
+              "chief innovation officer"
+            ],
+            "id": "soft_trap_role",
+            "weight": 0.5
+          },
+          {
+            "any_of": [
+              "2019-06-15"
+            ],
+            "id": "hard_trap_date",
+            "weight": 1
+          }
+        ]
+      },
+      "output": "Acme Corp's chief innovation officer approved the deal.",
+      "dimensions": {
+        "fact_coverage": 1,
+        "hallucination_free": 0.5
+      },
+      "detail": {
+        "facts": [
+          {
+            "id": "party_acme",
+            "found": true,
+            "weight": 1,
+            "matched_form": "Acme Corp"
+          }
+        ],
+        "forbidden_facts": [
+          {
+            "id": "soft_trap_role",
+            "found": true,
+            "weight": 0.5,
+            "matched_form": "chief innovation officer"
+          },
+          {
+            "id": "hard_trap_date",
+            "found": false,
+            "weight": 1
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"facts\":[{\"id\":\"party_acme\",\"found\":true,\"weight\":1,\"matched_form\":\"Acme Corp\"}],\"forbidden_facts\":[{\"id\":\"soft_trap_role\",\"found\":true,\"weight\":0.5,\"matched_form\":\"chief innovation officer\"},{\"id\":\"hard_trap_date\",\"found\":false,\"weight\":1}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "near_miss_fact.yaml",
+      "description": "adversarial near-miss — a similar-but-wrong surface form does not count as the fact",
+      "spec_json": {
+        "facts": [
+          {
+            "any_of": [
+              "Acme Corp",
+              "Acme Corporation"
+            ],
+            "id": "party_acme"
+          },
+          {
+            "any_of": [
+              "24 month",
+              "24-month",
+              "two-year"
+            ],
+            "id": "term_24mo"
+          }
+        ]
+      },
+      "output": "The agreement names Acme Incorporated and runs for a 24 month term.",
+      "dimensions": {
+        "fact_coverage": 0.5
+      },
+      "detail": {
+        "facts": [
+          {
+            "id": "party_acme",
+            "found": false,
+            "weight": 1
+          },
+          {
+            "id": "term_24mo",
+            "found": true,
+            "weight": 1,
+            "matched_form": "24 month"
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"facts\":[{\"id\":\"party_acme\",\"found\":false,\"weight\":1},{\"id\":\"term_24mo\",\"found\":true,\"weight\":1,\"matched_form\":\"24 month\"}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "regex_surface_forms.yaml",
+      "description": "regex facts search the raw output; the literal fact needs its exact surface form",
+      "spec_json": {
+        "facts": [
+          {
+            "any_of": [
+              "\\b24[- ]months?\\b"
+            ],
+            "id": "term_24mo",
+            "regex": true
+          },
+          {
+            "any_of": [
+              "five percent"
+            ],
+            "id": "penalty_pct"
+          }
+        ]
+      },
+      "output": "The term is 24 months with a 5% late penalty.",
+      "dimensions": {
+        "fact_coverage": 0.5
+      },
+      "detail": {
+        "facts": [
+          {
+            "id": "term_24mo",
+            "found": true,
+            "weight": 1,
+            "matched_form": "\\b24[- ]months?\\b"
+          },
+          {
+            "id": "penalty_pct",
+            "found": false,
+            "weight": 1
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"facts\":[{\"id\":\"term_24mo\",\"found\":true,\"weight\":1,\"matched_form\":\"\\\\b24[- ]months?\\\\b\"},{\"id\":\"penalty_pct\",\"found\":false,\"weight\":1}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "weighted_partial_coverage.yaml",
+      "description": "coverage is the weighted fraction of facts found",
+      "spec_json": {
+        "facts": [
+          {
+            "any_of": [
+              "March 1, 2025",
+              "2025-03-01"
+            ],
+            "id": "effective_date",
+            "weight": 3
+          },
+          {
+            "any_of": [
+              "Delaware"
+            ],
+            "id": "governing_law",
+            "weight": 1
+          }
+        ]
+      },
+      "output": "The contract takes effect on 2025-03-01.",
+      "dimensions": {
+        "fact_coverage": 0.75
+      },
+      "detail": {
+        "facts": [
+          {
+            "id": "effective_date",
+            "found": true,
+            "weight": 3,
+            "matched_form": "2025-03-01"
+          },
+          {
+            "id": "governing_law",
+            "found": false,
+            "weight": 1
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"facts\":[{\"id\":\"effective_date\",\"found\":true,\"weight\":3,\"matched_form\":\"2025-03-01\"},{\"id\":\"governing_law\",\"found\":false,\"weight\":1}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "whitespace_case_normalization.yaml",
+      "description": "literal matching folds case and collapses whitespace, including line breaks",
+      "spec_json": {
+        "facts": [
+          {
+            "any_of": [
+              "24 month"
+            ],
+            "id": "term_24mo"
+          }
+        ]
+      },
+      "output": "The agreement runs for a 24\nMONTH term.",
+      "dimensions": {
+        "fact_coverage": 1
+      },
+      "detail": {
+        "facts": [
+          {
+            "id": "term_24mo",
+            "found": true,
+            "weight": 1,
+            "matched_form": "24 month"
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"facts\":[{\"id\":\"term_24mo\",\"found\":true,\"weight\":1,\"matched_form\":\"24 month\"}]}",
+      "failure_counter": 0
+    }
+  ]
+}

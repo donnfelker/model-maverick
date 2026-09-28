@@ -1,0 +1,76 @@
+{
+  "about": "Classification eval for the prompt path (spec §8). Each case is a real prompt with the capability and difficulty band we expect the CLASSIFIER to produce. These are the only trustworthy signals here because they are real engine outputs from a real classifier. difficulty bands: easy=1-2, medium=3, hard=4-5. accept_capabilities lists acceptable classifications when a prompt legitimately straddles two. NOTE: there is deliberately no 'model tier' label — the engine has no small/mid/flagship concept; it ranks by measured quality/cost/latency. Routing is not scored here (see routing invariants in run_eval.sh, and rank_test.go/ceiling_test.go for ranking logic). Real routing quality requires real measured benchmarks.",
+  "cases": [
+    { "id": "cap_usa",       "prompt": "What is the capital of the USA?",
+      "capability": "factual_qa", "band": "easy" },
+
+    { "id": "hft_rust",      "prompt": "Design and implement a complete high-frequency trading system in Rust: a lock-free limit order book, risk limits, FIX 4.4 connectivity, and a backtesting harness. Provide the full module structure and core code.",
+      "capability": "code_generation", "band": "hard" },
+
+    { "id": "berlin_wall",   "prompt": "What year did the Berlin Wall fall?",
+      "capability": "factual_qa", "band": "easy" },
+
+    { "id": "pct_math",      "prompt": "What is 15% of 240?",
+      "capability": "multi_step_reasoning", "accept_capabilities": ["multi_step_reasoning","factual_qa"], "band": "easy" },
+
+    { "id": "translate_fr",  "prompt": "Translate 'Good morning, where is the train station?' into French.",
+      "capability": "translation_multilingual", "band": "easy" },
+
+    { "id": "translate_legal","prompt": "Translate the following German commercial-contract clause into English, preserving exact legal meaning and terms of art: 'Der Verkaeufer haftet nur fuer Vorsatz und grobe Fahrlaessigkeit; die Haftung fuer leichte Fahrlaessigkeit ist ausgeschlossen, soweit gesetzlich zulaessig.'",
+      "capability": "translation_multilingual", "band": "medium" },
+
+    { "id": "fix_grammar",   "prompt": "Fix the grammar: 'he go to the store yesterday and buyed milk'.",
+      "capability": "rewriting_editing", "band": "easy" },
+
+    { "id": "punchy_copy",   "prompt": "Rewrite this to be more concise and punchy: 'Our product is a solution that helps teams to be able to collaborate together in a more effective and efficient manner.'",
+      "capability": "rewriting_editing", "band": "medium" },
+
+    { "id": "json_extract",  "prompt": "Extract the invoice number, date, and total as JSON from: 'Invoice #INV-7781 dated 2026-03-04, amount due $1,240.50'. Output only JSON.",
+      "capability": "structured_extraction", "accept_capabilities": ["structured_extraction","instruction_schema_following"], "band": "easy" },
+
+    { "id": "kg_extract",    "prompt": "From this dense systems spec, extract every service, its dependencies, and the events it emits into a normalized knowledge-graph JSON with nodes and typed edges. [spec: the OrderService calls PaymentService and InventoryService, emits OrderPlaced; PaymentService emits PaymentCaptured consumed by FulfillmentService; ...]",
+      "capability": "structured_extraction", "band": "hard" },
+
+    { "id": "schema_strict", "prompt": "Return ONLY valid YAML with exactly these three keys and no others: name (string), priority (one of low|med|high), tags (list of strings). Input: a high-priority task called 'ship release' tagged infra and urgent.",
+      "capability": "instruction_schema_following", "band": "medium" },
+
+    { "id": "sum_one_line",  "prompt": "Summarize in one sentence: 'The committee met on Tuesday, reviewed the Q2 budget, approved the marketing spend, and deferred the hiring plan to next quarter.'",
+      "capability": "summarization_synthesis", "band": "easy" },
+
+    { "id": "sum_reconcile", "prompt": "Across these four earnings reports, summarize the top financial risks and reconcile the conflicting FY revenue figures ($4.1B in the press release, $4.06B in the 10-K, $4.1B in the deck, $4.058B in the footnotes), stating which is authoritative and why.",
+      "capability": "summarization_synthesis", "accept_capabilities": ["summarization_synthesis","long_context_qa","multi_step_reasoning"], "band": "hard" },
+
+    { "id": "induction",     "prompt": "Prove by induction that the sum of the first n odd numbers equals n squared.",
+      "capability": "multi_step_reasoning", "band": "medium" },
+
+    { "id": "logic_puzzle",  "prompt": "Five houses in a row, five owners of different nationalities drinking different beverages, smoking different brands, keeping different pets. Given fifteen constraints, determine who owns the fish. Show the full deduction.",
+      "capability": "multi_step_reasoning", "band": "hard" },
+
+    { "id": "longctx_clause","prompt": "Using the attached 60-page master services agreement, find every limitation-of-liability clause, compute the aggregate liability cap across all of them, and cite the section number of each.",
+      "capability": "long_context_qa", "band": "hard" },
+
+    { "id": "reverse_list",  "prompt": "Write a Python function to reverse a singly linked list in place.",
+      "capability": "code_generation", "band": "easy" },
+
+    { "id": "refactor_go",   "prompt": "Refactor this 400-line legacy Go HTTP handler into clean, dependency-injected, table-tested code with context propagation and structured errors, and explain each change. [long legacy code follows]",
+      "capability": "code_generation", "band": "hard" },
+
+    { "id": "critique_arg",  "prompt": "Critique this argument for logical fallacies and rate its soundness 1-5: 'Every successful founder dropped out of college, so dropping out causes success.'",
+      "capability": "critique_and_judging", "band": "medium" },
+
+    { "id": "judge_rank",    "prompt": "Here are twelve candidate answers to a hard medical dosing question. Rank them by correctness, flag any that are dangerously wrong, and justify each placement with the underlying pharmacology.",
+      "capability": "critique_and_judging", "band": "hard" },
+
+    { "id": "translate_multi","prompt": "Translate 'The quick brown fox jumps over the lazy dog' into Spanish, German, and Japanese.",
+      "capability": "translation_multilingual", "accept_capabilities": ["translation_multilingual"], "band": "easy" },
+
+    { "id": "instr_list",    "prompt": "List exactly three bullet points, each starting with a verb, each under 10 words, about staying hydrated. No preamble.",
+      "capability": "instruction_schema_following", "band": "easy" },
+
+    { "id": "code_tests",    "prompt": "Write a comprehensive integration test suite for a distributed payment service that must handle idempotency keys, partial failures, retries, and exactly-once capture across two providers.",
+      "capability": "code_generation", "band": "hard" },
+
+    { "id": "capital_fr",    "prompt": "What is the capital of France?",
+      "capability": "factual_qa", "band": "easy" }
+  ]
+}

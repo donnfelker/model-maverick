@@ -1,0 +1,119 @@
+{
+  "algorithm": "data_key = HKDF-SHA256(ikm=master_key(32 bytes), salt=utf8(capture_id), info=empty, L=32); AES-256-GCM(key=data_key, nonce=12 random bytes, aad=none); stored ciphertext = GCM output (ct || 16-byte tag); nonce stored separately",
+  "cases": [
+    {
+      "expected": {
+        "ciphertext_len": 89,
+        "ciphertext_with_tag_hex": "2faec55f6732311b6ff8c9aa50df85a0c0083199c6453d32047cc3b6f518b7bf9432d5be01c41493cea255f7cc6e8519ef5ad63c2105283f27c1018a813efabd411dbc4ad187031f8474af30893f038dd0048bdda28279a4e1",
+        "data_key_hex": "a0749c2e3468253baccb072baf04c94bf9091f7df1250671fbdac54ae63d24c4",
+        "hkdf_prk_hex": "02a4e1d29be8b972419cec017530fd852692427b3be3c0b02eef182c2d36d5f4",
+        "tag_hex": "74af30893f038dd0048bdda28279a4e1"
+      },
+      "id": "a1_testcapture_zero_nonce",
+      "input": {
+        "capture_id": "cap_01JZZZZZZZZZZZZZZZZZZZZZZZ",
+        "hkdf_info_hex": "",
+        "hkdf_salt_hex": "6361705f30314a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+        "master_key_hex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+        "nonce_hex": "000000000000000000000000",
+        "plaintext": "Extract the parties from this contract: Acme v. Bravo, signed 2026-01-15.",
+        "plaintext_utf8_hex": "457874726163742074686520706172746965732066726f6d207468697320636f6e74726163743a2041636d6520762e20427261766f2c207369676e656420323032362d30312d31352e"
+      }
+    },
+    {
+      "expected": {
+        "ciphertext_len": 31,
+        "ciphertext_with_tag_hex": "46f6a49f9493c5aa3f9c13532e936dc5f56a6852f61afd0a469dc910be9cf1",
+        "data_key_hex": "a0749c2e3468253baccb072baf04c94bf9091f7df1250671fbdac54ae63d24c4",
+        "hkdf_prk_hex": "02a4e1d29be8b972419cec017530fd852692427b3be3c0b02eef182c2d36d5f4",
+        "tag_hex": "c5f56a6852f61afd0a469dc910be9cf1"
+      },
+      "id": "a1_testcapture_seq_nonce",
+      "input": {
+        "capture_id": "cap_01JZZZZZZZZZZZZZZZZZZZZZZZ",
+        "hkdf_info_hex": "",
+        "hkdf_salt_hex": "6361705f30314a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+        "master_key_hex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+        "nonce_hex": "000102030405060708090a0b",
+        "plaintext": "captured prompt",
+        "plaintext_utf8_hex": "63617074757265642070726f6d7074"
+      }
+    },
+    {
+      "expected": {
+        "ciphertext_len": 31,
+        "ciphertext_with_tag_hex": "3f9f1c6030c104c4463df50343987e4bed6f3f60d05dee42ba227a182813e3",
+        "data_key_hex": "1ac6e5a5395ff26f68f95e8abacb7fc62f80394210e71a74ba85f18b10148b6e",
+        "hkdf_prk_hex": "796222aaf39650fa940996999de6600b47eb6bd1989f60ac41847aaae22c18d9",
+        "tag_hex": "4bed6f3f60d05dee42ba227a182813e3"
+      },
+      "id": "a1_other_capture_seq_nonce",
+      "input": {
+        "capture_id": "cap_01K000000000000000000000ZZ",
+        "hkdf_info_hex": "",
+        "hkdf_salt_hex": "6361705f30314b3030303030303030303030303030303030303030305a5a",
+        "master_key_hex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+        "nonce_hex": "000102030405060708090a0b",
+        "plaintext": "captured prompt",
+        "plaintext_utf8_hex": "63617074757265642070726f6d7074"
+      }
+    },
+    {
+      "expected": {
+        "ciphertext_len": 31,
+        "ciphertext_with_tag_hex": "a3b46291cf8b88bb176561df3347928ef17e4e0f920eef039fc13c178fcc97",
+        "data_key_hex": "c8bf792b8d85bc64356a99b14cf8da3aad52d034e7365ff4dcddc43a7c878010",
+        "hkdf_prk_hex": "93828f847f1d40f235e5380c24158ce39606ecba5586612215e9009d2369ff3c",
+        "tag_hex": "8ef17e4e0f920eef039fc13c178fcc97"
+      },
+      "id": "b2_testcapture_seq_nonce",
+      "input": {
+        "capture_id": "cap_01JZZZZZZZZZZZZZZZZZZZZZZZ",
+        "hkdf_info_hex": "",
+        "hkdf_salt_hex": "6361705f30314a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+        "master_key_hex": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+        "nonce_hex": "000102030405060708090a0b",
+        "plaintext": "captured prompt",
+        "plaintext_utf8_hex": "63617074757265642070726f6d7074"
+      }
+    },
+    {
+      "expected": {
+        "ciphertext_len": 16,
+        "ciphertext_with_tag_hex": "8deaa4e013f95881af47450bace9174e",
+        "data_key_hex": "f92fccb620c8d7e403d8a2be5fe9f3bd77a15e3a7f79954369ccabb0ad57fa94",
+        "hkdf_prk_hex": "ff7facea8e7a4ed57f83bed150441ef65b5a1dcd72e4eba61f1f619b5b7781ff",
+        "tag_hex": "8deaa4e013f95881af47450bace9174e"
+      },
+      "id": "seq_master_empty_plaintext",
+      "input": {
+        "capture_id": "cap_01JZZZZZZZZZZZZZZZZZZZZZZZ",
+        "hkdf_info_hex": "",
+        "hkdf_salt_hex": "6361705f30314a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+        "master_key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "nonce_hex": "000102030405060708090a0b",
+        "plaintext": "",
+        "plaintext_utf8_hex": ""
+      }
+    },
+    {
+      "expected": {
+        "ciphertext_len": 33,
+        "ciphertext_with_tag_hex": "e17c2881fce4b8e28ffc4db3f1e1013cf6fd0d9c0796099666f2fdf99c13f3e505",
+        "data_key_hex": "159722e38c7aca5d03505ca5b9831119670b426815e75caded951e228594755d",
+        "hkdf_prk_hex": "36f459b5e0a56acfccad7aeb70b8dd43bfa9a55c2d5ba01e1289163bcc687e66",
+        "tag_hex": "fd0d9c0796099666f2fdf99c13f3e505"
+      },
+      "id": "seq_master_unicode",
+      "input": {
+        "capture_id": "cap_01ABCDEFGHJKMNPQRSTVWXYZ00",
+        "hkdf_info_hex": "",
+        "hkdf_salt_hex": "6361705f303141424344454647484a4b4d4e5051525354565758595a3030",
+        "master_key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "nonce_hex": "000102030405060708090a0b",
+        "plaintext": "café 日本 😀",
+        "plaintext_utf8_hex": "636166c3a920e697a5e69cac20f09f9880"
+      }
+    }
+  ]
+}

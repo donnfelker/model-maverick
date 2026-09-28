@@ -1,0 +1,35 @@
+# Intended divergences from the Go engine
+
+The Rust port matches the Go engine's behavior (documented in `reference/engine-reference.md`, `parity/fixtures/`, `parity/blackbox/`) everywhere except the items below. Each was adopted into `specs/` on 2026-09-28 and comes from `plans/master-plan.md`. A parity diff that matches a row here is expected; any other diff is a bug.
+
+When a Go fixture or black-box record covers behavior listed here, the Rust test asserts the **Rust expected** column, not the recorded Go value.
+
+| # | Area | Go behavior (oracle) | Rust expected | Plan / spec ref |
+|---|---|---|---|---|
+| D1 | Policy: zero retention | `tenant_constraints.zero_retention` only blocks debug capture; recommendation ignores it | Filters columns by `retention_mode` (`zero` only, with `retention_valid_until` expiry; expired reads as `unknown`); exclusion reason `standing_constraint:zero_retention`; never relaxed for G1; `409 no_compliant_columns` when empty | plan §3.2 step 3, §3.3 |
+| D2 | Classifier: zero retention | Prompt always goes to the global classifier column | Uses `classifier.zero_retention_column`; if unset, prompt form returns `422 zero_retention_requires_declared` and the prompt never leaves the engine | plan §3.2 |
+| D3 | Classifier deadline | 5 s timeout plus 1 retry | One 1.5 s total deadline covering call, retry, and backoff, bounded by the caller's propagated deadline | plan §3.2 |
+| D4 | Classifier budget | None | Per-tenant daily quota and global daily classifier spend cap; past either, `fallback_default` with `classification_quota_exceeded` flag | plan §3.1 |
+| D5 | Workload projection | Proxy uses last user-role message text only (`maxPromptChars` 100,000) | Versioned projection: system/developer instructions, bounded recent conversation, response-format schema, tool names and descriptions; projection version in the classification cache key; `X-Maverick-Workload` declared override | plan §3.5 |
+| D6 | Scoring: errors | Errors and timeouts "score zero" in spec text but are excluded from the task-score mean | Excluded from quality; counted in a new per-cell `availability` aggregate; pass rate (and ceilings) keep errors and timeouts as failures in the denominator | plan §3.1 Scoring |
+| D7 | Latency aggregates | Folded only from runs with a measured latency | Timeouts included, censored at the timeout value | plan §3.1 Scoring |
+| D8 | Ranking: availability | No availability input | Columns under the availability floor (default 0.9, trailing 7 nights) rank after all others, flagged `low_availability` | plan §3.2 Ranking |
+| D9 | Recommend entries | Model only | Each entry carries `settings` (effort, thinking) and `retention_mode`; response carries `zero_retention` for such tenants | plan §3.2, §3.5 |
+| D10 | Job uniqueness | River `UniqueOpts{ByArgs}` dedupes against running and completed jobs; each execution mints a new `batch_id`; no resume | Engine-owned `batches` lease (`UNIQUE(kind, window)`, deterministic `batch_id`, lease owner = graphile worker ID, heartbeat, takeover, resume from existing `runs`); duplicate delivery with a live foreign lease completes as a no-op; per-kind `max_attempts` | plan §3.1, §5 |
+| D11 | Failure tail | Detached from the job context with its own deadline | Written in the same transaction as the batch outcome; no detached durable work | plan §3.1 |
+| D12 | Proxy keys | `resolveKey`: native provider uses the caller credential, anything else falls back to env provider keys, in every deployment | Hosted mode reads no provider env keys (caller OpenRouter key, or chain restricted to the credential's provider); self-hosted may use env keys | plan §3.5 |
+| D13 | Proxy tenant auth | One configured `MAVERICK_API_KEY` per proxy | Hosted: tenant key in `X-Maverick-API-Key`, `Authorization`/`x-api-key` reserved for the provider credential; self-hosted keeps the configured key | plan §3.5 |
+| D14 | Proxy settings | Rewrites the model string; caller's effort passes through (normalized) | Applies the recommended column's `settings` unless the alias has `?settings=caller`; telemetry records `settings_applied` | plan §3.2, §3.5 |
+| D15 | OpenRouter execution | No retention handling | Per-alias `retention_mode` with expiry; for zero-retention tenants sends OpenRouter's per-request ZDR option and skips unverified aliases; fails closed with 409 | plan §3.6 |
+| D16 | Telemetry outcomes | 2xx maps to `success` whether or not a check ran; proxy never sends `check_pass` | `check_pass` is three-valued; 2xx with no check is `completed_unchecked` (availability only, never quality evidence) | plan §3.5 Telemetry |
+| D17 | SDK/proxy fail-open | Any MM error falls back to last-known-good, static default, original model | Zero-retention codes are terminal and purge the cached chain; during outages zero-retention tenants may use only entries stamped `retention_mode: zero` or locally verified defaults, else fail closed | plan §2 G14, §3.5 |
+| D18 | Capture crypto | Single master key | Key ring (current plus previous); `capture_key_version` stored per capture; 96-bit CSPRNG nonce per capture | plan §3.4 |
+| D19 | Telemetry redaction | slog JSON logs | `#[instrument(skip_all)]` with allowlisted fields; no prompt, completion, body, or credential in spans, logs, or metric labels; canary test | plan §6 |
+| D20 | Latency target | Prompt-path cache miss p95 < 2.5 s | Uncached prompt path p95 < 1.8 s; proxy-added TTFB measured | plan §3.2 |
+| D21 | Migrations | goose, `goose_db_version` | sqlx with a baseline equal to goose head, adopted via `maverick migrate adopt-goose-baseline`; additive only during the rollback window | plan §7.0 step 2(b) |
+| D22 | Job queue | River | `graphile_worker` 0.13.x; River tables left untouched until 30 days after cutover | plan §6, §7.0 |
+| D23 | Provider clients: ambient env | Go provider SDKs read ambient env vars (`ANTHROPIC_BASE_URL`, `OPENAI_ORG_ID`, `GOOGLE_GEMINI_BASE_URL`, and others) that can silently change URLs and headers | Rust clients read only the engine's own config; no ambient SDK env vars (reference/engine-reference.md (Part 2) Q-P4) | this file |
+| D24 | JSON Schema grader error text | Error strings embed `file://<process cwd>/spec.schema.json#` and library wording | Parity is the `<kind> spec: ` prefix, the pass/fail decision, and the substrings tests check; cwd-dependent text is not reproduced (Q-JS1) | this file |
+| D25 | Request-body parse errors | `malformed request body:` messages embed Go `encoding/json` error text and Go type names | Same `malformed request body:` prefix, status, and error code; the detail text after the prefix is not reproduced (reference/engine-reference.md (Part 5) Q1) | this file |
+
+Porting note (not a divergence): Go's regexp `\d \w \s \b` are ASCII-only and Go lowercases per rune; Rust's `regex` classes are Unicode by default and `to_lowercase` handles multi-char mappings. Use ASCII classes (`(?-u:\w)`) and per-char lowercasing where the fixtures require Go's result (reference/engine-reference.md (Part 2) §15).

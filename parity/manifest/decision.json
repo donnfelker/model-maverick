@@ -1,0 +1,445 @@
+{
+  "area": "decision",
+  "packages": [
+    "internal/policy",
+    "internal/recommend",
+    "internal/classify",
+    "internal/auth",
+    "internal/tracing",
+    "internal/history"
+  ],
+  "go_test_count": 105,
+  "go_test_count_note": "grep -c '^func Test' over the six packages' *_test.go files; includes classify.TestMain (harness).",
+  "extra_fixtures_without_go_test": [
+    "rank_extras.json (display_score, high_stakes)",
+    "reasons.json",
+    "validate_input.json",
+    "history_telemetry.json",
+    "tracing_trace_shape.json",
+    "tracing_capture_crypto.json (fixed-nonce vectors)",
+    "classify_parse.json extra cases",
+    "tracing_capture_decide.json extra: cases"
+  ],
+  "tests": [
+    {
+      "go_test": "policy.TestValidateWeights",
+      "where": "fixtures/decision/policy_validate.json#TestValidateWeights/*"
+    },
+    {
+      "go_test": "policy.TestValidatePoolShapes",
+      "where": "fixtures/decision/policy_validate.json#TestValidatePoolShapes/*"
+    },
+    {
+      "go_test": "policy.TestSimulatePerCellSurvivorship",
+      "where": "fixtures/decision/policy_simulate.json#TestSimulatePerCellSurvivorship#*"
+    },
+    {
+      "go_test": "policy.TestSimulateMissingAggregatesSurvive",
+      "where": "fixtures/decision/policy_simulate.json#TestSimulateMissingAggregatesSurvive#*"
+    },
+    {
+      "go_test": "policy.TestSimulateAllRetired",
+      "where": "fixtures/decision/policy_simulate.json#TestSimulateAllRetired#*"
+    },
+    {
+      "go_test": "policy.TestSimulateRetiredExcludedFromSurvivors",
+      "where": "fixtures/decision/policy_simulate.json#TestSimulateRetiredExcludedFromSurvivors#*"
+    },
+    {
+      "go_test": "policy.TestSimulateNamesLatencyConstraint",
+      "where": "fixtures/decision/policy_simulate.json#TestSimulateNamesLatencyConstraint#*"
+    },
+    {
+      "go_test": "policy.TestSimulateBoundaryValuePasses",
+      "where": "fixtures/decision/policy_simulate.json#TestSimulateBoundaryValuePasses#*"
+    },
+    {
+      "go_test": "policy.TestValidateConstraintValues",
+      "where": "fixtures/decision/policy_validate.json#TestValidateConstraintValues/*"
+    },
+    {
+      "go_test": "policy.TestEvaluatePoolResolution",
+      "where": "fixtures/decision/policy_evaluate.json#TestEvaluatePoolResolution*"
+    },
+    {
+      "go_test": "policy.TestEvaluateRetiredExclusion",
+      "where": "fixtures/decision/policy_evaluate.json#TestEvaluateRetiredExclusion*"
+    },
+    {
+      "go_test": "policy.TestEvaluateAllowlistNarrowing",
+      "where": "fixtures/decision/policy_evaluate.json#TestEvaluateAllowlistNarrowing*"
+    },
+    {
+      "go_test": "policy.TestEvaluateAllowlistErrors",
+      "where": "fixtures/decision/policy_evaluate.json#TestEvaluateAllowlistErrors*"
+    },
+    {
+      "go_test": "policy.TestEvaluateStandingConstraints",
+      "where": "fixtures/decision/policy_evaluate.json#TestEvaluateStandingConstraints*"
+    },
+    {
+      "go_test": "policy.TestEvaluateDriftFallback",
+      "where": "fixtures/decision/policy_evaluate.json#TestEvaluateDriftFallback*"
+    },
+    {
+      "go_test": "policy.TestEvaluateDriftFallbackTie",
+      "where": "fixtures/decision/policy_evaluate.json#TestEvaluateDriftFallbackTie*"
+    },
+    {
+      "go_test": "policy.TestEvaluateDriftFallbackRelativeExcess",
+      "where": "fixtures/decision/policy_evaluate.json#TestEvaluateDriftFallbackRelativeExcess*"
+    },
+    {
+      "go_test": "policy.TestEvaluatePreferences",
+      "where": "fixtures/decision/policy_evaluate.json#TestEvaluatePreferences*"
+    },
+    {
+      "go_test": "policy.TestEvaluateDriftFallbackThenPreferences",
+      "where": "fixtures/decision/policy_evaluate.json#TestEvaluateDriftFallbackThenPreferences*"
+    },
+    {
+      "go_test": "policy.TestEvaluateAllRetiredPoolAlertsInsteadOfSilence",
+      "where": "fixtures/decision/policy_evaluate.json#TestEvaluateAllRetiredPoolAlertsInsteadOfSilence*"
+    },
+    {
+      "go_test": "policy.TestEvaluatePoolMemberMissingFromCatalogIsIgnored",
+      "where": "fixtures/decision/policy_evaluate.json#TestEvaluatePoolMemberMissingFromCatalogIsIgnored*"
+    },
+    {
+      "go_test": "policy.TestEvaluateDeterminism",
+      "where": "fixtures/decision/policy_evaluate.json#TestEvaluateDeterminism*"
+    },
+    {
+      "go_test": "policy.TestReasonsEnum",
+      "where": "fixtures/decision/policy_reasons.json#reasons"
+    },
+    {
+      "go_test": "policy.TestEvaluateSurvivorsNeverEmptyProperty",
+      "where": "fixtures/decision/policy_property_g1.json#TestEvaluateSurvivorsNeverEmptyProperty#1..600 ; reference/engine-reference.md (Part 4)#policy-properties"
+    },
+    {
+      "go_test": "recommend.TestEveryCapabilityHasAResolvableCheckSpec",
+      "where": "fixtures/decision/checks.json#registry/* ; reference/engine-reference.md (Part 4)#recommend-checks"
+    },
+    {
+      "go_test": "recommend.TestCheckSpecTypesFollowSection84",
+      "where": "fixtures/decision/checks.json#registry/* ; reference/engine-reference.md (Part 4)#recommend-checks"
+    },
+    {
+      "go_test": "recommend.TestCheckDefinitionSpecsAreExecutableShapes",
+      "where": "fixtures/decision/checks.json#registry/* ; reference/engine-reference.md (Part 4)#recommend-checks"
+    },
+    {
+      "go_test": "recommend.TestLookupCheckUnknownRef",
+      "where": "fixtures/decision/checks.json#registry/* ; reference/engine-reference.md (Part 4)#recommend-checks"
+    },
+    {
+      "go_test": "recommend.TestCheckDefinitionSpecsValidateAgainstGraders",
+      "where": "fixtures/decision/checks.json#registry/* ; reference/engine-reference.md (Part 4)#recommend-checks"
+    },
+    {
+      "go_test": "recommend.TestRankOrdering",
+      "where": "fixtures/decision/rank.json#TestRankOrdering*"
+    },
+    {
+      "go_test": "recommend.TestRankSingleSurvivor",
+      "where": "fixtures/decision/rank.json#TestRankSingleSurvivor*"
+    },
+    {
+      "go_test": "recommend.TestRankNoDataExclusion",
+      "where": "fixtures/decision/rank.json#TestRankNoDataExclusion*"
+    },
+    {
+      "go_test": "recommend.TestRankFlagPassthrough",
+      "where": "fixtures/decision/rank.json#TestRankFlagPassthrough*"
+    },
+    {
+      "go_test": "recommend.TestRankPermutationProperty",
+      "where": "fixtures/decision/rank_property.json#TestRankPermutationProperty#* ; reference/engine-reference.md (Part 4)#policy-properties"
+    },
+    {
+      "go_test": "recommend.TestRankPickStableUnderJitterWhenIndistinguishable",
+      "where": "fixtures/decision/rank_property.json#TestRankPickStableUnderJitterWhenIndistinguishable#* ; reference/engine-reference.md (Part 4)#policy-properties"
+    },
+    {
+      "go_test": "recommend.TestRankPickStableUnderJitterWithClearWinner",
+      "where": "fixtures/decision/rank_property.json#TestRankPickStableUnderJitterWithClearWinner#* ; reference/engine-reference.md (Part 4)#policy-properties"
+    },
+    {
+      "go_test": "recommend.TestDefaultWeights",
+      "where": "fixtures/decision/rank_extras.json#default_weights/*"
+    },
+    {
+      "go_test": "recommend.TestCeilingGoldens",
+      "where": "fixtures/decision/ceiling.json#TestCeilingGoldens*"
+    },
+    {
+      "go_test": "recommend.TestCeilingHonorsPerTenantBar",
+      "where": "fixtures/decision/ceiling.json#TestCeilingHonorsPerTenantBar*"
+    },
+    {
+      "go_test": "recommend.TestCeilingMonotonicity",
+      "where": "fixtures/decision/ceiling_property.json#TestCeilingMonotonicity#* ; reference/engine-reference.md (Part 4)#policy-properties"
+    },
+    {
+      "go_test": "recommend.TestClears",
+      "where": "fixtures/decision/ceiling.json#TestClears*"
+    },
+    {
+      "go_test": "recommend.TestCeilingsGrid",
+      "where": "fixtures/decision/ceiling.json#TestCeilingsGrid*"
+    },
+    {
+      "go_test": "recommend.TestBands",
+      "where": "fixtures/decision/bands.json#TestResolveBandsCheapestClearingColumn#1 (band_tiers) ; reference/engine-reference.md (Part 4)#bands"
+    },
+    {
+      "go_test": "recommend.TestResolveBandsCheapestClearingColumn",
+      "where": "fixtures/decision/bands.json#TestResolveBandsCheapestClearingColumn#1"
+    },
+    {
+      "go_test": "recommend.TestResolveBandsCostAveragedOverBandTiers",
+      "where": "fixtures/decision/bands.json#TestResolveBandsCostAveragedOverBandTiers#1"
+    },
+    {
+      "go_test": "recommend.TestResolveBandsFallbackWhenNothingClears",
+      "where": "fixtures/decision/bands.json#TestResolveBandsFallbackWhenNothingClears#1"
+    },
+    {
+      "go_test": "recommend.TestResolveBandsFallbackCeilingTieBreaksOnCost",
+      "where": "fixtures/decision/bands.json#TestResolveBandsFallbackCeilingTieBreaksOnCost#1"
+    },
+    {
+      "go_test": "recommend.TestResolveBandsKnownCostBeatsUnknown",
+      "where": "fixtures/decision/bands.json#TestResolveBandsKnownCostBeatsUnknown#1"
+    },
+    {
+      "go_test": "recommend.TestResolveBandsTiesKeepPoolOrder",
+      "where": "fixtures/decision/bands.json#TestResolveBandsTiesKeepPoolOrder#1"
+    },
+    {
+      "go_test": "recommend.TestResolveBandsMissingPassRateAtTopTier",
+      "where": "fixtures/decision/bands.json#TestResolveBandsMissingPassRateAtTopTier#1"
+    },
+    {
+      "go_test": "recommend.TestResolveBandsEmptyCandidates",
+      "where": "fixtures/decision/bands.json#TestResolveBandsEmptyCandidates#1"
+    },
+    {
+      "go_test": "classify.TestMain",
+      "where": "reference/engine-reference.md (Part 4)#classify-store"
+    },
+    {
+      "go_test": "classify.TestCacheRoundTrip",
+      "where": "reference/engine-reference.md (Part 4)#classify-store"
+    },
+    {
+      "go_test": "classify.TestCacheConflictKeepsFirstWrite",
+      "where": "reference/engine-reference.md (Part 4)#classify-store"
+    },
+    {
+      "go_test": "classify.TestResolveVersionBumpInvalidationStoreBacked",
+      "where": "reference/engine-reference.md (Part 4)#classify-store"
+    },
+    {
+      "go_test": "classify.TestClassifyHappyPath",
+      "where": "reference/engine-reference.md (Part 4)#classify-classifier"
+    },
+    {
+      "go_test": "classify.TestClassifyPromptVersionBumped",
+      "where": "fixtures/decision/classify_constants.json#version_default,version_v7,prompt_version,response_schema_json"
+    },
+    {
+      "go_test": "classify.TestClassifyVersion",
+      "where": "fixtures/decision/classify_constants.json#version_default,version_v7,prompt_version,response_schema_json"
+    },
+    {
+      "go_test": "classify.TestClassifyRetriesOnceOnFailure",
+      "where": "reference/engine-reference.md (Part 4)#classify-classifier"
+    },
+    {
+      "go_test": "classify.TestClassifyRetriesOnceOnInvalidOutput",
+      "where": "reference/engine-reference.md (Part 4)#classify-classifier"
+    },
+    {
+      "go_test": "classify.TestClassifyTimeoutExhaustsBothAttempts",
+      "where": "reference/engine-reference.md (Part 4)#classify-classifier"
+    },
+    {
+      "go_test": "classify.TestClassifyInvalidOutputFails",
+      "where": "fixtures/decision/classify_parse.json#* ; reference/engine-reference.md (Part 4)#classify-classifier"
+    },
+    {
+      "go_test": "classify.TestClassifyBoundaryOutputs",
+      "where": "fixtures/decision/classify_parse.json#* ; reference/engine-reference.md (Part 4)#classify-classifier"
+    },
+    {
+      "go_test": "classify.TestClassifyTruncation",
+      "where": "fixtures/decision/classify_truncate.json#* ; reference/engine-reference.md (Part 4)#classify-classifier"
+    },
+    {
+      "go_test": "classify.TestResponseSchemaEnumeratesCapabilities",
+      "where": "fixtures/decision/classify_constants.json#version_default,version_v7,prompt_version,response_schema_json"
+    },
+    {
+      "go_test": "classify.TestClientFor",
+      "where": "reference/engine-reference.md (Part 4)#classify-classifier"
+    },
+    {
+      "go_test": "classify.TestClassifyStopsRetryingOnCanceledContext",
+      "where": "reference/engine-reference.md (Part 4)#classify-classifier"
+    },
+    {
+      "go_test": "classify.TestClassifyErrorNamesColumn",
+      "where": "reference/engine-reference.md (Part 4)#classify-classifier"
+    },
+    {
+      "go_test": "classify.TestResolveMethodTransitions",
+      "where": "reference/engine-reference.md (Part 4)#classify-resolver"
+    },
+    {
+      "go_test": "classify.TestResolveDifferentPromptsMiss",
+      "where": "reference/engine-reference.md (Part 4)#classify-resolver"
+    },
+    {
+      "go_test": "classify.TestFallbackClassification",
+      "where": "fixtures/decision/classify_constants.json#fallback"
+    },
+    {
+      "go_test": "classify.TestResolveFallbackNotCached",
+      "where": "reference/engine-reference.md (Part 4)#classify-resolver"
+    },
+    {
+      "go_test": "classify.TestResolveNeverFails",
+      "where": "reference/engine-reference.md (Part 4)#classify-resolver"
+    },
+    {
+      "go_test": "classify.TestResolveDegradedAlert",
+      "where": "fixtures/decision/classify_degraded_tracker.json#resolve_degraded_alert_sequence ; reference/engine-reference.md (Part 4)#classify-resolver"
+    },
+    {
+      "go_test": "auth.TestMintKeyFormat",
+      "where": "fixtures/decision/auth_keys.json#base62_cases ; reference/engine-reference.md (Part 4)#auth-cases"
+    },
+    {
+      "go_test": "auth.TestMintKeyUnique",
+      "where": "reference/engine-reference.md (Part 4)#auth-cases"
+    },
+    {
+      "go_test": "auth.TestEncodeBase62PadsToFixedLength",
+      "where": "fixtures/decision/auth_keys.json#base62_cases ; reference/engine-reference.md (Part 4)#auth-cases"
+    },
+    {
+      "go_test": "auth.TestVerifierRejectsMalformedAuthorizationWithoutStoreLookup",
+      "where": "reference/engine-reference.md (Part 4)#auth-cases"
+    },
+    {
+      "go_test": "auth.TestVerifierUnknownKey",
+      "where": "reference/engine-reference.md (Part 4)#auth-cases"
+    },
+    {
+      "go_test": "auth.TestVerifierRevokedKey",
+      "where": "reference/engine-reference.md (Part 4)#auth-cases"
+    },
+    {
+      "go_test": "auth.TestVerifierSuspendedTenant",
+      "where": "reference/engine-reference.md (Part 4)#auth-cases"
+    },
+    {
+      "go_test": "auth.TestVerifierActiveKeyReturnsIdentity",
+      "where": "reference/engine-reference.md (Part 4)#auth-cases"
+    },
+    {
+      "go_test": "auth.TestVerifierStoreFailureIsNotAnAuthError",
+      "where": "reference/engine-reference.md (Part 4)#auth-cases"
+    },
+    {
+      "go_test": "auth.TestInternalAuthAcceptsEachRotationToken",
+      "where": "fixtures/decision/auth_keys.json#internal_auth_cases"
+    },
+    {
+      "go_test": "auth.TestInternalAuthRejectsBadTokens",
+      "where": "fixtures/decision/auth_keys.json#internal_auth_cases"
+    },
+    {
+      "go_test": "auth.TestIdentityContextRoundTrip",
+      "where": "reference/engine-reference.md (Part 4)#auth-cases"
+    },
+    {
+      "go_test": "auth.TestInternalActorContextRoundTrip",
+      "where": "reference/engine-reference.md (Part 4)#auth-cases"
+    },
+    {
+      "go_test": "tracing.TestFingerprintGoldenVector",
+      "where": "fixtures/decision/tracing_fingerprint.json#golden"
+    },
+    {
+      "go_test": "tracing.TestFingerprintRFC4231Vector",
+      "where": "fixtures/decision/tracing_fingerprint.json#rfc4231_tc2"
+    },
+    {
+      "go_test": "tracing.TestFingerprintOneCharEditDiverges",
+      "where": "fixtures/decision/tracing_fingerprint.json#one_char_edit"
+    },
+    {
+      "go_test": "tracing.TestFingerprintCrossTenantDiverges",
+      "where": "fixtures/decision/tracing_fingerprint.json#cross_tenant"
+    },
+    {
+      "go_test": "tracing.TestFingerprintEmptyPrompt",
+      "where": "fixtures/decision/tracing_fingerprint.json#empty_prompt"
+    },
+    {
+      "go_test": "tracing.TestFingerprintNoUnicodeNormalization",
+      "where": "fixtures/decision/tracing_fingerprint.json#nfc_cafe,nfd_cafe"
+    },
+    {
+      "go_test": "tracing.TestFingerprintFormat",
+      "where": "fixtures/decision/tracing_fingerprint.json#golden"
+    },
+    {
+      "go_test": "tracing.TestSealOpenRoundTrip",
+      "where": "fixtures/decision/tracing_capture_crypto.json#* ; reference/engine-reference.md (Part 4)#tracing-cases"
+    },
+    {
+      "go_test": "tracing.TestSealNoncesAndCiphertextsDiffer",
+      "where": "reference/engine-reference.md (Part 4)#tracing-cases"
+    },
+    {
+      "go_test": "tracing.TestOpenRejectsTamperedCiphertext",
+      "where": "fixtures/decision/tracing_capture_crypto.json#* ; reference/engine-reference.md (Part 4)#tracing-cases"
+    },
+    {
+      "go_test": "tracing.TestOpenRejectsWrongMasterKey",
+      "where": "fixtures/decision/tracing_capture_crypto.json#* ; reference/engine-reference.md (Part 4)#tracing-cases"
+    },
+    {
+      "go_test": "tracing.TestOpenRejectsWrongCaptureID",
+      "where": "fixtures/decision/tracing_capture_crypto.json#* ; reference/engine-reference.md (Part 4)#tracing-cases"
+    },
+    {
+      "go_test": "tracing.TestSealRejectsShortMasterKey",
+      "where": "reference/engine-reference.md (Part 4)#tracing-cases"
+    },
+    {
+      "go_test": "tracing.TestDecide",
+      "where": "fixtures/decision/tracing_capture_decide.json#*"
+    },
+    {
+      "go_test": "history.TestCursorRoundTrip",
+      "where": "fixtures/decision/history_cursor.json#encode,decode ; reference/engine-reference.md (Part 4)#history-cases"
+    },
+    {
+      "go_test": "history.TestCursorIsOpaque",
+      "where": "fixtures/decision/history_cursor.json#encode,decode ; reference/engine-reference.md (Part 4)#history-cases"
+    },
+    {
+      "go_test": "history.TestCursorRejectsGarbage",
+      "where": "fixtures/decision/history_cursor.json#encode,decode ; reference/engine-reference.md (Part 4)#history-cases"
+    },
+    {
+      "go_test": "history.TestCursorRejectsForeignKind",
+      "where": "fixtures/decision/history_cursor.json#encode,decode ; reference/engine-reference.md (Part 4)#history-cases"
+    }
+  ]
+}

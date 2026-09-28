@@ -1,0 +1,10 @@
+description: >-
+  rubric items carry no weights — per-dimension weighting is the envelope's
+  weight_dimensions and the task's dimension_weights (spec 5.4, 6.1)
+spec:
+  rubric:
+    - { dimension: idiom, criterion: Idiomatic style., weight: 2 }
+output: irrelevant
+expect:
+  error: true
+  error_contains: weight

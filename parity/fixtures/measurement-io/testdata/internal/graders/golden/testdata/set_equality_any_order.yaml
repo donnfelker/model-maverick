@@ -1,0 +1,11 @@
+description: set mode accepts a bulleted list in any order
+spec:
+  answers:
+    - { set: [red, green, blue] }
+output: |-
+  - Blue
+  - red
+  - GREEN
+expect:
+  dimensions: { answer_correctness: 1.0 }
+  detail_contains: ['"mode":"set"']

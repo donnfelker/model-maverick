@@ -1,0 +1,10 @@
+description: English output fails a language ja rule, and a critical language rule zeroes the score
+spec:
+  rules:
+    - { language: ja, critical: true }
+    - { must_include: contract }
+output: |-
+  The contract is signed by both parties and takes effect in thirty days.
+expect:
+  dimensions: { constraint_compliance: 0.0 }
+  detail_contains: ['"critical_failed":true']

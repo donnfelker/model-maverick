@@ -1,0 +1,367 @@
+{
+  "description": "internal/api/middleware unit cases. Clock values are UTC. Window = 60s. Reset header = unix seconds of window end. Retry-After = max(ceil(seconds until window end),1).",
+  "cases": [
+    {
+      "id": "request-id-mints",
+      "go_test": "middleware.TestRequestIDMintsWhenAbsent",
+      "given": {
+        "inbound_x_request_id": null
+      },
+      "expected": {
+        "context_request_id": "<non-empty ULID, 26 chars Crockford base32>",
+        "response_header_X-Request-ID": "== context value"
+      }
+    },
+    {
+      "id": "request-id-accepts-inbound",
+      "go_test": "middleware.TestRequestIDAcceptsInboundHeader",
+      "given": {
+        "inbound_x_request_id": "inbound-123"
+      },
+      "expected": {
+        "context_request_id": "inbound-123",
+        "response_header_X-Request-ID": "inbound-123"
+      }
+    },
+    {
+      "id": "logger-fields",
+      "go_test": "middleware.TestLoggerEmitsRequestFieldsAndNeverAuthorization",
+      "given": {
+        "method": "POST",
+        "path": "/v1/things",
+        "authorization": "Bearer mk_live_supersecretvalue",
+        "handler_status": 201
+      },
+      "expected": {
+        "log_line_json_keys_include": {
+          "msg": "request",
+          "method": "POST",
+          "path": "/v1/things",
+          "status": 201,
+          "ms": "<float ms, microsecond resolution>",
+          "request_id": "<non-empty>"
+        },
+        "log_must_not_contain": [
+          "supersecretvalue",
+          "Authorization"
+        ]
+      }
+    },
+    {
+      "id": "logger-tenant-fields",
+      "go_test": "middleware.TestLoggerIncludesTenantWhenAuthed",
+      "given": {
+        "api_key_row": {
+          "id": "key_42",
+          "tenant_id": "ten_42",
+          "status": "active"
+        },
+        "tenant_row": {
+          "id": "ten_42",
+          "status": "active"
+        },
+        "authorization": "Bearer mk_live_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "expected": {
+        "log_line_includes": {
+          "tenant_id": "ten_42",
+          "key_id": "key_42"
+        }
+      }
+    },
+    {
+      "id": "recoverer-500",
+      "go_test": "middleware.TestRecovererWritesEnvelopeAndLogsStack",
+      "given": {
+        "handler": "panic(\"boom\") before writing"
+      },
+      "expected": {
+        "status": 500,
+        "body_exact": "{\"error\":{\"code\":\"internal_error\",\"message\":\"internal error\",\"details\":{}}}\n",
+        "log_contains": [
+          "boom",
+          "stack"
+        ]
+      }
+    },
+    {
+      "id": "recoverer-started-response",
+      "go_test": "middleware.TestRecovererDoesNotOverwriteStartedResponse",
+      "given": {
+        "handler": "WriteHeader(200); Write(\"partial\"); panic(\"late boom\")"
+      },
+      "expected": {
+        "status": 200,
+        "body_exact": "partial"
+      }
+    },
+    {
+      "id": "auth-missing-header",
+      "go_test": "middleware.TestAuthMiddlewareEnvelopes/missing_header",
+      "given": {
+        "authorization": "",
+        "store": "GetAPIKeyByHash -> no rows"
+      },
+      "expected": {
+        "status": 401,
+        "code": "unauthorized",
+        "message": "missing or invalid API key",
+        "next_called": false
+      }
+    },
+    {
+      "id": "auth-unknown-key",
+      "go_test": "middleware.TestAuthMiddlewareEnvelopes/unknown_key",
+      "given": {
+        "authorization": "Bearer mk_live_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "store": "GetAPIKeyByHash -> no rows"
+      },
+      "expected": {
+        "status": 401,
+        "code": "unauthorized",
+        "next_called": false
+      }
+    },
+    {
+      "id": "auth-suspended",
+      "go_test": "middleware.TestAuthMiddlewareEnvelopes/suspended_tenant",
+      "given": {
+        "authorization": "Bearer mk_live_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "api_key_row": {
+          "id": "key_1",
+          "tenant_id": "ten_1",
+          "status": "active"
+        },
+        "tenant_row": {
+          "id": "ten_1",
+          "status": "suspended"
+        }
+      },
+      "expected": {
+        "status": 403,
+        "code": "tenant_suspended",
+        "message": "tenant is suspended",
+        "next_called": false
+      }
+    },
+    {
+      "id": "auth-store-failure",
+      "go_test": "middleware.TestAuthMiddlewareEnvelopes/store_failure",
+      "given": {
+        "authorization": "Bearer mk_live_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "store": "GetAPIKeyByHash -> error 'db down'"
+      },
+      "expected": {
+        "status": 500,
+        "code": "internal_error",
+        "message": "internal error",
+        "next_called": false
+      }
+    },
+    {
+      "id": "auth-identity-in-context",
+      "go_test": "middleware.TestAuthMiddlewarePutsIdentityInContext",
+      "given": {
+        "authorization": "Bearer mk_live_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "api_key_row": {
+          "id": "key_1",
+          "tenant_id": "ten_1",
+          "status": "active"
+        },
+        "tenant_row": {
+          "id": "ten_1",
+          "status": "active"
+        }
+      },
+      "expected": {
+        "identity": {
+          "tenant_id": "ten_1",
+          "api_key_id": "key_1"
+        }
+      }
+    },
+    {
+      "id": "internal-auth",
+      "go_test": "middleware.TestInternalAuthMiddleware",
+      "given": {
+        "tokens": [
+          {
+            "label": "ops",
+            "secret": "alpha"
+          }
+        ]
+      },
+      "steps": [
+        {
+          "authorization": null,
+          "expected": {
+            "status": 401,
+            "code": "unauthorized",
+            "message": "missing or invalid internal token"
+          }
+        },
+        {
+          "authorization": "Bearer ops:alpha",
+          "expected": {
+            "status": 200,
+            "actor": "ops"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rate-limiter-fixed-window",
+      "go_test": "middleware.TestRateLimiterFixedWindow",
+      "given": {
+        "limit": 2,
+        "window_seconds": 60,
+        "clock": "2026-07-06T12:00:30Z"
+      },
+      "steps": [
+        {
+          "clock": "2026-07-06T12:00:30Z",
+          "key": "key_1",
+          "expected": {
+            "allowed": true,
+            "limit": 2,
+            "remaining": 1,
+            "reset": "2026-07-06T12:01:00Z",
+            "retry_after_seconds": 30
+          }
+        },
+        {
+          "clock": "2026-07-06T12:00:30Z",
+          "key": "key_1",
+          "expected": {
+            "allowed": true,
+            "remaining": 0
+          }
+        },
+        {
+          "clock": "2026-07-06T12:00:30Z",
+          "key": "key_1",
+          "expected": {
+            "allowed": false,
+            "remaining": 0,
+            "retry_after_seconds": 30
+          }
+        },
+        {
+          "clock": "2026-07-06T12:01:01Z",
+          "key": "key_1",
+          "expected": {
+            "allowed": true,
+            "remaining": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "rate-limiter-isolates-keys",
+      "go_test": "middleware.TestRateLimiterIsolatesKeys",
+      "given": {
+        "limit": 1,
+        "window_seconds": 60,
+        "clock": "wall clock"
+      },
+      "steps": [
+        {
+          "key": "key_a",
+          "expected": {
+            "allowed": true
+          }
+        },
+        {
+          "key": "key_a",
+          "expected": {
+            "allowed": false
+          }
+        },
+        {
+          "key": "key_b",
+          "expected": {
+            "allowed": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "rate-limit-middleware-headers",
+      "go_test": "middleware.TestRateLimitMiddlewareHeadersAndRetryAfter",
+      "given": {
+        "limit": 1,
+        "window_seconds": 60,
+        "clock": "2026-07-06T12:00:30Z",
+        "identity": {
+          "tenant_id": "ten_1",
+          "api_key_id": "key_1"
+        }
+      },
+      "steps": [
+        {
+          "expected": {
+            "status": 200,
+            "headers": {
+              "X-RateLimit-Limit": "1",
+              "X-RateLimit-Remaining": "0",
+              "X-RateLimit-Reset": "1783339260"
+            }
+          }
+        },
+        {
+          "expected": {
+            "status": 429,
+            "code": "rate_limited",
+            "body_exact": "{\"error\":{\"code\":\"rate_limited\",\"message\":\"rate limit exceeded\",\"details\":{\"limit\":1}}}\n",
+            "headers": {
+              "Retry-After": "30",
+              "X-RateLimit-Limit": "1",
+              "X-RateLimit-Remaining": "0",
+              "X-RateLimit-Reset": "1783339260"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "body-limit-oversize-content-length",
+      "go_test": "middleware.TestBodyLimitRejectsOversizeContentLength",
+      "given": {
+        "max_bytes": 16,
+        "body": "aaaaaaaaaaaaaaaaa",
+        "content_length": 17
+      },
+      "expected": {
+        "status": 413,
+        "code": "payload_too_large",
+        "body_exact": "{\"error\":{\"code\":\"payload_too_large\",\"message\":\"request body exceeds the limit\",\"details\":{\"limit_bytes\":16}}}\n",
+        "handler_called": false
+      }
+    },
+    {
+      "id": "body-limit-at-cap",
+      "go_test": "middleware.TestBodyLimitPassesBodiesAtTheCap",
+      "given": {
+        "max_bytes": 16,
+        "body": "aaaaaaaaaaaaaaaa",
+        "content_length": 16
+      },
+      "expected": {
+        "status": 200,
+        "handler_read_bytes": 16
+      }
+    },
+    {
+      "id": "body-limit-chunked",
+      "go_test": "middleware.TestBodyLimitWrapsChunkedBodies",
+      "given": {
+        "max_bytes": 16,
+        "body": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "content_length": -1
+      },
+      "expected": {
+        "handler_read_error": "max-bytes error (limit 16); a JSON-decoding handler maps it to 413 payload_too_large with details {\"limit_bytes\":16}"
+      }
+    }
+  ]
+}

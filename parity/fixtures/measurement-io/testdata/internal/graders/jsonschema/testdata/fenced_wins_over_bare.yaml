@@ -1,0 +1,18 @@
+description: a parseable fenced block takes precedence over earlier bare JSON in prose
+spec:
+  schema:
+    type: object
+    required: [answer]
+    properties:
+      answer: { type: string }
+  checks:
+    - { path: $.answer, equals: final }
+output: |-
+  My draft was {"answer": "draft"} but the final version is below.
+
+  ```json
+  {"answer": "final"}
+  ```
+expect:
+  dimensions: { schema_validity: 1.0, field_accuracy: 1.0 }
+  detail_contains: ['"extraction":"fenced"']

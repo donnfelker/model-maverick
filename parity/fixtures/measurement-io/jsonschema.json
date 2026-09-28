@@ -1,0 +1,1047 @@
+{
+  "about": "json_schema grader. Error strings are exact Go output except '{SPEC_SCHEMA_URL}' / '{TASK_SCHEMA_URL}', which Go renders as 'file://<process cwd>/spec.schema.json#' (cwd-dependent, see QUIRK in behavior doc). Text after the 'jsonschema validation failed with' marker is santhosh-tekuri/jsonschema v6 library wording; parity requirement is the prefix up to and including '<kind> spec: ' plus the pass/fail decision, and 'contains' checks named in go_test_expect.",
+  "go_tests": {
+    "jsonschema.TestKind": {
+      "expect_kind": "json_schema"
+    },
+    "jsonschema.TestValidateSpecAccepts": {
+      "spec_raw": "{\n\t\t\"schema\": {\"type\": \"object\", \"required\": [\"a\"]},\n\t\t\"checks\": [\n\t\t\t{\"path\": \"$.a\", \"equals\": null},\n\t\t\t{\"path\": \"$.b[2].c\", \"regex\": \"\\\\d+\"},\n\t\t\t{\"path\": \"$.d\", \"numeric\": 1.5, \"tolerance\": 0.1}\n\t\t]\n\t}",
+      "expect": "valid"
+    },
+    "jsonschema.TestParsePath": {
+      "path": "$.items[10].name",
+      "segments": [
+        {
+          "key": "items",
+          "index": -1
+        },
+        {
+          "key": "",
+          "index": 10
+        },
+        {
+          "key": "name",
+          "index": -1
+        }
+      ],
+      "reject": "$[x]"
+    },
+    "jsonschema.TestValueEqual": [
+      {
+        "a": {
+          "json_number": "12500"
+        },
+        "b": {
+          "float64": 12500
+        },
+        "equal": true
+      },
+      {
+        "a": {
+          "string": "12500"
+        },
+        "b": {
+          "float64": 12500
+        },
+        "equal": false
+      },
+      {
+        "a": {
+          "object": {
+            "a": [
+              {
+                "json_number": "1"
+              },
+              "x"
+            ]
+          }
+        },
+        "b": {
+          "object": {
+            "a": [
+              {
+                "float64": 1
+              },
+              "x"
+            ]
+          }
+        },
+        "equal": true
+      }
+    ]
+  },
+  "validate_spec_rejects": [
+    {
+      "id": "not json",
+      "go_test": "jsonschema.TestValidateSpecRejects/not_json",
+      "spec_raw": "{",
+      "expect_error_contains": "json_schema spec",
+      "go_error": "json_schema spec: unexpected EOF"
+    },
+    {
+      "id": "missing schema",
+      "go_test": "jsonschema.TestValidateSpecRejects/missing_schema",
+      "spec_raw": "{\"checks\": [{\"path\": \"$.a\", \"equals\": 1}]}",
+      "expect_error_contains": "json_schema spec",
+      "go_error": "json_schema spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '': missing property 'schema'"
+    },
+    {
+      "id": "unknown field",
+      "go_test": "jsonschema.TestValidateSpecRejects/unknown_field",
+      "spec_raw": "{\"schema\": {}, \"extra\": true}",
+      "expect_error_contains": "json_schema spec",
+      "go_error": "json_schema spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '': additional properties 'extra' not allowed"
+    },
+    {
+      "id": "schema wrong type",
+      "go_test": "jsonschema.TestValidateSpecRejects/schema_wrong_type",
+      "spec_raw": "{\"schema\": \"object\"}",
+      "expect_error_contains": "json_schema spec",
+      "go_error": "json_schema spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/schema': got string, want boolean or object"
+    },
+    {
+      "id": "empty checks",
+      "go_test": "jsonschema.TestValidateSpecRejects/empty_checks",
+      "spec_raw": "{\"schema\": {}, \"checks\": []}",
+      "expect_error_contains": "json_schema spec",
+      "go_error": "json_schema spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/checks': minItems: got 0, want 1"
+    },
+    {
+      "id": "check without kind",
+      "go_test": "jsonschema.TestValidateSpecRejects/check_without_kind",
+      "spec_raw": "{\"schema\": {}, \"checks\": [{\"path\": \"$.a\"}]}",
+      "expect_error_contains": "json_schema spec",
+      "go_error": "json_schema spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/checks/0': 'oneOf' failed, none matched\n  - at '/checks/0': missing property 'equals'\n  - at '/checks/0': missing property 'regex'\n  - at '/checks/0': missing property 'numeric'"
+    },
+    {
+      "id": "check with two kinds",
+      "go_test": "jsonschema.TestValidateSpecRejects/check_with_two_kinds",
+      "spec_raw": "{\"schema\": {}, \"checks\": [{\"path\": \"$.a\", \"equals\": 1, \"numeric\": 1}]}",
+      "expect_error_contains": "json_schema spec",
+      "go_error": "json_schema spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/checks/0': 'oneOf' failed, subschemas 0, 2 matched"
+    },
+    {
+      "id": "tolerance without numeric",
+      "go_test": "jsonschema.TestValidateSpecRejects/tolerance_without_numeric",
+      "spec_raw": "{\"schema\": {}, \"checks\": [{\"path\": \"$.a\", \"equals\": 1, \"tolerance\": 0.1}]}",
+      "expect_error_contains": "json_schema spec",
+      "go_error": "json_schema spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/checks/0': properties 'numeric' required, if 'tolerance' exists"
+    },
+    {
+      "id": "negative tolerance",
+      "go_test": "jsonschema.TestValidateSpecRejects/negative_tolerance",
+      "spec_raw": "{\"schema\": {}, \"checks\": [{\"path\": \"$.a\", \"numeric\": 1, \"tolerance\": -0.1}]}",
+      "expect_error_contains": "json_schema spec",
+      "go_error": "json_schema spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/checks/0/tolerance': minimum: got -0.1, want 0"
+    },
+    {
+      "id": "path without dollar",
+      "go_test": "jsonschema.TestValidateSpecRejects/path_without_dollar",
+      "spec_raw": "{\"schema\": {}, \"checks\": [{\"path\": \"a.b\", \"equals\": 1}]}",
+      "expect_error_contains": "json_schema spec",
+      "go_error": "json_schema spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/checks/0/path': 'a.b' does not match pattern '^\\\\$'"
+    },
+    {
+      "id": "bad path segment",
+      "go_test": "jsonschema.TestValidateSpecRejects/bad_path_segment",
+      "spec_raw": "{\"schema\": {}, \"checks\": [{\"path\": \"$..a\", \"equals\": 1}]}",
+      "expect_error_contains": "empty segment",
+      "go_error": "json_schema spec: checks[0]: path \"$..a\" has an empty segment"
+    },
+    {
+      "id": "bad check regex",
+      "go_test": "jsonschema.TestValidateSpecRejects/bad_check_regex",
+      "spec_raw": "{\"schema\": {}, \"checks\": [{\"path\": \"$.a\", \"regex\": \"(\"}]}",
+      "expect_error_contains": "checks[0]",
+      "go_error": "json_schema spec: checks[0]: error parsing regexp: missing closing ): `\\A(?:()\\z`"
+    },
+    {
+      "id": "uncompilable embedded schema",
+      "go_test": "jsonschema.TestValidateSpecRejects/uncompilable_embedded_schema",
+      "spec_raw": "{\"schema\": {\"type\": \"nope\"}}",
+      "expect_error_contains": "embedded schema",
+      "go_error": "json_schema spec: embedded schema: \"{TASK_SCHEMA_URL}\" is not valid against metaschema: jsonschema validation failed with 'https://json-schema.org/draft/2020-12/schema#'\n- at '': 'allOf' failed\n  - at '/type': 'anyOf' failed\n    - at '/type': value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'\n    - at '/type': got string, want array"
+    },
+    {
+      "id": "unterminated index (probe)",
+      "go_error": "json_schema spec: checks[0]: path \"$.a[1\" has an unterminated index",
+      "valid": false
+    },
+    {
+      "id": "negative index (probe)",
+      "go_error": "json_schema spec: checks[0]: path \"$.a[-1]\" has a bad array index \"-1\"",
+      "valid": false
+    },
+    {
+      "id": "unexpected char (probe)",
+      "go_error": "json_schema spec: checks[0]: path \"$a\": unexpected 'a'",
+      "valid": false
+    },
+    {
+      "id": "boolean schema true (probe)",
+      "go_error": null,
+      "valid": true
+    },
+    {
+      "id": "remote ref (probe)",
+      "go_error": "json_schema spec: embedded schema: failing loading \"https://example.com/x.json\": invalid file url: https://example.com/x.json",
+      "valid": false
+    }
+  ],
+  "extract_json": [
+    {
+      "output": "```json\n{\"a\":1}\n```",
+      "method": "fenced",
+      "extracted": true,
+      "doc": {
+        "a": 1
+      },
+      "go_test": "jsonschema.TestExtractJSON"
+    },
+    {
+      "output": "```\n[1,2]\n```",
+      "method": "fenced",
+      "extracted": true,
+      "doc": [
+        1,
+        2
+      ],
+      "go_test": "jsonschema.TestExtractJSON"
+    },
+    {
+      "output": "```\n42\n```",
+      "method": "fenced",
+      "extracted": true,
+      "doc": 42,
+      "go_test": "jsonschema.TestExtractJSON"
+    },
+    {
+      "output": "```\n{\"a\":1} extra\n```",
+      "method": "bare",
+      "extracted": true,
+      "doc": {
+        "a": 1
+      },
+      "go_test": "jsonschema.TestExtractJSON"
+    },
+    {
+      "output": "the result: {\"a\": 1} done",
+      "method": "bare",
+      "extracted": true,
+      "doc": {
+        "a": 1
+      },
+      "go_test": "jsonschema.TestExtractJSON"
+    },
+    {
+      "output": "list [1, 2, 3] end",
+      "method": "bare",
+      "extracted": true,
+      "doc": [
+        1,
+        2,
+        3
+      ],
+      "go_test": "jsonschema.TestExtractJSON"
+    },
+    {
+      "output": "set {not json} then {\"a\":1}",
+      "method": "bare",
+      "extracted": true,
+      "doc": {
+        "a": 1
+      },
+      "go_test": "jsonschema.TestExtractJSON"
+    },
+    {
+      "output": "the answer is 42",
+      "method": "",
+      "extracted": false,
+      "doc": null,
+      "go_test": "jsonschema.TestExtractJSON"
+    },
+    {
+      "output": "no structured data here",
+      "method": "",
+      "extracted": false,
+      "doc": null,
+      "go_test": "jsonschema.TestExtractJSON"
+    },
+    {
+      "output": "  ```json\n{\"a\":2}\n  ```",
+      "method": "fenced",
+      "extracted": true,
+      "doc": {
+        "a": 2
+      },
+      "probe": true
+    },
+    {
+      "output": "```json\n\n```\n{\"b\":1}",
+      "method": "bare",
+      "extracted": true,
+      "doc": {
+        "b": 1
+      },
+      "probe": true
+    },
+    {
+      "output": "```\n{\"a\":1}",
+      "method": "bare",
+      "extracted": true,
+      "doc": {
+        "a": 1
+      },
+      "probe": true
+    },
+    {
+      "output": "```\n\"str\"\n```",
+      "method": "fenced",
+      "extracted": true,
+      "doc": "str",
+      "probe": true
+    },
+    {
+      "output": "```\nnull\n```",
+      "method": "fenced",
+      "extracted": true,
+      "doc": null,
+      "probe": true
+    },
+    {
+      "output": "{\"a\":1}{\"b\":2}",
+      "method": "bare",
+      "extracted": true,
+      "doc": {
+        "a": 1
+      },
+      "probe": true
+    },
+    {
+      "output": "[1,2",
+      "method": "",
+      "extracted": false,
+      "doc": null,
+      "probe": true
+    },
+    {
+      "output": "{\"a\":1e400}",
+      "method": "bare",
+      "extracted": true,
+      "doc": {
+        "a": {
+          "json_number": "1e400"
+        }
+      },
+      "probe": true,
+      "note": "number kept as the literal json.Number '1e400'; numeric comparisons on it fail (Float64 overflows)"
+    },
+    {
+      "output": "{\"a\":\"\\ud800\"}",
+      "method": "bare",
+      "extracted": true,
+      "doc": {
+        "a": "�"
+      },
+      "probe": true,
+      "note": "lone surrogate escape decodes to U+FFFD"
+    },
+    {
+      "output": "```js\n{\"a\":1}\n```\n```\n{\"b\":2}\n```",
+      "method": "fenced",
+      "extracted": true,
+      "doc": {
+        "a": 1
+      },
+      "probe": true
+    },
+    {
+      "output": "{\"a\":1,\"a\":2}",
+      "method": "bare",
+      "extracted": true,
+      "doc": {
+        "a": 2
+      },
+      "probe": true
+    }
+  ],
+  "grade_probes": [
+    {
+      "spec": "{\"schema\":{\"type\":\"object\",\"properties\":{\"d\":{\"type\":\"string\",\"format\":\"date\"}}}}",
+      "output": "{\"d\":\"not-a-date\"}",
+      "dimensions": {
+        "schema_validity": 1
+      },
+      "detail_exact_bytes": "{\"extraction\":\"bare\",\"schema_valid\":true}"
+    },
+    {
+      "spec": "{\"schema\":{\"type\":\"object\",\"properties\":{\"e\":{\"format\":\"email\"}}}}",
+      "output": "{\"e\":\"nope\"}",
+      "dimensions": {
+        "schema_validity": 1
+      },
+      "detail_exact_bytes": "{\"extraction\":\"bare\",\"schema_valid\":true}"
+    },
+    {
+      "spec": "{\"schema\":{\"type\":\"integer\"}}",
+      "output": "[1.0]",
+      "dimensions": {
+        "schema_validity": 0
+      },
+      "detail_exact_bytes": "{\"extraction\":\"bare\",\"schema_valid\":false,\"schema_errors\":[\"/: type\"]}"
+    },
+    {
+      "spec": "{\"schema\":{\"type\":\"array\",\"items\":{\"type\":\"integer\"}}}",
+      "output": "[1.0, 2.5]",
+      "dimensions": {
+        "schema_validity": 0
+      },
+      "detail_exact_bytes": "{\"extraction\":\"bare\",\"schema_valid\":false,\"schema_errors\":[\"/1: type\"]}"
+    },
+    {
+      "spec": "{\"schema\":{\"type\":\"object\",\"required\":[\"a\",\"b\"],\"properties\":{\"c\":{\"type\":\"string\"}}}}",
+      "output": "{\"c\":5}",
+      "dimensions": {
+        "schema_validity": 0
+      },
+      "detail_exact_bytes": "{\"extraction\":\"bare\",\"schema_valid\":false,\"schema_errors\":[\"/: required\",\"/c: type\"]}"
+    },
+    {
+      "spec": "{\"schema\":{\"type\":\"object\"},\"checks\":[{\"path\":\"$.n\",\"numeric\":5}]}",
+      "output": "{\"n\":\"5\"}",
+      "dimensions": {
+        "field_accuracy": 1,
+        "schema_validity": 1
+      },
+      "detail_exact_bytes": "{\"extraction\":\"bare\",\"schema_valid\":true,\"checks\":[{\"path\":\"$.n\",\"kind\":\"numeric\",\"pass\":true,\"got\":\"\\\"5\\\"\"}]}"
+    },
+    {
+      "spec": "{\"schema\":{\"type\":\"object\"},\"checks\":[{\"path\":\"$.n\",\"equals\":5}]}",
+      "output": "{\"n\":5.0}",
+      "dimensions": {
+        "field_accuracy": 1,
+        "schema_validity": 1
+      },
+      "detail_exact_bytes": "{\"extraction\":\"bare\",\"schema_valid\":true,\"checks\":[{\"path\":\"$.n\",\"kind\":\"equals\",\"pass\":true,\"got\":\"5.0\"}]}"
+    },
+    {
+      "spec": "{\"schema\":{\"type\":\"object\"},\"checks\":[{\"path\":\"$.n\",\"equals\":\"5\"}]}",
+      "output": "{\"n\":5}",
+      "dimensions": {
+        "field_accuracy": 0,
+        "schema_validity": 1
+      },
+      "detail_exact_bytes": "{\"extraction\":\"bare\",\"schema_valid\":true,\"checks\":[{\"path\":\"$.n\",\"kind\":\"equals\",\"pass\":false,\"got\":\"5\"}]}"
+    },
+    {
+      "spec": "{\"schema\":{\"type\":\"object\"},\"checks\":[{\"path\":\"$.n\",\"regex\":\"5\"}]}",
+      "output": "{\"n\":5}",
+      "dimensions": {
+        "field_accuracy": 0,
+        "schema_validity": 1
+      },
+      "detail_exact_bytes": "{\"extraction\":\"bare\",\"schema_valid\":true,\"checks\":[{\"path\":\"$.n\",\"kind\":\"regex\",\"pass\":false,\"got\":\"5\"}]}"
+    },
+    {
+      "spec": "{\"schema\":{\"type\":\"object\"},\"checks\":[{\"path\":\"$.n\",\"equals\":null}]}",
+      "output": "{\"n\":null}",
+      "dimensions": {
+        "field_accuracy": 1,
+        "schema_validity": 1
+      },
+      "detail_exact_bytes": "{\"extraction\":\"bare\",\"schema_valid\":true,\"checks\":[{\"path\":\"$.n\",\"kind\":\"equals\",\"pass\":true,\"got\":\"null\"}]}"
+    },
+    {
+      "spec": "{\"schema\":{\"type\":\"object\"},\"checks\":[{\"path\":\"$.n\",\"equals\":null}]}",
+      "output": "{}",
+      "dimensions": {
+        "field_accuracy": 0,
+        "schema_validity": 1
+      },
+      "detail_exact_bytes": "{\"extraction\":\"bare\",\"schema_valid\":true,\"checks\":[{\"path\":\"$.n\",\"kind\":\"equals\",\"pass\":false}]}"
+    },
+    {
+      "spec": "{\"schema\":{\"type\":\"object\"},\"checks\":[{\"path\":\"$\",\"equals\":{\"a\":[1,2]}}]}",
+      "output": "{\"a\":[1.0,2]}",
+      "dimensions": {
+        "field_accuracy": 1,
+        "schema_validity": 1
+      },
+      "detail_exact_bytes": "{\"extraction\":\"bare\",\"schema_valid\":true,\"checks\":[{\"path\":\"$\",\"kind\":\"equals\",\"pass\":true,\"got\":\"{\\\"a\\\":[1.0,2]}\"}]}"
+    },
+    {
+      "spec": "{\"schema\":{\"type\":\"object\"},\"checks\":[{\"path\":\"$.a[1].b\",\"equals\":\"x\"}]}",
+      "output": "{\"a\":[{},{\"b\":\"x\"}]}",
+      "dimensions": {
+        "field_accuracy": 1,
+        "schema_validity": 1
+      },
+      "detail_exact_bytes": "{\"extraction\":\"bare\",\"schema_valid\":true,\"checks\":[{\"path\":\"$.a[1].b\",\"kind\":\"equals\",\"pass\":true,\"got\":\"\\\"x\\\"\"}]}"
+    },
+    {
+      "spec": "{\"schema\":{\"type\":\"object\"},\"checks\":[{\"path\":\"$.s\",\"equals\":\"é\"}]}",
+      "output": "{\"s\":\"\\u00e9\"}",
+      "dimensions": {
+        "field_accuracy": 1,
+        "schema_validity": 1
+      },
+      "detail_exact_bytes": "{\"extraction\":\"bare\",\"schema_valid\":true,\"checks\":[{\"path\":\"$.s\",\"kind\":\"equals\",\"pass\":true,\"got\":\"\\\"é\\\"\"}]}"
+    },
+    {
+      "spec": "{\"schema\":{\"type\":\"object\"},\"checks\":[{\"path\":\"$.s\",\"equals\":\"<>&\"}]}",
+      "output": "{\"s\":\"<>&\"}",
+      "dimensions": {
+        "field_accuracy": 1,
+        "schema_validity": 1
+      },
+      "detail_exact_bytes": "{\"extraction\":\"bare\",\"schema_valid\":true,\"checks\":[{\"path\":\"$.s\",\"kind\":\"equals\",\"pass\":true,\"got\":\"\\\"\\\\u003c\\\\u003e\\\\u0026\\\"\"}]}"
+    },
+    {
+      "spec": "{\"schema\":true}",
+      "output": "no json",
+      "dimensions": {
+        "schema_validity": 0
+      },
+      "detail_exact_bytes": "{\"extraction\":\"none\",\"schema_valid\":false}"
+    },
+    {
+      "spec": "{\"schema\":false}",
+      "output": "{}",
+      "dimensions": {
+        "schema_validity": 0
+      },
+      "detail_exact_bytes": "{\"extraction\":\"bare\",\"schema_valid\":false,\"schema_errors\":[\"/: \"]}"
+    }
+  ],
+  "fixture_results": [
+    {
+      "file": "bad_spec_missing_schema.yaml",
+      "description": "spec payload without the required schema key is rejected at validation",
+      "spec_json": {
+        "checks": [
+          {
+            "equals": "x",
+            "path": "$.name"
+          }
+        ]
+      },
+      "output": "irrelevant",
+      "validate_error": "json_schema spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '': missing property 'schema'",
+      "failure_counter": 0
+    },
+    {
+      "file": "bare_object_in_prose.yaml",
+      "description": "bare JSON object embedded in prose is extracted and validates",
+      "spec_json": {
+        "schema": {
+          "properties": {
+            "status": {
+              "enum": [
+                "ok",
+                "error"
+              ]
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        }
+      },
+      "output": "Sure! The result is {\"status\": \"ok\"} — let me know if you need anything else.",
+      "dimensions": {
+        "schema_validity": 1
+      },
+      "detail": {
+        "extraction": "bare",
+        "schema_valid": true
+      },
+      "detail_exact_bytes": "{\"extraction\":\"bare\",\"schema_valid\":true}",
+      "failure_counter": 0
+    },
+    {
+      "file": "checks_half_pass.yaml",
+      "description": "field_accuracy is the fraction of checks passed",
+      "spec_json": {
+        "checks": [
+          {
+            "equals": "2025-03-01",
+            "path": "$.effective_date"
+          },
+          {
+            "numeric": 12500,
+            "path": "$.payment.amount_usd",
+            "tolerance": 0
+          },
+          {
+            "equals": "Acme Corp",
+            "path": "$.parties[0]"
+          },
+          {
+            "equals": "Beta LLC",
+            "path": "$.parties[1]"
+          }
+        ],
+        "schema": {
+          "properties": {
+            "effective_date": {
+              "type": "string"
+            },
+            "parties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "payment": {
+              "properties": {
+                "amount_usd": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "parties",
+            "effective_date",
+            "payment"
+          ],
+          "type": "object"
+        }
+      },
+      "output": "```json\n{\n  \"parties\": [\"Acme Corp\", \"Gamma GmbH\"],\n  \"effective_date\": \"2025-03-01\",\n  \"payment\": { \"amount_usd\": 12000 }\n}\n```",
+      "dimensions": {
+        "field_accuracy": 0.5,
+        "schema_validity": 1
+      },
+      "detail": {
+        "extraction": "fenced",
+        "schema_valid": true,
+        "checks": [
+          {
+            "path": "$.effective_date",
+            "kind": "equals",
+            "pass": true,
+            "got": "\"2025-03-01\""
+          },
+          {
+            "path": "$.payment.amount_usd",
+            "kind": "numeric",
+            "pass": false,
+            "got": "12000"
+          },
+          {
+            "path": "$.parties[0]",
+            "kind": "equals",
+            "pass": true,
+            "got": "\"Acme Corp\""
+          },
+          {
+            "path": "$.parties[1]",
+            "kind": "equals",
+            "pass": false,
+            "got": "\"Gamma GmbH\""
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"extraction\":\"fenced\",\"schema_valid\":true,\"checks\":[{\"path\":\"$.effective_date\",\"kind\":\"equals\",\"pass\":true,\"got\":\"\\\"2025-03-01\\\"\"},{\"path\":\"$.payment.amount_usd\",\"kind\":\"numeric\",\"pass\":false,\"got\":\"12000\"},{\"path\":\"$.parties[0]\",\"kind\":\"equals\",\"pass\":true,\"got\":\"\\\"Acme Corp\\\"\"},{\"path\":\"$.parties[1]\",\"kind\":\"equals\",\"pass\":false,\"got\":\"\\\"Gamma GmbH\\\"\"}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "envelope_spec_example.yaml",
+      "description": "cmd §8.1-style envelope with schema_validity and field_accuracy mapping",
+      "spec_json": {
+        "checks": [
+          {
+            "equals": "2025-03-01",
+            "path": "$.effective_date"
+          },
+          {
+            "numeric": 12500,
+            "path": "$.payment.amount_usd",
+            "tolerance": 0
+          }
+        ],
+        "schema": {
+          "properties": {
+            "effective_date": {
+              "type": "string"
+            },
+            "parties": {
+              "items": {
+                "type": "string"
+              },
+              "minItems": 2,
+              "type": "array"
+            },
+            "payment": {
+              "properties": {
+                "amount_usd": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "amount_usd"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "parties",
+            "effective_date",
+            "payment"
+          ],
+          "type": "object"
+        }
+      },
+      "output": "```json\n{\n  \"parties\": [\"Acme Corp\", \"Beta LLC\"],\n  \"effective_date\": \"2025-03-01\",\n  \"payment\": { \"amount_usd\": 12500 }\n}\n```",
+      "dimensions": {
+        "field_accuracy": 1,
+        "schema_validity": 1
+      },
+      "detail": {
+        "extraction": "fenced",
+        "schema_valid": true,
+        "checks": [
+          {
+            "path": "$.effective_date",
+            "kind": "equals",
+            "pass": true,
+            "got": "\"2025-03-01\""
+          },
+          {
+            "path": "$.payment.amount_usd",
+            "kind": "numeric",
+            "pass": true,
+            "got": "12500"
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"extraction\":\"fenced\",\"schema_valid\":true,\"checks\":[{\"path\":\"$.effective_date\",\"kind\":\"equals\",\"pass\":true,\"got\":\"\\\"2025-03-01\\\"\"},{\"path\":\"$.payment.amount_usd\",\"kind\":\"numeric\",\"pass\":true,\"got\":\"12500\"}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "fenced_valid_checks_pass.yaml",
+      "description": "fenced JSON block validates and both per-field checks pass",
+      "spec_json": {
+        "checks": [
+          {
+            "equals": "Acme Corp",
+            "path": "$.name"
+          },
+          {
+            "numeric": 12500,
+            "path": "$.amount",
+            "tolerance": 0
+          }
+        ],
+        "schema": {
+          "properties": {
+            "amount": {
+              "type": "number"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "amount"
+          ],
+          "type": "object"
+        }
+      },
+      "output": "Here is the extraction you asked for:\n\n```json\n{ \"name\": \"Acme Corp\", \"amount\": 12500 }\n```",
+      "dimensions": {
+        "field_accuracy": 1,
+        "schema_validity": 1
+      },
+      "detail": {
+        "extraction": "fenced",
+        "schema_valid": true,
+        "checks": [
+          {
+            "path": "$.name",
+            "kind": "equals",
+            "pass": true,
+            "got": "\"Acme Corp\""
+          },
+          {
+            "path": "$.amount",
+            "kind": "numeric",
+            "pass": true,
+            "got": "12500"
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"extraction\":\"fenced\",\"schema_valid\":true,\"checks\":[{\"path\":\"$.name\",\"kind\":\"equals\",\"pass\":true,\"got\":\"\\\"Acme Corp\\\"\"},{\"path\":\"$.amount\",\"kind\":\"numeric\",\"pass\":true,\"got\":\"12500\"}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "fenced_wins_over_bare.yaml",
+      "description": "a parseable fenced block takes precedence over earlier bare JSON in prose",
+      "spec_json": {
+        "checks": [
+          {
+            "equals": "final",
+            "path": "$.answer"
+          }
+        ],
+        "schema": {
+          "properties": {
+            "answer": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "answer"
+          ],
+          "type": "object"
+        }
+      },
+      "output": "My draft was {\"answer\": \"draft\"} but the final version is below.\n\n```json\n{\"answer\": \"final\"}\n```",
+      "dimensions": {
+        "field_accuracy": 1,
+        "schema_validity": 1
+      },
+      "detail": {
+        "extraction": "fenced",
+        "schema_valid": true,
+        "checks": [
+          {
+            "path": "$.answer",
+            "kind": "equals",
+            "pass": true,
+            "got": "\"final\""
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"extraction\":\"fenced\",\"schema_valid\":true,\"checks\":[{\"path\":\"$.answer\",\"kind\":\"equals\",\"pass\":true,\"got\":\"\\\"final\\\"\"}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "malformed_json_scores_zero.yaml",
+      "description": "adversarial — malformed JSON (dangling value) is a 0 score, not a grader error",
+      "spec_json": {
+        "checks": [
+          {
+            "numeric": 12500,
+            "path": "$.amount",
+            "tolerance": 0
+          }
+        ],
+        "schema": {
+          "properties": {
+            "amount": {
+              "type": "number"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "amount"
+          ],
+          "type": "object"
+        }
+      },
+      "output": "```json\n{ \"name\": \"Acme Corp\", \"amount\": }\n```",
+      "dimensions": {
+        "field_accuracy": 0,
+        "schema_validity": 0
+      },
+      "detail": {
+        "extraction": "none",
+        "schema_valid": false,
+        "checks": [
+          {
+            "path": "$.amount",
+            "kind": "numeric",
+            "pass": false
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"extraction\":\"none\",\"schema_valid\":false,\"checks\":[{\"path\":\"$.amount\",\"kind\":\"numeric\",\"pass\":false}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "no_json_prose.yaml",
+      "description": "pure prose with no JSON anywhere scores schema_validity 0",
+      "spec_json": {
+        "schema": {
+          "type": "object"
+        }
+      },
+      "output": "I'm sorry, I can't produce structured data for that request, but the\nagreement names Acme Corp and runs for 24 months.",
+      "dimensions": {
+        "schema_validity": 0
+      },
+      "detail": {
+        "extraction": "none",
+        "schema_valid": false
+      },
+      "detail_exact_bytes": "{\"extraction\":\"none\",\"schema_valid\":false}",
+      "failure_counter": 0
+    },
+    {
+      "file": "numeric_tolerance_check.yaml",
+      "description": "numeric check passes within tolerance, fails outside it",
+      "spec_json": {
+        "checks": [
+          {
+            "numeric": 0.25,
+            "path": "$.confidence",
+            "tolerance": 0.01
+          },
+          {
+            "numeric": 12,
+            "path": "$.count",
+            "tolerance": 0
+          }
+        ],
+        "schema": {
+          "properties": {
+            "confidence": {
+              "type": "number"
+            },
+            "count": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "confidence",
+            "count"
+          ],
+          "type": "object"
+        }
+      },
+      "output": "```json\n{ \"confidence\": 0.245, \"count\": 13 }\n```",
+      "dimensions": {
+        "field_accuracy": 0.5,
+        "schema_validity": 1
+      },
+      "detail": {
+        "extraction": "fenced",
+        "schema_valid": true,
+        "checks": [
+          {
+            "path": "$.confidence",
+            "kind": "numeric",
+            "pass": true,
+            "got": "0.245"
+          },
+          {
+            "path": "$.count",
+            "kind": "numeric",
+            "pass": false,
+            "got": "13"
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"extraction\":\"fenced\",\"schema_valid\":true,\"checks\":[{\"path\":\"$.confidence\",\"kind\":\"numeric\",\"pass\":true,\"got\":\"0.245\"},{\"path\":\"$.count\",\"kind\":\"numeric\",\"pass\":false,\"got\":\"13\"}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "regex_check_and_missing_path.yaml",
+      "description": "regex check is anchored to the whole field value; a missing path fails its check",
+      "spec_json": {
+        "checks": [
+          {
+            "path": "$.effective_date",
+            "regex": "\\d{4}-\\d{2}-\\d{2}"
+          },
+          {
+            "path": "$.termination_date",
+            "regex": "\\d{4}-\\d{2}-\\d{2}"
+          }
+        ],
+        "schema": {
+          "properties": {
+            "effective_date": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "effective_date"
+          ],
+          "type": "object"
+        }
+      },
+      "output": "```json\n{ \"effective_date\": \"2025-03-01\" }\n```",
+      "dimensions": {
+        "field_accuracy": 0.5,
+        "schema_validity": 1
+      },
+      "detail": {
+        "extraction": "fenced",
+        "schema_valid": true,
+        "checks": [
+          {
+            "path": "$.effective_date",
+            "kind": "regex",
+            "pass": true,
+            "got": "\"2025-03-01\""
+          },
+          {
+            "path": "$.termination_date",
+            "kind": "regex",
+            "pass": false
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"extraction\":\"fenced\",\"schema_valid\":true,\"checks\":[{\"path\":\"$.effective_date\",\"kind\":\"regex\",\"pass\":true,\"got\":\"\\\"2025-03-01\\\"\"},{\"path\":\"$.termination_date\",\"kind\":\"regex\",\"pass\":false}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "schema_invalid_checks_still_run.yaml",
+      "description": "schema-invalid document (missing required field) still gets its field checks evaluated",
+      "spec_json": {
+        "checks": [
+          {
+            "equals": "Acme Corp",
+            "path": "$.name"
+          }
+        ],
+        "schema": {
+          "properties": {
+            "amount": {
+              "type": "number"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "amount"
+          ],
+          "type": "object"
+        }
+      },
+      "output": "```json\n{ \"name\": \"Acme Corp\" }\n```",
+      "dimensions": {
+        "field_accuracy": 1,
+        "schema_validity": 0
+      },
+      "detail": {
+        "extraction": "fenced",
+        "schema_valid": false,
+        "schema_errors": [
+          "/: required"
+        ],
+        "checks": [
+          {
+            "path": "$.name",
+            "kind": "equals",
+            "pass": true,
+            "got": "\"Acme Corp\""
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"extraction\":\"fenced\",\"schema_valid\":false,\"schema_errors\":[\"/: required\"],\"checks\":[{\"path\":\"$.name\",\"kind\":\"equals\",\"pass\":true,\"got\":\"\\\"Acme Corp\\\"\"}]}",
+      "failure_counter": 0
+    }
+  ]
+}

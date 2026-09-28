@@ -1,0 +1,10 @@
+description: a present forbidden fact with autofail true records the cmd §4 autofail marker in the detail
+spec:
+  forbidden_facts:
+    - { id: fabricated_citation, any_of: ["Smith v. Jones (2021)"], weight: 1, autofail: true }
+    - { id: distractor_2019_date, any_of: ["2019-06-15"], weight: 1 }
+output: |-
+  As held in Smith v. Jones (2021), the filing deadline is jurisdictional.
+expect:
+  dimensions: { hallucination_free: 0.0 }
+  detail_contains: ['"id":"fabricated_citation"', '"found":true', '"autofail":true']

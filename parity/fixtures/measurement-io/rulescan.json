@@ -1,0 +1,886 @@
+{
+  "about": "rule_scan grader. Error strings are exact Go output except '{SPEC_SCHEMA_URL}' / '{TASK_SCHEMA_URL}', which Go renders as 'file://<process cwd>/spec.schema.json#' (cwd-dependent, see QUIRK in behavior doc). Text after the 'jsonschema validation failed with' marker is santhosh-tekuri/jsonschema v6 library wording; parity requirement is the prefix up to and including '<kind> spec: ' plus the pass/fail decision, and 'contains' checks named in go_test_expect.",
+  "go_tests": {
+    "rulescan.TestKind": {
+      "expect_kind": "rule_scan"
+    },
+    "rulescan.TestValidateSpecAccepts": {
+      "spec": {
+        "rules": [
+          {
+            "must_include": "\\bWHERE\\b",
+            "regex": true,
+            "weight": 2,
+            "critical": false
+          },
+          {
+            "must_not_include": "as an ai",
+            "case_insensitive": true
+          },
+          {
+            "max_length_chars": 500
+          },
+          {
+            "max_length_words": 80
+          },
+          {
+            "line_count": {
+              "min": 1,
+              "max": 10
+            }
+          },
+          {
+            "language": "fr"
+          }
+        ]
+      },
+      "expect": "valid"
+    }
+  },
+  "validate_spec_rejects": [
+    {
+      "id": "not json",
+      "go_test": "rulescan.TestValidateSpecRejects/not_json",
+      "spec_raw": "[",
+      "expect_error_contains": "rule_scan spec",
+      "go_error": "rule_scan spec: unexpected EOF"
+    },
+    {
+      "id": "missing rules",
+      "go_test": "rulescan.TestValidateSpecRejects/missing_rules",
+      "spec_raw": "{}",
+      "expect_error_contains": "rule_scan spec",
+      "go_error": "rule_scan spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '': missing property 'rules'"
+    },
+    {
+      "id": "empty rules",
+      "go_test": "rulescan.TestValidateSpecRejects/empty_rules",
+      "spec_raw": "{\"rules\": []}",
+      "expect_error_contains": "rule_scan spec",
+      "go_error": "rule_scan spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/rules': minItems: got 0, want 1"
+    },
+    {
+      "id": "rule without kind",
+      "go_test": "rulescan.TestValidateSpecRejects/rule_without_kind",
+      "spec_raw": "{\"rules\": [{\"weight\": 1}]}",
+      "expect_error_contains": "rule_scan spec",
+      "go_error": "rule_scan spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/rules/0': 'oneOf' failed, none matched\n  - at '/rules/0': missing property 'must_include'\n  - at '/rules/0': missing property 'must_not_include'\n  - at '/rules/0': missing property 'max_length_chars'\n  - at '/rules/0': missing property 'max_length_words'\n  - at '/rules/0': missing property 'line_count'\n  - at '/rules/0': missing property 'language'"
+    },
+    {
+      "id": "two kinds in one rule",
+      "go_test": "rulescan.TestValidateSpecRejects/two_kinds_in_one_rule",
+      "spec_raw": "{\"rules\": [{\"must_include\": \"a\", \"max_length_chars\": 10}]}",
+      "expect_error_contains": "rule_scan spec",
+      "go_error": "rule_scan spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/rules/0': 'oneOf' failed, subschemas 0, 2 matched"
+    },
+    {
+      "id": "regex flag on length rule",
+      "go_test": "rulescan.TestValidateSpecRejects/regex_flag_on_length_rule",
+      "spec_raw": "{\"rules\": [{\"max_length_chars\": 10, \"regex\": true}]}",
+      "expect_error_contains": "rule_scan spec",
+      "go_error": "rule_scan spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/rules/0': 'anyOf' failed\n  - at '/rules/0': missing property 'must_include'\n  - at '/rules/0': missing property 'must_not_include'"
+    },
+    {
+      "id": "bad regex",
+      "go_test": "rulescan.TestValidateSpecRejects/bad_regex",
+      "spec_raw": "{\"rules\": [{\"must_include\": \"(\", \"regex\": true}]}",
+      "expect_error_contains": "rules[0]",
+      "go_error": "rule_scan spec: rules[0]: error parsing regexp: missing closing ): `(`"
+    },
+    {
+      "id": "zero weight",
+      "go_test": "rulescan.TestValidateSpecRejects/zero_weight",
+      "spec_raw": "{\"rules\": [{\"must_include\": \"a\", \"weight\": 0}]}",
+      "expect_error_contains": "rule_scan spec",
+      "go_error": "rule_scan spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/rules/0/weight': exclusiveMinimum: got 0, want 0"
+    },
+    {
+      "id": "unknown language",
+      "go_test": "rulescan.TestValidateSpecRejects/unknown_language",
+      "spec_raw": "{\"rules\": [{\"language\": \"tlh\"}]}",
+      "expect_error_contains": "rule_scan spec",
+      "go_error": "rule_scan spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/rules/0/language': value must be one of 'en', 'es', 'fr', 'de', 'it', 'pt', 'nl', 'ru', 'zh', 'ja', 'ko', 'ar', 'he', 'el', 'hi', 'th'"
+    },
+    {
+      "id": "empty line_count bounds",
+      "go_test": "rulescan.TestValidateSpecRejects/empty_line_count_bounds",
+      "spec_raw": "{\"rules\": [{\"line_count\": {}}]}",
+      "expect_error_contains": "rule_scan spec",
+      "go_error": "rule_scan spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/rules/0/line_count': 'oneOf' failed, none matched\n  - at '/rules/0/line_count': got object, want integer\n  - at '/rules/0/line_count': minProperties: got 0, want 1"
+    },
+    {
+      "id": "inverted line_count bounds",
+      "go_test": "rulescan.TestValidateSpecRejects/inverted_line_count_bounds",
+      "spec_raw": "{\"rules\": [{\"line_count\": {\"min\": 5, \"max\": 2}}]}",
+      "expect_error_contains": "min 5 > max 2",
+      "go_error": "rule_scan spec: rules[0]: line_count: min 5 > max 2"
+    },
+    {
+      "id": "unknown rule field",
+      "go_test": "rulescan.TestValidateSpecRejects/unknown_rule_field",
+      "spec_raw": "{\"rules\": [{\"must_include\": \"a\", \"severity\": \"high\"}]}",
+      "expect_error_contains": "rule_scan spec",
+      "go_error": "rule_scan spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/rules/0': additional properties 'severity' not allowed"
+    },
+    {
+      "id": "case_insensitive on length (probe)",
+      "go_error": "rule_scan spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/rules/0': 'anyOf' failed\n  - at '/rules/0': missing property 'must_include'\n  - at '/rules/0': missing property 'must_not_include'"
+    },
+    {
+      "id": "line_count float (probe)",
+      "go_error": "rule_scan spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/rules/0/line_count': 'oneOf' failed, none matched\n  - at '/rules/0/line_count': got number, want integer\n  - at '/rules/0/line_count': got number, want object"
+    },
+    {
+      "id": "max_length_chars 1.0 (probe)",
+      "go_error": "rule_scan spec: json: cannot unmarshal number 1.0 into Go struct field rule.rules.max_length_chars of type int"
+    }
+  ],
+  "count_lines": [
+    {
+      "in": "",
+      "out": 0,
+      "go_test": "rulescan.TestCountLines"
+    },
+    {
+      "in": "   \n\n",
+      "out": 0,
+      "go_test": "rulescan.TestCountLines"
+    },
+    {
+      "in": "one line",
+      "out": 1,
+      "go_test": "rulescan.TestCountLines"
+    },
+    {
+      "in": "one line\n",
+      "out": 1,
+      "go_test": "rulescan.TestCountLines"
+    },
+    {
+      "in": "a\nb\nc",
+      "out": 3,
+      "go_test": "rulescan.TestCountLines"
+    },
+    {
+      "in": "a\nb\nc\r\n",
+      "out": 3,
+      "go_test": "rulescan.TestCountLines"
+    },
+    {
+      "in": "a\r\nb",
+      "out": 2,
+      "probe": true
+    },
+    {
+      "in": "\n\na",
+      "out": 3,
+      "probe": true
+    },
+    {
+      "in": "a\n\n\nb",
+      "out": 4,
+      "probe": true
+    },
+    {
+      "in": "a\n \n",
+      "out": 2,
+      "probe": true
+    },
+    {
+      "in": "a\rb",
+      "out": 1,
+      "probe": true
+    },
+    {
+      "in": "a\n\r\n\r",
+      "out": 1,
+      "probe": true
+    }
+  ],
+  "language_matches": [
+    {
+      "code": "fr",
+      "output": "Le contrat est signé par les deux parties et il ne peut pas être modifié sans une notification écrite.",
+      "match": true,
+      "go_test": "rulescan.TestLanguageMatches"
+    },
+    {
+      "code": "en",
+      "output": "Le contrat est signé par les deux parties et il ne peut pas être modifié sans une notification écrite.",
+      "match": false,
+      "go_test": "rulescan.TestLanguageMatches"
+    },
+    {
+      "code": "en",
+      "output": "The contract is signed by both parties and it cannot be modified without written notice.",
+      "match": true,
+      "go_test": "rulescan.TestLanguageMatches"
+    },
+    {
+      "code": "fr",
+      "output": "The contract is signed by both parties and it cannot be modified without written notice.",
+      "match": false,
+      "go_test": "rulescan.TestLanguageMatches"
+    },
+    {
+      "code": "ja",
+      "output": "この契約は両当事者によって署名され、書面による通知なしに変更することはできません。",
+      "match": true,
+      "go_test": "rulescan.TestLanguageMatches"
+    },
+    {
+      "code": "zh",
+      "output": "この契約は両当事者によって署名され、書面による通知なしに変更することはできません。",
+      "match": false,
+      "go_test": "rulescan.TestLanguageMatches"
+    },
+    {
+      "code": "zh",
+      "output": "本合同由双方签署，未经书面通知不得修改。",
+      "match": true,
+      "go_test": "rulescan.TestLanguageMatches"
+    },
+    {
+      "code": "ja",
+      "output": "本合同由双方签署，未经书面通知不得修改。",
+      "match": false,
+      "go_test": "rulescan.TestLanguageMatches"
+    },
+    {
+      "code": "ru",
+      "output": "Договор подписан обеими сторонами и не может быть изменен без письменного уведомления.",
+      "match": true,
+      "go_test": "rulescan.TestLanguageMatches"
+    },
+    {
+      "code": "ru",
+      "output": "The contract is signed by both parties and it cannot be modified without written notice.",
+      "match": false,
+      "go_test": "rulescan.TestLanguageMatches"
+    },
+    {
+      "code": "en",
+      "output": "",
+      "match": false,
+      "go_test": "rulescan.TestLanguageMatches"
+    },
+    {
+      "code": "en",
+      "output": "42 17 99",
+      "match": false,
+      "go_test": "rulescan.TestLanguageMatches"
+    },
+    {
+      "code": "es",
+      "output": "el perro y la casa",
+      "match": true,
+      "probe": true
+    },
+    {
+      "code": "it",
+      "output": "il cane e la casa",
+      "match": false,
+      "probe": true
+    },
+    {
+      "code": "pt",
+      "output": "o cão e a casa",
+      "match": true,
+      "probe": true
+    },
+    {
+      "code": "en",
+      "output": "the the de de",
+      "match": false,
+      "probe": true
+    },
+    {
+      "code": "en",
+      "output": "The (the) \"the\"",
+      "match": true,
+      "probe": true
+    },
+    {
+      "code": "ko",
+      "output": "안녕하세요 세계",
+      "match": true,
+      "probe": true
+    },
+    {
+      "code": "el",
+      "output": "Καλημέρα κόσμε",
+      "match": true,
+      "probe": true
+    },
+    {
+      "code": "hi",
+      "output": "नमस्ते दुनिया",
+      "match": true,
+      "probe": true
+    },
+    {
+      "code": "th",
+      "output": "สวัสดีชาวโลก",
+      "match": true,
+      "probe": true
+    },
+    {
+      "code": "ar",
+      "output": "مرحبا بالعالم",
+      "match": true,
+      "probe": true
+    },
+    {
+      "code": "he",
+      "output": "שלום עולם",
+      "match": true,
+      "probe": true
+    },
+    {
+      "code": "de",
+      "output": "Der Hund und die Katze",
+      "match": true,
+      "probe": true
+    },
+    {
+      "code": "nl",
+      "output": "het is een test van de",
+      "match": true,
+      "probe": true
+    },
+    {
+      "code": "en",
+      "output": "THE AND IS",
+      "match": true,
+      "probe": true
+    },
+    {
+      "code": "en",
+      "output": "a b c",
+      "match": false,
+      "probe": true
+    }
+  ],
+  "grade_probes": [
+    {
+      "spec": "{\"rules\":[{\"max_length_chars\":3}]}",
+      "output": "héé",
+      "dimensions": {
+        "constraint_compliance": 1
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"max_length_chars\",\"pass\":true,\"weight\":1}],\"score\":1,\"critical_failed\":false}"
+    },
+    {
+      "spec": "{\"rules\":[{\"max_length_chars\":3}]}",
+      "output": "héé!",
+      "dimensions": {
+        "constraint_compliance": 0
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"max_length_chars\",\"pass\":false,\"weight\":1}],\"score\":0,\"critical_failed\":false}"
+    },
+    {
+      "spec": "{\"rules\":[{\"must_include\":\"STRASSE\",\"case_insensitive\":true}]}",
+      "output": "straße",
+      "dimensions": {
+        "constraint_compliance": 0
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"must_include\",\"pass\":false,\"weight\":1}],\"score\":0,\"critical_failed\":false}"
+    },
+    {
+      "spec": "{\"rules\":[{\"must_include\":\"İ\",\"case_insensitive\":true}]}",
+      "output": "i̇",
+      "dimensions": {
+        "constraint_compliance": 1
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"must_include\",\"pass\":true,\"weight\":1}],\"score\":1,\"critical_failed\":false}"
+    },
+    {
+      "spec": "{\"rules\":[{\"must_include\":\"\\\\d\",\"regex\":true}]}",
+      "output": "٣",
+      "dimensions": {
+        "constraint_compliance": 0
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"must_include\",\"pass\":false,\"weight\":1}],\"score\":0,\"critical_failed\":false}"
+    },
+    {
+      "spec": "{\"rules\":[{\"must_include\":\"\\\\bcafé\\\\b\",\"regex\":true}]}",
+      "output": "le café noir",
+      "dimensions": {
+        "constraint_compliance": 0
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"must_include\",\"pass\":false,\"weight\":1}],\"score\":0,\"critical_failed\":false}"
+    },
+    {
+      "spec": "{\"rules\":[{\"must_include\":\"\\\\w+é\",\"regex\":true}]}",
+      "output": "café",
+      "dimensions": {
+        "constraint_compliance": 1
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"must_include\",\"pass\":true,\"weight\":1}],\"score\":1,\"critical_failed\":false}"
+    },
+    {
+      "spec": "{\"rules\":[{\"must_include\":\"^b\",\"regex\":true}]}",
+      "output": "a\nb",
+      "dimensions": {
+        "constraint_compliance": 0
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"must_include\",\"pass\":false,\"weight\":1}],\"score\":0,\"critical_failed\":false}"
+    },
+    {
+      "spec": "{\"rules\":[{\"must_include\":\"a.b\",\"regex\":true}]}",
+      "output": "a\nb",
+      "dimensions": {
+        "constraint_compliance": 0
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"must_include\",\"pass\":false,\"weight\":1}],\"score\":0,\"critical_failed\":false}"
+    },
+    {
+      "spec": "{\"rules\":[{\"must_include\":\"x\",\"weight\":0.1,\"critical\":true},{\"must_include\":\"y\",\"weight\":3}]}",
+      "output": "y",
+      "dimensions": {
+        "constraint_compliance": 0
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"must_include\",\"pass\":false,\"weight\":0.1,\"critical\":true},{\"index\":1,\"kind\":\"must_include\",\"pass\":true,\"weight\":3}],\"score\":0,\"critical_failed\":true}"
+    },
+    {
+      "spec": "{\"rules\":[{\"max_length_words\":2}]}",
+      "output": "a b c",
+      "dimensions": {
+        "constraint_compliance": 0
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"max_length_words\",\"pass\":false,\"weight\":1}],\"score\":0,\"critical_failed\":false}"
+    }
+  ],
+  "fixture_results": [
+    {
+      "file": "bad_spec_rule_without_kind.yaml",
+      "description": "a rule carrying only weight and critical has no kind and is rejected",
+      "spec_json": {
+        "rules": [
+          {
+            "critical": true,
+            "weight": 2
+          }
+        ]
+      },
+      "output": "irrelevant",
+      "validate_error": "rule_scan spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/rules/0': 'oneOf' failed, none matched\n  - at '/rules/0': missing property 'must_include'\n  - at '/rules/0': missing property 'must_not_include'\n  - at '/rules/0': missing property 'max_length_chars'\n  - at '/rules/0': missing property 'max_length_words'\n  - at '/rules/0': missing property 'line_count'\n  - at '/rules/0': missing property 'language'",
+      "failure_counter": 0
+    },
+    {
+      "file": "case_insensitive_literal.yaml",
+      "description": "case_insensitive folds both sides of a literal match",
+      "spec_json": {
+        "rules": [
+          {
+            "case_insensitive": true,
+            "must_include": "select"
+          },
+          {
+            "must_include": "select"
+          }
+        ]
+      },
+      "output": "SELECT * FROM users;",
+      "dimensions": {
+        "constraint_compliance": 0.5
+      },
+      "detail": {
+        "rules": [
+          {
+            "index": 0,
+            "kind": "must_include",
+            "pass": true,
+            "weight": 1
+          },
+          {
+            "index": 1,
+            "kind": "must_include",
+            "pass": false,
+            "weight": 1
+          }
+        ],
+        "score": 0.5,
+        "critical_failed": false
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"must_include\",\"pass\":true,\"weight\":1},{\"index\":1,\"kind\":\"must_include\",\"pass\":false,\"weight\":1}],\"score\":0.5,\"critical_failed\":false}",
+      "failure_counter": 0
+    },
+    {
+      "file": "critical_pass_scores_normally.yaml",
+      "description": "a passing critical rule has no special effect; the non-critical miss just costs its weight",
+      "spec_json": {
+        "rules": [
+          {
+            "critical": true,
+            "must_not_include": "DELETE",
+            "weight": 1
+          },
+          {
+            "must_include": "ORDER BY",
+            "weight": 1
+          }
+        ]
+      },
+      "output": "SELECT name FROM users WHERE id = 1;",
+      "dimensions": {
+        "constraint_compliance": 0.5
+      },
+      "detail": {
+        "rules": [
+          {
+            "index": 0,
+            "kind": "must_not_include",
+            "pass": true,
+            "weight": 1,
+            "critical": true
+          },
+          {
+            "index": 1,
+            "kind": "must_include",
+            "pass": false,
+            "weight": 1
+          }
+        ],
+        "score": 0.5,
+        "critical_failed": false
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"must_not_include\",\"pass\":true,\"weight\":1,\"critical\":true},{\"index\":1,\"kind\":\"must_include\",\"pass\":false,\"weight\":1}],\"score\":0.5,\"critical_failed\":false}",
+      "failure_counter": 0
+    },
+    {
+      "file": "critical_rule_failure_zeroes.yaml",
+      "description": "adversarial — a failed critical rule zeroes the dimension even though every other rule passes",
+      "spec_json": {
+        "rules": [
+          {
+            "must_include": "WHERE",
+            "weight": 5
+          },
+          {
+            "must_include": "LIMIT",
+            "weight": 5
+          },
+          {
+            "critical": true,
+            "must_not_include": "DELETE",
+            "weight": 1
+          }
+        ]
+      },
+      "output": "DELETE FROM users WHERE id = 1 LIMIT 1;",
+      "dimensions": {
+        "constraint_compliance": 0
+      },
+      "detail": {
+        "rules": [
+          {
+            "index": 0,
+            "kind": "must_include",
+            "pass": true,
+            "weight": 5
+          },
+          {
+            "index": 1,
+            "kind": "must_include",
+            "pass": true,
+            "weight": 5
+          },
+          {
+            "index": 2,
+            "kind": "must_not_include",
+            "pass": false,
+            "weight": 1,
+            "critical": true
+          }
+        ],
+        "score": 0,
+        "critical_failed": true
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"must_include\",\"pass\":true,\"weight\":5},{\"index\":1,\"kind\":\"must_include\",\"pass\":true,\"weight\":5},{\"index\":2,\"kind\":\"must_not_include\",\"pass\":false,\"weight\":1,\"critical\":true}],\"score\":0,\"critical_failed\":true}",
+      "failure_counter": 0
+    },
+    {
+      "file": "envelope_where_regex.yaml",
+      "description": "the spec §5.4 example envelope passes on a WHERE-bearing query",
+      "spec_json": {
+        "rules": [
+          {
+            "critical": false,
+            "must_include": "\\bWHERE\\b",
+            "regex": true,
+            "weight": 2
+          }
+        ]
+      },
+      "output": "SELECT * FROM users WHERE id = 1;",
+      "dimensions": {
+        "constraint_compliance": 1
+      },
+      "detail": {
+        "rules": [
+          {
+            "index": 0,
+            "kind": "must_include",
+            "pass": true,
+            "weight": 2
+          }
+        ],
+        "score": 1,
+        "critical_failed": false
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"must_include\",\"pass\":true,\"weight\":2}],\"score\":1,\"critical_failed\":false}",
+      "failure_counter": 0
+    },
+    {
+      "file": "language_french_pass.yaml",
+      "description": "the language rule accepts French output for language fr",
+      "spec_json": {
+        "rules": [
+          {
+            "language": "fr"
+          }
+        ]
+      },
+      "output": "Le contrat est signé par les deux parties et il entre en vigueur dans un\ndélai de trente jours. Les paiements sont dus à la fin de chaque mois, et\nune pénalité ne peut pas être appliquée sans notification écrite.",
+      "dimensions": {
+        "constraint_compliance": 1
+      },
+      "detail": {
+        "rules": [
+          {
+            "index": 0,
+            "kind": "language",
+            "pass": true,
+            "weight": 1
+          }
+        ],
+        "score": 1,
+        "critical_failed": false
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"language\",\"pass\":true,\"weight\":1}],\"score\":1,\"critical_failed\":false}",
+      "failure_counter": 0
+    },
+    {
+      "file": "language_mismatch_fail.yaml",
+      "description": "English output fails a language ja rule, and a critical language rule zeroes the score",
+      "spec_json": {
+        "rules": [
+          {
+            "critical": true,
+            "language": "ja"
+          },
+          {
+            "must_include": "contract"
+          }
+        ]
+      },
+      "output": "The contract is signed by both parties and takes effect in thirty days.",
+      "dimensions": {
+        "constraint_compliance": 0
+      },
+      "detail": {
+        "rules": [
+          {
+            "index": 0,
+            "kind": "language",
+            "pass": false,
+            "weight": 1,
+            "critical": true
+          },
+          {
+            "index": 1,
+            "kind": "must_include",
+            "pass": true,
+            "weight": 1
+          }
+        ],
+        "score": 0,
+        "critical_failed": true
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"language\",\"pass\":false,\"weight\":1,\"critical\":true},{\"index\":1,\"kind\":\"must_include\",\"pass\":true,\"weight\":1}],\"score\":0,\"critical_failed\":true}",
+      "failure_counter": 0
+    },
+    {
+      "file": "length_limits.yaml",
+      "description": "max_length_chars passes while max_length_words fails",
+      "spec_json": {
+        "rules": [
+          {
+            "max_length_chars": 100
+          },
+          {
+            "max_length_words": 5
+          }
+        ]
+      },
+      "output": "this summary has exactly seven words total",
+      "dimensions": {
+        "constraint_compliance": 0.5
+      },
+      "detail": {
+        "rules": [
+          {
+            "index": 0,
+            "kind": "max_length_chars",
+            "pass": true,
+            "weight": 1
+          },
+          {
+            "index": 1,
+            "kind": "max_length_words",
+            "pass": false,
+            "weight": 1
+          }
+        ],
+        "score": 0.5,
+        "critical_failed": false
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"max_length_chars\",\"pass\":true,\"weight\":1},{\"index\":1,\"kind\":\"max_length_words\",\"pass\":false,\"weight\":1}],\"score\":0.5,\"critical_failed\":false}",
+      "failure_counter": 0
+    },
+    {
+      "file": "line_count_exact_and_bounds.yaml",
+      "description": "integer line_count means exact; the bounded form allows a range",
+      "spec_json": {
+        "rules": [
+          {
+            "line_count": 3
+          },
+          {
+            "line_count": {
+              "max": 4,
+              "min": 2
+            }
+          },
+          {
+            "line_count": {
+              "min": 5
+            }
+          }
+        ]
+      },
+      "output": "first line\nsecond line\nthird line",
+      "dimensions": {
+        "constraint_compliance": 0.6666666666666666
+      },
+      "detail": {
+        "rules": [
+          {
+            "index": 0,
+            "kind": "line_count",
+            "pass": true,
+            "weight": 1
+          },
+          {
+            "index": 1,
+            "kind": "line_count",
+            "pass": true,
+            "weight": 1
+          },
+          {
+            "index": 2,
+            "kind": "line_count",
+            "pass": false,
+            "weight": 1
+          }
+        ],
+        "score": 0.6666666666666666,
+        "critical_failed": false
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"line_count\",\"pass\":true,\"weight\":1},{\"index\":1,\"kind\":\"line_count\",\"pass\":true,\"weight\":1},{\"index\":2,\"kind\":\"line_count\",\"pass\":false,\"weight\":1}],\"score\":0.6666666666666666,\"critical_failed\":false}",
+      "failure_counter": 0
+    },
+    {
+      "file": "must_not_include_regex_violation.yaml",
+      "description": "a must_not_include regex rule fails when the forbidden pattern appears",
+      "spec_json": {
+        "rules": [
+          {
+            "must_not_include": "(?i)\\bas an ai\\b",
+            "regex": true
+          },
+          {
+            "case_insensitive": true,
+            "must_include": "\\bpython\\b",
+            "regex": true
+          }
+        ]
+      },
+      "output": "As an AI, I suggest the following Python snippet.",
+      "dimensions": {
+        "constraint_compliance": 0.5
+      },
+      "detail": {
+        "rules": [
+          {
+            "index": 0,
+            "kind": "must_not_include",
+            "pass": false,
+            "weight": 1
+          },
+          {
+            "index": 1,
+            "kind": "must_include",
+            "pass": true,
+            "weight": 1
+          }
+        ],
+        "score": 0.5,
+        "critical_failed": false
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"must_not_include\",\"pass\":false,\"weight\":1},{\"index\":1,\"kind\":\"must_include\",\"pass\":true,\"weight\":1}],\"score\":0.5,\"critical_failed\":false}",
+      "failure_counter": 0
+    },
+    {
+      "file": "weighted_fraction.yaml",
+      "description": "score is the weighted fraction of rules satisfied",
+      "spec_json": {
+        "rules": [
+          {
+            "must_include": "WHERE",
+            "weight": 2
+          },
+          {
+            "must_include": "ORDER BY",
+            "weight": 1
+          },
+          {
+            "must_not_include": "DROP TABLE",
+            "weight": 1
+          }
+        ]
+      },
+      "output": "SELECT * FROM users WHERE id = 1;",
+      "dimensions": {
+        "constraint_compliance": 0.75
+      },
+      "detail": {
+        "rules": [
+          {
+            "index": 0,
+            "kind": "must_include",
+            "pass": true,
+            "weight": 2
+          },
+          {
+            "index": 1,
+            "kind": "must_include",
+            "pass": false,
+            "weight": 1
+          },
+          {
+            "index": 2,
+            "kind": "must_not_include",
+            "pass": true,
+            "weight": 1
+          }
+        ],
+        "score": 0.75,
+        "critical_failed": false
+      },
+      "detail_exact_bytes": "{\"rules\":[{\"index\":0,\"kind\":\"must_include\",\"pass\":true,\"weight\":2},{\"index\":1,\"kind\":\"must_include\",\"pass\":false,\"weight\":1},{\"index\":2,\"kind\":\"must_not_include\",\"pass\":true,\"weight\":1}],\"score\":0.75,\"critical_failed\":false}",
+      "failure_counter": 0
+    }
+  ]
+}

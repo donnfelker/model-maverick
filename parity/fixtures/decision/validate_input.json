@@ -1,0 +1,250 @@
+{
+  "cases": [
+    {
+      "expected": null,
+      "function": "validate_input",
+      "go_test": null,
+      "id": "validate_input/valid_declared",
+      "input": {
+        "constraints": {
+          "max_cost_per_run": null,
+          "max_latency_ms": null
+        },
+        "mode": "",
+        "workload": {
+          "capability": "factual_qa",
+          "difficulty": null,
+          "prompt": ""
+        }
+      }
+    },
+    {
+      "expected": {
+        "code": "invalid_request",
+        "details": {
+          "capability": "telepathy"
+        },
+        "message": "workload.capability \"telepathy\" is not a v1 capability"
+      },
+      "function": "validate_input",
+      "go_test": null,
+      "id": "validate_input/bad_capability",
+      "input": {
+        "constraints": {
+          "max_cost_per_run": null,
+          "max_latency_ms": null
+        },
+        "mode": "",
+        "workload": {
+          "capability": "telepathy",
+          "difficulty": null,
+          "prompt": ""
+        }
+      }
+    },
+    {
+      "expected": {
+        "code": "invalid_request",
+        "details": {
+          "difficulty": 0
+        },
+        "message": "workload.difficulty 0 is out of range 1-5"
+      },
+      "function": "validate_input",
+      "go_test": null,
+      "id": "validate_input/difficulty_0",
+      "input": {
+        "constraints": {
+          "max_cost_per_run": null,
+          "max_latency_ms": null
+        },
+        "mode": "",
+        "workload": {
+          "capability": "factual_qa",
+          "difficulty": 0,
+          "prompt": ""
+        }
+      }
+    },
+    {
+      "expected": {
+        "code": "invalid_request",
+        "details": {
+          "difficulty": 6
+        },
+        "message": "workload.difficulty 6 is out of range 1-5"
+      },
+      "function": "validate_input",
+      "go_test": null,
+      "id": "validate_input/difficulty_6",
+      "input": {
+        "constraints": {
+          "max_cost_per_run": null,
+          "max_latency_ms": null
+        },
+        "mode": "",
+        "workload": {
+          "capability": "factual_qa",
+          "difficulty": 6,
+          "prompt": ""
+        }
+      }
+    },
+    {
+      "expected": null,
+      "function": "validate_input",
+      "go_test": null,
+      "id": "validate_input/difficulty_3",
+      "input": {
+        "constraints": {
+          "max_cost_per_run": null,
+          "max_latency_ms": null
+        },
+        "mode": "",
+        "workload": {
+          "capability": "factual_qa",
+          "difficulty": 3,
+          "prompt": ""
+        }
+      }
+    },
+    {
+      "expected": {
+        "code": "invalid_request",
+        "details": {
+          "mode": "fast"
+        },
+        "message": "mode \"fast\" is not one of quality, balanced, cost"
+      },
+      "function": "validate_input",
+      "go_test": null,
+      "id": "validate_input/bad_mode",
+      "input": {
+        "constraints": {
+          "max_cost_per_run": null,
+          "max_latency_ms": null
+        },
+        "mode": "fast",
+        "workload": {
+          "capability": "factual_qa",
+          "difficulty": null,
+          "prompt": ""
+        }
+      }
+    },
+    {
+      "expected": null,
+      "function": "validate_input",
+      "go_test": null,
+      "id": "validate_input/prompt_path_skips_capability",
+      "input": {
+        "constraints": {
+          "max_cost_per_run": null,
+          "max_latency_ms": null
+        },
+        "mode": "",
+        "workload": {
+          "capability": "telepathy",
+          "difficulty": null,
+          "prompt": "hi"
+        }
+      }
+    },
+    {
+      "expected": {
+        "code": "invalid_request",
+        "details": {
+          "field": "max_cost_per_run"
+        },
+        "message": "constraints.max_cost_per_run must be greater than 0"
+      },
+      "function": "validate_input",
+      "go_test": null,
+      "id": "validate_input/neg_cost",
+      "input": {
+        "constraints": {
+          "max_cost_per_run": -1,
+          "max_latency_ms": null
+        },
+        "mode": "",
+        "workload": {
+          "capability": "factual_qa",
+          "difficulty": null,
+          "prompt": ""
+        }
+      }
+    },
+    {
+      "expected": {
+        "code": "invalid_request",
+        "details": {
+          "field": "max_latency_ms"
+        },
+        "message": "constraints.max_latency_ms must be greater than 0"
+      },
+      "function": "validate_input",
+      "go_test": null,
+      "id": "validate_input/zero_latency",
+      "input": {
+        "constraints": {
+          "max_cost_per_run": null,
+          "max_latency_ms": 0
+        },
+        "mode": "",
+        "workload": {
+          "capability": "factual_qa",
+          "difficulty": null,
+          "prompt": ""
+        }
+      }
+    },
+    {
+      "expected": {
+        "code": "invalid_request",
+        "details": {
+          "capability": "telepathy"
+        },
+        "message": "workload.capability \"telepathy\" is not a v1 capability"
+      },
+      "function": "validate_input",
+      "go_test": null,
+      "id": "validate_input/bad_cap_and_mode_first_wins",
+      "input": {
+        "constraints": {
+          "max_cost_per_run": null,
+          "max_latency_ms": null
+        },
+        "mode": "fast",
+        "workload": {
+          "capability": "telepathy",
+          "difficulty": null,
+          "prompt": ""
+        }
+      }
+    },
+    {
+      "error": "<nil>",
+      "expected": "{\"mode\":\"cost\",\"pool\":\"default\",\"workload\":{\"domain_tags\":[\"legal\"]}}",
+      "function": "exclude_prompt",
+      "go_test": null,
+      "id": "exclude_prompt/0",
+      "input": "{\"workload\":{\"prompt\":\"secret <b>&</b>\",\"domain_tags\":[\"legal\"]},\"mode\":\"cost\",\"pool\":\"default\"}"
+    },
+    {
+      "error": "<nil>",
+      "expected": "{\"allowed_models\":[\"gpt-5.5\"],\"constraints\":{\"max_cost_per_run\":0.010},\"pool\":\"p\",\"workload\":{}}",
+      "function": "exclude_prompt",
+      "go_test": null,
+      "id": "exclude_prompt/1",
+      "input": "{\"pool\":\"p\",\"workload\":{\"prompt\":\"x\"},\"allowed_models\":[\"gpt-5.5\"],\"constraints\":{\"max_cost_per_run\":0.010}}"
+    },
+    {
+      "error": "<nil>",
+      "expected": "{\"workload\":{\"extra\":{\"b\":1,\"a\":2}},\"z\":1e3}",
+      "function": "exclude_prompt",
+      "go_test": null,
+      "id": "exclude_prompt/2",
+      "input": "{\"workload\": {\"prompt\": \"x\", \"extra\": {\"b\":1, \"a\":2}}, \"z\": 1e3}"
+    }
+  ]
+}

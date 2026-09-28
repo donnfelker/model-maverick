@@ -1,0 +1,8 @@
+description: an answer declaring two modes is rejected at validation
+spec:
+  answers:
+    - { value: Paris, regex: 'paris' }
+output: irrelevant
+expect:
+  error: true
+  error_contains: golden_answer spec

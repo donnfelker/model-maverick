@@ -1,0 +1,508 @@
+{
+  "cases": [
+    {
+      "expected": [],
+      "function": "validate_weights",
+      "go_test": "policy.TestValidateWeights/valid",
+      "id": "TestValidateWeights/valid#1",
+      "input": [
+        {
+          "capability": "code_generation",
+          "quality_bar": 0.8,
+          "w_cost": 0.1,
+          "w_latency": 0.1,
+          "w_quality": 0.8
+        }
+      ]
+    },
+    {
+      "expected": [],
+      "function": "validate_weights",
+      "go_test": "policy.TestValidateWeights/valid_within_tolerance",
+      "id": "TestValidateWeights/valid_within_tolerance#1",
+      "input": [
+        {
+          "capability": "factual_qa",
+          "quality_bar": 0.8,
+          "w_cost": 0.1,
+          "w_latency": 0.1009,
+          "w_quality": 0.8
+        }
+      ]
+    },
+    {
+      "expected": [],
+      "function": "validate_weights",
+      "go_test": "policy.TestValidateWeights/empty_list",
+      "id": "TestValidateWeights/empty_list#1",
+      "input": []
+    },
+    {
+      "expected": [
+        {
+          "code": "invalid_request",
+          "details": {
+            "capability": "code_generation",
+            "sum": 0.9000000134110451
+          },
+          "message": "weights for \"code_generation\" must sum to 1 (got 0.9000)"
+        }
+      ],
+      "function": "validate_weights",
+      "go_test": "policy.TestValidateWeights/sum_too_low",
+      "id": "TestValidateWeights/sum_too_low#1",
+      "input": [
+        {
+          "capability": "code_generation",
+          "quality_bar": 0.8,
+          "w_cost": 0.3,
+          "w_latency": 0.1,
+          "w_quality": 0.5
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "code": "invalid_request",
+          "details": {
+            "capability": "code_generation",
+            "sum": 1.200000025331974
+          },
+          "message": "weights for \"code_generation\" must sum to 1 (got 1.2000)"
+        }
+      ],
+      "function": "validate_weights",
+      "go_test": "policy.TestValidateWeights/sum_too_high",
+      "id": "TestValidateWeights/sum_too_high#1",
+      "input": [
+        {
+          "capability": "code_generation",
+          "quality_bar": 0.8,
+          "w_cost": 0.3,
+          "w_latency": 0.1,
+          "w_quality": 0.8
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "code": "invalid_request",
+          "details": {
+            "capability": "code_generation",
+            "field": "w_quality"
+          },
+          "message": "w_quality for \"code_generation\" must be between 0 and 1"
+        },
+        {
+          "code": "invalid_request",
+          "details": {
+            "capability": "code_generation",
+            "field": "w_cost"
+          },
+          "message": "w_cost for \"code_generation\" must be between 0 and 1"
+        }
+      ],
+      "function": "validate_weights",
+      "go_test": "policy.TestValidateWeights/negative_weight",
+      "id": "TestValidateWeights/negative_weight#1",
+      "input": [
+        {
+          "capability": "code_generation",
+          "quality_bar": 0.8,
+          "w_cost": -0.5,
+          "w_latency": 0,
+          "w_quality": 1.5
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "code": "invalid_request",
+          "details": {
+            "capability": "code_generation",
+            "field": "w_quality"
+          },
+          "message": "w_quality for \"code_generation\" must be between 0 and 1"
+        },
+        {
+          "code": "invalid_request",
+          "details": {
+            "capability": "code_generation",
+            "field": "w_cost"
+          },
+          "message": "w_cost for \"code_generation\" must be between 0 and 1"
+        },
+        {
+          "code": "invalid_request",
+          "details": {
+            "capability": "code_generation",
+            "field": "w_latency"
+          },
+          "message": "w_latency for \"code_generation\" must be between 0 and 1"
+        }
+      ],
+      "function": "validate_weights",
+      "go_test": "policy.TestValidateWeights/weight_above_one",
+      "id": "TestValidateWeights/weight_above_one#1",
+      "input": [
+        {
+          "capability": "code_generation",
+          "quality_bar": 0.8,
+          "w_cost": -0.1,
+          "w_latency": -0.1,
+          "w_quality": 1.2
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "code": "invalid_request",
+          "details": {
+            "capability": "code_generation",
+            "field": "quality_bar"
+          },
+          "message": "quality_bar for \"code_generation\" must be greater than 0 and at most 1"
+        }
+      ],
+      "function": "validate_weights",
+      "go_test": "policy.TestValidateWeights/quality_bar_zero",
+      "id": "TestValidateWeights/quality_bar_zero#1",
+      "input": [
+        {
+          "capability": "code_generation",
+          "quality_bar": 0,
+          "w_cost": 0.1,
+          "w_latency": 0.1,
+          "w_quality": 0.8
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "code": "invalid_request",
+          "details": {
+            "capability": "code_generation",
+            "field": "quality_bar"
+          },
+          "message": "quality_bar for \"code_generation\" must be greater than 0 and at most 1"
+        }
+      ],
+      "function": "validate_weights",
+      "go_test": "policy.TestValidateWeights/quality_bar_above_one",
+      "id": "TestValidateWeights/quality_bar_above_one#1",
+      "input": [
+        {
+          "capability": "code_generation",
+          "quality_bar": 1.01,
+          "w_cost": 0.1,
+          "w_latency": 0.1,
+          "w_quality": 0.8
+        }
+      ]
+    },
+    {
+      "expected": [],
+      "function": "validate_weights",
+      "go_test": "policy.TestValidateWeights/quality_bar_exactly_one",
+      "id": "TestValidateWeights/quality_bar_exactly_one#1",
+      "input": [
+        {
+          "capability": "code_generation",
+          "quality_bar": 1,
+          "w_cost": 0.1,
+          "w_latency": 0.1,
+          "w_quality": 0.8
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "code": "invalid_request",
+          "details": {
+            "capability": "telepathy"
+          },
+          "message": "capability \"telepathy\" is not a v1 capability"
+        }
+      ],
+      "function": "validate_weights",
+      "go_test": "policy.TestValidateWeights/unknown_capability",
+      "id": "TestValidateWeights/unknown_capability#1",
+      "input": [
+        {
+          "capability": "telepathy",
+          "quality_bar": 0.8,
+          "w_cost": 0.1,
+          "w_latency": 0.1,
+          "w_quality": 0.8
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "code": "invalid_request",
+          "details": {
+            "capability": "code_generation"
+          },
+          "message": "capability \"code_generation\" appears more than once"
+        }
+      ],
+      "function": "validate_weights",
+      "go_test": "policy.TestValidateWeights/duplicate_capability",
+      "id": "TestValidateWeights/duplicate_capability#1",
+      "input": [
+        {
+          "capability": "code_generation",
+          "quality_bar": 0.8,
+          "w_cost": 0.1,
+          "w_latency": 0.1,
+          "w_quality": 0.8
+        },
+        {
+          "capability": "code_generation",
+          "quality_bar": 0.8,
+          "w_cost": 0.35,
+          "w_latency": 0.15,
+          "w_quality": 0.5
+        }
+      ]
+    },
+    {
+      "expected": [],
+      "function": "validate_pool_shapes",
+      "go_test": "policy.TestValidatePoolShapes/single_default_pool",
+      "id": "TestValidatePoolShapes/single_default_pool#1",
+      "input": [
+        {
+          "is_default": true,
+          "model_column_ids": [
+            "col_a"
+          ],
+          "name": "default"
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "code": "invalid_request",
+          "details": {
+            "default_count": 0
+          },
+          "message": "exactly one pool must be is_default: true (got 0)"
+        }
+      ],
+      "function": "validate_pool_shapes",
+      "go_test": "policy.TestValidatePoolShapes/empty_list",
+      "id": "TestValidatePoolShapes/empty_list#1",
+      "input": []
+    },
+    {
+      "expected": [
+        {
+          "code": "invalid_request",
+          "details": {
+            "default_count": 0
+          },
+          "message": "exactly one pool must be is_default: true (got 0)"
+        }
+      ],
+      "function": "validate_pool_shapes",
+      "go_test": "policy.TestValidatePoolShapes/zero_defaults",
+      "id": "TestValidatePoolShapes/zero_defaults#1",
+      "input": [
+        {
+          "is_default": false,
+          "model_column_ids": [
+            "col_a"
+          ],
+          "name": "p"
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "code": "invalid_request",
+          "details": {
+            "default_count": 2
+          },
+          "message": "exactly one pool must be is_default: true (got 2)"
+        }
+      ],
+      "function": "validate_pool_shapes",
+      "go_test": "policy.TestValidatePoolShapes/two_defaults",
+      "id": "TestValidatePoolShapes/two_defaults#1",
+      "input": [
+        {
+          "is_default": true,
+          "model_column_ids": [
+            "col_a"
+          ],
+          "name": "a"
+        },
+        {
+          "is_default": true,
+          "model_column_ids": [
+            "col_a"
+          ],
+          "name": "b"
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "code": "invalid_request",
+          "details": {
+            "pool": ""
+          },
+          "message": "pool name must not be empty"
+        }
+      ],
+      "function": "validate_pool_shapes",
+      "go_test": "policy.TestValidatePoolShapes/empty_name",
+      "id": "TestValidatePoolShapes/empty_name#1",
+      "input": [
+        {
+          "is_default": true,
+          "model_column_ids": [
+            "col_a"
+          ],
+          "name": ""
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "code": "invalid_request",
+          "details": {
+            "pool": "a"
+          },
+          "message": "pool name \"a\" appears more than once"
+        }
+      ],
+      "function": "validate_pool_shapes",
+      "go_test": "policy.TestValidatePoolShapes/duplicate_names",
+      "id": "TestValidatePoolShapes/duplicate_names#1",
+      "input": [
+        {
+          "is_default": true,
+          "model_column_ids": [
+            "col_a"
+          ],
+          "name": "a"
+        },
+        {
+          "is_default": false,
+          "model_column_ids": [
+            "col_a"
+          ],
+          "name": "a"
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "code": "invalid_request",
+          "details": {
+            "pool": "a"
+          },
+          "message": "pool \"a\" has no model_column_ids"
+        }
+      ],
+      "function": "validate_pool_shapes",
+      "go_test": "policy.TestValidatePoolShapes/no_columns",
+      "id": "TestValidatePoolShapes/no_columns#1",
+      "input": [
+        {
+          "is_default": true,
+          "model_column_ids": [],
+          "name": "a"
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "code": "invalid_request",
+          "details": {
+            "entry": "col_a",
+            "pool": "a"
+          },
+          "message": "pool \"a\" lists column \"col_a\" more than once"
+        }
+      ],
+      "function": "validate_pool_shapes",
+      "go_test": "policy.TestValidatePoolShapes/duplicate_column_entry",
+      "id": "TestValidatePoolShapes/duplicate_column_entry#1",
+      "input": [
+        {
+          "is_default": true,
+          "model_column_ids": [
+            "col_a",
+            "col_a"
+          ],
+          "name": "a"
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "code": "invalid_request",
+          "details": {
+            "field": "max_cost_per_run"
+          },
+          "message": "max_cost_per_run must be greater than 0"
+        }
+      ],
+      "function": "validate_constraint_values",
+      "go_test": "policy.TestValidateConstraintValues",
+      "id": "TestValidateConstraintValues#1",
+      "input": {
+        "max_cost_per_run": -1,
+        "max_latency_ms": null,
+        "zero_retention": false
+      }
+    },
+    {
+      "expected": [
+        {
+          "code": "invalid_request",
+          "details": {
+            "field": "max_latency_ms"
+          },
+          "message": "max_latency_ms must be greater than 0"
+        }
+      ],
+      "function": "validate_constraint_values",
+      "go_test": "policy.TestValidateConstraintValues",
+      "id": "TestValidateConstraintValues#2",
+      "input": {
+        "max_cost_per_run": null,
+        "max_latency_ms": 0,
+        "zero_retention": false
+      }
+    },
+    {
+      "expected": [],
+      "function": "validate_constraint_values",
+      "go_test": "policy.TestValidateConstraintValues",
+      "id": "TestValidateConstraintValues#3",
+      "input": {
+        "max_cost_per_run": null,
+        "max_latency_ms": null,
+        "zero_retention": false
+      }
+    }
+  ]
+}

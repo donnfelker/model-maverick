@@ -1,0 +1,61 @@
+id: task_sx_017
+capability: structured_extraction
+domain_tags: [legal]
+difficulty_tier: 3
+difficulty_knobs: { document_noise: 3, field_count: 3, nesting_depth: 2, distractor_content: 4 }
+prompt: |
+  Extract the parties, effective date, term, and payment obligations from the
+  following services agreement. Return JSON matching the provided schema.
+attachments:
+  - name: agreement.txt
+    content: |
+      SERVICES AGREEMENT
+
+      This Services Agreement is entered into as of 2025-03-01 (the
+      "Effective Date") by and between Acme Corporation ("Provider") and
+      Bolt Industries LLC ("Client").
+
+      1. Term. The initial term of this Agreement is twenty-four (24) months
+         from the Effective Date.
+      2. Fees. Client shall pay Provider a monthly fee of $12,500, due net 30.
+      3. Prior Drafts. The draft agreement circulated on 2019-06-15 is
+         superseded in its entirety and is of no force or effect.
+temperature: 0
+max_tokens: 2000
+pass_threshold: 0.7
+smoke_member: false
+dimension_weights: { schema_validity: 0.3, field_accuracy: 0.4, completeness: 0.2, hallucination_free: 0.1 }
+grader_specs:
+  - type: json_schema
+    version: 1
+    weight_dimensions: { schema_validity: 1.0, field_accuracy: 1.0 }
+    spec:
+      schema:
+        $schema: "https://json-schema.org/draft/2020-12/schema"
+        type: object
+        required: [parties, effective_date, term, payment]
+        properties:
+          parties:
+            type: array
+            minItems: 2
+            items: { type: string }
+          effective_date: { type: string }
+          term: { type: string }
+          payment:
+            type: object
+            required: [amount_usd]
+            properties:
+              amount_usd: { type: number }
+      checks:
+        - { path: $.effective_date, equals: "2025-03-01" }
+        - { path: $.payment.amount_usd, numeric: 12500, tolerance: 0 }
+  - type: key_facts
+    version: 1
+    weight_dimensions: { completeness: 1.0, hallucination_free: 1.0 }
+    spec:
+      facts:
+        - { id: party_acme, any_of: ["Acme Corp", "Acme Corporation"], weight: 1 }
+        - { id: party_bolt, any_of: ["Bolt Industries"], weight: 1 }
+        - { id: term_24mo, any_of: ["24 month", "two-year", "24-month", "twenty-four (24) months"], weight: 1 }
+      forbidden_facts:
+        - { id: distractor_2019_date, any_of: ["2019-06-15"], weight: 1 }

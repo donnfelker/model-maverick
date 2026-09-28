@@ -1,0 +1,12 @@
+{
+  "fixtures": [
+    {
+      "model": "claude-opus-4-8",
+      "prompt": "Extract the invoice total as JSON.",
+      "output": "{\"total\": 42.50}",
+      "tokens_in": 120,
+      "tokens_out": 18,
+      "latency_ms": 25
+    }
+  ]
+}

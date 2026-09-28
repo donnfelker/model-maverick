@@ -1,0 +1,349 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "dimensions": {
+          "faithfulness": 0.5,
+          "field_accuracy": 0.75,
+          "schema_validity": 1
+        },
+        "gradable": true,
+        "pass": true,
+        "q": 0.8,
+        "weight_covered": 1
+      },
+      "go_test": "scoring.TestRunQualityWeightedSum",
+      "id": "weighted_sum",
+      "input": {
+        "grader_dims": [
+          {
+            "field_accuracy": 0.75,
+            "schema_validity": 1
+          },
+          {
+            "faithfulness": 0.5
+          }
+        ],
+        "pass_threshold": 0.7,
+        "status": "ok",
+        "weights": {
+          "faithfulness": 0.2,
+          "field_accuracy": 0.4,
+          "schema_validity": 0.4
+        }
+      }
+    },
+    {
+      "expected": {
+        "dimensions": {
+          "field_accuracy": 0.75,
+          "schema_validity": 1
+        },
+        "gradable": true,
+        "pass": true,
+        "q": 0.875,
+        "weight_covered": 0.8
+      },
+      "go_test": "scoring.TestRunQualityRenormalizesAbsentDimensions",
+      "id": "renormalizes_absent",
+      "input": {
+        "grader_dims": [
+          {
+            "field_accuracy": 0.75,
+            "schema_validity": 1
+          },
+          null
+        ],
+        "pass_threshold": 0.7,
+        "status": "ok",
+        "weights": {
+          "faithfulness": 0.2,
+          "field_accuracy": 0.4,
+          "schema_validity": 0.4
+        }
+      }
+    },
+    {
+      "expected": {
+        "dimensions": {
+          "faithfulness": 0.8
+        },
+        "gradable": true,
+        "pass": true,
+        "q": 0.8,
+        "weight_covered": 1
+      },
+      "go_test": "scoring.TestRunQualitySharedDimensionAveraged",
+      "id": "shared_dimension_averaged",
+      "input": {
+        "grader_dims": [
+          {
+            "faithfulness": 0.9
+          },
+          {
+            "faithfulness": 0.7
+          }
+        ],
+        "pass_threshold": 0.7,
+        "status": "ok",
+        "weights": {
+          "faithfulness": 1
+        }
+      }
+    },
+    {
+      "expected": {
+        "dimensions": {},
+        "gradable": false,
+        "pass": false,
+        "q": 0,
+        "weight_covered": 0
+      },
+      "go_test": "scoring.TestRunQualityStatusHandling",
+      "id": "status_provider_error",
+      "input": {
+        "grader_dims": [
+          {
+            "a": 0.9
+          }
+        ],
+        "pass_threshold": 0.7,
+        "status": "provider_error",
+        "weights": {
+          "a": 1
+        }
+      }
+    },
+    {
+      "expected": {
+        "dimensions": {},
+        "gradable": false,
+        "pass": false,
+        "q": 0,
+        "weight_covered": 0
+      },
+      "go_test": "scoring.TestRunQualityStatusHandling",
+      "id": "status_timeout",
+      "input": {
+        "grader_dims": [
+          {
+            "a": 0.9
+          }
+        ],
+        "pass_threshold": 0.7,
+        "status": "timeout",
+        "weights": {
+          "a": 1
+        }
+      }
+    },
+    {
+      "expected": {
+        "dimensions": {
+          "a": 0.2
+        },
+        "gradable": true,
+        "pass": false,
+        "q": 0.2,
+        "weight_covered": 1
+      },
+      "go_test": "scoring.TestRunQualityStatusHandling",
+      "id": "status_parse_failure_graded",
+      "input": {
+        "grader_dims": [
+          {
+            "a": 0.2
+          }
+        ],
+        "pass_threshold": 0.7,
+        "status": "parse_failure",
+        "weights": {
+          "a": 1
+        }
+      }
+    },
+    {
+      "expected": {
+        "dimensions": {},
+        "gradable": false,
+        "pass": false,
+        "q": 0,
+        "weight_covered": 0
+      },
+      "go_test": "scoring.TestRunQualityAllGradersAbsent",
+      "id": "all_graders_absent",
+      "input": {
+        "grader_dims": [
+          null,
+          null
+        ],
+        "pass_threshold": 0.7,
+        "status": "ok",
+        "weights": {
+          "a": 0.5,
+          "b": 0.5
+        }
+      }
+    },
+    {
+      "expected": {
+        "dimensions": {
+          "a": 0.5
+        },
+        "gradable": true,
+        "pass": false,
+        "q": 0.5,
+        "weight_covered": 1
+      },
+      "go_test": "scoring.TestRunQualityIgnoresUnweightedDimensions",
+      "id": "ignores_unweighted",
+      "input": {
+        "grader_dims": [
+          {
+            "a": 0.5,
+            "stray": 1
+          }
+        ],
+        "pass_threshold": 0.7,
+        "status": "ok",
+        "weights": {
+          "a": 1
+        }
+      }
+    },
+    {
+      "expected": {
+        "dimensions": {
+          "a": 0.7
+        },
+        "gradable": true,
+        "pass": true,
+        "q": 0.7,
+        "weight_covered": 1
+      },
+      "go_test": "scoring.TestRunQualityPassAtExactThreshold",
+      "id": "pass_at_exact_threshold",
+      "input": {
+        "grader_dims": [
+          {
+            "a": 0.7
+          }
+        ],
+        "pass_threshold": 0.7,
+        "status": "ok",
+        "weights": {
+          "a": 1
+        }
+      }
+    },
+    {
+      "expected": {
+        "dimensions": {
+          "answer_correctness": 1,
+          "style": 0.7
+        },
+        "gradable": true,
+        "pass": true,
+        "q": 0.85,
+        "weight_covered": 1
+      },
+      "go_test": "scoring.TestOrderSwapMeanOnlyForRunQuality",
+      "id": "order_swap_mean_only",
+      "input": {
+        "grader_dims": [
+          {
+            "answer_correctness": 1
+          },
+          {
+            "style": 0.7
+          }
+        ],
+        "pass_threshold": 0.7,
+        "status": "ok",
+        "weights": {
+          "answer_correctness": 0.5,
+          "style": 0.5
+        }
+      }
+    },
+    {
+      "expected": {
+        "dimensions": {
+          "a": 1,
+          "b": 0.5
+        },
+        "gradable": true,
+        "pass": false,
+        "q": 0.5,
+        "weight_covered": 1
+      },
+      "go_test": "",
+      "id": "extra_zero_weight_dimension",
+      "input": {
+        "grader_dims": [
+          {
+            "a": 1,
+            "b": 0.5
+          }
+        ],
+        "pass_threshold": 0.7,
+        "status": "ok",
+        "weights": {
+          "a": 0,
+          "b": 1
+        }
+      }
+    },
+    {
+      "expected": {
+        "dimensions": {},
+        "gradable": false,
+        "pass": false,
+        "q": 0,
+        "weight_covered": 0
+      },
+      "go_test": "",
+      "id": "extra_only_zero_weight_covered",
+      "input": {
+        "grader_dims": [
+          {
+            "a": 1
+          }
+        ],
+        "pass_threshold": 0.7,
+        "status": "ok",
+        "weights": {
+          "a": 0
+        }
+      }
+    },
+    {
+      "expected": {
+        "dimensions": {
+          "a": 0.8
+        },
+        "gradable": true,
+        "pass": true,
+        "q": 0.8,
+        "weight_covered": 1
+      },
+      "go_test": "",
+      "id": "extra_unknown_status_graded",
+      "input": {
+        "grader_dims": [
+          {
+            "a": 0.8
+          }
+        ],
+        "pass_threshold": 0.7,
+        "status": "weird_status",
+        "weights": {
+          "a": 1
+        }
+      }
+    }
+  ],
+  "function": "RunQuality(weights, grader_dims, status, pass_threshold) -\u003e RunScore",
+  "note": "grader_dims entries that are null are errored graders (absent). Expected values were produced by running the Go code.",
+  "tolerance": 1e-12
+}

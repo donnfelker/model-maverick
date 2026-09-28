@@ -1,0 +1,32 @@
+{
+  "about": "graders/testutil golden-fixture harness self-tests with two test-double graders.",
+  "echo_grader": "kind 'echo'. ValidateSpec: strict JSON decode of {\"fail\": bool} rejecting unknown fields. Grade: if fail -> error 'echo: forced failure'; else chars = min(1, len(output bytes)/100), nonempty = 1 if len>0 else 0, detail = {\"length\": len}.",
+  "where_grader": "kind 'rule_scan'. ValidateSpec: spec must decode as a JSON object. Grade: constraint_compliance = 1 if output contains the substring 'WHERE' else 0; detail {\"matched\": bool}.",
+  "cases": [
+    {
+      "go_test": "testutil.TestRunGoldenEcho/echo_basic",
+      "fixture": "testdata/internal/graders/testutil/testdata/echo_basic.yaml",
+      "output_len_bytes": 43,
+      "dimensions": {
+        "chars": 0.43,
+        "nonempty": 1.0
+      },
+      "detail_exact_bytes": "{\"length\":43}"
+    },
+    {
+      "go_test": "testutil.TestRunGoldenEcho/echo_error",
+      "fixture": "testdata/internal/graders/testutil/testdata/echo_error.yaml",
+      "grade_error": "grader echo: echo: forced failure",
+      "dimensions": null,
+      "failure_counter": 1
+    },
+    {
+      "go_test": "testutil.TestRunGoldenDirEnvelopeFixture/where_pass",
+      "fixture": "testdata/internal/graders/testutil/testdata/rulescan/where_pass.yaml",
+      "dimensions": {
+        "constraint_compliance": 1.0
+      },
+      "detail_exact_bytes": "{\"matched\":true}"
+    }
+  ]
+}

@@ -1,0 +1,825 @@
+{
+  "crosses_bar": {
+    "cases": [
+      {
+        "bar": 0.88,
+        "baseline": 90,
+        "current": 86.9,
+        "expected": true
+      },
+      {
+        "bar": 0.95,
+        "baseline": 90,
+        "current": 86.9,
+        "expected": false
+      },
+      {
+        "bar": 0.8,
+        "baseline": 90,
+        "current": 86.9,
+        "expected": false
+      },
+      {
+        "bar": 0.9,
+        "baseline": 90,
+        "current": 86.9,
+        "expected": true
+      },
+      {
+        "bar": 0.869,
+        "baseline": 90,
+        "current": 86.9,
+        "expected": false
+      }
+    ],
+    "go_test": "scoring.TestRegressionCrossesBar"
+  },
+  "detect": [
+    {
+      "expected": [
+        {
+          "as_of": "2031-05-08",
+          "baseline": 90,
+          "current": 86.94116999999999,
+          "delta": 3.05883000000001,
+          "dimension": "quality",
+          "kind": "drop"
+        }
+      ],
+      "go_test": "scoring.TestDetectRegressionsGradualDropFlagsAtCrossingNight",
+      "id": "gradual_drop_8",
+      "series": [
+        {
+          "as_of": "2031-05-01",
+          "ewma": 0.9,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-02",
+          "ewma": 0.9,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-03",
+          "ewma": 0.9,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-04",
+          "ewma": 0.897,
+          "variance": 0.000018749999999999893
+        },
+        {
+          "as_of": "2031-05-05",
+          "ewma": 0.8919,
+          "variance": 0.00006399999999999985
+        },
+        {
+          "as_of": "2031-05-06",
+          "ewma": 0.88533,
+          "variance": 0.00013333333333333334
+        },
+        {
+          "as_of": "2031-05-07",
+          "ewma": 0.8777309999999999,
+          "variance": 0.00022448979591836734
+        },
+        {
+          "as_of": "2031-05-08",
+          "ewma": 0.8694116999999999,
+          "variance": 0.0003359375
+        }
+      ]
+    },
+    {
+      "expected": [],
+      "go_test": "scoring.TestDetectRegressionsStableSeriesStaysQuiet",
+      "id": "stable",
+      "series": [
+        {
+          "as_of": "2031-05-01",
+          "ewma": 0.9,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-02",
+          "ewma": 0.903,
+          "variance": 0.000025000000000000045
+        },
+        {
+          "as_of": "2031-05-03",
+          "ewma": 0.8991,
+          "variance": 0.00006666666666666679
+        },
+        {
+          "as_of": "2031-05-04",
+          "ewma": 0.89937,
+          "variance": 0.00005000000000000009
+        },
+        {
+          "as_of": "2031-05-05",
+          "ewma": 0.905559,
+          "variance": 0.00010400000000000018
+        },
+        {
+          "as_of": "2031-05-06",
+          "ewma": 0.8978913,
+          "variance": 0.00016666666666666696
+        },
+        {
+          "as_of": "2031-05-07",
+          "ewma": 0.89852391,
+          "variance": 0.0001428571428571431
+        },
+        {
+          "as_of": "2031-05-08",
+          "ewma": 0.901966737,
+          "variance": 0.00013593750000000026
+        },
+        {
+          "as_of": "2031-05-09",
+          "ewma": 0.9013767158999999,
+          "variance": 0.00012098765432098788
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "as_of": "2031-05-05",
+          "baseline": 90,
+          "current": 80,
+          "delta": 9.999999999999996,
+          "dimension": "quality",
+          "kind": "shock"
+        }
+      ],
+      "go_test": "scoring.TestDetectRegressionsSuddenShock",
+      "id": "sudden_shock",
+      "series": [
+        {
+          "as_of": "2031-05-01",
+          "ewma": 0.9,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-02",
+          "ewma": 0.9,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-03",
+          "ewma": 0.9,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-04",
+          "ewma": 0.9,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-05",
+          "ewma": 0.87,
+          "variance": 0.001599999999999999
+        }
+      ]
+    },
+    {
+      "expected": [],
+      "go_test": "scoring.TestDetectRegressionsShockRespectsVarianceBand",
+      "id": "variance_band_noisy",
+      "series": [
+        {
+          "as_of": "2031-05-01",
+          "ewma": 0.9,
+          "variance": 0.0025
+        },
+        {
+          "as_of": "2031-05-02",
+          "ewma": 0.882,
+          "variance": 0
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "as_of": "2031-05-02",
+          "baseline": 90,
+          "current": 84.00000000000001,
+          "delta": 5.9999999999999805,
+          "dimension": "quality",
+          "kind": "shock"
+        }
+      ],
+      "go_test": "scoring.TestDetectRegressionsShockRespectsVarianceBand",
+      "id": "variance_band_quiet",
+      "series": [
+        {
+          "as_of": "2031-05-01",
+          "ewma": 0.9,
+          "variance": 0.0001
+        },
+        {
+          "as_of": "2031-05-02",
+          "ewma": 0.882,
+          "variance": 0
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "as_of": "2031-05-02",
+          "baseline": 92,
+          "current": 78.66666666666667,
+          "delta": 13.333333333333327,
+          "dimension": "quality",
+          "kind": "shock"
+        },
+        {
+          "as_of": "2031-05-03",
+          "baseline": 92,
+          "current": 88,
+          "delta": 3.9999999999999996,
+          "dimension": "quality",
+          "kind": "drop"
+        },
+        {
+          "as_of": "2031-05-04",
+          "baseline": 92,
+          "current": 88,
+          "delta": 3.9999999999999996,
+          "dimension": "quality",
+          "kind": "drop"
+        },
+        {
+          "as_of": "2031-05-05",
+          "baseline": 92,
+          "current": 88,
+          "delta": 3.9999999999999996,
+          "dimension": "quality",
+          "kind": "drop"
+        },
+        {
+          "as_of": "2031-05-06",
+          "baseline": 92,
+          "current": 88,
+          "delta": 3.9999999999999996,
+          "dimension": "quality",
+          "kind": "drop"
+        },
+        {
+          "as_of": "2031-05-07",
+          "baseline": 92,
+          "current": 88,
+          "delta": 3.9999999999999996,
+          "dimension": "quality",
+          "kind": "drop"
+        },
+        {
+          "as_of": "2031-05-08",
+          "baseline": 92,
+          "current": 88,
+          "delta": 3.9999999999999996,
+          "dimension": "quality",
+          "kind": "drop"
+        }
+      ],
+      "go_test": "scoring.TestDetectRegressionsTrailingWindowExpires",
+      "id": "trailing_window_expires",
+      "series": [
+        {
+          "as_of": "2031-05-01",
+          "ewma": 0.92,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-02",
+          "ewma": 0.88,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-03",
+          "ewma": 0.88,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-04",
+          "ewma": 0.88,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-05",
+          "ewma": 0.88,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-06",
+          "ewma": 0.88,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-07",
+          "ewma": 0.88,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-08",
+          "ewma": 0.88,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-09",
+          "ewma": 0.88,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-10",
+          "ewma": 0.88,
+          "variance": 0
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "as_of": "2031-05-08",
+          "baseline": 90,
+          "current": 86.94116999999999,
+          "delta": 3.05883000000001,
+          "dimension": "quality",
+          "kind": "drop"
+        },
+        {
+          "as_of": "2031-05-09",
+          "baseline": 90,
+          "current": 86.05881899999999,
+          "delta": 3.9411810000000136,
+          "dimension": "quality",
+          "kind": "drop"
+        },
+        {
+          "as_of": "2031-05-10",
+          "baseline": 90,
+          "current": 85.14117329999998,
+          "delta": 4.858826700000016,
+          "dimension": "quality",
+          "kind": "drop"
+        },
+        {
+          "as_of": "2031-05-11",
+          "baseline": 89.7,
+          "current": 84.19882130999999,
+          "delta": 5.50117869000002,
+          "dimension": "quality",
+          "kind": "drop"
+        }
+      ],
+      "go_test": "scoring.TestFilterAlertableDedupAndDeepening",
+      "id": "gradual_drop_11",
+      "series": [
+        {
+          "as_of": "2031-05-01",
+          "ewma": 0.9,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-02",
+          "ewma": 0.9,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-03",
+          "ewma": 0.9,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-04",
+          "ewma": 0.897,
+          "variance": 0.000018749999999999893
+        },
+        {
+          "as_of": "2031-05-05",
+          "ewma": 0.8919,
+          "variance": 0.00006399999999999985
+        },
+        {
+          "as_of": "2031-05-06",
+          "ewma": 0.88533,
+          "variance": 0.00013333333333333334
+        },
+        {
+          "as_of": "2031-05-07",
+          "ewma": 0.8777309999999999,
+          "variance": 0.00022448979591836734
+        },
+        {
+          "as_of": "2031-05-08",
+          "ewma": 0.8694116999999999,
+          "variance": 0.0003359375
+        },
+        {
+          "as_of": "2031-05-09",
+          "ewma": 0.8605881899999999,
+          "variance": 0.00046666666666666645
+        },
+        {
+          "as_of": "2031-05-10",
+          "ewma": 0.8514117329999998,
+          "variance": 0.0006159999999999994
+        },
+        {
+          "as_of": "2031-05-11",
+          "ewma": 0.8419882130999998,
+          "variance": 0.0007834710743801643
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "as_of": "2031-05-08",
+          "baseline": 89.99999761581421,
+          "current": 86.94116473197937,
+          "delta": 3.058832883834839,
+          "dimension": "quality",
+          "kind": "drop"
+        },
+        {
+          "as_of": "2031-05-09",
+          "baseline": 89.99999761581421,
+          "current": 86.05881333351135,
+          "delta": 3.9411842823028564,
+          "dimension": "quality",
+          "kind": "drop"
+        },
+        {
+          "as_of": "2031-05-10",
+          "baseline": 89.99999761581421,
+          "current": 85.14117002487183,
+          "delta": 4.858827590942383,
+          "dimension": "quality",
+          "kind": "drop"
+        },
+        {
+          "as_of": "2031-05-11",
+          "baseline": 89.69999551773071,
+          "current": 84.1988205909729,
+          "delta": 5.5011749267578125,
+          "dimension": "quality",
+          "kind": "drop"
+        }
+      ],
+      "go_test": "jobs.TestRegressionScanDropDedupAndDeepening (production storage path)",
+      "id": "extra_decline_11_float32_production_fold",
+      "series": [
+        {
+          "as_of": "2031-05-01",
+          "ewma": 0.8999999761581421,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-02",
+          "ewma": 0.8999999761581421,
+          "variance": 1.4210854397564648e-16
+        },
+        {
+          "as_of": "2031-05-03",
+          "ewma": 0.8999999761581421,
+          "variance": 1.2631871163830345e-16
+        },
+        {
+          "as_of": "2031-05-04",
+          "ewma": 0.8969999551773071,
+          "variance": 0.000018749909941107035
+        },
+        {
+          "as_of": "2031-05-05",
+          "ewma": 0.8918999433517456,
+          "variance": 0.00006399997801054269
+        },
+        {
+          "as_of": "2031-05-06",
+          "ewma": 0.8853299617767334,
+          "variance": 0.00013333337847143412
+        },
+        {
+          "as_of": "2031-05-07",
+          "ewma": 0.8777309656143188,
+          "variance": 0.00022448950039688498
+        },
+        {
+          "as_of": "2031-05-08",
+          "ewma": 0.8694116473197937,
+          "variance": 0.00033593710395507514
+        },
+        {
+          "as_of": "2031-05-09",
+          "ewma": 0.8605881333351135,
+          "variance": 0.0004666666209232062
+        },
+        {
+          "as_of": "2031-05-10",
+          "ewma": 0.8514117002487183,
+          "variance": 0.0006160000339150429
+        },
+        {
+          "as_of": "2031-05-11",
+          "ewma": 0.841988205909729,
+          "variance": 0.00078347057569772
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "as_of": "2031-05-08",
+          "baseline": 89.99999761581421,
+          "current": 86.94117069244385,
+          "delta": 3.0588269233703613,
+          "dimension": "quality",
+          "kind": "drop"
+        },
+        {
+          "as_of": "2031-05-09",
+          "baseline": 89.99999761581421,
+          "current": 86.05881929397583,
+          "delta": 3.941178321838379,
+          "dimension": "quality",
+          "kind": "drop"
+        },
+        {
+          "as_of": "2031-05-10",
+          "baseline": 89.99999761581421,
+          "current": 85.1411759853363,
+          "delta": 4.858821630477905,
+          "dimension": "quality",
+          "kind": "drop"
+        },
+        {
+          "as_of": "2031-05-11",
+          "baseline": 89.70000147819519,
+          "current": 84.1988205909729,
+          "delta": 5.50118088722229,
+          "dimension": "quality",
+          "kind": "drop"
+        }
+      ],
+      "go_test": "jobs.TestRegressionScanDropDedupAndDeepening (seedQualitySeries path)",
+      "id": "extra_decline_11_float32_test_seeding",
+      "series": [
+        {
+          "as_of": "2031-05-01",
+          "ewma": 0.8999999761581421,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-02",
+          "ewma": 0.8999999761581421,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-03",
+          "ewma": 0.8999999761581421,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-04",
+          "ewma": 0.8970000147819519,
+          "variance": 0.000018750000890577212
+        },
+        {
+          "as_of": "2031-05-05",
+          "ewma": 0.8919000029563904,
+          "variance": 0.00006399999983841553
+        },
+        {
+          "as_of": "2031-05-06",
+          "ewma": 0.8853300213813782,
+          "variance": 0.00013333333481568843
+        },
+        {
+          "as_of": "2031-05-07",
+          "ewma": 0.8777310252189636,
+          "variance": 0.00022448979143518955
+        },
+        {
+          "as_of": "2031-05-08",
+          "ewma": 0.8694117069244385,
+          "variance": 0.00033593751140870154
+        },
+        {
+          "as_of": "2031-05-09",
+          "ewma": 0.8605881929397583,
+          "variance": 0.0004666666791308671
+        },
+        {
+          "as_of": "2031-05-10",
+          "ewma": 0.851411759853363,
+          "variance": 0.000615999975707382
+        },
+        {
+          "as_of": "2031-05-11",
+          "ewma": 0.841988205909729,
+          "variance": 0.0007834710995666683
+        }
+      ]
+    },
+    {
+      "expected": [],
+      "go_test": "",
+      "id": "extra_single_row",
+      "series": [
+        {
+          "as_of": "2031-05-01",
+          "ewma": 0.5,
+          "variance": 0
+        }
+      ]
+    },
+    {
+      "expected": [
+        {
+          "as_of": "2031-05-09",
+          "baseline": 95,
+          "current": 45.00000000000004,
+          "delta": 49.99999999999996,
+          "dimension": "quality",
+          "kind": "shock"
+        },
+        {
+          "as_of": "2031-05-10",
+          "baseline": 80,
+          "current": 76.66666666666669,
+          "delta": 3.333333333333317,
+          "dimension": "quality",
+          "kind": "shock"
+        }
+      ],
+      "go_test": "",
+      "id": "extra_gap_days",
+      "series": [
+        {
+          "as_of": "2031-05-01",
+          "ewma": 0.95,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-09",
+          "ewma": 0.8,
+          "variance": 0
+        },
+        {
+          "as_of": "2031-05-10",
+          "ewma": 0.79,
+          "variance": 0
+        }
+      ]
+    }
+  ],
+  "filter_alertable": [
+    {
+      "expected": [
+        {
+          "as_of": "2031-05-08",
+          "baseline": 90,
+          "current": 86.94116999999999,
+          "delta": 3.05883000000001,
+          "dimension": "quality",
+          "kind": "drop"
+        },
+        {
+          "as_of": "2031-05-11",
+          "baseline": 89.7,
+          "current": 84.19882130999999,
+          "delta": 5.50117869000002,
+          "dimension": "quality",
+          "kind": "drop"
+        }
+      ],
+      "findings": [
+        {
+          "as_of": "2031-05-08",
+          "baseline": 90,
+          "current": 86.94116999999999,
+          "delta": 3.05883000000001,
+          "dimension": "quality",
+          "kind": "drop"
+        },
+        {
+          "as_of": "2031-05-09",
+          "baseline": 90,
+          "current": 86.05881899999999,
+          "delta": 3.9411810000000136,
+          "dimension": "quality",
+          "kind": "drop"
+        },
+        {
+          "as_of": "2031-05-10",
+          "baseline": 90,
+          "current": 85.14117329999998,
+          "delta": 4.858826700000016,
+          "dimension": "quality",
+          "kind": "drop"
+        },
+        {
+          "as_of": "2031-05-11",
+          "baseline": 89.7,
+          "current": 84.19882130999999,
+          "delta": 5.50117869000002,
+          "dimension": "quality",
+          "kind": "drop"
+        }
+      ],
+      "go_test": "scoring.TestFilterAlertableDedupAndDeepening",
+      "id": "dedup_and_deepening",
+      "last": null
+    },
+    {
+      "expected": [],
+      "findings": [
+        {
+          "as_of": "2031-05-08",
+          "baseline": 90,
+          "current": 87.5,
+          "delta": 2.5,
+          "dimension": "quality",
+          "kind": "drop"
+        }
+      ],
+      "go_test": "scoring.TestFilterAlertableWindowExpiry",
+      "id": "inside_window_not_deeper",
+      "last": {
+        "as_of": "2031-05-02",
+        "current": 88
+      }
+    },
+    {
+      "expected": [
+        {
+          "as_of": "2031-05-08",
+          "baseline": 90,
+          "current": 87.5,
+          "delta": 2.5,
+          "dimension": "quality",
+          "kind": "drop"
+        }
+      ],
+      "findings": [
+        {
+          "as_of": "2031-05-08",
+          "baseline": 90,
+          "current": 87.5,
+          "delta": 2.5,
+          "dimension": "quality",
+          "kind": "drop"
+        }
+      ],
+      "go_test": "scoring.TestFilterAlertableWindowExpiry",
+      "id": "exactly_seven_days_rearms",
+      "last": {
+        "as_of": "2031-05-01",
+        "current": 88
+      }
+    },
+    {
+      "expected": [
+        {
+          "as_of": "2031-05-04",
+          "baseline": 90,
+          "current": 84,
+          "delta": 6,
+          "dimension": "quality",
+          "kind": "drop"
+        }
+      ],
+      "findings": [
+        {
+          "as_of": "2031-05-04",
+          "baseline": 90,
+          "current": 84,
+          "delta": 6,
+          "dimension": "quality",
+          "kind": "drop"
+        }
+      ],
+      "go_test": "",
+      "id": "extra_deepen_exactly_2",
+      "last": {
+        "as_of": "2031-05-02",
+        "current": 86
+      }
+    }
+  ],
+  "params": {
+    "alpha": 0.3,
+    "dedup_days": 7,
+    "deepen_points": 2,
+    "drop_points": 3,
+    "shock_floor_points": 3,
+    "shock_sigma": 2,
+    "trailing_days": 7
+  },
+  "tolerance": 1e-9
+}

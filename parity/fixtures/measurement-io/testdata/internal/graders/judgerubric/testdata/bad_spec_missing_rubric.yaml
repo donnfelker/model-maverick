@@ -1,0 +1,7 @@
+description: a spec without rubric items fails validation
+spec:
+  reference: some reference material
+output: irrelevant
+expect:
+  error: true
+  error_contains: rubric

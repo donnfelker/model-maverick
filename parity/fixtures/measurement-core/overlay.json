@@ -1,0 +1,433 @@
+{
+  "apply_autofail": [
+    {
+      "details_raw": [
+        "{\"critical_failed\":true}"
+      ],
+      "expected": {
+        "dimensions": {
+          "answer_correctness": 1,
+          "constraint_compliance": 1
+        },
+        "gradable": true,
+        "pass": false,
+        "q": 0,
+        "weight_covered": 0.65
+      },
+      "go_test": "scoring.TestApplyAutofailZeroesRun",
+      "id": "critical_zeroes",
+      "run_score": {
+        "dimensions": {
+          "answer_correctness": 1,
+          "constraint_compliance": 1
+        },
+        "gradable": true,
+        "pass": true,
+        "q": 1,
+        "weight_covered": 0.65
+      }
+    },
+    {
+      "details_raw": [
+        "{}"
+      ],
+      "expected": {
+        "dimensions": {
+          "answer_correctness": 1,
+          "constraint_compliance": 1
+        },
+        "gradable": true,
+        "pass": true,
+        "q": 1,
+        "weight_covered": 0.65
+      },
+      "go_test": "scoring.TestApplyAutofailZeroesRun",
+      "id": "clean_untouched",
+      "run_score": {
+        "dimensions": {
+          "answer_correctness": 1,
+          "constraint_compliance": 1
+        },
+        "gradable": true,
+        "pass": true,
+        "q": 1,
+        "weight_covered": 0.65
+      }
+    }
+  ],
+  "autofail": [
+    {
+      "details_raw": null,
+      "expected": false,
+      "go_test": "scoring.TestAutofail/no_details",
+      "id": "no details"
+    },
+    {
+      "details_raw": [
+        null
+      ],
+      "expected": false,
+      "go_test": "scoring.TestAutofail/nil_detail",
+      "id": "nil detail"
+    },
+    {
+      "details_raw": [
+        "{}"
+      ],
+      "expected": false,
+      "go_test": "scoring.TestAutofail/empty_object",
+      "id": "empty object"
+    },
+    {
+      "details_raw": [
+        "{\"rules\""
+      ],
+      "expected": false,
+      "go_test": "scoring.TestAutofail/malformed_detail",
+      "id": "malformed detail"
+    },
+    {
+      "details_raw": [
+        "{\"rules\":[{\"index\":0,\"kind\":\"must_not_include\",\"pass\":false,\"weight\":1,\"critical\":true}],\"score\":0,\"critical_failed\":true}"
+      ],
+      "expected": true,
+      "go_test": "scoring.TestAutofail/critical_rule_failed",
+      "id": "critical rule failed"
+    },
+    {
+      "details_raw": [
+        "{\"rules\":[{\"index\":0,\"kind\":\"must_not_include\",\"pass\":true,\"weight\":1,\"critical\":true}],\"score\":1,\"critical_failed\":false}"
+      ],
+      "expected": false,
+      "go_test": "scoring.TestAutofail/critical_rule_passed",
+      "id": "critical rule passed"
+    },
+    {
+      "details_raw": [
+        "{\"forbidden_facts\":[{\"id\":\"fabricated_citation\",\"found\":true,\"weight\":1,\"autofail\":true}]}"
+      ],
+      "expected": true,
+      "go_test": "scoring.TestAutofail/forbidden_fact_with_autofail_found",
+      "id": "forbidden fact with autofail found"
+    },
+    {
+      "details_raw": [
+        "{\"forbidden_facts\":[{\"id\":\"distractor\",\"found\":true,\"weight\":1}]}"
+      ],
+      "expected": false,
+      "go_test": "scoring.TestAutofail/forbidden_fact_without_autofail",
+      "id": "forbidden fact without autofail"
+    },
+    {
+      "details_raw": [
+        "{\"forbidden_facts\":[{\"id\":\"fabricated_citation\",\"found\":false,\"weight\":1,\"autofail\":true}]}"
+      ],
+      "expected": false,
+      "go_test": "scoring.TestAutofail/autofail_fact_absent_from_output",
+      "id": "autofail fact absent from output"
+    },
+    {
+      "details_raw": [
+        "{}",
+        "{\"forbidden_facts\":[{\"id\":\"fabricated_citation\",\"found\":true,\"weight\":1,\"autofail\":true}]}"
+      ],
+      "expected": true,
+      "go_test": "scoring.TestAutofail/marker_in_later_grader",
+      "id": "marker in later grader"
+    },
+    {
+      "details_raw": [
+        "{\"critical_failed\":\"true\",\"forbidden_facts\":[{\"found\":true,\"autofail\":true}]}"
+      ],
+      "expected": false,
+      "go_test": "",
+      "id": "extra: critical_failed wrong type makes whole detail undecodable"
+    },
+    {
+      "details_raw": [
+        "null"
+      ],
+      "expected": false,
+      "go_test": "",
+      "id": "extra: json null detail"
+    },
+    {
+      "details_raw": [
+        "{\"forbidden_facts\":null,\"critical_failed\":false}"
+      ],
+      "expected": false,
+      "go_test": "",
+      "id": "extra: forbidden_facts null"
+    }
+  ],
+  "high_stakes": {
+    "cases": [
+      {
+        "domain_tags": null,
+        "expected": false
+      },
+      {
+        "domain_tags": [],
+        "expected": false
+      },
+      {
+        "domain_tags": [
+          "real_estate"
+        ],
+        "expected": false
+      },
+      {
+        "domain_tags": [
+          "medical"
+        ],
+        "expected": true
+      },
+      {
+        "domain_tags": [
+          "legal"
+        ],
+        "expected": true
+      },
+      {
+        "domain_tags": [
+          "financial"
+        ],
+        "expected": true
+      },
+      {
+        "domain_tags": [
+          "photography",
+          "financial"
+        ],
+        "expected": true
+      },
+      {
+        "domain_tags": [
+          "Medical"
+        ],
+        "expected": false
+      }
+    ],
+    "go_test": "scoring.TestHighStakes"
+  },
+  "overlay_golden_pair": {
+    "cases": [
+      {
+        "expected": {
+          "dimensions": {
+            "completeness": 0.9,
+            "field_accuracy": 0.6,
+            "hallucination_free": 1,
+            "schema_validity": 1
+          },
+          "gradable": true,
+          "pass": true,
+          "q": 0.8200000000000002,
+          "weight_covered": 0.9999999999999999
+        },
+        "grader_dims": [
+          {
+            "field_accuracy": 0.6,
+            "schema_validity": 1
+          },
+          {
+            "completeness": 0.9,
+            "hallucination_free": 1
+          }
+        ],
+        "id": "native",
+        "weights": {
+          "completeness": 0.2,
+          "field_accuracy": 0.4,
+          "hallucination_free": 0.1,
+          "schema_validity": 0.3
+        }
+      },
+      {
+        "expected": {
+          "dimensions": {
+            "completeness": 0.9,
+            "field_accuracy": 0.6,
+            "hallucination_free": 1,
+            "schema_validity": 1
+          },
+          "gradable": true,
+          "pass": true,
+          "q": 0.7876923076923076,
+          "weight_covered": 0.6500000000000001
+        },
+        "grader_dims": [
+          {
+            "field_accuracy": 0.6,
+            "schema_validity": 1
+          },
+          {
+            "completeness": 0.9,
+            "hallucination_free": 1
+          }
+        ],
+        "id": "overlay_standing_uncovered",
+        "weights": {
+          "calibration_safe_hedging": 0.2,
+          "citation_honesty": 0.15,
+          "completeness": 0.1,
+          "field_accuracy": 0.32000000000000006,
+          "hallucination_free": 0.08000000000000002,
+          "schema_validity": 0.15
+        }
+      },
+      {
+        "expected": {
+          "dimensions": {
+            "calibration_safe_hedging": 0.5,
+            "citation_honesty": 1,
+            "completeness": 0.9,
+            "field_accuracy": 0.6,
+            "hallucination_free": 1,
+            "schema_validity": 1
+          },
+          "gradable": true,
+          "pass": true,
+          "q": 0.7619999999999998,
+          "weight_covered": 1.0000000000000002
+        },
+        "grader_dims": [
+          {
+            "field_accuracy": 0.6,
+            "schema_validity": 1
+          },
+          {
+            "completeness": 0.9,
+            "hallucination_free": 1
+          },
+          {
+            "calibration_safe_hedging": 0.5,
+            "citation_honesty": 1
+          }
+        ],
+        "id": "overlay_standing_fed",
+        "weights": {
+          "calibration_safe_hedging": 0.2,
+          "citation_honesty": 0.15,
+          "completeness": 0.1,
+          "field_accuracy": 0.32000000000000006,
+          "hallucination_free": 0.08000000000000002,
+          "schema_validity": 0.15
+        }
+      },
+      {
+        "expected": {
+          "dimensions": {
+            "completeness": 0.9,
+            "field_accuracy": 0.6,
+            "hallucination_free": 1,
+            "schema_validity": 1
+          },
+          "gradable": true,
+          "pass": true,
+          "q": 0.8200000000000002,
+          "weight_covered": 0.9999999999999999
+        },
+        "grader_dims": [
+          {
+            "field_accuracy": 0.6,
+            "schema_validity": 1
+          },
+          {
+            "completeness": 0.9,
+            "hallucination_free": 1
+          },
+          {
+            "calibration_safe_hedging": 0.5,
+            "citation_honesty": 1
+          }
+        ],
+        "id": "native_standing_fed",
+        "weights": {
+          "completeness": 0.2,
+          "field_accuracy": 0.4,
+          "hallucination_free": 0.1,
+          "schema_validity": 0.3
+        }
+      }
+    ],
+    "go_test": "scoring.TestOverlayGoldenSameOutputWithAndWithoutOverlay",
+    "pass_threshold": 0.7,
+    "status": "ok"
+  },
+  "overlay_weights": [
+    {
+      "expected": {
+        "calibration_safe_hedging": 0.2,
+        "citation_honesty": 0.15,
+        "completeness": 0.1,
+        "field_accuracy": 0.32000000000000006,
+        "hallucination_free": 0.08000000000000002,
+        "schema_validity": 0.15
+      },
+      "go_test": "scoring.TestOverlayWeightsStructuredExtraction",
+      "id": "structured_extraction",
+      "input": {
+        "completeness": 0.2,
+        "field_accuracy": 0.4,
+        "hallucination_free": 0.1,
+        "schema_validity": 0.3
+      }
+    },
+    {
+      "expected": {
+        "accuracy": 0.25,
+        "calibrated_hedging": 0.20000000000000004,
+        "citation_honesty": 0.15,
+        "false_premise_detection": 0.10000000000000002,
+        "precision": 0.05000000000000001
+      },
+      "go_test": "scoring.TestOverlayWeightsNativeCalibrationClass",
+      "id": "native_calibration_class",
+      "input": {
+        "accuracy": 0.5,
+        "calibrated_hedging": 0.2,
+        "false_premise_detection": 0.2,
+        "precision": 0.1
+      }
+    },
+    {
+      "expected": {
+        "answer_correctness": 0.4,
+        "calibration_safe_hedging": 0.2,
+        "citation_honesty": 0.15,
+        "constraint_compliance": 0.25
+      },
+      "go_test": "scoring.TestApplyAutofailZeroesRun",
+      "id": "answer_plus_constraint",
+      "input": {
+        "answer_correctness": 0.5,
+        "constraint_compliance": 0.5
+      }
+    },
+    {
+      "expected": {
+        "calibration_safe_hedging": 0.2,
+        "citation_honesty": 0.15,
+        "style": 0.25
+      },
+      "go_test": "",
+      "id": "extra_zero_weight_and_native_citation",
+      "input": {
+        "accuracy": 0,
+        "citation_honesty": 0.5,
+        "style": 1
+      }
+    },
+    {
+      "expected": {
+        "calibration_safe_hedging": 0.2,
+        "citation_honesty": 0.15
+      },
+      "go_test": "",
+      "id": "extra_empty",
+      "input": {}
+    }
+  ],
+  "tolerance": 1e-12
+}

@@ -1,0 +1,8 @@
+description: spec payload without the required schema key is rejected at validation
+spec:
+  checks:
+    - { path: $.name, equals: x }
+output: irrelevant
+expect:
+  error: true
+  error_contains: json_schema spec

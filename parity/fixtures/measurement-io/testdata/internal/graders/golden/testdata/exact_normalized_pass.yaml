@@ -1,0 +1,8 @@
+description: exact mode matches after whitespace collapse, case fold, and trailing punctuation strip
+spec:
+  answers:
+    - { value: paris }
+output: "  Paris.  "
+expect:
+  dimensions: { answer_correctness: 1.0 }
+  detail_contains: ['"mode":"value"', '"answer_index":0']

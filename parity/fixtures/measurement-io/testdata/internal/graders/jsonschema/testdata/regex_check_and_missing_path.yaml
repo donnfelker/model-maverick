@@ -1,0 +1,17 @@
+description: regex check is anchored to the whole field value; a missing path fails its check
+spec:
+  schema:
+    type: object
+    required: [effective_date]
+    properties:
+      effective_date: { type: string }
+  checks:
+    - { path: $.effective_date, regex: '\d{4}-\d{2}-\d{2}' }
+    - { path: $.termination_date, regex: '\d{4}-\d{2}-\d{2}' }
+output: |-
+  ```json
+  { "effective_date": "2025-03-01" }
+  ```
+expect:
+  dimensions: { schema_validity: 1.0, field_accuracy: 0.5 }
+  detail_contains: ['"path":"$.termination_date"', '"pass":false']

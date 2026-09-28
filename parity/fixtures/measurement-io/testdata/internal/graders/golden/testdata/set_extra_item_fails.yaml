@@ -1,0 +1,7 @@
+description: set-equality is exact — an extra member fails
+spec:
+  answers:
+    - { set: [red, green, blue] }
+output: red, green, blue, yellow
+expect:
+  dimensions: { answer_correctness: 0.0 }

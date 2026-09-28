@@ -1,0 +1,31 @@
+description: >-
+  A position-biased judge (scores the first-listed dimension 1.0, the second
+  0.6) is averaged flat by the spec 5.5 order swap: both dimensions come out
+  at the 0.8 mean and the 0.4 disagreement lands in the detail blob.
+envelope:
+  type: judge_rubric
+  version: 1
+  weight_dimensions: { idiom: 1.0, readability: 1.0 }
+  spec:
+    judge_prompt: Grade the Go review comment below.
+    rubric:
+      - { dimension: idiom, criterion: The suggestion follows Go idioms. }
+      - { dimension: readability, criterion: The comment is clear and actionable. }
+    reference: |-
+      Reference guidance: prefer errors.As over type assertions on wrapped errors.
+output: |-
+  Use errors.As here; a bare type assertion misses wrapped errors.
+task:
+  id: task_rw_001
+  capability: rewriting_editing
+  prompt: Review this Go diff and comment on idiom.
+run:
+  model_column_id: col_anthropic_fixture
+expect:
+  dimensions: { idiom: 0.8, readability: 0.8 }
+  detail_contains:
+    - '"order_swap"'
+    - '"judged_family":"anthropic"'
+    - '"family":"google"'
+    - '"rubric_order":["idiom","readability"]'
+    - '"rubric_order":["readability","idiom"]'

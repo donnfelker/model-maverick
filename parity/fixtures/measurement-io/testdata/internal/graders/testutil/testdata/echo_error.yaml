@@ -1,0 +1,6 @@
+description: forced grader failure marks dimensions absent, never zero
+spec: { fail: true }
+output: this output never gets scored
+expect:
+  error: true
+  error_contains: forced failure

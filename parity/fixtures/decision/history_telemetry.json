@@ -1,0 +1,118 @@
+{
+  "cases": [
+    {
+      "accepted": true,
+      "details_json_exact": "{\"status\":200}",
+      "endpoint_used": "direct",
+      "input": "{\"recommendation_id\":\"rec_1\",\"model_used\":\"m\",\"status\":200}",
+      "outcome": "success"
+    },
+    {
+      "accepted": true,
+      "details_json_exact": "{\"check_pass\":false,\"status\":200}",
+      "endpoint_used": "direct",
+      "input": "{\"recommendation_id\":\"rec_1\",\"model_used\":\"m\",\"status\":200,\"check_pass\":false}",
+      "outcome": "parse_failure"
+    },
+    {
+      "accepted": true,
+      "details_json_exact": "{\"check_pass\":true,\"finish_reason\":\"stop\",\"latency_ms\":900,\"status\":200,\"tokens_in\":10,\"tokens_out\":5}",
+      "endpoint_used": "openrouter",
+      "input": "{\"recommendation_id\":\"rec_1\",\"model_used\":\"m\",\"status\":200,\"check_pass\":true,\"latency_ms\":900,\"tokens_in\":10,\"tokens_out\":5,\"finish_reason\":\"stop\",\"endpoint_used\":\"openrouter\"}",
+      "outcome": "success"
+    },
+    {
+      "accepted": true,
+      "details_json_exact": "{\"error_class\":\"timeout\",\"status\":500}",
+      "endpoint_used": "direct",
+      "input": "{\"recommendation_id\":\"rec_1\",\"model_used\":\"m\",\"status\":500,\"error_class\":\"timeout\"}",
+      "outcome": "latency_exceeded"
+    },
+    {
+      "accepted": true,
+      "details_json_exact": "{\"status\":0}",
+      "endpoint_used": "direct",
+      "input": "{\"recommendation_id\":\"rec_1\",\"model_used\":\"m\",\"status\":0}",
+      "outcome": "provider_error"
+    },
+    {
+      "accepted": true,
+      "details_json_exact": "{\"status\":429}",
+      "endpoint_used": "direct",
+      "input": "{\"recommendation_id\":\"rec_1\",\"model_used\":\"m\",\"status\":429}",
+      "outcome": "provider_error"
+    },
+    {
+      "accepted": true,
+      "details_json_exact": "{\"error_class\":\"connect_error\",\"status\":200}",
+      "endpoint_used": "direct",
+      "input": "{\"recommendation_id\":\"rec_1\",\"model_used\":\"m\",\"status\":200,\"error_class\":\"connect_error\"}",
+      "outcome": "provider_error"
+    },
+    {
+      "accepted": true,
+      "details_json_exact": "{\"status\":404}",
+      "endpoint_used": "direct",
+      "input": "{\"recommendation_id\":\"rec_1\",\"model_used\":\"m\",\"status\":404}",
+      "outcome": "other"
+    },
+    {
+      "accepted": true,
+      "details_json_exact": "{\"check_pass\":false,\"status\":302}",
+      "endpoint_used": "direct",
+      "input": "{\"recommendation_id\":\"rec_1\",\"model_used\":\"m\",\"status\":302,\"check_pass\":false}",
+      "outcome": "other"
+    },
+    {
+      "accepted": true,
+      "details_json_exact": "{\"check_pass\":false,\"error_class\":\"other\",\"status\":200}",
+      "endpoint_used": "direct",
+      "input": "{\"recommendation_id\":\"rec_1\",\"model_used\":\"m\",\"status\":200,\"error_class\":\"other\",\"check_pass\":false}",
+      "outcome": "parse_failure"
+    },
+    {
+      "accepted": false,
+      "input": "{\"recommendation_id\":\"rec_1\",\"model_used\":\"m\",\"status\":-1}"
+    },
+    {
+      "accepted": false,
+      "input": "{\"recommendation_id\":\"rec_1\",\"model_used\":\"m\"}"
+    },
+    {
+      "accepted": false,
+      "input": "{\"recommendation_id\":\"\",\"model_used\":\"m\",\"status\":200}"
+    },
+    {
+      "accepted": false,
+      "input": "{\"recommendation_id\":\"rec_1\",\"model_used\":\"m\",\"status\":200,\"endpoint_used\":\"lambda\"}"
+    },
+    {
+      "accepted": false,
+      "input": "{\"recommendation_id\":\"rec_1\",\"model_used\":\"m\",\"status\":200,\"error_class\":\"weird\"}"
+    },
+    {
+      "accepted": false,
+      "input": "{\"recommendation_id\":\"rec_1\",\"model_used\":\"m\",\"status\":200,\"latency_ms\":-5}"
+    },
+    {
+      "accepted": true,
+      "details_json_exact": "{\"status\":200}",
+      "endpoint_used": "direct",
+      "input": "{\"recommendation_id\":\"rec_1\",\"model_used\":\"m\",\"status\":200,\"unknown\":1}",
+      "outcome": "success"
+    },
+    {
+      "accepted": false,
+      "input": "{\"recommendation_id\":\"rec_1\",\"model_used\":\"m\",\"status\":200} {}"
+    },
+    {
+      "accepted": false,
+      "input": "{\"recommendation_id\":\"rec_1\",\"model_used\":\"m\",\"status\":\"200\"}"
+    },
+    {
+      "accepted": false,
+      "input": "{\"recommendation_id\":\"rec_1\",\"model_used\":\"m\",\"status\":200.5}"
+    }
+  ],
+  "max_items": 500
+}

@@ -1,0 +1,395 @@
+{
+  "area": "store",
+  "packages": [
+    "internal/store",
+    "internal/store/migrations",
+    "internal/store/queries",
+    "internal/store/db",
+    "internal/store/ids",
+    "internal/store/storetest",
+    "internal/config",
+    "cmd/maverick",
+    "cmd/maverick-proxy"
+  ],
+  "go_test_count": 47,
+  "go_test_count_by_file": {
+    "internal/store/store_test.go": 11,
+    "internal/store/health_test.go": 1,
+    "internal/store/ids/ids_test.go": 2,
+    "internal/config/config_test.go": 6,
+    "cmd/maverick/main_test.go": 19,
+    "cmd/maverick/calibrate_test.go": 8
+  },
+  "count_note": "go_test_count counts every `func Test*` including the two TestMain harness functions. manifest_top_level_count is the number of distinct top-level test names below; table-test subtests of config.TestLoadMalformedValues are listed individually as well.",
+  "manifest_top_level_count": 47,
+  "tests": [
+    {
+      "go_test": "ids.TestNewFormat",
+      "where": "fixtures/store/ids.json#format"
+    },
+    {
+      "go_test": "ids.TestNewUnique",
+      "where": "fixtures/store/ids.json#unique-concurrent"
+    },
+    {
+      "go_test": "config.TestLoadDefaults",
+      "where": "fixtures/store/config_load.json#defaults"
+    },
+    {
+      "go_test": "config.TestLoadOverrides",
+      "where": "fixtures/store/config_load.json#overrides"
+    },
+    {
+      "go_test": "config.TestLoadRequiredMissing",
+      "where": "fixtures/store/config_load.json#required-missing"
+    },
+    {
+      "go_test": "config.TestLoadEmptyRequiredIsMissing",
+      "where": "fixtures/store/config_load.json#empty-required-is-missing"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/public_addr_without_port",
+      "where": "fixtures/store/config_load.json#malformed/public_addr_without_port"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/public_addr_non-numeric_port",
+      "where": "fixtures/store/config_load.json#malformed/public_addr_non-numeric_port"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/internal_addr_port_out_of_range",
+      "where": "fixtures/store/config_load.json#malformed/internal_addr_port_out_of_range"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/tokens_missing_separator",
+      "where": "fixtures/store/config_load.json#malformed/tokens_missing_separator"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/tokens_empty_label",
+      "where": "fixtures/store/config_load.json#malformed/tokens_empty_label"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/tokens_empty_secret",
+      "where": "fixtures/store/config_load.json#malformed/tokens_empty_secret"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/master_key_not_hex",
+      "where": "fixtures/store/config_load.json#malformed/master_key_not_hex"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/master_key_too_short",
+      "where": "fixtures/store/config_load.json#malformed/master_key_too_short"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/judge_pool_empty_entry",
+      "where": "fixtures/store/config_load.json#malformed/judge_pool_empty_entry"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/nightly_cap_not_a_number",
+      "where": "fixtures/store/config_load.json#malformed/nightly_cap_not_a_number"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/nightly_cap_negative",
+      "where": "fixtures/store/config_load.json#malformed/nightly_cap_negative"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/alpha_not_a_number",
+      "where": "fixtures/store/config_load.json#malformed/alpha_not_a_number"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/alpha_above_one",
+      "where": "fixtures/store/config_load.json#malformed/alpha_above_one"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/alpha_zero",
+      "where": "fixtures/store/config_load.json#malformed/alpha_zero"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/lambda_var_not_a_number",
+      "where": "fixtures/store/config_load.json#malformed/lambda_var_not_a_number"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/noise_band_NaN",
+      "where": "fixtures/store/config_load.json#malformed/noise_band_NaN"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/rpm_non-numeric",
+      "where": "fixtures/store/config_load.json#malformed/rpm_non-numeric"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/rpm_zero",
+      "where": "fixtures/store/config_load.json#malformed/rpm_zero"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/rpm_negative",
+      "where": "fixtures/store/config_load.json#malformed/rpm_negative"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/retention_days_float",
+      "where": "fixtures/store/config_load.json#malformed/retention_days_float"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/capture_max_window_zero",
+      "where": "fixtures/store/config_load.json#malformed/capture_max_window_zero"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/capture_retention_hours_negative",
+      "where": "fixtures/store/config_load.json#malformed/capture_retention_hours_negative"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/capture_expiry_cron_free_text",
+      "where": "fixtures/store/config_load.json#malformed/capture_expiry_cron_free_text"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/history_prune_cron_too_few_fields",
+      "where": "fixtures/store/config_load.json#malformed/history_prune_cron_too_few_fields"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/min_nights_non-numeric",
+      "where": "fixtures/store/config_load.json#malformed/min_nights_non-numeric"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/cold_start_nights_zero",
+      "where": "fixtures/store/config_load.json#malformed/cold_start_nights_zero"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/cron_too_few_fields",
+      "where": "fixtures/store/config_load.json#malformed/cron_too_few_fields"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/cron_free_text",
+      "where": "fixtures/store/config_load.json#malformed/cron_free_text"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/runner_repeats_zero",
+      "where": "fixtures/store/config_load.json#malformed/runner_repeats_zero"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/runner_timeout_not_a_duration",
+      "where": "fixtures/store/config_load.json#malformed/runner_timeout_not_a_duration"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/runner_timeout_zero",
+      "where": "fixtures/store/config_load.json#malformed/runner_timeout_zero"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/runner_timeout_above_cap",
+      "where": "fixtures/store/config_load.json#malformed/runner_timeout_above_cap"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/batch_job_timeout_not_a_duration",
+      "where": "fixtures/store/config_load.json#malformed/batch_job_timeout_not_a_duration"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/batch_job_timeout_zero",
+      "where": "fixtures/store/config_load.json#malformed/batch_job_timeout_zero"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/batch_job_timeout_negative",
+      "where": "fixtures/store/config_load.json#malformed/batch_job_timeout_negative"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/batch_job_timeout_above_cap",
+      "where": "fixtures/store/config_load.json#malformed/batch_job_timeout_above_cap"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/provider_max_concurrency_zero",
+      "where": "fixtures/store/config_load.json#malformed/provider_max_concurrency_zero"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/provider_rpm_negative",
+      "where": "fixtures/store/config_load.json#malformed/provider_rpm_negative"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues/provider_rpm_non-numeric",
+      "where": "fixtures/store/config_load.json#malformed/provider_rpm_non-numeric"
+    },
+    {
+      "go_test": "config.TestLoadReportsAllIssuesAtOnce",
+      "where": "fixtures/store/config_load.json#all-issues-at-once"
+    },
+    {
+      "go_test": "config.TestLoadMalformedValues",
+      "where": "fixtures/store/config_load.json#malformed/*"
+    },
+    {
+      "go_test": "store.TestMain",
+      "where": "reference/engine-reference.md (Part 1)#store-TestMain"
+    },
+    {
+      "go_test": "store.TestMigrationsUpDownUpClean",
+      "where": "reference/engine-reference.md (Part 1)#store-TestMigrationsUpDownUpClean"
+    },
+    {
+      "go_test": "store.TestMigrateRunsGooseThenRiverIdempotently",
+      "where": "reference/engine-reference.md (Part 1)#store-TestMigrateRunsGooseThenRiverIdempotently"
+    },
+    {
+      "go_test": "store.TestTenantsRoundTrip",
+      "where": "reference/engine-reference.md (Part 1)#store-TestTenantsRoundTrip"
+    },
+    {
+      "go_test": "store.TestAPIKeysRoundTrip",
+      "where": "reference/engine-reference.md (Part 1)#store-TestAPIKeysRoundTrip"
+    },
+    {
+      "go_test": "store.TestModelColumnsRoundTrip",
+      "where": "reference/engine-reference.md (Part 1)#store-TestModelColumnsRoundTrip"
+    },
+    {
+      "go_test": "store.TestModelColumnsExecutionAliasesRoundTrip",
+      "where": "reference/engine-reference.md (Part 1)#store-TestModelColumnsExecutionAliasesRoundTrip"
+    },
+    {
+      "go_test": "store.TestTasksUpsertRoundTrip",
+      "where": "reference/engine-reference.md (Part 1)#store-TestTasksUpsertRoundTrip"
+    },
+    {
+      "go_test": "store.TestRunsInsertRoundTrip",
+      "where": "reference/engine-reference.md (Part 1)#store-TestRunsInsertRoundTrip"
+    },
+    {
+      "go_test": "store.TestRunsUniqueIndexOnBatchTaskColumnRepeat",
+      "where": "reference/engine-reference.md (Part 1)#store-TestRunsUniqueIndexOnBatchTaskColumnRepeat"
+    },
+    {
+      "go_test": "store.TestScoresRoundTrip",
+      "where": "reference/engine-reference.md (Part 1)#store-TestScoresRoundTrip"
+    },
+    {
+      "go_test": "store.TestReadJobHealth",
+      "where": "reference/engine-reference.md (Part 1)#store-TestReadJobHealth"
+    },
+    {
+      "go_test": "main.TestRunNoCommandPrintsUsage",
+      "where": "fixtures/store/cli.json#no-command"
+    },
+    {
+      "go_test": "main.TestRunUnknownCommand",
+      "where": "fixtures/store/cli.json#unknown-command"
+    },
+    {
+      "go_test": "main.TestRunCorpusWithoutSubcommand",
+      "where": "fixtures/store/cli.json#corpus-no-sub"
+    },
+    {
+      "go_test": "main.TestRunCorpusUnknownSubcommand",
+      "where": "fixtures/store/cli.json#corpus-unknown-sub"
+    },
+    {
+      "go_test": "main.TestRunCorpusLoadRequiresVersionAndDir",
+      "where": "fixtures/store/cli.json#corpus-load-missing-dir"
+    },
+    {
+      "go_test": "main.TestRunCorpusLoadRejectsInvalidCorpusListingEveryViolation",
+      "where": "fixtures/store/cli.json#corpus-load-invalid-tier-range"
+    },
+    {
+      "go_test": "main.TestRunCorpusLoadValidatesBeforeTouchingTheDatabase",
+      "where": "fixtures/store/cli.json#corpus-load-invalid-test-suite"
+    },
+    {
+      "go_test": "main.TestRunCorpusLoadValidCorpusFailsOnUnreachableDatabase",
+      "where": "fixtures/store/cli.json#corpus-load-valid-unreachable-db"
+    },
+    {
+      "go_test": "main.TestRunCorpusActivateRequiresVersion",
+      "where": "fixtures/store/cli.json#corpus-activate-missing-version"
+    },
+    {
+      "go_test": "main.TestRunCorpusActivateFailsOnUnreachableDatabase",
+      "where": "fixtures/store/cli.json#corpus-activate-unreachable-db"
+    },
+    {
+      "go_test": "main.TestRunCorpusCalibrateFailsOnUnreachableDatabase",
+      "where": "fixtures/store/cli.json#corpus-calibrate-unreachable-db"
+    },
+    {
+      "go_test": "main.TestRunMCPStdioRequiresAPIKey",
+      "where": "fixtures/store/cli.json#mcp-stdio-missing-key"
+    },
+    {
+      "go_test": "main.TestRunMCPStdioFailsFastNamingMissingVarsOnStderr",
+      "where": "fixtures/store/cli.json#mcp-stdio-missing-config"
+    },
+    {
+      "go_test": "main.TestRunMCPStdioFailsOnUnreachableDatabase",
+      "where": "fixtures/store/cli.json#mcp-stdio-unreachable-db"
+    },
+    {
+      "go_test": "main.TestRunServeFailsFastNamingMissingVars",
+      "where": "fixtures/store/cli.json#serve-missing-config"
+    },
+    {
+      "go_test": "main.TestRunServeFailsFastNamingMalformedVar",
+      "where": "fixtures/store/cli.json#serve-malformed-var"
+    },
+    {
+      "go_test": "main.TestRunServeLogsJSON",
+      "where": "fixtures/store/cli.json#serve-logs-json"
+    },
+    {
+      "go_test": "main.TestRunServeRejectsConflictingFlags",
+      "where": "fixtures/store/cli.json#serve-conflicting-flags"
+    },
+    {
+      "go_test": "main.TestRunMigrateFailsFastOnMissingConfig",
+      "where": "fixtures/store/cli.json#migrate-missing-config"
+    },
+    {
+      "go_test": "main.TestRunMigrateFailsOnUnreachableDatabase",
+      "where": "fixtures/store/cli.json#migrate-unreachable-db"
+    },
+    {
+      "go_test": "main.TestMain",
+      "where": "reference/engine-reference.md (Part 1)#store-TestMain"
+    },
+    {
+      "go_test": "main.TestRunCorpusCalibrateNamesTheInversionAndTheOutlierAndNothingElse",
+      "where": "reference/engine-reference.md (Part 1)#main-TestRunCorpusCalibrateNamesTheInversionAndTheOutlierAndNothingElse"
+    },
+    {
+      "go_test": "main.TestRunCorpusCalibrateNamesTheInversionAndTheOutlierAndNothingElse",
+      "where": "fixtures/store/calibrate.json#report_crafted_grid"
+    },
+    {
+      "go_test": "main.TestRunCorpusCalibrateEmptyAggregatesPrintsNoData",
+      "where": "reference/engine-reference.md (Part 1)#main-TestRunCorpusCalibrateEmptyAggregatesPrintsNoData"
+    },
+    {
+      "go_test": "main.TestTierFindingsInterpolatesAcrossTierGaps",
+      "where": "fixtures/store/calibrate.json#tier_findings/gap-outlier-flagged"
+    },
+    {
+      "go_test": "main.TestTierFindingsInterpolatesAcrossTierGaps",
+      "where": "fixtures/store/calibrate.json#tier_findings/gap-inside-threshold"
+    },
+    {
+      "go_test": "main.TestTierFindingsInterpolatesAcrossTierGaps",
+      "where": "fixtures/store/calibrate.json#tier_findings/uneven-neighbors"
+    },
+    {
+      "go_test": "main.TestTierFindingsFlagsInversionAcrossTierGaps",
+      "where": "fixtures/store/calibrate.json#tier_findings/inversion-across-gap"
+    },
+    {
+      "go_test": "main.TestTierFindingsSingleTierAndEqualRatesAreClean",
+      "where": "fixtures/store/calibrate.json#tier_findings/single-tier"
+    },
+    {
+      "go_test": "main.TestTierFindingsSingleTierAndEqualRatesAreClean",
+      "where": "fixtures/store/calibrate.json#tier_findings/flat"
+    },
+    {
+      "go_test": "main.TestCraftedGridDeviations",
+      "where": "fixtures/store/calibrate.json#tier_findings/crafted-inverted"
+    },
+    {
+      "go_test": "main.TestCraftedGridDeviations",
+      "where": "fixtures/store/calibrate.json#tier_findings/crafted-outlier"
+    },
+    {
+      "go_test": "main.TestRunCorpusCalibrateNamesTheInversionAndTheOutlierAndNothingElse",
+      "where": "fixtures/store/calibrate.json#tier_findings/crafted-mono"
+    }
+  ]
+}

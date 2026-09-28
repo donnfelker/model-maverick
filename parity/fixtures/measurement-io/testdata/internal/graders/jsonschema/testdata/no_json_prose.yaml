@@ -1,0 +1,10 @@
+description: pure prose with no JSON anywhere scores schema_validity 0
+spec:
+  schema:
+    type: object
+output: |-
+  I'm sorry, I can't produce structured data for that request, but the
+  agreement names Acme Corp and runs for 24 months.
+expect:
+  dimensions: { schema_validity: 0.0 }
+  detail_contains: ['"extraction":"none"']

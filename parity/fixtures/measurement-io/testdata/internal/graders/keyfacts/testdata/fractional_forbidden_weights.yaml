@@ -1,0 +1,12 @@
+description: forbidden facts subtract their weight — fractional weights leave a partial score
+spec:
+  facts:
+    - { id: party_acme, any_of: ["Acme Corp"] }
+  forbidden_facts:
+    - { id: soft_trap_role, any_of: ["chief innovation officer"], weight: 0.5 }
+    - { id: hard_trap_date, any_of: ["2019-06-15"], weight: 1 }
+output: |-
+  Acme Corp's chief innovation officer approved the deal.
+expect:
+  dimensions: { fact_coverage: 1.0, hallucination_free: 0.5 }
+  detail_contains: ['"id":"soft_trap_role"', '"id":"hard_trap_date"']

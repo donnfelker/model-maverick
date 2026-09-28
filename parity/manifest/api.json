@@ -1,0 +1,1255 @@
+{
+  "area": "api",
+  "packages": [
+    "internal/api",
+    "internal/api/handlers",
+    "internal/api/middleware",
+    "internal/api/apierrors",
+    "internal/mcp"
+  ],
+  "go_test_count": 209,
+  "go_test_count_by_file": {
+    "internal/api/bench_test.go": 0,
+    "internal/api/capture_read_test.go": 9,
+    "internal/api/capture_test.go": 21,
+    "internal/api/config_test.go": 23,
+    "internal/api/e2e_phase2_test.go": 1,
+    "internal/api/health_internal_test.go": 1,
+    "internal/api/history_test.go": 28,
+    "internal/api/internalv1_captures_test.go": 10,
+    "internal/api/internalv1_test.go": 18,
+    "internal/api/mcp_test.go": 9,
+    "internal/api/models_test.go": 5,
+    "internal/api/policies_test.go": 13,
+    "internal/api/recommend_prompt_test.go": 7,
+    "internal/api/recommend_test.go": 13,
+    "internal/api/server_test.go": 22,
+    "internal/api/telemetry_test.go": 10,
+    "internal/api/apierrors/errors_test.go": 4,
+    "internal/api/middleware/middleware_test.go": 15
+  },
+  "count_note": "go_test_count counts every `func Test*` (grep -c '^func Test') in the five packages, including the TestMain harness in internal/api/server_test.go. internal/api/handlers and internal/mcp have no test files; they are exercised through internal/api tests. bench_test.go has only benchmarks (0 Test functions). manifest_top_level_count is the number of distinct top-level test names below and must equal go_test_count. Table-test subtests are listed individually where a fixture row exists; other subtests are covered by their parent's entry (behavior doc row plus black-box records).",
+  "manifest_top_level_count": 209,
+  "blackbox": {
+    "recorded": "blackbox/api-recorded.jsonl",
+    "seed_sql": "blackbox/api-seed-sql.jsonl",
+    "timeline": "blackbox/api-timeline.md",
+    "readme": "blackbox/README.md",
+    "records": 619,
+    "seed_statements": 1498
+  },
+  "tests": [
+    {
+      "go_test": "api.TestTenantCaptureReadEndpointsRequireAuth",
+      "where": "reference/engine-reference.md (Part 5)#t-TestTenantCaptureReadEndpointsRequireAuth",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestTenantCaptureReadEndpointsRequireAuth\")"
+    },
+    {
+      "go_test": "api.TestTenantListCapturesShape",
+      "where": "reference/engine-reference.md (Part 5)#t-TestTenantListCapturesShape",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestTenantListCapturesShape\")"
+    },
+    {
+      "go_test": "api.TestTenantListCapturesStrictlyScoped",
+      "where": "reference/engine-reference.md (Part 5)#t-TestTenantListCapturesStrictlyScoped",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestTenantListCapturesStrictlyScoped\")"
+    },
+    {
+      "go_test": "api.TestTenantListCapturesPagination",
+      "where": "reference/engine-reference.md (Part 5)#t-TestTenantListCapturesPagination",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestTenantListCapturesPagination\")"
+    },
+    {
+      "go_test": "api.TestTenantReadOwnPromptRoundTrip",
+      "where": "reference/engine-reference.md (Part 5)#t-TestTenantReadOwnPromptRoundTrip",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestTenantReadOwnPromptRoundTrip\")"
+    },
+    {
+      "go_test": "api.TestTenantReadCrossTenant404IndistinguishableAndLogged",
+      "where": "reference/engine-reference.md (Part 5)#t-TestTenantReadCrossTenant404IndistinguishableAndLogged",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestTenantReadCrossTenant404IndistinguishableAndLogged\")"
+    },
+    {
+      "go_test": "api.TestTenantReadExpiredButPresent410",
+      "where": "reference/engine-reference.md (Part 5)#t-TestTenantReadExpiredButPresent410",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestTenantReadExpiredButPresent410\")"
+    },
+    {
+      "go_test": "api.TestTenantReadHardDeleted410",
+      "where": "reference/engine-reference.md (Part 5)#t-TestTenantReadHardDeleted410",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestTenantReadHardDeleted410\")"
+    },
+    {
+      "go_test": "api.TestTenantCaptureReadZeroRetention",
+      "where": "reference/engine-reference.md (Part 5)#t-TestTenantCaptureReadZeroRetention",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestTenantCaptureReadZeroRetention\")"
+    },
+    {
+      "go_test": "api.TestCaptureEndpointsRequireAuth",
+      "where": "reference/engine-reference.md (Part 5)#t-TestCaptureEndpointsRequireAuth",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestCaptureEndpointsRequireAuth\")"
+    },
+    {
+      "go_test": "api.TestCaptureWindowCreate201",
+      "where": "reference/engine-reference.md (Part 5)#t-TestCaptureWindowCreate201",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestCaptureWindowCreate201\")"
+    },
+    {
+      "go_test": "api.TestCaptureWindowCreateScopedFields",
+      "where": "reference/engine-reference.md (Part 5)#t-TestCaptureWindowCreateScopedFields",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestCaptureWindowCreateScopedFields\")"
+    },
+    {
+      "go_test": "api.TestCaptureWindowCreateValidation422",
+      "where": "reference/engine-reference.md (Part 5)#t-TestCaptureWindowCreateValidation422",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestCaptureWindowCreateValidation422\")"
+    },
+    {
+      "go_test": "api.TestCaptureWindowCreateZeroRetention409",
+      "where": "reference/engine-reference.md (Part 5)#t-TestCaptureWindowCreateZeroRetention409",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestCaptureWindowCreateZeroRetention409\")"
+    },
+    {
+      "go_test": "api.TestCaptureWindowDeleteEndsEarly",
+      "where": "reference/engine-reference.md (Part 5)#t-TestCaptureWindowDeleteEndsEarly",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestCaptureWindowDeleteEndsEarly\")"
+    },
+    {
+      "go_test": "api.TestCaptureWindowDeleteCrossTenant404",
+      "where": "reference/engine-reference.md (Part 5)#t-TestCaptureWindowDeleteCrossTenant404",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestCaptureWindowDeleteCrossTenant404\")"
+    },
+    {
+      "go_test": "api.TestRecommendPromptCapturedUnderActiveWindow",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRecommendPromptCapturedUnderActiveWindow",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestRecommendPromptCapturedUnderActiveWindow\")"
+    },
+    {
+      "go_test": "api.TestRecommendPromptNotCapturedWithoutWindow",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRecommendPromptNotCapturedWithoutWindow",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestRecommendPromptNotCapturedWithoutWindow\")"
+    },
+    {
+      "go_test": "api.TestRecommendDeclaredPathNeverCaptured",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRecommendDeclaredPathNeverCaptured",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestRecommendDeclaredPathNeverCaptured\")"
+    },
+    {
+      "go_test": "api.TestCaptureWindowKeyScope",
+      "where": "reference/engine-reference.md (Part 5)#t-TestCaptureWindowKeyScope",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestCaptureWindowKeyScope\")"
+    },
+    {
+      "go_test": "api.TestCaptureConfidenceBelowSampling",
+      "where": "reference/engine-reference.md (Part 5)#t-TestCaptureConfidenceBelowSampling",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestCaptureConfidenceBelowSampling\")"
+    },
+    {
+      "go_test": "api.TestCaptureZeroRetentionBeltAndSuspenders",
+      "where": "reference/engine-reference.md (Part 5)#t-TestCaptureZeroRetentionBeltAndSuspenders",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestCaptureZeroRetentionBeltAndSuspenders\")"
+    },
+    {
+      "go_test": "api.TestReplayMatch",
+      "where": "reference/engine-reference.md (Part 5)#t-TestReplayMatch",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestReplayMatch\")"
+    },
+    {
+      "go_test": "api.TestReplayMismatch",
+      "where": "reference/engine-reference.md (Part 5)#t-TestReplayMismatch",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestReplayMismatch\")"
+    },
+    {
+      "go_test": "api.TestReplayClassifierFailureFallsBack",
+      "where": "reference/engine-reference.md (Part 5)#t-TestReplayClassifierFailureFallsBack",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestReplayClassifierFailureFallsBack\")"
+    },
+    {
+      "go_test": "api.TestReplayClassifierVersion",
+      "where": "reference/engine-reference.md (Part 5)#t-TestReplayClassifierVersion",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestReplayClassifierVersion\")"
+    },
+    {
+      "go_test": "api.TestReplayNotFound404",
+      "where": "reference/engine-reference.md (Part 5)#t-TestReplayNotFound404",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestReplayNotFound404\")"
+    },
+    {
+      "go_test": "api.TestReplayCrossTenant404",
+      "where": "reference/engine-reference.md (Part 5)#t-TestReplayCrossTenant404",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestReplayCrossTenant404\")"
+    },
+    {
+      "go_test": "api.TestReplayExpiredButPresent410",
+      "where": "reference/engine-reference.md (Part 5)#t-TestReplayExpiredButPresent410",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestReplayExpiredButPresent410\")"
+    },
+    {
+      "go_test": "api.TestReplayHardDeleted410",
+      "where": "reference/engine-reference.md (Part 5)#t-TestReplayHardDeleted410",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestReplayHardDeleted410\")"
+    },
+    {
+      "go_test": "api.TestConfigPoolsRoundTrip",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigPoolsRoundTrip",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigPoolsRoundTrip\")"
+    },
+    {
+      "go_test": "api.TestConfigPoolsFullReplace",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigPoolsFullReplace",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigPoolsFullReplace\")"
+    },
+    {
+      "go_test": "api.TestConfigPoolsUnknownModel",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigPoolsUnknownModel",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigPoolsUnknownModel\")"
+    },
+    {
+      "go_test": "api.TestConfigPoolsDefaultRule",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigPoolsDefaultRule",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigPoolsDefaultRule\")"
+    },
+    {
+      "go_test": "api.TestConfigPoolsDuplicateName",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigPoolsDuplicateName",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigPoolsDuplicateName\")"
+    },
+    {
+      "go_test": "api.TestConfigPoolsAllRetired",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigPoolsAllRetired",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigPoolsAllRetired\")"
+    },
+    {
+      "go_test": "api.TestConfigPoolsRejectedByStoredConstraint",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigPoolsRejectedByStoredConstraint",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigPoolsRejectedByStoredConstraint\")"
+    },
+    {
+      "go_test": "api.TestConfigConstraintsRoundTrip",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigConstraintsRoundTrip",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigConstraintsRoundTrip\")"
+    },
+    {
+      "go_test": "api.TestConfigConstraintsWouldEmptyPool",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigConstraintsWouldEmptyPool",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigConstraintsWouldEmptyPool\")"
+    },
+    {
+      "go_test": "api.TestConfigConstraintsLatencyWouldEmptyPool",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigConstraintsLatencyWouldEmptyPool",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigConstraintsLatencyWouldEmptyPool\")"
+    },
+    {
+      "go_test": "api.TestConfigConstraintsNameTheEmptiedPool",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigConstraintsNameTheEmptiedPool",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigConstraintsNameTheEmptiedPool\")"
+    },
+    {
+      "go_test": "api.TestConfigConstraintsUnmeasuredColumnsSurvive",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigConstraintsUnmeasuredColumnsSurvive",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigConstraintsUnmeasuredColumnsSurvive\")"
+    },
+    {
+      "go_test": "api.TestConfigConstraintsUseLatestAggregate",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigConstraintsUseLatestAggregate",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigConstraintsUseLatestAggregate\")"
+    },
+    {
+      "go_test": "api.TestConfigWeightsRoundTrip",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigWeightsRoundTrip",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigWeightsRoundTrip\")"
+    },
+    {
+      "go_test": "api.TestConfigWeightsFullReplace",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigWeightsFullReplace",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigWeightsFullReplace\")"
+    },
+    {
+      "go_test": "api.TestConfigWeightsValidation",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigWeightsValidation",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigWeightsValidation\")"
+    },
+    {
+      "go_test": "api.TestConfigWeightsSumTolerance",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigWeightsSumTolerance",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigWeightsSumTolerance\")"
+    },
+    {
+      "go_test": "api.TestConfigStrictDecoding",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigStrictDecoding",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigStrictDecoding\")"
+    },
+    {
+      "go_test": "api.TestConfigCrossTenantIsolation",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigCrossTenantIsolation",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigCrossTenantIsolation\")"
+    },
+    {
+      "go_test": "api.TestConfigOversizeBodyDeclaredLength413",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigOversizeBodyDeclaredLength413",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigOversizeBodyDeclaredLength413\")"
+    },
+    {
+      "go_test": "api.TestConfigOversizeBodyChunked413",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigOversizeBodyChunked413",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigOversizeBodyChunked413\")"
+    },
+    {
+      "go_test": "api.TestConfigWrongMethod",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigWrongMethod",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigWrongMethod\")"
+    },
+    {
+      "go_test": "api.TestConfigRequiresAuth",
+      "where": "reference/engine-reference.md (Part 5)#t-TestConfigRequiresAuth",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestConfigRequiresAuth\")"
+    },
+    {
+      "go_test": "api.TestPhase2ExitEndToEndRecommend",
+      "where": "reference/engine-reference.md (Part 5)#t-TestPhase2ExitEndToEndRecommend",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestPhase2ExitEndToEndRecommend\")"
+    },
+    {
+      "go_test": "api.TestRiverQueuesComponent",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRiverQueuesComponent"
+    },
+    {
+      "go_test": "api.TestRiverQueuesComponent/no_queues_means_no_workers",
+      "where": "fixtures/api/health_river_queues.json#no-queues"
+    },
+    {
+      "go_test": "api.TestRiverQueuesComponent/fresh_heartbeat_is_ok",
+      "where": "fixtures/api/health_river_queues.json#fresh"
+    },
+    {
+      "go_test": "api.TestRiverQueuesComponent/one_live_queue_keeps_the_cluster_ok_despite_a_stale_sibling",
+      "where": "fixtures/api/health_river_queues.json#one-live"
+    },
+    {
+      "go_test": "api.TestRiverQueuesComponent/a_paused_queue_is_surfaced_over_ok",
+      "where": "fixtures/api/health_river_queues.json#paused"
+    },
+    {
+      "go_test": "api.TestRiverQueuesComponent/every_heartbeat_stale_is_stale",
+      "where": "fixtures/api/health_river_queues.json#stale"
+    },
+    {
+      "go_test": "api.TestHistoryRequiresAuth",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryRequiresAuth",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryRequiresAuth\")"
+    },
+    {
+      "go_test": "api.TestHistoryRecommendationsSummaries",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryRecommendationsSummaries",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryRecommendationsSummaries\")"
+    },
+    {
+      "go_test": "api.TestHistoryRecommendationsFilters",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryRecommendationsFilters",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryRecommendationsFilters\")"
+    },
+    {
+      "go_test": "api.TestHistoryRecommendationsPaginationWalk",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryRecommendationsPaginationWalk",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryRecommendationsPaginationWalk\")"
+    },
+    {
+      "go_test": "api.TestHistoryRecommendationsPaginationExactBoundary",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryRecommendationsPaginationExactBoundary",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryRecommendationsPaginationExactBoundary\")"
+    },
+    {
+      "go_test": "api.TestHistoryRecommendationsEmptyPage",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryRecommendationsEmptyPage",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryRecommendationsEmptyPage\")"
+    },
+    {
+      "go_test": "api.TestHistoryRecommendationsCursorStableUnderInserts",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryRecommendationsCursorStableUnderInserts",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryRecommendationsCursorStableUnderInserts\")"
+    },
+    {
+      "go_test": "api.TestHistoryRecommendationsCrossTenantIsolation",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryRecommendationsCrossTenantIsolation",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryRecommendationsCrossTenantIsolation\")"
+    },
+    {
+      "go_test": "api.TestHistoryInvalidCursor422",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryInvalidCursor422",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryInvalidCursor422\")"
+    },
+    {
+      "go_test": "api.TestHistoryForeignCursor422",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryForeignCursor422",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryForeignCursor422\")"
+    },
+    {
+      "go_test": "api.TestHistoryInvalidLimit422",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryInvalidLimit422",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryInvalidLimit422\")"
+    },
+    {
+      "go_test": "api.TestHistoryLimitBoundsAccepted",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryLimitBoundsAccepted",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryLimitBoundsAccepted\")"
+    },
+    {
+      "go_test": "api.TestHistoryUnknownParam422",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryUnknownParam422",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryUnknownParam422\")"
+    },
+    {
+      "go_test": "api.TestHistoryInvalidSince422",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryInvalidSince422",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryInvalidSince422\")"
+    },
+    {
+      "go_test": "api.TestHistoryTraceFullDecision",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryTraceFullDecision",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryTraceFullDecision\")"
+    },
+    {
+      "go_test": "api.TestHistoryTraceNullPromptHashOnDeclared",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryTraceNullPromptHashOnDeclared",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryTraceNullPromptHashOnDeclared\")"
+    },
+    {
+      "go_test": "api.TestHistoryTraceCrossTenant404Oracle",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryTraceCrossTenant404Oracle",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryTraceCrossTenant404Oracle\")"
+    },
+    {
+      "go_test": "api.TestHistoryOutcomesListAndFilters",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryOutcomesListAndFilters",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryOutcomesListAndFilters\")"
+    },
+    {
+      "go_test": "api.TestHistoryOutcomesCrossTenantIsolation",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryOutcomesCrossTenantIsolation",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryOutcomesCrossTenantIsolation\")"
+    },
+    {
+      "go_test": "api.TestHistoryOutcomesPaginationWalk",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryOutcomesPaginationWalk",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryOutcomesPaginationWalk\")"
+    },
+    {
+      "go_test": "api.TestHistoryModelSeriesShapeAndOrder",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryModelSeriesShapeAndOrder",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryModelSeriesShapeAndOrder\")"
+    },
+    {
+      "go_test": "api.TestHistoryModelSeriesRegressionMarker",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryModelSeriesRegressionMarker",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryModelSeriesRegressionMarker\")"
+    },
+    {
+      "go_test": "api.TestHistoryModelSeriesFilters",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryModelSeriesFilters",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryModelSeriesFilters\")"
+    },
+    {
+      "go_test": "api.TestHistoryModelSeriesPaginationWalk",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryModelSeriesPaginationWalk",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryModelSeriesPaginationWalk\")"
+    },
+    {
+      "go_test": "api.TestHistoryModelSeriesUnknownColumn404",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryModelSeriesUnknownColumn404",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryModelSeriesUnknownColumn404\")"
+    },
+    {
+      "go_test": "api.TestHistoryModelSeriesEmptyForKnownColumn",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryModelSeriesEmptyForKnownColumn",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryModelSeriesEmptyForKnownColumn\")"
+    },
+    {
+      "go_test": "api.TestHistoryCalibrationListShape",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryCalibrationListShape",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryCalibrationListShape\")"
+    },
+    {
+      "go_test": "api.TestHistoryCalibrationFiltersAndPagination",
+      "where": "reference/engine-reference.md (Part 5)#t-TestHistoryCalibrationFiltersAndPagination",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestHistoryCalibrationFiltersAndPagination\")"
+    },
+    {
+      "go_test": "api.TestOperatorCaptureEndpointsRequireAuth",
+      "where": "reference/engine-reference.md (Part 5)#t-TestOperatorCaptureEndpointsRequireAuth",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestOperatorCaptureEndpointsRequireAuth\")"
+    },
+    {
+      "go_test": "api.TestOperatorListCapturesShape",
+      "where": "reference/engine-reference.md (Part 5)#t-TestOperatorListCapturesShape",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestOperatorListCapturesShape\")"
+    },
+    {
+      "go_test": "api.TestOperatorListCapturesFilters",
+      "where": "reference/engine-reference.md (Part 5)#t-TestOperatorListCapturesFilters",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestOperatorListCapturesFilters\")"
+    },
+    {
+      "go_test": "api.TestOperatorListCapturesPagination",
+      "where": "reference/engine-reference.md (Part 5)#t-TestOperatorListCapturesPagination",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestOperatorListCapturesPagination\")"
+    },
+    {
+      "go_test": "api.TestOperatorReadCapturePromptRoundTrip",
+      "where": "reference/engine-reference.md (Part 5)#t-TestOperatorReadCapturePromptRoundTrip",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestOperatorReadCapturePromptRoundTrip\")"
+    },
+    {
+      "go_test": "api.TestOperatorReadCapturePromptExpiredButPresent410",
+      "where": "reference/engine-reference.md (Part 5)#t-TestOperatorReadCapturePromptExpiredButPresent410",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestOperatorReadCapturePromptExpiredButPresent410\")"
+    },
+    {
+      "go_test": "api.TestOperatorReadCapturePromptHardDeleted410",
+      "where": "reference/engine-reference.md (Part 5)#t-TestOperatorReadCapturePromptHardDeleted410",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestOperatorReadCapturePromptHardDeleted410\")"
+    },
+    {
+      "go_test": "api.TestOperatorReadCapturePromptUnknown404",
+      "where": "reference/engine-reference.md (Part 5)#t-TestOperatorReadCapturePromptUnknown404",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestOperatorReadCapturePromptUnknown404\")"
+    },
+    {
+      "go_test": "api.TestOperatorListZeroRetentionTenantHasNoCaptures",
+      "where": "reference/engine-reference.md (Part 5)#t-TestOperatorListZeroRetentionTenantHasNoCaptures",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestOperatorListZeroRetentionTenantHasNoCaptures\")"
+    },
+    {
+      "go_test": "api.TestPublicListenerNeverLeaksForeignPromptText",
+      "where": "reference/engine-reference.md (Part 5)#t-TestPublicListenerNeverLeaksForeignPromptText",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestPublicListenerNeverLeaksForeignPromptText\")"
+    },
+    {
+      "go_test": "api.TestInternalV1EveryEndpointRejectsMissingAndBadTokens",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalV1EveryEndpointRejectsMissingAndBadTokens",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalV1EveryEndpointRejectsMissingAndBadTokens\")"
+    },
+    {
+      "go_test": "api.TestInternalV1EachRotationTokenAcceptedWithAuditActor",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalV1EachRotationTokenAcceptedWithAuditActor",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalV1EachRotationTokenAcceptedWithAuditActor\")"
+    },
+    {
+      "go_test": "api.TestInternalTenantCreateDefaults",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalTenantCreateDefaults",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalTenantCreateDefaults\")"
+    },
+    {
+      "go_test": "api.TestInternalTenantCreateWithoutActiveColumnsHasNoPool",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalTenantCreateWithoutActiveColumnsHasNoPool",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalTenantCreateWithoutActiveColumnsHasNoPool\")"
+    },
+    {
+      "go_test": "api.TestInternalTenantCreateValidation",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalTenantCreateValidation",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalTenantCreateValidation\")"
+    },
+    {
+      "go_test": "api.TestInternalTenantGetSummary",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalTenantGetSummary",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalTenantGetSummary\")"
+    },
+    {
+      "go_test": "api.TestInternalTenantSuspendActivateToggleReachesPublicListener",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalTenantSuspendActivateToggleReachesPublicListener",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalTenantSuspendActivateToggleReachesPublicListener\")"
+    },
+    {
+      "go_test": "api.TestInternalAPIKeyRawReturnedExactlyOnce",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalAPIKeyRawReturnedExactlyOnce",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalAPIKeyRawReturnedExactlyOnce\")"
+    },
+    {
+      "go_test": "api.TestInternalConfigG4ParityByteExact",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalConfigG4ParityByteExact",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalConfigG4ParityByteExact\")"
+    },
+    {
+      "go_test": "api.TestInternalColumnCreateEntersColdStart",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalColumnCreateEntersColdStart",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalColumnCreateEntersColdStart\")"
+    },
+    {
+      "go_test": "api.TestInternalColumnUpdateStatusPricingDeprecation",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalColumnUpdateStatusPricingDeprecation",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalColumnUpdateStatusPricingDeprecation\")"
+    },
+    {
+      "go_test": "api.TestInternalColumnExecutionAliasesCreateAndUpdate",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalColumnExecutionAliasesCreateAndUpdate",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalColumnExecutionAliasesCreateAndUpdate\")"
+    },
+    {
+      "go_test": "api.TestInternalColumnRetireGuardBlocksThenAllowsAfterAmend",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalColumnRetireGuardBlocksThenAllowsAfterAmend",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalColumnRetireGuardBlocksThenAllowsAfterAmend\")"
+    },
+    {
+      "go_test": "api.TestInternalColumnRetireBlockDeliversAlert",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalColumnRetireBlockDeliversAlert",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalColumnRetireBlockDeliversAlert\")"
+    },
+    {
+      "go_test": "api.TestInternalAlertsFeedFilters",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalAlertsFeedFilters",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalAlertsFeedFilters\")"
+    },
+    {
+      "go_test": "api.TestInternalCorpusActivateFlipsActiveVersion",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalCorpusActivateFlipsActiveVersion",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalCorpusActivateFlipsActiveVersion\")"
+    },
+    {
+      "go_test": "api.TestInternalProvisionThenRecommendEndToEnd",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalProvisionThenRecommendEndToEnd",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalProvisionThenRecommendEndToEnd\")"
+    },
+    {
+      "go_test": "api.TestInternalV1UnknownPathAndMethodEnvelopes",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalV1UnknownPathAndMethodEnvelopes",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalV1UnknownPathAndMethodEnvelopes\")"
+    },
+    {
+      "go_test": "api.TestMCPRecommendModelMatchesRESTAndWritesTraceRow",
+      "where": "reference/engine-reference.md (Part 5)#t-TestMCPRecommendModelMatchesRESTAndWritesTraceRow",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestMCPRecommendModelMatchesRESTAndWritesTraceRow\")"
+    },
+    {
+      "go_test": "api.TestMCPGetPolicyMatchesREST",
+      "where": "reference/engine-reference.md (Part 5)#t-TestMCPGetPolicyMatchesREST",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestMCPGetPolicyMatchesREST\")"
+    },
+    {
+      "go_test": "api.TestMCPListModelsMatchesREST",
+      "where": "reference/engine-reference.md (Part 5)#t-TestMCPListModelsMatchesREST",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestMCPListModelsMatchesREST\")"
+    },
+    {
+      "go_test": "api.TestMCPListsExactlyTheSpecTools",
+      "where": "reference/engine-reference.md (Part 5)#t-TestMCPListsExactlyTheSpecTools",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestMCPListsExactlyTheSpecTools\")"
+    },
+    {
+      "go_test": "api.TestMCPListsExactlyTheSpecTools",
+      "where": "fixtures/api/mcp.json#tools_list"
+    },
+    {
+      "go_test": "api.TestMCPEndpointRequiresAuth",
+      "where": "reference/engine-reference.md (Part 5)#t-TestMCPEndpointRequiresAuth",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestMCPEndpointRequiresAuth\")"
+    },
+    {
+      "go_test": "api.TestMCPRateLimitAppliesToMCPRequests",
+      "where": "reference/engine-reference.md (Part 5)#t-TestMCPRateLimitAppliesToMCPRequests",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestMCPRateLimitAppliesToMCPRequests\")"
+    },
+    {
+      "go_test": "api.TestMCPToolCallsResolveTenantPerRequest",
+      "where": "reference/engine-reference.md (Part 5)#t-TestMCPToolCallsResolveTenantPerRequest",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestMCPToolCallsResolveTenantPerRequest\")"
+    },
+    {
+      "go_test": "api.TestMCPRecommendModelBadArgs",
+      "where": "reference/engine-reference.md (Part 5)#t-TestMCPRecommendModelBadArgs",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestMCPRecommendModelBadArgs\")"
+    },
+    {
+      "go_test": "api.TestMCPRecommendModelBadArgs",
+      "where": "fixtures/api/mcp.json#tool_error_cases"
+    },
+    {
+      "go_test": "api.TestMCPStdioStyleTransportBindsRunContextIdentity",
+      "where": "reference/engine-reference.md (Part 5)#t-TestMCPStdioStyleTransportBindsRunContextIdentity",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestMCPStdioStyleTransportBindsRunContextIdentity\")"
+    },
+    {
+      "go_test": "api.TestModelsRequiresAuth",
+      "where": "reference/engine-reference.md (Part 5)#t-TestModelsRequiresAuth",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestModelsRequiresAuth\")"
+    },
+    {
+      "go_test": "api.TestModelsWrongMethod",
+      "where": "reference/engine-reference.md (Part 5)#t-TestModelsWrongMethod",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestModelsWrongMethod\")"
+    },
+    {
+      "go_test": "api.TestModelsCatalogFieldExact",
+      "where": "reference/engine-reference.md (Part 5)#t-TestModelsCatalogFieldExact",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestModelsCatalogFieldExact\")"
+    },
+    {
+      "go_test": "api.TestModelsEntryKeySetExact",
+      "where": "reference/engine-reference.md (Part 5)#t-TestModelsEntryKeySetExact",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestModelsEntryKeySetExact\")"
+    },
+    {
+      "go_test": "api.TestModelsCarriesExecutionAliases",
+      "where": "reference/engine-reference.md (Part 5)#t-TestModelsCarriesExecutionAliases",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestModelsCarriesExecutionAliases\")"
+    },
+    {
+      "go_test": "api.TestPoliciesRequiresAuth",
+      "where": "reference/engine-reference.md (Part 5)#t-TestPoliciesRequiresAuth",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestPoliciesRequiresAuth\")"
+    },
+    {
+      "go_test": "api.TestPoliciesResponseShapeByteExact",
+      "where": "reference/engine-reference.md (Part 5)#t-TestPoliciesResponseShapeByteExact",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestPoliciesResponseShapeByteExact\")"
+    },
+    {
+      "go_test": "api.TestPoliciesAllCapabilitiesInOrder",
+      "where": "reference/engine-reference.md (Part 5)#t-TestPoliciesAllCapabilitiesInOrder",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestPoliciesAllCapabilitiesInOrder\")"
+    },
+    {
+      "go_test": "api.TestPoliciesClearsBandFalseFallback",
+      "where": "reference/engine-reference.md (Part 5)#t-TestPoliciesClearsBandFalseFallback",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestPoliciesClearsBandFalseFallback\")"
+    },
+    {
+      "go_test": "api.TestPoliciesQualityBarOverride",
+      "where": "reference/engine-reference.md (Part 5)#t-TestPoliciesQualityBarOverride",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestPoliciesQualityBarOverride\")"
+    },
+    {
+      "go_test": "api.TestPoliciesQualitySourceColumn",
+      "where": "reference/engine-reference.md (Part 5)#t-TestPoliciesQualitySourceColumn",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestPoliciesQualitySourceColumn\")"
+    },
+    {
+      "go_test": "api.TestPoliciesExcludesRetiredColumns",
+      "where": "reference/engine-reference.md (Part 5)#t-TestPoliciesExcludesRetiredColumns",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestPoliciesExcludesRetiredColumns\")"
+    },
+    {
+      "go_test": "api.TestPoliciesNamedPoolSelection",
+      "where": "reference/engine-reference.md (Part 5)#t-TestPoliciesNamedPoolSelection",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestPoliciesNamedPoolSelection\")"
+    },
+    {
+      "go_test": "api.TestPoliciesUnknownCapability",
+      "where": "reference/engine-reference.md (Part 5)#t-TestPoliciesUnknownCapability",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestPoliciesUnknownCapability\")"
+    },
+    {
+      "go_test": "api.TestPoliciesUnknownQueryParameter",
+      "where": "reference/engine-reference.md (Part 5)#t-TestPoliciesUnknownQueryParameter",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestPoliciesUnknownQueryParameter\")"
+    },
+    {
+      "go_test": "api.TestPoliciesUnknownPool",
+      "where": "reference/engine-reference.md (Part 5)#t-TestPoliciesUnknownPool",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestPoliciesUnknownPool\")"
+    },
+    {
+      "go_test": "api.TestPoliciesNoDefaultPool",
+      "where": "reference/engine-reference.md (Part 5)#t-TestPoliciesNoDefaultPool",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestPoliciesNoDefaultPool\")"
+    },
+    {
+      "go_test": "api.TestPoliciesCrossTenantIsolation",
+      "where": "reference/engine-reference.md (Part 5)#t-TestPoliciesCrossTenantIsolation",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestPoliciesCrossTenantIsolation\")"
+    },
+    {
+      "go_test": "api.TestRecommendPromptFormClassified",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRecommendPromptFormClassified",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestRecommendPromptFormClassified\")"
+    },
+    {
+      "go_test": "api.TestRecommendPromptSecondRequestHitsCache",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRecommendPromptSecondRequestHitsCache",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestRecommendPromptSecondRequestHitsCache\")"
+    },
+    {
+      "go_test": "api.TestRecommendPromptClassifierOutageFallsBack",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRecommendPromptClassifierOutageFallsBack",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestRecommendPromptClassifierOutageFallsBack\")"
+    },
+    {
+      "go_test": "api.TestRecommendPromptHighStakesTagDerivation",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRecommendPromptHighStakesTagDerivation",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestRecommendPromptHighStakesTagDerivation\" or starts with \"TestRecommendPromptHighStakesTagDerivation/\")"
+    },
+    {
+      "go_test": "api.TestRecommendPromptOverCharLimit422",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRecommendPromptOverCharLimit422",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestRecommendPromptOverCharLimit422\")"
+    },
+    {
+      "go_test": "api.TestRecommendPromptAtCharLimitSurfacesTruncated",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRecommendPromptAtCharLimitSurfacesTruncated",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestRecommendPromptAtCharLimitSurfacesTruncated\")"
+    },
+    {
+      "go_test": "api.TestRecommendPromptRejectsDeclaredFields",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRecommendPromptRejectsDeclaredFields",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestRecommendPromptRejectsDeclaredFields\")"
+    },
+    {
+      "go_test": "api.TestRecommendRequiresAuth",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRecommendRequiresAuth",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestRecommendRequiresAuth\")"
+    },
+    {
+      "go_test": "api.TestRecommendDeclaredResponseByteExact",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRecommendDeclaredResponseByteExact",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestRecommendDeclaredResponseByteExact\")"
+    },
+    {
+      "go_test": "api.TestRecommendDifficultyDefaultsOnColdStart",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRecommendDifficultyDefaultsOnColdStart",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestRecommendDifficultyDefaultsOnColdStart\")"
+    },
+    {
+      "go_test": "api.TestRecommendEntriesCarryExecutionAliases",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRecommendEntriesCarryExecutionAliases",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestRecommendEntriesCarryExecutionAliases\")"
+    },
+    {
+      "go_test": "api.TestRecommendHighStakesRequiresListedTag",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRecommendHighStakesRequiresListedTag",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestRecommendHighStakesRequiresListedTag\")"
+    },
+    {
+      "go_test": "api.TestRecommendRequestErrors",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRecommendRequestErrors",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestRecommendRequestErrors\")"
+    },
+    {
+      "go_test": "api.TestRecommendTraceRowMixedSurvivorsAndExclusions",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRecommendTraceRowMixedSurvivorsAndExclusions",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestRecommendTraceRowMixedSurvivorsAndExclusions\")"
+    },
+    {
+      "go_test": "api.TestRecommendPickViolatingPreferenceFlagsResponse",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRecommendPickViolatingPreferenceFlagsResponse",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestRecommendPickViolatingPreferenceFlagsResponse\")"
+    },
+    {
+      "go_test": "api.TestRecommendDriftFallbackPersistsAlert",
+      "where": "reference/engine-reference.md (Part 5)#t-TestRecommendDriftFallbackPersistsAlert",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestRecommendDriftFallbackPersistsAlert\")"
+    },
+    {
+      "go_test": "api.TestChecksRequiresAuth",
+      "where": "reference/engine-reference.md (Part 5)#t-TestChecksRequiresAuth",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestChecksRequiresAuth\")"
+    },
+    {
+      "go_test": "api.TestChecksKnownRefShape",
+      "where": "reference/engine-reference.md (Part 5)#t-TestChecksKnownRefShape",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestChecksKnownRefShape\")"
+    },
+    {
+      "go_test": "api.TestChecksUnknownRef404",
+      "where": "reference/engine-reference.md (Part 5)#t-TestChecksUnknownRef404",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestChecksUnknownRef404\")"
+    },
+    {
+      "go_test": "api.TestChecksEveryCapabilityRefResolvable",
+      "where": "reference/engine-reference.md (Part 5)#t-TestChecksEveryCapabilityRefResolvable",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestChecksEveryCapabilityRefResolvable\")"
+    },
+    {
+      "go_test": "api.TestMain",
+      "where": "reference/engine-reference.md (Part 5)#t-TestMain"
+    },
+    {
+      "go_test": "api.TestPublicUnknownPathReturnsEnvelope",
+      "where": "reference/engine-reference.md (Part 5)#t-TestPublicUnknownPathReturnsEnvelope",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestPublicUnknownPathReturnsEnvelope\")"
+    },
+    {
+      "go_test": "api.TestPublicMethodNotAllowedReturnsEnvelope",
+      "where": "reference/engine-reference.md (Part 5)#t-TestPublicMethodNotAllowedReturnsEnvelope",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestPublicMethodNotAllowedReturnsEnvelope\")"
+    },
+    {
+      "go_test": "api.TestV1MissingKey401",
+      "where": "reference/engine-reference.md (Part 5)#t-TestV1MissingKey401",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestV1MissingKey401\")"
+    },
+    {
+      "go_test": "api.TestV1MissingKeyEnvelopeByteExact",
+      "where": "reference/engine-reference.md (Part 5)#t-TestV1MissingKeyEnvelopeByteExact",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestV1MissingKeyEnvelopeByteExact\")"
+    },
+    {
+      "go_test": "api.TestV1GarbageKey401",
+      "where": "reference/engine-reference.md (Part 5)#t-TestV1GarbageKey401",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestV1GarbageKey401\")"
+    },
+    {
+      "go_test": "api.TestV1UnknownKey401",
+      "where": "reference/engine-reference.md (Part 5)#t-TestV1UnknownKey401",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestV1UnknownKey401\")"
+    },
+    {
+      "go_test": "api.TestV1RevokedKey401",
+      "where": "reference/engine-reference.md (Part 5)#t-TestV1RevokedKey401",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestV1RevokedKey401\")"
+    },
+    {
+      "go_test": "api.TestV1SuspendedTenant403",
+      "where": "reference/engine-reference.md (Part 5)#t-TestV1SuspendedTenant403",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestV1SuspendedTenant403\")"
+    },
+    {
+      "go_test": "api.TestV1AuthedResponseCarriesRateLimitHeaders",
+      "where": "reference/engine-reference.md (Part 5)#t-TestV1AuthedResponseCarriesRateLimitHeaders",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestV1AuthedResponseCarriesRateLimitHeaders\")"
+    },
+    {
+      "go_test": "api.TestV1RateLimitExceeded429",
+      "where": "reference/engine-reference.md (Part 5)#t-TestV1RateLimitExceeded429",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestV1RateLimitExceeded429\")"
+    },
+    {
+      "go_test": "api.TestV1RateLimitIsPerKey",
+      "where": "reference/engine-reference.md (Part 5)#t-TestV1RateLimitIsPerKey",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestV1RateLimitIsPerKey\")"
+    },
+    {
+      "go_test": "api.TestV1OversizeBody413",
+      "where": "reference/engine-reference.md (Part 5)#t-TestV1OversizeBody413",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestV1OversizeBody413\")"
+    },
+    {
+      "go_test": "api.TestV1BodyAtCapIsNotRejected",
+      "where": "reference/engine-reference.md (Part 5)#t-TestV1BodyAtCapIsNotRejected",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestV1BodyAtCapIsNotRejected\")"
+    },
+    {
+      "go_test": "api.TestKeyIssueVerifyRoundTrip",
+      "where": "reference/engine-reference.md (Part 5)#t-TestKeyIssueVerifyRoundTrip",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestKeyIssueVerifyRoundTrip\")"
+    },
+    {
+      "go_test": "api.TestUpOKWithLiveDatabase",
+      "where": "reference/engine-reference.md (Part 5)#t-TestUpOKWithLiveDatabase",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestUpOKWithLiveDatabase\")"
+    },
+    {
+      "go_test": "api.TestUpReturns503WhenDatabaseUnreachable",
+      "where": "reference/engine-reference.md (Part 5)#t-TestUpReturns503WhenDatabaseUnreachable",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestUpReturns503WhenDatabaseUnreachable\")"
+    },
+    {
+      "go_test": "api.TestInternalHealthDetailRequiresBearer",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalHealthDetailRequiresBearer",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalHealthDetailRequiresBearer\")"
+    },
+    {
+      "go_test": "api.TestInternalHealthDetailAcceptsEachRotationToken",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalHealthDetailAcceptsEachRotationToken",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalHealthDetailAcceptsEachRotationToken\")"
+    },
+    {
+      "go_test": "api.TestInternalHealthDetailShape",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalHealthDetailShape",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalHealthDetailShape\")"
+    },
+    {
+      "go_test": "api.TestInternalUnknownPathsReturnEnvelope",
+      "where": "reference/engine-reference.md (Part 5)#t-TestInternalUnknownPathsReturnEnvelope",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestInternalUnknownPathsReturnEnvelope\")"
+    },
+    {
+      "go_test": "api.TestPublicResponsesCarryRequestID",
+      "where": "reference/engine-reference.md (Part 5)#t-TestPublicResponsesCarryRequestID",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestPublicResponsesCarryRequestID\")"
+    },
+    {
+      "go_test": "api.TestTelemetryRequiresAuth",
+      "where": "reference/engine-reference.md (Part 5)#t-TestTelemetryRequiresAuth",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestTelemetryRequiresAuth\")"
+    },
+    {
+      "go_test": "api.TestOutcomesRouteRemoved",
+      "where": "reference/engine-reference.md (Part 5)#t-TestOutcomesRouteRemoved",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestOutcomesRouteRemoved\")"
+    },
+    {
+      "go_test": "api.TestTelemetryEmptyItemsNoOp",
+      "where": "reference/engine-reference.md (Part 5)#t-TestTelemetryEmptyItemsNoOp",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestTelemetryEmptyItemsNoOp\")"
+    },
+    {
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422",
+      "where": "reference/engine-reference.md (Part 5)#t-TestTelemetryEnvelopeInvalidRequest422",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestTelemetryEnvelopeInvalidRequest422\")"
+    },
+    {
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/empty_body",
+      "where": "fixtures/api/telemetry.json#env-0"
+    },
+    {
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/malformed_json",
+      "where": "fixtures/api/telemetry.json#env-1"
+    },
+    {
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/non-object_body_(array)",
+      "where": "fixtures/api/telemetry.json#env-2"
+    },
+    {
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/non-object_body_(string)",
+      "where": "fixtures/api/telemetry.json#env-3"
+    },
+    {
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/missing_items_key",
+      "where": "fixtures/api/telemetry.json#env-4"
+    },
+    {
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/null_items",
+      "where": "fixtures/api/telemetry.json#env-5"
+    },
+    {
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/non-array_items_(string)",
+      "where": "fixtures/api/telemetry.json#env-6"
+    },
+    {
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/non-array_items_(object)",
+      "where": "fixtures/api/telemetry.json#env-7"
+    },
+    {
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/trailing_content",
+      "where": "fixtures/api/telemetry.json#env-8"
+    },
+    {
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/501_items",
+      "where": "fixtures/api/telemetry.json#env-9"
+    },
+    {
+      "go_test": "api.TestTelemetryDerivationTable",
+      "where": "reference/engine-reference.md (Part 5)#t-TestTelemetryDerivationTable",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestTelemetryDerivationTable\")"
+    },
+    {
+      "go_test": "api.TestTelemetryDerivationTable/timeout_beats_a_5xx_status",
+      "where": "fixtures/api/telemetry.json#derive-0"
+    },
+    {
+      "go_test": "api.TestTelemetryDerivationTable/timeout_beats_status_0",
+      "where": "fixtures/api/telemetry.json#derive-1"
+    },
+    {
+      "go_test": "api.TestTelemetryDerivationTable/connect_error_beats_a_2xx_status",
+      "where": "fixtures/api/telemetry.json#derive-2"
+    },
+    {
+      "go_test": "api.TestTelemetryDerivationTable/provider_error_error_class",
+      "where": "fixtures/api/telemetry.json#derive-3"
+    },
+    {
+      "go_test": "api.TestTelemetryDerivationTable/status_0_(transport_failure)",
+      "where": "fixtures/api/telemetry.json#derive-4"
+    },
+    {
+      "go_test": "api.TestTelemetryDerivationTable/status_429",
+      "where": "fixtures/api/telemetry.json#derive-5"
+    },
+    {
+      "go_test": "api.TestTelemetryDerivationTable/status_500",
+      "where": "fixtures/api/telemetry.json#derive-6"
+    },
+    {
+      "go_test": "api.TestTelemetryDerivationTable/status_503",
+      "where": "fixtures/api/telemetry.json#derive-7"
+    },
+    {
+      "go_test": "api.TestTelemetryDerivationTable/2xx_with_check_pass_false",
+      "where": "fixtures/api/telemetry.json#derive-8"
+    },
+    {
+      "go_test": "api.TestTelemetryDerivationTable/201_with_check_pass_false",
+      "where": "fixtures/api/telemetry.json#derive-9"
+    },
+    {
+      "go_test": "api.TestTelemetryDerivationTable/2xx_success",
+      "where": "fixtures/api/telemetry.json#derive-10"
+    },
+    {
+      "go_test": "api.TestTelemetryDerivationTable/2xx_with_check_pass_true",
+      "where": "fixtures/api/telemetry.json#derive-11"
+    },
+    {
+      "go_test": "api.TestTelemetryDerivationTable/semantic_4xx_is_other",
+      "where": "fixtures/api/telemetry.json#derive-12"
+    },
+    {
+      "go_test": "api.TestTelemetryDerivationTable/3xx_is_other",
+      "where": "fixtures/api/telemetry.json#derive-13"
+    },
+    {
+      "go_test": "api.TestTelemetryAcceptedDroppedCounts",
+      "where": "reference/engine-reference.md (Part 5)#t-TestTelemetryAcceptedDroppedCounts",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestTelemetryAcceptedDroppedCounts\")"
+    },
+    {
+      "go_test": "api.TestTelemetryDropsInvalidItems",
+      "where": "reference/engine-reference.md (Part 5)#t-TestTelemetryDropsInvalidItems",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestTelemetryDropsInvalidItems\")"
+    },
+    {
+      "go_test": "api.TestTelemetryDropsInvalidItems/missing_recommendation_id",
+      "where": "fixtures/api/telemetry.json#drop-0"
+    },
+    {
+      "go_test": "api.TestTelemetryDropsInvalidItems/empty_recommendation_id",
+      "where": "fixtures/api/telemetry.json#drop-1"
+    },
+    {
+      "go_test": "api.TestTelemetryDropsInvalidItems/missing_model_used",
+      "where": "fixtures/api/telemetry.json#drop-2"
+    },
+    {
+      "go_test": "api.TestTelemetryDropsInvalidItems/missing_status",
+      "where": "fixtures/api/telemetry.json#drop-3"
+    },
+    {
+      "go_test": "api.TestTelemetryDropsInvalidItems/mistyped_status_(string)",
+      "where": "fixtures/api/telemetry.json#drop-4"
+    },
+    {
+      "go_test": "api.TestTelemetryDropsInvalidItems/negative_status",
+      "where": "fixtures/api/telemetry.json#drop-5"
+    },
+    {
+      "go_test": "api.TestTelemetryDropsInvalidItems/negative_latency_ms",
+      "where": "fixtures/api/telemetry.json#drop-6"
+    },
+    {
+      "go_test": "api.TestTelemetryDropsInvalidItems/negative_tokens_in",
+      "where": "fixtures/api/telemetry.json#drop-7"
+    },
+    {
+      "go_test": "api.TestTelemetryDropsInvalidItems/negative_tokens_out",
+      "where": "fixtures/api/telemetry.json#drop-8"
+    },
+    {
+      "go_test": "api.TestTelemetryDropsInvalidItems/invalid_error_class",
+      "where": "fixtures/api/telemetry.json#drop-9"
+    },
+    {
+      "go_test": "api.TestTelemetryDropsInvalidItems/invalid_endpoint_used",
+      "where": "fixtures/api/telemetry.json#drop-10"
+    },
+    {
+      "go_test": "api.TestTelemetryDropsInvalidItems/mistyped_check_pass",
+      "where": "fixtures/api/telemetry.json#drop-11"
+    },
+    {
+      "go_test": "api.TestTelemetryDropsInvalidItems/item_is_not_an_object",
+      "where": "fixtures/api/telemetry.json#drop-12"
+    },
+    {
+      "go_test": "api.TestTelemetryEndpointUsedDefaultAndStored",
+      "where": "reference/engine-reference.md (Part 5)#t-TestTelemetryEndpointUsedDefaultAndStored",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestTelemetryEndpointUsedDefaultAndStored\")"
+    },
+    {
+      "go_test": "api.TestTelemetryDetailsContainsExactSuppliedFacts",
+      "where": "reference/engine-reference.md (Part 5)#t-TestTelemetryDetailsContainsExactSuppliedFacts",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestTelemetryDetailsContainsExactSuppliedFacts\")"
+    },
+    {
+      "go_test": "api.TestTelemetryMultipleItemsPerRecommendationAppended",
+      "where": "reference/engine-reference.md (Part 5)#t-TestTelemetryMultipleItemsPerRecommendationAppended",
+      "blackbox": "blackbox/api-recorded.jsonl (test == \"TestTelemetryMultipleItemsPerRecommendationAppended\")"
+    },
+    {
+      "go_test": "apierrors.TestWriteEnvelopeByteExactAppendixB",
+      "where": "fixtures/api/apierrors.json#write-envelope-byte-exact"
+    },
+    {
+      "go_test": "apierrors.TestWriteNilDetailsMarshalsEmptyObject",
+      "where": "fixtures/api/apierrors.json#nil-details-empty-object"
+    },
+    {
+      "go_test": "apierrors.TestCodeConstantsMatchAppendixB",
+      "where": "fixtures/api/apierrors.json#code-constants"
+    },
+    {
+      "go_test": "apierrors.TestNotFoundHandlerWritesEnvelope",
+      "where": "fixtures/api/apierrors.json#not-found-handler"
+    },
+    {
+      "go_test": "middleware.TestRequestIDMintsWhenAbsent",
+      "where": "fixtures/api/middleware.json#request-id-mints"
+    },
+    {
+      "go_test": "middleware.TestRequestIDAcceptsInboundHeader",
+      "where": "fixtures/api/middleware.json#request-id-accepts-inbound"
+    },
+    {
+      "go_test": "middleware.TestLoggerEmitsRequestFieldsAndNeverAuthorization",
+      "where": "fixtures/api/middleware.json#logger-fields"
+    },
+    {
+      "go_test": "middleware.TestLoggerIncludesTenantWhenAuthed",
+      "where": "fixtures/api/middleware.json#logger-tenant-fields"
+    },
+    {
+      "go_test": "middleware.TestRecovererWritesEnvelopeAndLogsStack",
+      "where": "fixtures/api/middleware.json#recoverer-500"
+    },
+    {
+      "go_test": "middleware.TestRecovererDoesNotOverwriteStartedResponse",
+      "where": "fixtures/api/middleware.json#recoverer-started-response"
+    },
+    {
+      "go_test": "middleware.TestAuthMiddlewareEnvelopes/missing_header",
+      "where": "fixtures/api/middleware.json#auth-missing-header"
+    },
+    {
+      "go_test": "middleware.TestAuthMiddlewareEnvelopes/unknown_key",
+      "where": "fixtures/api/middleware.json#auth-unknown-key"
+    },
+    {
+      "go_test": "middleware.TestAuthMiddlewareEnvelopes/suspended_tenant",
+      "where": "fixtures/api/middleware.json#auth-suspended"
+    },
+    {
+      "go_test": "middleware.TestAuthMiddlewareEnvelopes/store_failure",
+      "where": "fixtures/api/middleware.json#auth-store-failure"
+    },
+    {
+      "go_test": "middleware.TestAuthMiddlewarePutsIdentityInContext",
+      "where": "fixtures/api/middleware.json#auth-identity-in-context"
+    },
+    {
+      "go_test": "middleware.TestInternalAuthMiddleware",
+      "where": "fixtures/api/middleware.json#internal-auth"
+    },
+    {
+      "go_test": "middleware.TestRateLimiterFixedWindow",
+      "where": "fixtures/api/middleware.json#rate-limiter-fixed-window"
+    },
+    {
+      "go_test": "middleware.TestRateLimiterIsolatesKeys",
+      "where": "fixtures/api/middleware.json#rate-limiter-isolates-keys"
+    },
+    {
+      "go_test": "middleware.TestRateLimitMiddlewareHeadersAndRetryAfter",
+      "where": "fixtures/api/middleware.json#rate-limit-middleware-headers"
+    },
+    {
+      "go_test": "middleware.TestBodyLimitRejectsOversizeContentLength",
+      "where": "fixtures/api/middleware.json#body-limit-oversize-content-length"
+    },
+    {
+      "go_test": "middleware.TestBodyLimitPassesBodiesAtTheCap",
+      "where": "fixtures/api/middleware.json#body-limit-at-cap"
+    },
+    {
+      "go_test": "middleware.TestBodyLimitWrapsChunkedBodies",
+      "where": "fixtures/api/middleware.json#body-limit-chunked"
+    }
+  ]
+}

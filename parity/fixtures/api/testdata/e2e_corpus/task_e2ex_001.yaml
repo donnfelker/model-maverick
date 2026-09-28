@@ -1,0 +1,27 @@
+id: task_e2ex_001
+capability: structured_extraction
+difficulty_tier: 1
+difficulty_knobs: { document_noise: 1, field_count: 1, nesting_depth: 1, distractor_content: 1 }
+prompt: |
+  Extract the order id from the confirmation line below. Return a JSON
+  object with the single key order_id.
+attachments:
+  - name: confirmation.txt
+    content: |
+      Order ORD-7 confirmed for pickup on 2026-07-02.
+temperature: 0
+max_tokens: 128
+smoke_member: true
+dimension_weights: { schema_validity: 0.5, field_accuracy: 0.5 }
+grader_specs:
+  - type: json_schema
+    version: 1
+    weight_dimensions: { schema_validity: 1.0, field_accuracy: 1.0 }
+    spec:
+      schema:
+        type: object
+        required: [order_id]
+        properties:
+          order_id: { type: string }
+      checks:
+        - { path: $.order_id, regex: "ORD-7" }

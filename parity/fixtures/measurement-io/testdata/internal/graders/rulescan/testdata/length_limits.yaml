@@ -1,0 +1,9 @@
+description: max_length_chars passes while max_length_words fails
+spec:
+  rules:
+    - { max_length_chars: 100 }
+    - { max_length_words: 5 }
+output: this summary has exactly seven words total
+expect:
+  dimensions: { constraint_compliance: 0.5 }
+  detail_contains: ['"kind":"max_length_words"']

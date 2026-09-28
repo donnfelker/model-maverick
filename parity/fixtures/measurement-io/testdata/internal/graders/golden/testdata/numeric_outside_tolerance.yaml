@@ -1,0 +1,7 @@
+description: just past the tolerance boundary scores 0
+spec:
+  answers:
+    - { numeric: 100, tolerance: 0.5 }
+output: "100.75"
+expect:
+  dimensions: { answer_correctness: 0.0 }

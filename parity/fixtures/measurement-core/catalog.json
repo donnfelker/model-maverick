@@ -1,0 +1,219 @@
+{
+  "cost": {
+    "cases": [
+      {
+        "expected": 0.00063,
+        "go_test": "catalog.TestCostGolden/claude_list_price_small_run",
+        "id": "claude list price small run",
+        "input_per_mtok": 3,
+        "output_per_mtok": 15,
+        "tokens_in": 120,
+        "tokens_out": 18
+      },
+      {
+        "expected": 0.003396,
+        "go_test": "catalog.TestCostGolden/structured_extraction_run",
+        "id": "structured extraction run",
+        "input_per_mtok": 3,
+        "output_per_mtok": 15,
+        "tokens_in": 812,
+        "tokens_out": 64
+      },
+      {
+        "expected": 18,
+        "go_test": "catalog.TestCostGolden/one_mtok_each_way",
+        "id": "one mtok each way",
+        "input_per_mtok": 3,
+        "output_per_mtok": 15,
+        "tokens_in": 1000000,
+        "tokens_out": 1000000
+      },
+      {
+        "expected": 0.000465,
+        "go_test": "catalog.TestCostGolden/cheap_column",
+        "id": "cheap column",
+        "input_per_mtok": 2.5,
+        "output_per_mtok": 10,
+        "tokens_in": 118,
+        "tokens_out": 17
+      },
+      {
+        "expected": 0.0027,
+        "go_test": "catalog.TestCostGolden/fractional_prices",
+        "id": "fractional prices",
+        "input_per_mtok": 0.075,
+        "output_per_mtok": 0.3,
+        "tokens_in": 20000,
+        "tokens_out": 4000
+      },
+      {
+        "expected": 0,
+        "go_test": "catalog.TestCostGolden/rounds_to_numeric(12,6)_precision",
+        "id": "rounds to numeric(12,6) precision",
+        "input_per_mtok": 0.075,
+        "output_per_mtok": 0.3,
+        "tokens_in": 1,
+        "tokens_out": 1
+      },
+      {
+        "expected": 0,
+        "go_test": "catalog.TestCostGolden/zero_tokens",
+        "id": "zero tokens",
+        "input_per_mtok": 3,
+        "output_per_mtok": 15,
+        "tokens_in": 0,
+        "tokens_out": 0
+      },
+      {
+        "expected": 0,
+        "go_test": "catalog.TestCostGolden/empty_pricing_snapshot",
+        "id": "empty pricing snapshot",
+        "input_per_mtok": 0,
+        "output_per_mtok": 0,
+        "tokens_in": 500,
+        "tokens_out": 500
+      },
+      {
+        "expected": 0.000001,
+        "go_test": "",
+        "id": "extra half-away-from-zero rounding",
+        "input_per_mtok": 0.5,
+        "output_per_mtok": 0,
+        "tokens_in": 1,
+        "tokens_out": 0
+      },
+      {
+        "expected": 0.000002,
+        "go_test": "",
+        "id": "extra rounding 1.5e-6",
+        "input_per_mtok": 0.5,
+        "output_per_mtok": 0,
+        "tokens_in": 3,
+        "tokens_out": 0
+      }
+    ],
+    "formula": "round((tokens_in*input_per_mtok + tokens_out*output_per_mtok)/1e6 * 1e6)/1e6, round = half away from zero (Go math.Round)",
+    "tolerance": 1e-12
+  },
+  "parse_pricing": {
+    "cases": [
+      {
+        "expected": {
+          "pricing": {
+            "as_of": "2026-07-01",
+            "currency": "USD",
+            "input_per_mtok": 3,
+            "output_per_mtok": 15,
+            "source": "list"
+          }
+        },
+        "raw": "{\"input_per_mtok\": 3.00, \"output_per_mtok\": 15.00, \"currency\": \"USD\", \"as_of\": \"2026-07-01\", \"source\": \"list\"}"
+      },
+      {
+        "expected": {
+          "pricing": {
+            "as_of": "",
+            "currency": "",
+            "input_per_mtok": 0,
+            "output_per_mtok": 0,
+            "source": ""
+          }
+        },
+        "raw": "{}"
+      },
+      {
+        "expected": {
+          "pricing": {
+            "as_of": "",
+            "currency": "",
+            "input_per_mtok": 0,
+            "output_per_mtok": 0,
+            "source": ""
+          }
+        },
+        "raw": null
+      },
+      {
+        "expected": {
+          "error": "parsing pricing snapshot: json: cannot unmarshal string into Go struct field Pricing.input_per_mtok of type float64"
+        },
+        "raw": "{\"input_per_mtok\": \"three\"}"
+      },
+      {
+        "expected": {
+          "error": "pricing snapshot has a negative price"
+        },
+        "raw": "{\"input_per_mtok\": -1}"
+      },
+      {
+        "expected": {
+          "pricing": {
+            "as_of": "",
+            "currency": "",
+            "input_per_mtok": 1,
+            "output_per_mtok": 0,
+            "source": ""
+          }
+        },
+        "raw": "{\"input_per_mtok\": 1, \"extra_field\": true}"
+      },
+      {
+        "expected": {
+          "pricing": {
+            "as_of": "",
+            "currency": "",
+            "input_per_mtok": 0,
+            "output_per_mtok": 0,
+            "source": ""
+          }
+        },
+        "raw": "null"
+      }
+    ],
+    "go_test": "catalog.TestParsePricing"
+  },
+  "retirement_blocked": {
+    "column_id": "col_x",
+    "expected_alert_subject_json_as_marshaled": "{\"column_id\":\"col_x\",\"pools\":[{\"tenant_id\":\"ten_a\",\"pool\":\"default\"},{\"tenant_id\":\"ten_b\",\"pool\":\"pool \\\"q\\\"\",\"constraint\":\"max_cost_per_run\",\"capability\":\"factual_qa\",\"difficulty_tier\":3}]}",
+    "expected_error_message": "retiring column col_x would leave pool(s) \"default\" of tenant ten_a, \"pool \\\"q\\\"\" of tenant ten_b with zero usable columns; amend the pools first (spec 4.1)",
+    "go_test": "",
+    "pools": [
+      {
+        "tenant_id": "ten_a",
+        "pool": "default"
+      },
+      {
+        "tenant_id": "ten_b",
+        "pool": "pool \"q\"",
+        "constraint": "max_cost_per_run",
+        "capability": "factual_qa",
+        "difficulty_tier": 3
+      }
+    ]
+  },
+  "runnable": {
+    "cases": [
+      {
+        "expected": true,
+        "status": "cold_start"
+      },
+      {
+        "expected": true,
+        "status": "active"
+      },
+      {
+        "expected": true,
+        "status": "deprecated"
+      },
+      {
+        "expected": false,
+        "status": "retired"
+      },
+      {
+        "expected": false,
+        "status": "bogus"
+      }
+    ],
+    "go_test": "catalog.TestRunnable"
+  }
+}

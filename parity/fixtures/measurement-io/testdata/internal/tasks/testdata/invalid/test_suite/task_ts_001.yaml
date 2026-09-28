@@ -1,0 +1,22 @@
+id: task_ts_001
+capability: code_generation
+difficulty_tier: 3
+prompt: |
+  Write a Python function fizzbuzz(n) returning the classic FizzBuzz output
+  for 1..n as a list of strings.
+max_tokens: 1024
+dimension_weights: { tests_passed: 1.0 }
+grader_specs:
+  - type: test_suite
+    version: 1
+    weight_dimensions: { tests_passed: 1.0 }
+    spec:
+      files:
+        - name: test_fizzbuzz.py
+          content: |
+            from solution import fizzbuzz
+            def test_basic():
+                assert fizzbuzz(3) == ["1", "2", "Fizz"]
+      entrypoint: pytest -q
+      runtime_image: python:3.13-slim
+      timeout: 60

@@ -1,0 +1,397 @@
+{
+  "description": "POST /v1/telemetry contract as pinned by internal/api telemetry tests. Derivation rows: POST {items:[{recommendation_id:<owned rec>, model_used:'claude-sonnet-4-6', ...item}]} -> 200 {accepted:1,dropped:0}; the stored outcome (read back via GET /v1/history/outcomes?recommendation_id=...) has outcome=expected. Drop rows: each single-item batch -> 200 exactly {\"accepted\":0,\"dropped\":1}. Envelope rows: 422 invalid_request with the exact message (details {} except where noted). Semantics of derivation live in reference/engine-reference.md (Part 4) (history).",
+  "derivation": [
+    {
+      "id": "derive-0",
+      "go_test": "api.TestTelemetryDerivationTable/timeout_beats_a_5xx_status",
+      "item": {
+        "status": 503,
+        "error_class": "timeout"
+      },
+      "expected_outcome": "latency_exceeded"
+    },
+    {
+      "id": "derive-1",
+      "go_test": "api.TestTelemetryDerivationTable/timeout_beats_status_0",
+      "item": {
+        "status": 0,
+        "error_class": "timeout"
+      },
+      "expected_outcome": "latency_exceeded"
+    },
+    {
+      "id": "derive-2",
+      "go_test": "api.TestTelemetryDerivationTable/connect_error_beats_a_2xx_status",
+      "item": {
+        "status": 200,
+        "error_class": "connect_error"
+      },
+      "expected_outcome": "provider_error"
+    },
+    {
+      "id": "derive-3",
+      "go_test": "api.TestTelemetryDerivationTable/provider_error_error_class",
+      "item": {
+        "status": 200,
+        "error_class": "provider_error"
+      },
+      "expected_outcome": "provider_error"
+    },
+    {
+      "id": "derive-4",
+      "go_test": "api.TestTelemetryDerivationTable/status_0_(transport_failure)",
+      "item": {
+        "status": 0
+      },
+      "expected_outcome": "provider_error"
+    },
+    {
+      "id": "derive-5",
+      "go_test": "api.TestTelemetryDerivationTable/status_429",
+      "item": {
+        "status": 429
+      },
+      "expected_outcome": "provider_error"
+    },
+    {
+      "id": "derive-6",
+      "go_test": "api.TestTelemetryDerivationTable/status_500",
+      "item": {
+        "status": 500
+      },
+      "expected_outcome": "provider_error"
+    },
+    {
+      "id": "derive-7",
+      "go_test": "api.TestTelemetryDerivationTable/status_503",
+      "item": {
+        "status": 503
+      },
+      "expected_outcome": "provider_error"
+    },
+    {
+      "id": "derive-8",
+      "go_test": "api.TestTelemetryDerivationTable/2xx_with_check_pass_false",
+      "item": {
+        "status": 200,
+        "check_pass": false
+      },
+      "expected_outcome": "parse_failure"
+    },
+    {
+      "id": "derive-9",
+      "go_test": "api.TestTelemetryDerivationTable/201_with_check_pass_false",
+      "item": {
+        "status": 201,
+        "check_pass": false
+      },
+      "expected_outcome": "parse_failure"
+    },
+    {
+      "id": "derive-10",
+      "go_test": "api.TestTelemetryDerivationTable/2xx_success",
+      "item": {
+        "status": 200
+      },
+      "expected_outcome": "success"
+    },
+    {
+      "id": "derive-11",
+      "go_test": "api.TestTelemetryDerivationTable/2xx_with_check_pass_true",
+      "item": {
+        "status": 200,
+        "check_pass": true
+      },
+      "expected_outcome": "success"
+    },
+    {
+      "id": "derive-12",
+      "go_test": "api.TestTelemetryDerivationTable/semantic_4xx_is_other",
+      "item": {
+        "status": 404
+      },
+      "expected_outcome": "other"
+    },
+    {
+      "id": "derive-13",
+      "go_test": "api.TestTelemetryDerivationTable/3xx_is_other",
+      "item": {
+        "status": 301
+      },
+      "expected_outcome": "other"
+    }
+  ],
+  "drops": [
+    {
+      "id": "drop-0",
+      "go_test": "api.TestTelemetryDropsInvalidItems/missing_recommendation_id",
+      "item": {
+        "model_used": "claude-sonnet-4-6",
+        "status": 200
+      },
+      "expected_response_body_exact": "{\"accepted\":0,\"dropped\":1}\n"
+    },
+    {
+      "id": "drop-1",
+      "go_test": "api.TestTelemetryDropsInvalidItems/empty_recommendation_id",
+      "item": {
+        "recommendation_id": "",
+        "model_used": "claude-sonnet-4-6",
+        "status": 200
+      },
+      "expected_response_body_exact": "{\"accepted\":0,\"dropped\":1}\n"
+    },
+    {
+      "id": "drop-2",
+      "go_test": "api.TestTelemetryDropsInvalidItems/missing_model_used",
+      "item": {
+        "recommendation_id": "<seeded rec id>",
+        "status": 200
+      },
+      "expected_response_body_exact": "{\"accepted\":0,\"dropped\":1}\n"
+    },
+    {
+      "id": "drop-3",
+      "go_test": "api.TestTelemetryDropsInvalidItems/missing_status",
+      "item": {
+        "recommendation_id": "<seeded rec id>",
+        "model_used": "claude-sonnet-4-6"
+      },
+      "expected_response_body_exact": "{\"accepted\":0,\"dropped\":1}\n"
+    },
+    {
+      "id": "drop-4",
+      "go_test": "api.TestTelemetryDropsInvalidItems/mistyped_status_(string)",
+      "item": {
+        "recommendation_id": "<seeded rec id>",
+        "model_used": "claude-sonnet-4-6",
+        "status": "200"
+      },
+      "expected_response_body_exact": "{\"accepted\":0,\"dropped\":1}\n"
+    },
+    {
+      "id": "drop-5",
+      "go_test": "api.TestTelemetryDropsInvalidItems/negative_status",
+      "item": {
+        "recommendation_id": "<seeded rec id>",
+        "model_used": "claude-sonnet-4-6",
+        "status": -1
+      },
+      "expected_response_body_exact": "{\"accepted\":0,\"dropped\":1}\n"
+    },
+    {
+      "id": "drop-6",
+      "go_test": "api.TestTelemetryDropsInvalidItems/negative_latency_ms",
+      "item": {
+        "recommendation_id": "<seeded rec id>",
+        "model_used": "claude-sonnet-4-6",
+        "status": 200,
+        "latency_ms": -5
+      },
+      "expected_response_body_exact": "{\"accepted\":0,\"dropped\":1}\n"
+    },
+    {
+      "id": "drop-7",
+      "go_test": "api.TestTelemetryDropsInvalidItems/negative_tokens_in",
+      "item": {
+        "recommendation_id": "<seeded rec id>",
+        "model_used": "claude-sonnet-4-6",
+        "status": 200,
+        "tokens_in": -1
+      },
+      "expected_response_body_exact": "{\"accepted\":0,\"dropped\":1}\n"
+    },
+    {
+      "id": "drop-8",
+      "go_test": "api.TestTelemetryDropsInvalidItems/negative_tokens_out",
+      "item": {
+        "recommendation_id": "<seeded rec id>",
+        "model_used": "claude-sonnet-4-6",
+        "status": 200,
+        "tokens_out": -1
+      },
+      "expected_response_body_exact": "{\"accepted\":0,\"dropped\":1}\n"
+    },
+    {
+      "id": "drop-9",
+      "go_test": "api.TestTelemetryDropsInvalidItems/invalid_error_class",
+      "item": {
+        "recommendation_id": "<seeded rec id>",
+        "model_used": "claude-sonnet-4-6",
+        "status": 200,
+        "error_class": "not_a_real_class"
+      },
+      "expected_response_body_exact": "{\"accepted\":0,\"dropped\":1}\n"
+    },
+    {
+      "id": "drop-10",
+      "go_test": "api.TestTelemetryDropsInvalidItems/invalid_endpoint_used",
+      "item": {
+        "recommendation_id": "<seeded rec id>",
+        "model_used": "claude-sonnet-4-6",
+        "status": 200,
+        "endpoint_used": "not_a_real_endpoint"
+      },
+      "expected_response_body_exact": "{\"accepted\":0,\"dropped\":1}\n"
+    },
+    {
+      "id": "drop-11",
+      "go_test": "api.TestTelemetryDropsInvalidItems/mistyped_check_pass",
+      "item": {
+        "recommendation_id": "<seeded rec id>",
+        "model_used": "claude-sonnet-4-6",
+        "status": 200,
+        "check_pass": "yes"
+      },
+      "expected_response_body_exact": "{\"accepted\":0,\"dropped\":1}\n"
+    },
+    {
+      "id": "drop-12",
+      "go_test": "api.TestTelemetryDropsInvalidItems/item_is_not_an_object",
+      "item": "not-an-object",
+      "expected_response_body_exact": "{\"accepted\":0,\"dropped\":1}\n"
+    }
+  ],
+  "envelope_422": [
+    {
+      "id": "env-0",
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/empty_body",
+      "body": null,
+      "expected": {
+        "status": 422,
+        "code": "invalid_request",
+        "message": "request body is required",
+        "details": {}
+      }
+    },
+    {
+      "id": "env-1",
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/malformed_json",
+      "body": "{\"items\":",
+      "expected": {
+        "status": 422,
+        "code": "invalid_request",
+        "message": "malformed request body: unexpected EOF",
+        "details": {}
+      }
+    },
+    {
+      "id": "env-2",
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/non-object_body_(array)",
+      "body": "[1,2,3]",
+      "expected": {
+        "status": 422,
+        "code": "invalid_request",
+        "message": "malformed request body: json: cannot unmarshal array into Go value of type handlers.telemetryEnvelope",
+        "details": {}
+      }
+    },
+    {
+      "id": "env-3",
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/non-object_body_(string)",
+      "body": "\"hello\"",
+      "expected": {
+        "status": 422,
+        "code": "invalid_request",
+        "message": "malformed request body: json: cannot unmarshal string into Go value of type handlers.telemetryEnvelope",
+        "details": {}
+      }
+    },
+    {
+      "id": "env-4",
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/missing_items_key",
+      "body": "{}",
+      "expected": {
+        "status": 422,
+        "code": "invalid_request",
+        "message": "items is required",
+        "details": {
+          "field": "items"
+        }
+      }
+    },
+    {
+      "id": "env-5",
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/null_items",
+      "body": "{\"items\":null}",
+      "expected": {
+        "status": 422,
+        "code": "invalid_request",
+        "message": "items is required",
+        "details": {
+          "field": "items"
+        }
+      }
+    },
+    {
+      "id": "env-6",
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/non-array_items_(string)",
+      "body": "{\"items\":\"nope\"}",
+      "expected": {
+        "status": 422,
+        "code": "invalid_request",
+        "message": "malformed request body: json: cannot unmarshal string into Go struct field telemetryEnvelope.items of type []json.RawMessage",
+        "details": {}
+      }
+    },
+    {
+      "id": "env-7",
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/non-array_items_(object)",
+      "body": "{\"items\":{}}",
+      "expected": {
+        "status": 422,
+        "code": "invalid_request",
+        "message": "malformed request body: json: cannot unmarshal object into Go struct field telemetryEnvelope.items of type []json.RawMessage",
+        "details": {}
+      }
+    },
+    {
+      "id": "env-8",
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/trailing_content",
+      "body": "{\"items\":[]}{}",
+      "expected": {
+        "status": 422,
+        "code": "invalid_request",
+        "message": "request body has trailing content",
+        "details": {}
+      }
+    },
+    {
+      "id": "env-9",
+      "go_test": "api.TestTelemetryEnvelopeInvalidRequest422/501_items",
+      "body": "{\"items\":[null x 501]}",
+      "expected": {
+        "status": 422,
+        "code": "invalid_request",
+        "message": "items has 501 entries, exceeding the 500-entry limit",
+        "details": {
+          "count": 501,
+          "limit": 500
+        }
+      }
+    }
+  ],
+  "enums_exact": {
+    "error_class": [
+      "timeout",
+      "connect_error",
+      "provider_error",
+      "other"
+    ],
+    "endpoint_used": [
+      "direct",
+      "vertex",
+      "bedrock",
+      "azure",
+      "openrouter"
+    ],
+    "endpoint_used_default": "direct",
+    "max_items": 500
+  },
+  "details_rule": "details jsonb = {status} plus each of latency_ms, tokens_in, tokens_out, finish_reason, error_class, check_pass that was present on the item (endpoint_used is a column, not in details). Keys serialize sorted.",
+  "notes": [
+    "501 items body is the JSON encoding of {\"items\":[null,null,...501 times]} (Go marshals 501 nil maps as null).",
+    "Envelope decoding does NOT reject unknown top-level fields (no DisallowUnknownFields) but does reject trailing content.",
+    "Item decoding is lenient too: unknown item fields are ignored; case-insensitive key match applies (Go)."
+  ]
+}

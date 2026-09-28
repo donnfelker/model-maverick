@@ -1,0 +1,12 @@
+description: the spec §5.4 example envelope passes on a WHERE-bearing query
+envelope:
+  type: rule_scan
+  version: 1
+  weight_dimensions: { constraint_compliance: 1.0 }
+  spec:
+    rules:
+      - { must_include: '\bWHERE\b', regex: true, weight: 2, critical: false }
+output: SELECT * FROM users WHERE id = 1;
+expect:
+  dimensions: { constraint_compliance: 1.0 }
+  detail_contains: ['"kind":"must_include"', '"pass":true']

@@ -1,0 +1,413 @@
+{
+  "cases": [
+    {
+      "expected": [],
+      "go_test": "policy.TestSimulatePerCellSurvivorship",
+      "id": "TestSimulatePerCellSurvivorship#1",
+      "input": {
+        "cells_sorted": [
+          {
+            "capability": "code_generation",
+            "difficulty_tier": 3
+          },
+          {
+            "capability": "factual_qa",
+            "difficulty_tier": 2
+          }
+        ],
+        "column_status": {
+          "col_a": "active",
+          "col_b": "active"
+        },
+        "constraints": {
+          "max_cost_per_run": 0.01,
+          "max_latency_ms": null,
+          "zero_retention": false
+        },
+        "cost_ewmas": [
+          {
+            "capability": "code_generation",
+            "column_id": "col_a",
+            "difficulty_tier": 3,
+            "ewma": 0.02
+          },
+          {
+            "capability": "factual_qa",
+            "column_id": "col_a",
+            "difficulty_tier": 2,
+            "ewma": 0.005
+          },
+          {
+            "capability": "code_generation",
+            "column_id": "col_b",
+            "difficulty_tier": 3,
+            "ewma": 0.005
+          },
+          {
+            "capability": "factual_qa",
+            "column_id": "col_b",
+            "difficulty_tier": 2,
+            "ewma": 0.02
+          }
+        ],
+        "latency_ewmas": [],
+        "pools": [
+          {
+            "is_default": true,
+            "model_column_ids": [
+              "col_a",
+              "col_b"
+            ],
+            "name": "p"
+          }
+        ]
+      }
+    },
+    {
+      "expected": [
+        {
+          "code": "pool_would_be_empty",
+          "details": {
+            "capability": "code_generation",
+            "constraint": "max_cost_per_run",
+            "difficulty_tier": 3,
+            "pool": "p"
+          },
+          "message": "constraint \"max_cost_per_run\" would leave pool \"p\" with zero candidates for code_generation tier 3"
+        }
+      ],
+      "go_test": "policy.TestSimulatePerCellSurvivorship",
+      "id": "TestSimulatePerCellSurvivorship#2",
+      "input": {
+        "cells_sorted": [
+          {
+            "capability": "code_generation",
+            "difficulty_tier": 3
+          },
+          {
+            "capability": "factual_qa",
+            "difficulty_tier": 2
+          }
+        ],
+        "column_status": {
+          "col_a": "active",
+          "col_b": "active"
+        },
+        "constraints": {
+          "max_cost_per_run": 0.004,
+          "max_latency_ms": null,
+          "zero_retention": false
+        },
+        "cost_ewmas": [
+          {
+            "capability": "code_generation",
+            "column_id": "col_a",
+            "difficulty_tier": 3,
+            "ewma": 0.02
+          },
+          {
+            "capability": "factual_qa",
+            "column_id": "col_a",
+            "difficulty_tier": 2,
+            "ewma": 0.005
+          },
+          {
+            "capability": "code_generation",
+            "column_id": "col_b",
+            "difficulty_tier": 3,
+            "ewma": 0.005
+          },
+          {
+            "capability": "factual_qa",
+            "column_id": "col_b",
+            "difficulty_tier": 2,
+            "ewma": 0.02
+          }
+        ],
+        "latency_ewmas": [],
+        "pools": [
+          {
+            "is_default": true,
+            "model_column_ids": [
+              "col_a",
+              "col_b"
+            ],
+            "name": "p"
+          }
+        ]
+      }
+    },
+    {
+      "expected": [],
+      "go_test": "policy.TestSimulateMissingAggregatesSurvive",
+      "id": "TestSimulateMissingAggregatesSurvive#1",
+      "input": {
+        "cells_sorted": [],
+        "column_status": {
+          "col_a": "cold_start"
+        },
+        "constraints": {
+          "max_cost_per_run": 0.0001,
+          "max_latency_ms": 1,
+          "zero_retention": false
+        },
+        "cost_ewmas": [],
+        "latency_ewmas": [],
+        "pools": [
+          {
+            "is_default": true,
+            "model_column_ids": [
+              "col_a"
+            ],
+            "name": "p"
+          }
+        ]
+      }
+    },
+    {
+      "expected": [
+        {
+          "code": "pool_would_be_empty",
+          "details": {
+            "constraint": "status_retired",
+            "pool": "p"
+          },
+          "message": "pool \"p\" would have no usable columns: every column is retired"
+        }
+      ],
+      "go_test": "policy.TestSimulateAllRetired",
+      "id": "TestSimulateAllRetired#1",
+      "input": {
+        "cells_sorted": [],
+        "column_status": {
+          "col_a": "retired"
+        },
+        "constraints": {
+          "max_cost_per_run": null,
+          "max_latency_ms": null,
+          "zero_retention": false
+        },
+        "cost_ewmas": [],
+        "latency_ewmas": [],
+        "pools": [
+          {
+            "is_default": true,
+            "model_column_ids": [
+              "col_a"
+            ],
+            "name": "p"
+          }
+        ]
+      }
+    },
+    {
+      "expected": [
+        {
+          "code": "pool_would_be_empty",
+          "details": {
+            "capability": "code_generation",
+            "constraint": "max_cost_per_run",
+            "difficulty_tier": 3,
+            "pool": "p"
+          },
+          "message": "constraint \"max_cost_per_run\" would leave pool \"p\" with zero candidates for code_generation tier 3"
+        }
+      ],
+      "go_test": "policy.TestSimulateRetiredExcludedFromSurvivors",
+      "id": "TestSimulateRetiredExcludedFromSurvivors#1",
+      "input": {
+        "cells_sorted": [
+          {
+            "capability": "code_generation",
+            "difficulty_tier": 3
+          }
+        ],
+        "column_status": {
+          "col_pricey": "active",
+          "col_retired": "retired"
+        },
+        "constraints": {
+          "max_cost_per_run": 0.01,
+          "max_latency_ms": null,
+          "zero_retention": false
+        },
+        "cost_ewmas": [
+          {
+            "capability": "code_generation",
+            "column_id": "col_pricey",
+            "difficulty_tier": 3,
+            "ewma": 0.02
+          },
+          {
+            "capability": "code_generation",
+            "column_id": "col_retired",
+            "difficulty_tier": 3,
+            "ewma": 0.001
+          }
+        ],
+        "latency_ewmas": [],
+        "pools": [
+          {
+            "is_default": true,
+            "model_column_ids": [
+              "col_retired",
+              "col_pricey"
+            ],
+            "name": "p"
+          }
+        ]
+      }
+    },
+    {
+      "expected": [
+        {
+          "code": "pool_would_be_empty",
+          "details": {
+            "capability": "long_context_qa",
+            "constraint": "max_latency_ms",
+            "difficulty_tier": 4,
+            "pool": "slow"
+          },
+          "message": "constraint \"max_latency_ms\" would leave pool \"slow\" with zero candidates for long_context_qa tier 4"
+        }
+      ],
+      "go_test": "policy.TestSimulateNamesLatencyConstraint",
+      "id": "TestSimulateNamesLatencyConstraint#1",
+      "input": {
+        "cells_sorted": [
+          {
+            "capability": "long_context_qa",
+            "difficulty_tier": 4
+          }
+        ],
+        "column_status": {
+          "col_a": "active"
+        },
+        "constraints": {
+          "max_cost_per_run": 0.01,
+          "max_latency_ms": 2000,
+          "zero_retention": false
+        },
+        "cost_ewmas": [
+          {
+            "capability": "long_context_qa",
+            "column_id": "col_a",
+            "difficulty_tier": 4,
+            "ewma": 0.001
+          }
+        ],
+        "latency_ewmas": [
+          {
+            "capability": "long_context_qa",
+            "column_id": "col_a",
+            "difficulty_tier": 4,
+            "ewma": 9000
+          }
+        ],
+        "pools": [
+          {
+            "is_default": true,
+            "model_column_ids": [
+              "col_a"
+            ],
+            "name": "slow"
+          }
+        ]
+      }
+    },
+    {
+      "expected": [],
+      "go_test": "policy.TestSimulateBoundaryValuePasses",
+      "id": "TestSimulateBoundaryValuePasses#1",
+      "input": {
+        "cells_sorted": [
+          {
+            "capability": "factual_qa",
+            "difficulty_tier": 1
+          }
+        ],
+        "column_status": {
+          "col_a": "active"
+        },
+        "constraints": {
+          "max_cost_per_run": null,
+          "max_latency_ms": 2000,
+          "zero_retention": false
+        },
+        "cost_ewmas": [],
+        "latency_ewmas": [
+          {
+            "capability": "factual_qa",
+            "column_id": "col_a",
+            "difficulty_tier": 1,
+            "ewma": 2000
+          }
+        ],
+        "pools": [
+          {
+            "is_default": true,
+            "model_column_ids": [
+              "col_a"
+            ],
+            "name": "p"
+          }
+        ]
+      }
+    },
+    {
+      "expected": [],
+      "go_test": "policy.TestEvaluateDriftFallback",
+      "id": "TestEvaluateDriftFallback#1",
+      "input": {
+        "cells_sorted": [
+          {
+            "capability": "structured_extraction",
+            "difficulty_tier": 3
+          }
+        ],
+        "column_status": {
+          "col_a": "active",
+          "col_b": "active",
+          "col_c": "active"
+        },
+        "constraints": {
+          "max_cost_per_run": 0.01,
+          "max_latency_ms": null,
+          "zero_retention": false
+        },
+        "cost_ewmas": [
+          {
+            "capability": "structured_extraction",
+            "column_id": "col_a",
+            "difficulty_tier": 3,
+            "ewma": 0.008
+          },
+          {
+            "capability": "structured_extraction",
+            "column_id": "col_b",
+            "difficulty_tier": 3,
+            "ewma": 0.005
+          },
+          {
+            "capability": "structured_extraction",
+            "column_id": "col_c",
+            "difficulty_tier": 3,
+            "ewma": 0.009
+          }
+        ],
+        "latency_ewmas": [],
+        "pools": [
+          {
+            "is_default": true,
+            "model_column_ids": [
+              "col_a",
+              "col_b",
+              "col_c"
+            ],
+            "name": "default"
+          }
+        ]
+      }
+    }
+  ]
+}

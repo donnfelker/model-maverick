@@ -1,0 +1,12 @@
+description: bare JSON object embedded in prose is extracted and validates
+spec:
+  schema:
+    type: object
+    required: [status]
+    properties:
+      status: { enum: [ok, error] }
+output: |-
+  Sure! The result is {"status": "ok"} — let me know if you need anything else.
+expect:
+  dimensions: { schema_validity: 1.0 }
+  detail_contains: ['"extraction":"bare"']

@@ -1,0 +1,47 @@
+{
+  "fixtures": [
+    {
+      "model": "claude-opus-4-8",
+      "prompt": "Extract the invoice total as JSON.",
+      "output": "{\"total\": 42.50}",
+      "tokens_in": 120,
+      "tokens_out": 18
+    },
+    {
+      "model": "claude-haiku-4-5",
+      "prompt": "Extract the invoice total as JSON.",
+      "output": "{\"total\": 42.5}",
+      "tokens_in": 120,
+      "tokens_out": 16
+    },
+    {
+      "model": "gpt-5.5",
+      "prompt": "Extract the invoice total as JSON.",
+      "output": "{\"total\": 42.50}",
+      "tokens_in": 118,
+      "tokens_out": 17
+    },
+    {
+      "model": "gemini-3.1-pro",
+      "prompt": "Extract the invoice total as JSON.",
+      "output": "{\"total\": 42.50}",
+      "tokens_in": 122,
+      "tokens_out": 19
+    },
+    {
+      "model": "grok-4",
+      "prompt": "Extract the invoice total as JSON.",
+      "output": "{\"total\": 42.50}",
+      "tokens_in": 121,
+      "tokens_out": 18
+    },
+    {
+      "model": "gemini-3.1-flash",
+      "prompt": "Summarize the meeting notes in one sentence.",
+      "output": "The team agreed to ship the pricing change on Friday.",
+      "tokens_in": 340,
+      "tokens_out": 14,
+      "latency_ms": 20
+    }
+  ]
+}

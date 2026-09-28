@@ -1,0 +1,249 @@
+{
+  "cases": [
+    {
+      "capability": "code_generation",
+      "check_spec": {
+        "type": "rule_scan",
+        "ref": "checks/code_generation/v1"
+      },
+      "definition": {
+        "ref": "checks/code_generation/v1",
+        "capability": "code_generation",
+        "type": "rule_scan",
+        "spec": {
+          "rules": [
+            {
+              "must_include": "\\S",
+              "regex": true,
+              "weight": 1,
+              "critical": true
+            }
+          ]
+        }
+      },
+      "go_test": null,
+      "id": "registry/code_generation",
+      "spec_exact": "{\"rules\":[{\"must_include\":\"\\\\S\",\"regex\":true,\"weight\":1,\"critical\":true}]}"
+    },
+    {
+      "capability": "structured_extraction",
+      "check_spec": {
+        "type": "json_schema",
+        "ref": "checks/extraction/v1"
+      },
+      "definition": {
+        "ref": "checks/extraction/v1",
+        "capability": "structured_extraction",
+        "type": "json_schema",
+        "spec": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": [
+              "object",
+              "array"
+            ]
+          }
+        }
+      },
+      "go_test": null,
+      "id": "registry/structured_extraction",
+      "spec_exact": "{\"schema\":{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":[\"object\",\"array\"]}}"
+    },
+    {
+      "capability": "summarization_synthesis",
+      "check_spec": {
+        "type": "rule_scan",
+        "ref": "checks/summarization/v1"
+      },
+      "definition": {
+        "ref": "checks/summarization/v1",
+        "capability": "summarization_synthesis",
+        "type": "rule_scan",
+        "spec": {
+          "rules": [
+            {
+              "must_include": "\\S",
+              "regex": true,
+              "weight": 1,
+              "critical": true
+            }
+          ]
+        }
+      },
+      "go_test": null,
+      "id": "registry/summarization_synthesis",
+      "spec_exact": "{\"rules\":[{\"must_include\":\"\\\\S\",\"regex\":true,\"weight\":1,\"critical\":true}]}"
+    },
+    {
+      "capability": "multi_step_reasoning",
+      "check_spec": {
+        "type": "rule_scan",
+        "ref": "checks/reasoning/v1"
+      },
+      "definition": {
+        "ref": "checks/reasoning/v1",
+        "capability": "multi_step_reasoning",
+        "type": "rule_scan",
+        "spec": {
+          "rules": [
+            {
+              "must_include": "\\S",
+              "regex": true,
+              "weight": 1,
+              "critical": true
+            }
+          ]
+        }
+      },
+      "go_test": null,
+      "id": "registry/multi_step_reasoning",
+      "spec_exact": "{\"rules\":[{\"must_include\":\"\\\\S\",\"regex\":true,\"weight\":1,\"critical\":true}]}"
+    },
+    {
+      "capability": "instruction_schema_following",
+      "check_spec": {
+        "type": "json_schema",
+        "ref": "checks/schema_following/v1"
+      },
+      "definition": {
+        "ref": "checks/schema_following/v1",
+        "capability": "instruction_schema_following",
+        "type": "json_schema",
+        "spec": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object"
+          }
+        }
+      },
+      "go_test": null,
+      "id": "registry/instruction_schema_following",
+      "spec_exact": "{\"schema\":{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"object\"}}"
+    },
+    {
+      "capability": "long_context_qa",
+      "check_spec": {
+        "type": "rule_scan",
+        "ref": "checks/long_context_qa/v1"
+      },
+      "definition": {
+        "ref": "checks/long_context_qa/v1",
+        "capability": "long_context_qa",
+        "type": "rule_scan",
+        "spec": {
+          "rules": [
+            {
+              "must_include": "\\S",
+              "regex": true,
+              "weight": 1,
+              "critical": true
+            }
+          ]
+        }
+      },
+      "go_test": null,
+      "id": "registry/long_context_qa",
+      "spec_exact": "{\"rules\":[{\"must_include\":\"\\\\S\",\"regex\":true,\"weight\":1,\"critical\":true}]}"
+    },
+    {
+      "capability": "factual_qa",
+      "check_spec": {
+        "type": "rule_scan",
+        "ref": "checks/factual_qa/v1"
+      },
+      "definition": {
+        "ref": "checks/factual_qa/v1",
+        "capability": "factual_qa",
+        "type": "rule_scan",
+        "spec": {
+          "rules": [
+            {
+              "must_include": "\\S",
+              "regex": true,
+              "weight": 1,
+              "critical": true
+            }
+          ]
+        }
+      },
+      "go_test": null,
+      "id": "registry/factual_qa",
+      "spec_exact": "{\"rules\":[{\"must_include\":\"\\\\S\",\"regex\":true,\"weight\":1,\"critical\":true}]}"
+    },
+    {
+      "capability": "rewriting_editing",
+      "check_spec": {
+        "type": "rule_scan",
+        "ref": "checks/rewriting/v1"
+      },
+      "definition": {
+        "ref": "checks/rewriting/v1",
+        "capability": "rewriting_editing",
+        "type": "rule_scan",
+        "spec": {
+          "rules": [
+            {
+              "must_include": "\\S",
+              "regex": true,
+              "weight": 1,
+              "critical": true
+            }
+          ]
+        }
+      },
+      "go_test": null,
+      "id": "registry/rewriting_editing",
+      "spec_exact": "{\"rules\":[{\"must_include\":\"\\\\S\",\"regex\":true,\"weight\":1,\"critical\":true}]}"
+    },
+    {
+      "capability": "translation_multilingual",
+      "check_spec": {
+        "type": "rule_scan",
+        "ref": "checks/translation/v1"
+      },
+      "definition": {
+        "ref": "checks/translation/v1",
+        "capability": "translation_multilingual",
+        "type": "rule_scan",
+        "spec": {
+          "rules": [
+            {
+              "must_include": "\\S",
+              "regex": true,
+              "weight": 1,
+              "critical": true
+            }
+          ]
+        }
+      },
+      "go_test": null,
+      "id": "registry/translation_multilingual",
+      "spec_exact": "{\"rules\":[{\"must_include\":\"\\\\S\",\"regex\":true,\"weight\":1,\"critical\":true}]}"
+    },
+    {
+      "capability": "critique_and_judging",
+      "check_spec": {
+        "type": "rule_scan",
+        "ref": "checks/critique/v1"
+      },
+      "definition": {
+        "ref": "checks/critique/v1",
+        "capability": "critique_and_judging",
+        "type": "rule_scan",
+        "spec": {
+          "rules": [
+            {
+              "must_include": "\\S",
+              "regex": true,
+              "weight": 1,
+              "critical": true
+            }
+          ]
+        }
+      },
+      "go_test": null,
+      "id": "registry/critique_and_judging",
+      "spec_exact": "{\"rules\":[{\"must_include\":\"\\\\S\",\"regex\":true,\"weight\":1,\"critical\":true}]}"
+    }
+  ]
+}

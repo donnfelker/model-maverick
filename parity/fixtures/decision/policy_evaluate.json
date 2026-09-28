@@ -1,0 +1,3376 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [
+            {
+              "column_id": "col_gpt",
+              "detail": "column is not in pool \"default\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_legacy",
+              "detail": "column status is retired",
+              "reason": "status_retired"
+            }
+          ],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_sonnet",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_sonnet_vertex",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_opus",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_haiku",
+              "prefs_satisfied": true,
+              "violations": []
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluatePoolResolution/default_pool_when_unnamed",
+      "id": "TestEvaluatePoolResolution/default_pool_when_unnamed#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {},
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [
+            {
+              "column_id": "col_sonnet",
+              "detail": "column is not in pool \"openai-only\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_sonnet_vertex",
+              "detail": "column is not in pool \"openai-only\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_opus",
+              "detail": "column is not in pool \"openai-only\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_haiku",
+              "detail": "column is not in pool \"openai-only\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_legacy",
+              "detail": "column is not in pool \"openai-only\"",
+              "reason": "not_in_pool"
+            }
+          ],
+          "pool": "openai-only",
+          "survivors": [
+            {
+              "column_id": "col_gpt",
+              "prefs_satisfied": true,
+              "violations": []
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluatePoolResolution/named_pool",
+      "id": "TestEvaluatePoolResolution/named_pool#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {},
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": "openai-only"
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    },
+    {
+      "expected": {
+        "error": {
+          "code": "unknown_pool",
+          "details": {
+            "pool": "nope"
+          },
+          "message": "pool \"nope\" is not configured for this tenant"
+        }
+      },
+      "go_test": "policy.TestEvaluatePoolResolution/unknown_pool",
+      "id": "TestEvaluatePoolResolution/unknown_pool#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {},
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": "nope"
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    },
+    {
+      "expected": {
+        "error": {
+          "code": "unknown_pool",
+          "details": {
+            "pool": ""
+          },
+          "message": "tenant has no default pool"
+        }
+      },
+      "go_test": "policy.TestEvaluatePoolResolution/no_default_pool_configured",
+      "id": "TestEvaluatePoolResolution/no_default_pool_configured#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {},
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_opus"
+              ],
+              "name": "p"
+            }
+          ],
+          "tenant_id": ""
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [
+            {
+              "column_id": "col_sonnet",
+              "detail": "column is not in pool \"openai-only\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_sonnet_vertex",
+              "detail": "column is not in pool \"openai-only\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_opus",
+              "detail": "column is not in pool \"openai-only\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_haiku",
+              "detail": "column is not in pool \"openai-only\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_legacy",
+              "detail": "column is not in pool \"openai-only\"",
+              "reason": "not_in_pool"
+            }
+          ],
+          "pool": "openai-only",
+          "survivors": [
+            {
+              "column_id": "col_gpt",
+              "prefs_satisfied": true,
+              "violations": []
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluatePoolResolution/out-of-pool_columns_traced_not_in_pool",
+      "id": "TestEvaluatePoolResolution/out-of-pool_columns_traced_not_in_pool#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {},
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": "openai-only"
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [
+            {
+              "column_id": "col_gpt",
+              "detail": "column is not in pool \"default\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_legacy",
+              "detail": "column status is retired",
+              "reason": "status_retired"
+            }
+          ],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_sonnet",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_sonnet_vertex",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_opus",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_haiku",
+              "prefs_satisfied": true,
+              "violations": []
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluateRetiredExclusion",
+      "id": "TestEvaluateRetiredExclusion#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {},
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [
+            {
+              "column_id": "col_gpt",
+              "detail": "column is not in pool \"default\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_legacy",
+              "detail": "column status is retired",
+              "reason": "status_retired"
+            },
+            {
+              "column_id": "col_opus",
+              "detail": "column matches no allowed_models entry",
+              "reason": "not_in_allowlist"
+            },
+            {
+              "column_id": "col_haiku",
+              "detail": "column matches no allowed_models entry",
+              "reason": "not_in_allowlist"
+            }
+          ],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_sonnet",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_sonnet_vertex",
+              "prefs_satisfied": true,
+              "violations": []
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluateAllowlistNarrowing/model_id_matches_all_pool_variants",
+      "id": "TestEvaluateAllowlistNarrowing/model_id_matches_all_pool_variants#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {},
+        "request": {
+          "allowed_models": [
+            "claude-sonnet-4-6"
+          ],
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [
+            {
+              "column_id": "col_gpt",
+              "detail": "column is not in pool \"default\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_legacy",
+              "detail": "column status is retired",
+              "reason": "status_retired"
+            },
+            {
+              "column_id": "col_sonnet_vertex",
+              "detail": "column matches no allowed_models entry",
+              "reason": "not_in_allowlist"
+            },
+            {
+              "column_id": "col_opus",
+              "detail": "column matches no allowed_models entry",
+              "reason": "not_in_allowlist"
+            },
+            {
+              "column_id": "col_haiku",
+              "detail": "column matches no allowed_models entry",
+              "reason": "not_in_allowlist"
+            }
+          ],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_sonnet",
+              "prefs_satisfied": true,
+              "violations": []
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluateAllowlistNarrowing/column_id_matches_exactly",
+      "id": "TestEvaluateAllowlistNarrowing/column_id_matches_exactly#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {},
+        "request": {
+          "allowed_models": [
+            "col_sonnet"
+          ],
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [
+            {
+              "column_id": "col_gpt",
+              "detail": "column is not in pool \"default\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_legacy",
+              "detail": "column status is retired",
+              "reason": "status_retired"
+            },
+            {
+              "column_id": "col_sonnet",
+              "detail": "column matches no allowed_models entry",
+              "reason": "not_in_allowlist"
+            },
+            {
+              "column_id": "col_sonnet_vertex",
+              "detail": "column matches no allowed_models entry",
+              "reason": "not_in_allowlist"
+            }
+          ],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_opus",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_haiku",
+              "prefs_satisfied": true,
+              "violations": []
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluateAllowlistNarrowing/mixed_entries_union",
+      "id": "TestEvaluateAllowlistNarrowing/mixed_entries_union#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {},
+        "request": {
+          "allowed_models": [
+            "col_opus",
+            "claude-haiku-4-5"
+          ],
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [
+            {
+              "column_id": "col_gpt",
+              "detail": "column is not in pool \"default\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_legacy",
+              "detail": "column status is retired",
+              "reason": "status_retired"
+            }
+          ],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_sonnet",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_sonnet_vertex",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_opus",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_haiku",
+              "prefs_satisfied": true,
+              "violations": []
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluateAllowlistNarrowing/empty_allowlist_is_no_filter",
+      "id": "TestEvaluateAllowlistNarrowing/empty_allowlist_is_no_filter#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {},
+        "request": {
+          "allowed_models": [],
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    },
+    {
+      "expected": {
+        "error": {
+          "code": "unknown_model",
+          "details": {
+            "entry": "not-a-model"
+          },
+          "message": "allowed_models entry \"not-a-model\" is not in the model catalog"
+        }
+      },
+      "go_test": "policy.TestEvaluateAllowlistErrors/unknown_model",
+      "id": "TestEvaluateAllowlistErrors/unknown_model#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {},
+        "request": {
+          "allowed_models": [
+            "col_sonnet",
+            "not-a-model"
+          ],
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    },
+    {
+      "expected": {
+        "error": {
+          "code": "model_not_in_pool",
+          "details": {
+            "entry": "gpt-5.5",
+            "pool": "default"
+          },
+          "message": "allowed_models entry \"gpt-5.5\" is not in pool \"default\""
+        }
+      },
+      "go_test": "policy.TestEvaluateAllowlistErrors/known_model_outside_pool",
+      "id": "TestEvaluateAllowlistErrors/known_model_outside_pool#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {},
+        "request": {
+          "allowed_models": [
+            "col_sonnet",
+            "gpt-5.5"
+          ],
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    },
+    {
+      "expected": {
+        "error": {
+          "code": "model_not_in_pool",
+          "details": {
+            "entry": "col_gpt",
+            "pool": "default"
+          },
+          "message": "allowed_models entry \"col_gpt\" is not in pool \"default\""
+        }
+      },
+      "go_test": "policy.TestEvaluateAllowlistErrors/column_id_outside_pool",
+      "id": "TestEvaluateAllowlistErrors/column_id_outside_pool#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {},
+        "request": {
+          "allowed_models": [
+            "col_sonnet",
+            "col_gpt"
+          ],
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    },
+    {
+      "expected": {
+        "error": {
+          "code": "model_not_in_pool",
+          "details": {
+            "entry": "legacy-1",
+            "pool": "default"
+          },
+          "message": "allowed_models entry \"legacy-1\" matches only retired columns in pool \"default\""
+        }
+      },
+      "go_test": "policy.TestEvaluateAllowlistErrors/entry_matching_only_retired_pool_columns",
+      "id": "TestEvaluateAllowlistErrors/entry_matching_only_retired_pool_columns#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {},
+        "request": {
+          "allowed_models": [
+            "col_sonnet",
+            "legacy-1"
+          ],
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [
+            {
+              "column_id": "col_gpt",
+              "detail": "column is not in pool \"default\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_legacy",
+              "detail": "column status is retired",
+              "reason": "status_retired"
+            },
+            {
+              "column_id": "col_sonnet_vertex",
+              "detail": "cost_per_run_usd EWMA 0.02 exceeds max_cost_per_run 0.01",
+              "reason": "standing_constraint:max_cost_per_run"
+            }
+          ],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_sonnet",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_opus",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_haiku",
+              "prefs_satisfied": true,
+              "violations": []
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluateStandingConstraints/cost_cap_filters_with_named_reason",
+      "id": "TestEvaluateStandingConstraints/cost_cap_filters_with_named_reason#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {
+          "col_opus": {
+            "cost_per_run_usd": 0.005,
+            "latency_p95_ms": null
+          },
+          "col_sonnet": {
+            "cost_per_run_usd": 0.004,
+            "latency_p95_ms": null
+          },
+          "col_sonnet_vertex": {
+            "cost_per_run_usd": 0.02,
+            "latency_p95_ms": null
+          }
+        },
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": 0.01,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [
+            {
+              "column_id": "col_gpt",
+              "detail": "column is not in pool \"default\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_legacy",
+              "detail": "column status is retired",
+              "reason": "status_retired"
+            },
+            {
+              "column_id": "col_opus",
+              "detail": "latency_p95_ms EWMA 5000 exceeds max_latency_ms 2000",
+              "reason": "standing_constraint:max_latency_ms"
+            }
+          ],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_sonnet",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_sonnet_vertex",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_haiku",
+              "prefs_satisfied": true,
+              "violations": []
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluateStandingConstraints/latency_cap_filters_with_named_reason",
+      "id": "TestEvaluateStandingConstraints/latency_cap_filters_with_named_reason#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {
+          "col_opus": {
+            "cost_per_run_usd": null,
+            "latency_p95_ms": 5000
+          },
+          "col_sonnet": {
+            "cost_per_run_usd": null,
+            "latency_p95_ms": 1500
+          }
+        },
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": 2000,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [
+            {
+              "column_id": "col_gpt",
+              "detail": "column is not in pool \"default\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_legacy",
+              "detail": "column status is retired",
+              "reason": "status_retired"
+            }
+          ],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_sonnet",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_sonnet_vertex",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_opus",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_haiku",
+              "prefs_satisfied": true,
+              "violations": []
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluateStandingConstraints/EWMA_equal_to_the_limit_satisfies_it",
+      "id": "TestEvaluateStandingConstraints/EWMA_equal_to_the_limit_satisfies_it#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {
+          "col_sonnet": {
+            "cost_per_run_usd": 0.01,
+            "latency_p95_ms": 2000
+          }
+        },
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": 0.01,
+            "max_latency_ms": 2000,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [
+            {
+              "column_id": "col_gpt",
+              "detail": "column is not in pool \"default\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_legacy",
+              "detail": "column status is retired",
+              "reason": "status_retired"
+            }
+          ],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_sonnet",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_sonnet_vertex",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_opus",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_haiku",
+              "prefs_satisfied": true,
+              "violations": []
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluateStandingConstraints/unmeasured_columns_cannot_violate",
+      "id": "TestEvaluateStandingConstraints/unmeasured_columns_cannot_violate#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {},
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": 0.0001,
+            "max_latency_ms": 1,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [
+            {
+              "column_id": "col_gpt",
+              "detail": "column is not in pool \"default\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_legacy",
+              "detail": "column status is retired",
+              "reason": "status_retired"
+            },
+            {
+              "column_id": "col_opus",
+              "detail": "cost_per_run_usd EWMA 0.05 exceeds max_cost_per_run 0.01",
+              "reason": "standing_constraint:max_cost_per_run"
+            }
+          ],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_sonnet",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_sonnet_vertex",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_haiku",
+              "prefs_satisfied": true,
+              "violations": []
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluateStandingConstraints/both_limits_breached_names_cost_first",
+      "id": "TestEvaluateStandingConstraints/both_limits_breached_names_cost_first#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {
+          "col_opus": {
+            "cost_per_run_usd": 0.05,
+            "latency_p95_ms": 9000
+          },
+          "col_sonnet": {
+            "cost_per_run_usd": 0.002,
+            "latency_p95_ms": 900
+          }
+        },
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": 0.01,
+            "max_latency_ms": 2000,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": false,
+          "drift_alert": {
+            "kind": "pool_would_be_empty",
+            "message": "standing constraints emptied pool \"default\" for structured_extraction tier 3 at request time; retained least-violating columns [col_b]",
+            "severity": "critical",
+            "subject": {
+              "capability": "structured_extraction",
+              "difficulty_tier": 3,
+              "pool": "default",
+              "retained": [
+                "col_b"
+              ],
+              "tenant_id": "ten_02"
+            }
+          },
+          "exclusions": [
+            {
+              "column_id": "col_a",
+              "detail": "cost_per_run_usd EWMA 0.02 exceeds max_cost_per_run 0.01",
+              "reason": "standing_constraint:max_cost_per_run"
+            },
+            {
+              "column_id": "col_c",
+              "detail": "cost_per_run_usd EWMA 0.03 exceeds max_cost_per_run 0.01",
+              "reason": "standing_constraint:max_cost_per_run"
+            }
+          ],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_b",
+              "prefs_satisfied": true,
+              "violations": [
+                {
+                  "constraint": "max_cost_per_run",
+                  "estimated": 0.015,
+                  "limit": 0.01
+                }
+              ]
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluateDriftFallback",
+      "id": "TestEvaluateDriftFallback#2",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_a",
+            "model_id": "model-a",
+            "status": "active"
+          },
+          {
+            "id": "col_b",
+            "model_id": "model-b",
+            "status": "active"
+          },
+          {
+            "id": "col_c",
+            "model_id": "model-c",
+            "status": "active"
+          }
+        ],
+        "cell_aggregates": {
+          "col_a": {
+            "cost_per_run_usd": 0.02,
+            "latency_p95_ms": null
+          },
+          "col_b": {
+            "cost_per_run_usd": 0.015,
+            "latency_p95_ms": null
+          },
+          "col_c": {
+            "cost_per_run_usd": 0.03,
+            "latency_p95_ms": null
+          }
+        },
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": 0.01,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_a",
+                "col_b",
+                "col_c"
+              ],
+              "name": "default"
+            }
+          ],
+          "tenant_id": "ten_02"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": false,
+          "drift_alert": {
+            "kind": "pool_would_be_empty",
+            "message": "standing constraints emptied pool \"default\" for structured_extraction tier 3 at request time; retained least-violating columns [col_a col_b]",
+            "severity": "critical",
+            "subject": {
+              "capability": "structured_extraction",
+              "difficulty_tier": 3,
+              "pool": "default",
+              "retained": [
+                "col_a",
+                "col_b"
+              ],
+              "tenant_id": "ten_02"
+            }
+          },
+          "exclusions": [
+            {
+              "column_id": "col_c",
+              "detail": "cost_per_run_usd EWMA 0.03 exceeds max_cost_per_run 0.01",
+              "reason": "standing_constraint:max_cost_per_run"
+            }
+          ],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_a",
+              "prefs_satisfied": true,
+              "violations": [
+                {
+                  "constraint": "max_cost_per_run",
+                  "estimated": 0.02,
+                  "limit": 0.01
+                }
+              ]
+            },
+            {
+              "column_id": "col_b",
+              "prefs_satisfied": true,
+              "violations": [
+                {
+                  "constraint": "max_cost_per_run",
+                  "estimated": 0.02,
+                  "limit": 0.01
+                }
+              ]
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluateDriftFallbackTie",
+      "id": "TestEvaluateDriftFallbackTie#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_a",
+            "model_id": "model-a",
+            "status": "active"
+          },
+          {
+            "id": "col_b",
+            "model_id": "model-b",
+            "status": "active"
+          },
+          {
+            "id": "col_c",
+            "model_id": "model-c",
+            "status": "active"
+          }
+        ],
+        "cell_aggregates": {
+          "col_a": {
+            "cost_per_run_usd": 0.02,
+            "latency_p95_ms": null
+          },
+          "col_b": {
+            "cost_per_run_usd": 0.02,
+            "latency_p95_ms": null
+          },
+          "col_c": {
+            "cost_per_run_usd": 0.03,
+            "latency_p95_ms": null
+          }
+        },
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": 0.01,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_a",
+                "col_b",
+                "col_c"
+              ],
+              "name": "default"
+            }
+          ],
+          "tenant_id": "ten_02"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": false,
+          "drift_alert": {
+            "kind": "pool_would_be_empty",
+            "message": "standing constraints emptied pool \"default\" for structured_extraction tier 3 at request time; retained least-violating columns [col_a]",
+            "severity": "critical",
+            "subject": {
+              "capability": "structured_extraction",
+              "difficulty_tier": 3,
+              "pool": "default",
+              "retained": [
+                "col_a"
+              ],
+              "tenant_id": "ten_02"
+            }
+          },
+          "exclusions": [
+            {
+              "column_id": "col_b",
+              "detail": "cost_per_run_usd EWMA 0.03 exceeds max_cost_per_run 0.01",
+              "reason": "standing_constraint:max_cost_per_run"
+            },
+            {
+              "column_id": "col_c",
+              "detail": "cost_per_run_usd EWMA 0.05 exceeds max_cost_per_run 0.01",
+              "reason": "standing_constraint:max_cost_per_run"
+            }
+          ],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_a",
+              "prefs_satisfied": true,
+              "violations": [
+                {
+                  "constraint": "max_latency_ms",
+                  "estimated": 2100,
+                  "limit": 2000
+                }
+              ]
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluateDriftFallbackRelativeExcess",
+      "id": "TestEvaluateDriftFallbackRelativeExcess#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_a",
+            "model_id": "model-a",
+            "status": "active"
+          },
+          {
+            "id": "col_b",
+            "model_id": "model-b",
+            "status": "active"
+          },
+          {
+            "id": "col_c",
+            "model_id": "model-c",
+            "status": "active"
+          }
+        ],
+        "cell_aggregates": {
+          "col_a": {
+            "cost_per_run_usd": null,
+            "latency_p95_ms": 2100
+          },
+          "col_b": {
+            "cost_per_run_usd": 0.03,
+            "latency_p95_ms": 1000
+          },
+          "col_c": {
+            "cost_per_run_usd": 0.05,
+            "latency_p95_ms": null
+          }
+        },
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": 0.01,
+            "max_latency_ms": 2000,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_a",
+                "col_b",
+                "col_c"
+              ],
+              "name": "default"
+            }
+          ],
+          "tenant_id": "ten_02"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_b",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_c",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_a",
+              "prefs_satisfied": false,
+              "violations": [
+                {
+                  "constraint": "max_latency_ms",
+                  "estimated": 3000,
+                  "limit": 2000
+                }
+              ]
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluatePreferences/violators_partition_stably_to_the_back",
+      "id": "TestEvaluatePreferences/violators_partition_stably_to_the_back#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_a",
+            "model_id": "model-a",
+            "status": "active"
+          },
+          {
+            "id": "col_b",
+            "model_id": "model-b",
+            "status": "active"
+          },
+          {
+            "id": "col_c",
+            "model_id": "model-c",
+            "status": "active"
+          }
+        ],
+        "cell_aggregates": {
+          "col_a": {
+            "cost_per_run_usd": 0.002,
+            "latency_p95_ms": 3000
+          },
+          "col_b": {
+            "cost_per_run_usd": 0.02,
+            "latency_p95_ms": 1000
+          }
+        },
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": 2000
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_a",
+                "col_b",
+                "col_c"
+              ],
+              "name": "default"
+            }
+          ],
+          "tenant_id": "ten_02"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_c",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_a",
+              "prefs_satisfied": false,
+              "violations": [
+                {
+                  "constraint": "max_cost_per_run",
+                  "estimated": 0.002,
+                  "limit": 0.001
+                }
+              ]
+            },
+            {
+              "column_id": "col_b",
+              "prefs_satisfied": false,
+              "violations": [
+                {
+                  "constraint": "max_cost_per_run",
+                  "estimated": 0.02,
+                  "limit": 0.001
+                }
+              ]
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluatePreferences/unmeasured_survivor_satisfies_preferences",
+      "id": "TestEvaluatePreferences/unmeasured_survivor_satisfies_preferences#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_a",
+            "model_id": "model-a",
+            "status": "active"
+          },
+          {
+            "id": "col_b",
+            "model_id": "model-b",
+            "status": "active"
+          },
+          {
+            "id": "col_c",
+            "model_id": "model-c",
+            "status": "active"
+          }
+        ],
+        "cell_aggregates": {
+          "col_a": {
+            "cost_per_run_usd": 0.002,
+            "latency_p95_ms": 3000
+          },
+          "col_b": {
+            "cost_per_run_usd": 0.02,
+            "latency_p95_ms": 1000
+          }
+        },
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": 0.001,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_a",
+                "col_b",
+                "col_c"
+              ],
+              "name": "default"
+            }
+          ],
+          "tenant_id": "ten_02"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_a",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_b",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_c",
+              "prefs_satisfied": true,
+              "violations": []
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluatePreferences/no_preferences_keeps_pool_order",
+      "id": "TestEvaluatePreferences/no_preferences_keeps_pool_order#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_a",
+            "model_id": "model-a",
+            "status": "active"
+          },
+          {
+            "id": "col_b",
+            "model_id": "model-b",
+            "status": "active"
+          },
+          {
+            "id": "col_c",
+            "model_id": "model-c",
+            "status": "active"
+          }
+        ],
+        "cell_aggregates": {
+          "col_a": {
+            "cost_per_run_usd": 0.002,
+            "latency_p95_ms": 3000
+          },
+          "col_b": {
+            "cost_per_run_usd": 0.02,
+            "latency_p95_ms": 1000
+          }
+        },
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_a",
+                "col_b",
+                "col_c"
+              ],
+              "name": "default"
+            }
+          ],
+          "tenant_id": "ten_02"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_c",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_a",
+              "prefs_satisfied": false,
+              "violations": [
+                {
+                  "constraint": "max_latency_ms",
+                  "estimated": 3000,
+                  "limit": 500
+                }
+              ]
+            },
+            {
+              "column_id": "col_b",
+              "prefs_satisfied": false,
+              "violations": [
+                {
+                  "constraint": "max_cost_per_run",
+                  "estimated": 0.02,
+                  "limit": 0.01
+                },
+                {
+                  "constraint": "max_latency_ms",
+                  "estimated": 1000,
+                  "limit": 500
+                }
+              ]
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluatePreferences/both_preferences_violated_are_both_named",
+      "id": "TestEvaluatePreferences/both_preferences_violated_are_both_named#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_a",
+            "model_id": "model-a",
+            "status": "active"
+          },
+          {
+            "id": "col_b",
+            "model_id": "model-b",
+            "status": "active"
+          },
+          {
+            "id": "col_c",
+            "model_id": "model-c",
+            "status": "active"
+          }
+        ],
+        "cell_aggregates": {
+          "col_a": {
+            "cost_per_run_usd": 0.002,
+            "latency_p95_ms": 3000
+          },
+          "col_b": {
+            "cost_per_run_usd": 0.02,
+            "latency_p95_ms": 1000
+          }
+        },
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": 0.01,
+            "max_latency_ms": 500
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_a",
+                "col_b",
+                "col_c"
+              ],
+              "name": "default"
+            }
+          ],
+          "tenant_id": "ten_02"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": false,
+          "drift_alert": {
+            "kind": "pool_would_be_empty",
+            "message": "standing constraints emptied pool \"default\" for structured_extraction tier 3 at request time; retained least-violating columns [col_a col_b]",
+            "severity": "critical",
+            "subject": {
+              "capability": "structured_extraction",
+              "difficulty_tier": 3,
+              "pool": "default",
+              "retained": [
+                "col_a",
+                "col_b"
+              ],
+              "tenant_id": "ten_02"
+            }
+          },
+          "exclusions": [
+            {
+              "column_id": "col_c",
+              "detail": "cost_per_run_usd EWMA 0.05 exceeds max_cost_per_run 0.01",
+              "reason": "standing_constraint:max_cost_per_run"
+            }
+          ],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_b",
+              "prefs_satisfied": true,
+              "violations": [
+                {
+                  "constraint": "max_cost_per_run",
+                  "estimated": 0.02,
+                  "limit": 0.01
+                }
+              ]
+            },
+            {
+              "column_id": "col_a",
+              "prefs_satisfied": false,
+              "violations": [
+                {
+                  "constraint": "max_cost_per_run",
+                  "estimated": 0.02,
+                  "limit": 0.01
+                },
+                {
+                  "constraint": "max_latency_ms",
+                  "estimated": 4000,
+                  "limit": 2000
+                }
+              ]
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluateDriftFallbackThenPreferences",
+      "id": "TestEvaluateDriftFallbackThenPreferences#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_a",
+            "model_id": "model-a",
+            "status": "active"
+          },
+          {
+            "id": "col_b",
+            "model_id": "model-b",
+            "status": "active"
+          },
+          {
+            "id": "col_c",
+            "model_id": "model-c",
+            "status": "active"
+          }
+        ],
+        "cell_aggregates": {
+          "col_a": {
+            "cost_per_run_usd": 0.02,
+            "latency_p95_ms": 4000
+          },
+          "col_b": {
+            "cost_per_run_usd": 0.02,
+            "latency_p95_ms": 1000
+          },
+          "col_c": {
+            "cost_per_run_usd": 0.05,
+            "latency_p95_ms": null
+          }
+        },
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": 2000
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": 0.01,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_a",
+                "col_b",
+                "col_c"
+              ],
+              "name": "default"
+            }
+          ],
+          "tenant_id": "ten_02"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": {
+            "kind": "pool_would_be_empty",
+            "message": "pool \"default\" has no usable columns: every column is retired",
+            "severity": "critical",
+            "subject": {
+              "capability": "structured_extraction",
+              "difficulty_tier": 3,
+              "pool": "default",
+              "retained": null,
+              "tenant_id": "ten_03"
+            }
+          },
+          "exclusions": [
+            {
+              "column_id": "col_legacy",
+              "detail": "column status is retired",
+              "reason": "status_retired"
+            }
+          ],
+          "pool": "default",
+          "survivors": []
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluateAllRetiredPoolAlertsInsteadOfSilence",
+      "id": "TestEvaluateAllRetiredPoolAlertsInsteadOfSilence#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {},
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_legacy"
+              ],
+              "name": "default"
+            }
+          ],
+          "tenant_id": "ten_03"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_a",
+              "prefs_satisfied": true,
+              "violations": []
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluatePoolMemberMissingFromCatalogIsIgnored",
+      "id": "TestEvaluatePoolMemberMissingFromCatalogIsIgnored#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_a",
+            "model_id": "model-a",
+            "status": "active"
+          }
+        ],
+        "cell_aggregates": {},
+        "request": {
+          "allowed_models": null,
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_a",
+                "col_ghost"
+              ],
+              "name": "default"
+            }
+          ],
+          "tenant_id": "ten_04"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [
+            {
+              "column_id": "col_gpt",
+              "detail": "column is not in pool \"default\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_legacy",
+              "detail": "column status is retired",
+              "reason": "status_retired"
+            },
+            {
+              "column_id": "col_haiku",
+              "detail": "column matches no allowed_models entry",
+              "reason": "not_in_allowlist"
+            },
+            {
+              "column_id": "col_sonnet_vertex",
+              "detail": "cost_per_run_usd EWMA 0.02 exceeds max_cost_per_run 0.01",
+              "reason": "standing_constraint:max_cost_per_run"
+            }
+          ],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_opus",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_sonnet",
+              "prefs_satisfied": false,
+              "violations": [
+                {
+                  "constraint": "max_latency_ms",
+                  "estimated": 2500,
+                  "limit": 2000
+                }
+              ]
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluateDeterminism",
+      "id": "TestEvaluateDeterminism#1",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {
+          "col_opus": {
+            "cost_per_run_usd": 0.008,
+            "latency_p95_ms": 1500
+          },
+          "col_sonnet": {
+            "cost_per_run_usd": 0.004,
+            "latency_p95_ms": 2500
+          },
+          "col_sonnet_vertex": {
+            "cost_per_run_usd": 0.02,
+            "latency_p95_ms": null
+          }
+        },
+        "request": {
+          "allowed_models": [
+            "claude-sonnet-4-6",
+            "col_opus"
+          ],
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": 2000
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": 0.01,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    },
+    {
+      "expected": {
+        "decision": {
+          "constraints_met": true,
+          "drift_alert": null,
+          "exclusions": [
+            {
+              "column_id": "col_gpt",
+              "detail": "column is not in pool \"default\"",
+              "reason": "not_in_pool"
+            },
+            {
+              "column_id": "col_legacy",
+              "detail": "column status is retired",
+              "reason": "status_retired"
+            },
+            {
+              "column_id": "col_haiku",
+              "detail": "column matches no allowed_models entry",
+              "reason": "not_in_allowlist"
+            },
+            {
+              "column_id": "col_sonnet_vertex",
+              "detail": "cost_per_run_usd EWMA 0.02 exceeds max_cost_per_run 0.01",
+              "reason": "standing_constraint:max_cost_per_run"
+            }
+          ],
+          "pool": "default",
+          "survivors": [
+            {
+              "column_id": "col_opus",
+              "prefs_satisfied": true,
+              "violations": []
+            },
+            {
+              "column_id": "col_sonnet",
+              "prefs_satisfied": false,
+              "violations": [
+                {
+                  "constraint": "max_latency_ms",
+                  "estimated": 2500,
+                  "limit": 2000
+                }
+              ]
+            }
+          ]
+        },
+        "error": null
+      },
+      "go_test": "policy.TestEvaluateDeterminism",
+      "id": "TestEvaluateDeterminism#2",
+      "input": {
+        "catalog": [
+          {
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_sonnet_vertex",
+            "model_id": "claude-sonnet-4-6",
+            "status": "active"
+          },
+          {
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "status": "active"
+          },
+          {
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "status": "cold_start"
+          },
+          {
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "status": "active"
+          },
+          {
+            "id": "col_legacy",
+            "model_id": "legacy-1",
+            "status": "retired"
+          }
+        ],
+        "cell_aggregates": {
+          "col_opus": {
+            "cost_per_run_usd": 0.008,
+            "latency_p95_ms": 1500
+          },
+          "col_sonnet": {
+            "cost_per_run_usd": 0.004,
+            "latency_p95_ms": 2500
+          },
+          "col_sonnet_vertex": {
+            "cost_per_run_usd": 0.02,
+            "latency_p95_ms": null
+          }
+        },
+        "request": {
+          "allowed_models": [
+            "claude-sonnet-4-6",
+            "col_opus"
+          ],
+          "capability": "structured_extraction",
+          "constraints": {
+            "max_cost_per_run": null,
+            "max_latency_ms": 2000
+          },
+          "difficulty_tier": 3,
+          "pool": ""
+        },
+        "tenant_config": {
+          "constraints": {
+            "max_cost_per_run": 0.01,
+            "max_latency_ms": null,
+            "zero_retention": false
+          },
+          "pools": [
+            {
+              "is_default": true,
+              "model_column_ids": [
+                "col_sonnet",
+                "col_sonnet_vertex",
+                "col_opus",
+                "col_haiku",
+                "col_legacy"
+              ],
+              "name": "default"
+            },
+            {
+              "is_default": false,
+              "model_column_ids": [
+                "col_gpt"
+              ],
+              "name": "openai-only"
+            }
+          ],
+          "tenant_id": "ten_01"
+        }
+      }
+    }
+  ]
+}

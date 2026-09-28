@@ -1,0 +1,16 @@
+description: the cmd §8.1 key_facts envelope — fact_coverage renames to completeness via weight_dimensions
+envelope:
+  type: key_facts
+  version: 1
+  weight_dimensions: { completeness: 1.0, hallucination_free: 1.0 }
+  spec:
+    facts:
+      - { id: party_acme, any_of: ["Acme Corp", "Acme Corporation"], weight: 1 }
+      - { id: term_24mo, any_of: ["24 month", "two-year", "24-month"], weight: 1 }
+    forbidden_facts:
+      - { id: distractor_2019_date, any_of: ["2019-06-15"], weight: 1 }
+output: |-
+  The services agreement is between Acme Corp and Beta LLC, with a two-year
+  term beginning 2025-03-01.
+expect:
+  dimensions: { fact_coverage: 1.0, hallucination_free: 1.0 }

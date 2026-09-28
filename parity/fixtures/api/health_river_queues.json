@@ -1,0 +1,89 @@
+{
+  "description": "riverQueuesComponent(jobHealth) pure function behind /health/detail components.river_queues. Stale bound 60s (strictly greater than 60 is stale). freshest = minimum AgeSeconds across queues; queue names listed in input order joined by ', '. int(freshest) truncates toward zero.",
+  "cases": [
+    {
+      "id": "no-queues",
+      "go_test": "api.TestRiverQueuesComponent/no_queues_means_no_workers",
+      "input": {
+        "queues": []
+      },
+      "expected": {
+        "status": "no_workers",
+        "detail": "no River worker has registered a queue"
+      }
+    },
+    {
+      "id": "fresh",
+      "go_test": "api.TestRiverQueuesComponent/fresh_heartbeat_is_ok",
+      "input": {
+        "queues": [
+          {
+            "name": "default",
+            "paused": false,
+            "age_seconds": 3
+          }
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "detail": "queues: default"
+      }
+    },
+    {
+      "id": "one-live",
+      "go_test": "api.TestRiverQueuesComponent/one_live_queue_keeps_the_cluster_ok_despite_a_stale_sibling",
+      "input": {
+        "queues": [
+          {
+            "name": "default",
+            "paused": false,
+            "age_seconds": 3
+          },
+          {
+            "name": "batch",
+            "paused": false,
+            "age_seconds": 9999
+          }
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "detail": "queues: default, batch"
+      }
+    },
+    {
+      "id": "paused",
+      "go_test": "api.TestRiverQueuesComponent/a_paused_queue_is_surfaced_over_ok",
+      "input": {
+        "queues": [
+          {
+            "name": "default",
+            "paused": true,
+            "age_seconds": 3
+          }
+        ]
+      },
+      "expected": {
+        "status": "paused",
+        "detail": "paused queues: default"
+      }
+    },
+    {
+      "id": "stale",
+      "go_test": "api.TestRiverQueuesComponent/every_heartbeat_stale_is_stale",
+      "input": {
+        "queues": [
+          {
+            "name": "default",
+            "paused": false,
+            "age_seconds": 61
+          }
+        ]
+      },
+      "expected": {
+        "status": "stale",
+        "detail": "no worker heartbeat for 61s (queues: default)"
+      }
+    }
+  ]
+}

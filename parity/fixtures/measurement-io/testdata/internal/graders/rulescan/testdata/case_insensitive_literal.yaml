@@ -1,0 +1,8 @@
+description: case_insensitive folds both sides of a literal match
+spec:
+  rules:
+    - { must_include: select, case_insensitive: true }
+    - { must_include: select }
+output: SELECT * FROM users;
+expect:
+  dimensions: { constraint_compliance: 0.5 }

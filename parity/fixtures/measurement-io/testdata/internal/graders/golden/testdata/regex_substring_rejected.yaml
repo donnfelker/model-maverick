@@ -1,0 +1,7 @@
+description: regex mode is anchored — a mid-output match is not enough
+spec:
+  answers:
+    - { regex: '\d+' }
+output: The answer is 42
+expect:
+  dimensions: { answer_correctness: 0.0 }

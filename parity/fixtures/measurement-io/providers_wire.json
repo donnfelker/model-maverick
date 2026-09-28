@@ -1,0 +1,2938 @@
+{
+  "cases": [
+    {
+      "id": "anthropic_plain",
+      "provider": "anthropic",
+      "note": "no system, no settings",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "claude-opus-4-8",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"msg_01\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-opus-4-8\",\"content\":[{\"type\":\"text\",\"text\":\"hello world\"}],\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        }
+      ],
+      "completion_response": {
+        "Text": "hello world",
+        "TokensIn": 11,
+        "TokensOut": 7
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [
+        "anthropic.TestCompleteWithoutSchemaRequestBodyUnchanged"
+      ]
+    },
+    {
+      "id": "anthropic_system_thinking_budget",
+      "provider": "anthropic",
+      "note": "system + thinking with budget",
+      "completion_request": {
+        "max_tokens": 256,
+        "model": "claude-opus-4-8",
+        "prompt": "say hello",
+        "settings": {
+          "thinking": true,
+          "thinking_budget": 2048
+        },
+        "system": "be terse",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"msg_01\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-opus-4-8\",\"content\":[{\"type\":\"text\",\"text\":\"hello world\"}],\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "232",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":256,\"messages\":[{\"content\":[{\"text\":\"say hello\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0,\"system\":[{\"text\":\"be terse\",\"type\":\"text\"}],\"thinking\":{\"budget_tokens\":2048,\"type\":\"enabled\"}}"
+        }
+      ],
+      "completion_response": {
+        "Text": "hello world",
+        "TokensIn": 11,
+        "TokensOut": 7
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [
+        "anthropic.TestCompleteSuccessMapsUsage"
+      ]
+    },
+    {
+      "id": "anthropic_thinking_default_budget",
+      "provider": "anthropic",
+      "note": "thinking true without budget uses 1024",
+      "completion_request": {
+        "max_tokens": 4096,
+        "model": "claude-opus-4-8",
+        "prompt": "hi",
+        "settings": {
+          "thinking": true
+        },
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"msg_01\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-opus-4-8\",\"content\":[{\"type\":\"text\",\"text\":\"hello world\"}],\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "181",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":4096,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0,\"thinking\":{\"budget_tokens\":1024,\"type\":\"enabled\"}}"
+        }
+      ],
+      "completion_response": {
+        "Text": "hello world",
+        "TokensIn": 11,
+        "TokensOut": 7
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "anthropic_thinking_false",
+      "provider": "anthropic",
+      "note": "thinking false sends nothing",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "claude-opus-4-8",
+        "prompt": "hi",
+        "settings": {
+          "thinking": false,
+          "thinking_budget": 5000
+        },
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"msg_01\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-opus-4-8\",\"content\":[{\"type\":\"text\",\"text\":\"hello world\"}],\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        }
+      ],
+      "completion_response": {
+        "Text": "hello world",
+        "TokensIn": 11,
+        "TokensOut": 7
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "anthropic_temperature_0_7",
+      "provider": "anthropic",
+      "note": "temperature float32(0.7) widened to float64",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "claude-opus-4-8",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0.7
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"msg_01\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-opus-4-8\",\"content\":[{\"type\":\"text\",\"text\":\"hello world\"}],\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "144",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0.699999988079071}"
+        }
+      ],
+      "completion_response": {
+        "Text": "hello world",
+        "TokensIn": 11,
+        "TokensOut": 7
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "anthropic_multi_block",
+      "provider": "anthropic",
+      "note": "thinking block skipped, text blocks concatenated with no separator",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "claude-opus-4-8",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"msg_03\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-opus-4-8\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"hmm\",\"signature\":\"sig\"},{\"type\":\"text\",\"text\":\"part one \"},{\"type\":\"text\",\"text\":\"part two\"}],\"stop_reason\":\"max_tokens\",\"usage\":{\"input_tokens\":5,\"output_tokens\":9,\"cache_read_input_tokens\":100}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        }
+      ],
+      "completion_response": {
+        "Text": "part one part two",
+        "TokensIn": 5,
+        "TokensOut": 9
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "anthropic_refusal_empty",
+      "provider": "anthropic",
+      "note": "refusal stop_reason with no content = empty text, success",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "claude-opus-4-8",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"msg_04\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-opus-4-8\",\"content\":[],\"stop_reason\":\"refusal\",\"usage\":{\"input_tokens\":5,\"output_tokens\":0}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        }
+      ],
+      "completion_response": {
+        "Text": "",
+        "TokensIn": 5,
+        "TokensOut": 0
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "anthropic_forced_tool",
+      "provider": "anthropic",
+      "note": "response_schema setting forces tool use",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "claude-haiku-4-5",
+        "prompt": "hi",
+        "settings": {
+          "response_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "capability": {
+                "enum": [
+                  "factual_qa",
+                  "code_generation"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "capability"
+            ],
+            "type": "object"
+          }
+        },
+        "system": "classify",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"msg_02\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-haiku-4-5\",\"content\":[{\"type\":\"tool_use\",\"id\":\"toolu_01\",\"name\":\"record_result\",\"input\":{\"capability\":\"factual_qa\",\"difficulty\":1,\"domain_tags\":[],\"confidence\":0.9}}],\"stop_reason\":\"tool_use\",\"usage\":{\"input_tokens\":20,\"output_tokens\":12}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "482",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-haiku-4-5\",\"temperature\":0,\"system\":[{\"text\":\"classify\",\"type\":\"text\"}],\"tool_choice\":{\"name\":\"record_result\",\"type\":\"tool\"},\"tools\":[{\"input_schema\":{\"properties\":{\"capability\":{\"enum\":[\"factual_qa\",\"code_generation\"],\"type\":\"string\"}},\"required\":[\"capability\"],\"type\":\"object\",\"additionalProperties\":false},\"name\":\"record_result\",\"description\":\"Record the structured result.\"}]}"
+        }
+      ],
+      "completion_response": {
+        "Text": "{\"capability\":\"factual_qa\",\"difficulty\":1,\"domain_tags\":[],\"confidence\":0.9}",
+        "TokensIn": 20,
+        "TokensOut": 12
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [
+        "anthropic.TestCompleteForcedToolUseRequestShapeAndResponseParsing"
+      ]
+    },
+    {
+      "id": "anthropic_forced_tool_missing_block",
+      "provider": "anthropic",
+      "note": "forced tool but text reply",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "claude-haiku-4-5",
+        "prompt": "hi",
+        "settings": {
+          "response_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "capability": {
+                "enum": [
+                  "factual_qa",
+                  "code_generation"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "capability"
+            ],
+            "type": "object"
+          }
+        },
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"msg_01\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-opus-4-8\",\"content\":[{\"type\":\"text\",\"text\":\"hello world\"}],\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "437",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-haiku-4-5\",\"temperature\":0,\"tool_choice\":{\"name\":\"record_result\",\"type\":\"tool\"},\"tools\":[{\"input_schema\":{\"properties\":{\"capability\":{\"enum\":[\"factual_qa\",\"code_generation\"],\"type\":\"string\"}},\"required\":[\"capability\"],\"type\":\"object\",\"additionalProperties\":false},\"name\":\"record_result\",\"description\":\"Record the structured result.\"}]}"
+        }
+      ],
+      "error_string": "anthropic: response has no tool_use block for forced tool \"record_result\"",
+      "error_kind": "unknown",
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [
+        "anthropic.TestCompleteForcedToolUseMissingToolUseBlockErrors"
+      ]
+    },
+    {
+      "id": "anthropic_forced_tool_bad_schema_type",
+      "provider": "anthropic",
+      "note": "response_schema not a map",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "claude-haiku-4-5",
+        "prompt": "hi",
+        "settings": {
+          "response_schema": "nope"
+        },
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"msg_01\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-opus-4-8\",\"content\":[{\"type\":\"text\",\"text\":\"hello world\"}],\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}"
+        }
+      ],
+      "wire_requests": [],
+      "error_string": "anthropic: building forced-tool schema: response schema is string, want map[string]any",
+      "error_kind": "unknown",
+      "error_is_provider_error_type": false,
+      "calls": 0,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "anthropic_429_exhausts",
+      "provider": "anthropic",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "claude-opus-4-8",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 429,
+          "body": "{\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"rate limited\"}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        },
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        },
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        }
+      ],
+      "error_string": "anthropic: rate_limited (status 429) after 3 attempt(s): POST \"{BASE_URL}/v1/messages\": 429 Too Many Requests {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"rate limited\"}}",
+      "error_kind": "rate_limited",
+      "error_status": 429,
+      "error_attempts": 3,
+      "error_is_provider_error_type": true,
+      "calls": 3,
+      "go_tests": [
+        "anthropic.TestCompleteRateLimitRetriesThenFails"
+      ]
+    },
+    {
+      "id": "anthropic_500_exhausts",
+      "provider": "anthropic",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "claude-opus-4-8",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 500,
+          "body": "{\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"boom\"}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        },
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        },
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        }
+      ],
+      "error_string": "anthropic: provider_error (status 500) after 3 attempt(s): POST \"{BASE_URL}/v1/messages\": 500 Internal Server Error {\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"boom\"}}",
+      "error_kind": "provider_error",
+      "error_status": 500,
+      "error_attempts": 3,
+      "error_is_provider_error_type": true,
+      "calls": 3,
+      "go_tests": [
+        "anthropic.TestCompleteServerErrorRetriesThenFails"
+      ]
+    },
+    {
+      "id": "anthropic_529_exhausts",
+      "provider": "anthropic",
+      "note": "overloaded is >=500 provider_error",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "claude-opus-4-8",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 529,
+          "body": "{\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        },
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        },
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        }
+      ],
+      "error_string": "anthropic: provider_error (status 529) after 3 attempt(s): POST \"{BASE_URL}/v1/messages\": 529  {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}",
+      "error_kind": "provider_error",
+      "error_status": 529,
+      "error_attempts": 3,
+      "error_is_provider_error_type": true,
+      "calls": 3,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "anthropic_400_no_retry",
+      "provider": "anthropic",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "claude-opus-4-8",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 400,
+          "body": "{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"bad\"}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        }
+      ],
+      "error_string": "anthropic: invalid_request (status 400) after 1 attempt(s): POST \"{BASE_URL}/v1/messages\": 400 Bad Request {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"bad\"}}",
+      "error_kind": "invalid_request",
+      "error_status": 400,
+      "error_attempts": 1,
+      "error_is_provider_error_type": true,
+      "calls": 1,
+      "go_tests": [
+        "anthropic.TestCompleteInvalidRequestDoesNotRetry"
+      ]
+    },
+    {
+      "id": "anthropic_429_then_ok",
+      "provider": "anthropic",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "claude-opus-4-8",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 429,
+          "body": "{\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"rate limited\"}}"
+        },
+        {
+          "status": 200,
+          "body": "{\"id\":\"msg_01\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-opus-4-8\",\"content\":[{\"type\":\"text\",\"text\":\"hello world\"}],\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        },
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        }
+      ],
+      "completion_response": {
+        "Text": "hello world",
+        "TokensIn": 11,
+        "TokensOut": 7
+      },
+      "error_is_provider_error_type": false,
+      "calls": 2,
+      "go_tests": [
+        "anthropic.TestCompleteRecoversAfterRetryableError"
+      ]
+    },
+    {
+      "id": "anthropic_max_tokens_over_streaming_limit",
+      "provider": "anthropic",
+      "note": "SDK refuses non-streaming when 3600*max_tokens/128000 s > 600 s",
+      "completion_request": {
+        "max_tokens": 21334,
+        "model": "claude-opus-4-8",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"msg_01\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-opus-4-8\",\"content\":[{\"type\":\"text\",\"text\":\"hello world\"}],\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}"
+        }
+      ],
+      "wire_requests": [],
+      "error_string": "anthropic: provider_error after 3 attempt(s): streaming is required for operations that may take longer than 10 minutes",
+      "error_kind": "provider_error",
+      "error_attempts": 3,
+      "error_is_provider_error_type": true,
+      "calls": 0,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "anthropic_max_tokens_at_streaming_limit",
+      "provider": "anthropic",
+      "note": "21333 is allowed",
+      "completion_request": {
+        "max_tokens": 21333,
+        "model": "claude-opus-4-8",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"msg_01\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-opus-4-8\",\"content\":[{\"type\":\"text\",\"text\":\"hello world\"}],\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":11,\"output_tokens\":7}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "131",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":21333,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        }
+      ],
+      "completion_response": {
+        "Text": "hello world",
+        "TokensIn": 11,
+        "TokensOut": 7
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "anthropic_malformed_json_200",
+      "provider": "anthropic",
+      "note": "200 with non-JSON body",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "claude-opus-4-8",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "not json"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        },
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        },
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        }
+      ],
+      "error_string": "anthropic: provider_error after 3 attempt(s): error parsing response json: invalid character 'o' in literal null (expecting 'u')",
+      "error_kind": "provider_error",
+      "error_attempts": 3,
+      "error_is_provider_error_type": true,
+      "calls": 3,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "openai_plain",
+      "provider": "openai",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gpt-5.5",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion\",\"created\":1,\"model\":\"gpt-5.5\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"content\":\"hello world\"}}],\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":7,\"total_tokens\":18}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "106",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"gpt-5.5\",\"max_completion_tokens\":16,\"temperature\":0}"
+        }
+      ],
+      "completion_response": {
+        "Text": "hello world",
+        "TokensIn": 11,
+        "TokensOut": 7
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "openai_system_reasoning",
+      "provider": "openai",
+      "completion_request": {
+        "max_tokens": 256,
+        "model": "gpt-5.5",
+        "prompt": "say hello",
+        "settings": {
+          "reasoning": "high"
+        },
+        "system": "be terse",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion\",\"created\":1,\"model\":\"gpt-5.5\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"content\":\"hello world\"}}],\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":7,\"total_tokens\":18}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "179",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"be terse\",\"role\":\"system\"},{\"content\":\"say hello\",\"role\":\"user\"}],\"model\":\"gpt-5.5\",\"max_completion_tokens\":256,\"temperature\":0,\"reasoning_effort\":\"high\"}"
+        }
+      ],
+      "completion_response": {
+        "Text": "hello world",
+        "TokensIn": 11,
+        "TokensOut": 7
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [
+        "openai.TestCompleteSuccessMapsUsage"
+      ]
+    },
+    {
+      "id": "openai_temperature_0_7",
+      "provider": "openai",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gpt-5.5",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0.7
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion\",\"created\":1,\"model\":\"gpt-5.5\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"content\":\"hello world\"}}],\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":7,\"total_tokens\":18}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "122",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"gpt-5.5\",\"max_completion_tokens\":16,\"temperature\":0.699999988079071}"
+        }
+      ],
+      "completion_response": {
+        "Text": "hello world",
+        "TokensIn": 11,
+        "TokensOut": 7
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "openai_response_schema_ignored",
+      "provider": "openai",
+      "note": "response_schema setting is ignored by the openai client",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gpt-5.5",
+        "prompt": "hi",
+        "settings": {
+          "response_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "capability": {
+                "enum": [
+                  "factual_qa",
+                  "code_generation"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "capability"
+            ],
+            "type": "object"
+          },
+          "thinking": true
+        },
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion\",\"created\":1,\"model\":\"gpt-5.5\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"content\":\"hello world\"}}],\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":7,\"total_tokens\":18}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "106",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"gpt-5.5\",\"max_completion_tokens\":16,\"temperature\":0}"
+        }
+      ],
+      "completion_response": {
+        "Text": "hello world",
+        "TokensIn": 11,
+        "TokensOut": 7
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "openai_null_content_refusal",
+      "provider": "openai",
+      "note": "content null -> empty text, success",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gpt-5.5",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-2\",\"object\":\"chat.completion\",\"created\":1,\"model\":\"gpt-5.5\",\"choices\":[{\"index\":0,\"finish_reason\":\"length\",\"message\":{\"role\":\"assistant\",\"content\":null,\"refusal\":\"I can't\"}}],\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":0,\"total_tokens\":3}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "106",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"gpt-5.5\",\"max_completion_tokens\":16,\"temperature\":0}"
+        }
+      ],
+      "completion_response": {
+        "Text": "",
+        "TokensIn": 3,
+        "TokensOut": 0
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "openai_two_choices",
+      "provider": "openai",
+      "note": "first choice only",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gpt-5.5",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-3\",\"object\":\"chat.completion\",\"created\":1,\"model\":\"gpt-5.5\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"content\":\"first\"}},{\"index\":1,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"content\":\"second\"}}],\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":2,\"total_tokens\":5,\"completion_tokens_details\":{\"reasoning_tokens\":100}}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "106",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"gpt-5.5\",\"max_completion_tokens\":16,\"temperature\":0}"
+        }
+      ],
+      "completion_response": {
+        "Text": "first",
+        "TokensIn": 3,
+        "TokensOut": 2
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "openai_empty_choices",
+      "provider": "openai",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gpt-5.5",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion\",\"created\":1,\"model\":\"gpt-5.5\",\"choices\":[],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":0,\"total_tokens\":1}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "106",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"gpt-5.5\",\"max_completion_tokens\":16,\"temperature\":0}"
+        },
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "106",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"gpt-5.5\",\"max_completion_tokens\":16,\"temperature\":0}"
+        },
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "106",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"gpt-5.5\",\"max_completion_tokens\":16,\"temperature\":0}"
+        }
+      ],
+      "error_string": "openai: provider_error after 3 attempt(s): response contained no choices",
+      "error_kind": "provider_error",
+      "error_attempts": 3,
+      "error_is_provider_error_type": true,
+      "calls": 3,
+      "go_tests": [
+        "openai.TestCompleteEmptyChoicesIsProviderError"
+      ]
+    },
+    {
+      "id": "openai_429_exhausts",
+      "provider": "openai",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gpt-5.5",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 429,
+          "body": "{\"error\":{\"message\":\"rate limited\",\"type\":\"rate_limit_error\"}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "106",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"gpt-5.5\",\"max_completion_tokens\":16,\"temperature\":0}"
+        },
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "106",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"gpt-5.5\",\"max_completion_tokens\":16,\"temperature\":0}"
+        },
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "106",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"gpt-5.5\",\"max_completion_tokens\":16,\"temperature\":0}"
+        }
+      ],
+      "error_string": "openai: rate_limited (status 429) after 3 attempt(s): POST \"{BASE_URL}/chat/completions\": 429 Too Many Requests {\"message\":\"rate limited\",\"type\":\"rate_limit_error\"}",
+      "error_kind": "rate_limited",
+      "error_status": 429,
+      "error_attempts": 3,
+      "error_is_provider_error_type": true,
+      "calls": 3,
+      "go_tests": [
+        "openai.TestCompleteRateLimitRetriesThenFails"
+      ]
+    },
+    {
+      "id": "openai_500_exhausts",
+      "provider": "openai",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gpt-5.5",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 500,
+          "body": "{\"error\":{\"message\":\"boom\",\"type\":\"server_error\"}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "106",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"gpt-5.5\",\"max_completion_tokens\":16,\"temperature\":0}"
+        },
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "106",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"gpt-5.5\",\"max_completion_tokens\":16,\"temperature\":0}"
+        },
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "106",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"gpt-5.5\",\"max_completion_tokens\":16,\"temperature\":0}"
+        }
+      ],
+      "error_string": "openai: provider_error (status 500) after 3 attempt(s): POST \"{BASE_URL}/chat/completions\": 500 Internal Server Error {\"message\":\"boom\",\"type\":\"server_error\"}",
+      "error_kind": "provider_error",
+      "error_status": 500,
+      "error_attempts": 3,
+      "error_is_provider_error_type": true,
+      "calls": 3,
+      "go_tests": [
+        "openai.TestCompleteServerErrorRetriesThenFails"
+      ]
+    },
+    {
+      "id": "openai_400_no_retry",
+      "provider": "openai",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gpt-5.5",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 400,
+          "body": "{\"error\":{\"message\":\"bad\",\"type\":\"invalid_request_error\"}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "106",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"gpt-5.5\",\"max_completion_tokens\":16,\"temperature\":0}"
+        }
+      ],
+      "error_string": "openai: invalid_request (status 400) after 1 attempt(s): POST \"{BASE_URL}/chat/completions\": 400 Bad Request {\"message\":\"bad\",\"type\":\"invalid_request_error\"}",
+      "error_kind": "invalid_request",
+      "error_status": 400,
+      "error_attempts": 1,
+      "error_is_provider_error_type": true,
+      "calls": 1,
+      "go_tests": [
+        "openai.TestCompleteInvalidRequestDoesNotRetry"
+      ]
+    },
+    {
+      "id": "openai_500_then_ok",
+      "provider": "openai",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gpt-5.5",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 500,
+          "body": "{\"error\":{\"message\":\"boom\",\"type\":\"server_error\"}}"
+        },
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion\",\"created\":1,\"model\":\"gpt-5.5\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"content\":\"hello world\"}}],\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":7,\"total_tokens\":18}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "106",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"gpt-5.5\",\"max_completion_tokens\":16,\"temperature\":0}"
+        },
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "106",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"gpt-5.5\",\"max_completion_tokens\":16,\"temperature\":0}"
+        }
+      ],
+      "completion_response": {
+        "Text": "hello world",
+        "TokensIn": 11,
+        "TokensOut": 7
+      },
+      "error_is_provider_error_type": false,
+      "calls": 2,
+      "go_tests": [
+        "openai.TestCompleteRecoversAfterRetryableError"
+      ]
+    },
+    {
+      "id": "xai_plain",
+      "provider": "xai",
+      "completion_request": {
+        "max_tokens": 256,
+        "model": "grok-4",
+        "prompt": "say hello",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion\",\"created\":1,\"model\":\"grok-4\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"content\":\"hello world\"}}],\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":7,\"total_tokens\":18}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"say hello\",\"role\":\"user\"}],\"model\":\"grok-4\",\"max_completion_tokens\":256,\"temperature\":0}"
+        }
+      ],
+      "completion_response": {
+        "Text": "hello world",
+        "TokensIn": 11,
+        "TokensOut": 7
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [
+        "xai.TestCompleteSuccessMapsUsage"
+      ]
+    },
+    {
+      "id": "xai_429_exhausts",
+      "provider": "xai",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "grok-4",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 429,
+          "body": "{\"error\":{\"message\":\"rate limited\",\"type\":\"rate_limit_error\"}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "105",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"grok-4\",\"max_completion_tokens\":16,\"temperature\":0}"
+        },
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "105",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"grok-4\",\"max_completion_tokens\":16,\"temperature\":0}"
+        },
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "105",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"grok-4\",\"max_completion_tokens\":16,\"temperature\":0}"
+        }
+      ],
+      "error_string": "xai: rate_limited (status 429) after 3 attempt(s): POST \"{BASE_URL}/chat/completions\": 429 Too Many Requests {\"message\":\"rate limited\",\"type\":\"rate_limit_error\"}",
+      "error_kind": "rate_limited",
+      "error_status": 429,
+      "error_attempts": 3,
+      "error_is_provider_error_type": true,
+      "calls": 3,
+      "go_tests": [
+        "xai.TestCompleteRateLimitUsesXAIProviderLabel"
+      ]
+    },
+    {
+      "id": "google_plain",
+      "provider": "google",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gemini-3.1-pro",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"hello world\"}]},\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":11,\"candidatesTokenCount\":7}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        }
+      ],
+      "completion_response": {
+        "Text": "hello world",
+        "TokensIn": 11,
+        "TokensOut": 7
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "google_system_thinking_budget",
+      "provider": "google",
+      "completion_request": {
+        "max_tokens": 256,
+        "model": "gemini-3.1-pro",
+        "prompt": "say hello",
+        "settings": {
+          "thinking_budget": 2048
+        },
+        "system": "be terse",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"hello world\"}]},\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":11,\"candidatesTokenCount\":7}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "228",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"say hello\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":256,\"temperature\":0,\"thinkingConfig\":{\"thinkingBudget\":2048}},\"systemInstruction\":{\"parts\":[{\"text\":\"be terse\"}],\"role\":\"user\"}}\n"
+        }
+      ],
+      "completion_response": {
+        "Text": "hello world",
+        "TokensIn": 11,
+        "TokensOut": 7
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [
+        "google.TestCompleteSuccessMapsUsage"
+      ]
+    },
+    {
+      "id": "google_temperature_0_7",
+      "provider": "google",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gemini-3.1-pro",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0.7
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"hello world\"}]},\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":11,\"candidatesTokenCount\":7}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "115",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0.7}}\n"
+        }
+      ],
+      "completion_response": {
+        "Text": "hello world",
+        "TokensIn": 11,
+        "TokensOut": 7
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "google_thought_parts_skipped",
+      "provider": "google",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gemini-3.1-pro",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"thinking...\",\"thought\":true},{\"text\":\"part one \"},{\"text\":\"part two\"}]},\"finishReason\":\"MAX_TOKENS\"}],\"usageMetadata\":{\"promptTokenCount\":4,\"candidatesTokenCount\":6,\"thoughtsTokenCount\":50,\"totalTokenCount\":60}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        }
+      ],
+      "completion_response": {
+        "Text": "part one part two",
+        "TokensIn": 4,
+        "TokensOut": 6
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "google_no_usage",
+      "provider": "google",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gemini-3.1-pro",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"x\"}]},\"finishReason\":\"STOP\"}]}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        }
+      ],
+      "completion_response": {
+        "Text": "x",
+        "TokensIn": 0,
+        "TokensOut": 0
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "google_prompt_blocked",
+      "provider": "google",
+      "note": "no candidates -> empty text, success",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gemini-3.1-pro",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 200,
+          "body": "{\"promptFeedback\":{\"blockReason\":\"SAFETY\"},\"usageMetadata\":{\"promptTokenCount\":4}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        }
+      ],
+      "completion_response": {
+        "Text": "",
+        "TokensIn": 4,
+        "TokensOut": 0
+      },
+      "error_is_provider_error_type": false,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "google_429_exhausts",
+      "provider": "google",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gemini-3.1-pro",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 429,
+          "body": "{\"error\":{\"code\":429,\"message\":\"rate limited\",\"status\":\"RESOURCE_EXHAUSTED\"}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        },
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        },
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        }
+      ],
+      "error_string": "google: rate_limited (status 429) after 3 attempt(s): Error 429, Message: rate limited, Status: RESOURCE_EXHAUSTED, Details: []",
+      "error_kind": "rate_limited",
+      "error_status": 429,
+      "error_attempts": 3,
+      "error_is_provider_error_type": true,
+      "calls": 3,
+      "go_tests": [
+        "google.TestCompleteRateLimitRetriesThenFails"
+      ]
+    },
+    {
+      "id": "google_500_exhausts",
+      "provider": "google",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gemini-3.1-pro",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 500,
+          "body": "{\"error\":{\"code\":500,\"message\":\"boom\",\"status\":\"INTERNAL\"}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        },
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        },
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        }
+      ],
+      "error_string": "google: provider_error (status 500) after 3 attempt(s): Error 500, Message: boom, Status: INTERNAL, Details: []",
+      "error_kind": "provider_error",
+      "error_status": 500,
+      "error_attempts": 3,
+      "error_is_provider_error_type": true,
+      "calls": 3,
+      "go_tests": [
+        "google.TestCompleteServerErrorRetriesThenFails"
+      ]
+    },
+    {
+      "id": "google_400_no_retry",
+      "provider": "google",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gemini-3.1-pro",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 400,
+          "body": "{\"error\":{\"code\":400,\"message\":\"bad\",\"status\":\"INVALID_ARGUMENT\"}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        }
+      ],
+      "error_string": "google: invalid_request (status 400) after 1 attempt(s): Error 400, Message: bad, Status: INVALID_ARGUMENT, Details: []",
+      "error_kind": "invalid_request",
+      "error_status": 400,
+      "error_attempts": 1,
+      "error_is_provider_error_type": true,
+      "calls": 1,
+      "go_tests": [
+        "google.TestCompleteInvalidRequestDoesNotRetry"
+      ]
+    },
+    {
+      "id": "google_429_then_ok",
+      "provider": "google",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gemini-3.1-pro",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 429,
+          "body": "{\"error\":{\"code\":429,\"message\":\"rate limited\",\"status\":\"RESOURCE_EXHAUSTED\"}}"
+        },
+        {
+          "status": 200,
+          "body": "{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"hello world\"}]},\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":11,\"candidatesTokenCount\":7}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        },
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        }
+      ],
+      "completion_response": {
+        "Text": "hello world",
+        "TokensIn": 11,
+        "TokensOut": 7
+      },
+      "error_is_provider_error_type": false,
+      "calls": 2,
+      "go_tests": [
+        "google.TestCompleteRecoversAfterRetryableError"
+      ]
+    },
+    {
+      "id": "google_status_503_body_code_429",
+      "provider": "google",
+      "note": "code comes from the body, not the HTTP status",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gemini-3.1-pro",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 503,
+          "body": "{\"error\":{\"code\":429,\"message\":\"rate limited\",\"status\":\"RESOURCE_EXHAUSTED\"}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        },
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        },
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        }
+      ],
+      "error_string": "google: rate_limited (status 429) after 3 attempt(s): Error 429, Message: rate limited, Status: RESOURCE_EXHAUSTED, Details: []",
+      "error_kind": "rate_limited",
+      "error_status": 429,
+      "error_attempts": 3,
+      "error_is_provider_error_type": true,
+      "calls": 3,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "google_400_body_without_code",
+      "provider": "google",
+      "note": "error body without code -> code 0 -> provider_error, retried",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gemini-3.1-pro",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 400,
+          "body": "{\"error\":{\"message\":\"bad but no code\",\"status\":\"INVALID_ARGUMENT\"}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        },
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        },
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        }
+      ],
+      "error_string": "google: provider_error after 3 attempt(s): Error 0, Message: bad but no code, Status: INVALID_ARGUMENT, Details: []",
+      "error_kind": "provider_error",
+      "error_attempts": 3,
+      "error_is_provider_error_type": true,
+      "calls": 3,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "google_400_plain_text_body",
+      "provider": "google",
+      "note": "non-JSON error body -> HTTP status used",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gemini-3.1-pro",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 400,
+          "body": "plain text failure"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        }
+      ],
+      "error_string": "google: invalid_request (status 400) after 1 attempt(s): Error 400, Message: plain text failure, Status: 400 Bad Request, Details: []",
+      "error_kind": "invalid_request",
+      "error_status": 400,
+      "error_attempts": 1,
+      "error_is_provider_error_type": true,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "google_400_json_without_error_field",
+      "provider": "google",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gemini-3.1-pro",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 400,
+          "body": "{\"detail\":\"x\"}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1beta/models/gemini-3.1-pro:generateContent",
+          "raw_query": "",
+          "headers": {
+            "Accept-Encoding": "gzip",
+            "Content-Length": "113",
+            "Content-Type": "application/json",
+            "User-Agent": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Client": "google-genai-sdk/1.62.0 gl-go/go1.26.4",
+            "X-Goog-Api-Key": "test-key"
+          },
+          "body": "{\"contents\":[{\"parts\":[{\"text\":\"hi\"}],\"role\":\"user\"}],\"generationConfig\":{\"maxOutputTokens\":16,\"temperature\":0}}\n"
+        }
+      ],
+      "error_string": "google: invalid_request (status 400) after 1 attempt(s): Error 400, Message: {\"detail\":\"x\"}, Status: 400 Bad Request, Details: []",
+      "error_kind": "invalid_request",
+      "error_status": 400,
+      "error_attempts": 1,
+      "error_is_provider_error_type": true,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "openai_400_plain_text_body",
+      "provider": "openai",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "gpt-5.5",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 400,
+          "body": "plain text failure"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/chat/completions",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Authorization": "Bearer test-key",
+            "Content-Length": "106",
+            "Content-Type": "application/json",
+            "User-Agent": "OpenAI/Go 3.41.0",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "3.41.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4"
+          },
+          "body": "{\"messages\":[{\"content\":\"hi\",\"role\":\"user\"}],\"model\":\"gpt-5.5\",\"max_completion_tokens\":16,\"temperature\":0}"
+        }
+      ],
+      "error_string": "openai: invalid_request (status 400) after 1 attempt(s): POST \"{BASE_URL}/chat/completions\": 400 Bad Request ",
+      "error_kind": "invalid_request",
+      "error_status": 400,
+      "error_attempts": 1,
+      "error_is_provider_error_type": true,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "anthropic_400_plain_text_body",
+      "provider": "anthropic",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "claude-opus-4-8",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 400,
+          "body": "plain text failure"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        }
+      ],
+      "error_string": "anthropic: invalid_request (status 400) after 1 attempt(s): POST \"{BASE_URL}/v1/messages\": 400 Bad Request ",
+      "error_kind": "invalid_request",
+      "error_status": 400,
+      "error_attempts": 1,
+      "error_is_provider_error_type": true,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    },
+    {
+      "id": "anthropic_408_invalid_request",
+      "provider": "anthropic",
+      "note": "408 is 4xx so invalid_request, not retried",
+      "completion_request": {
+        "max_tokens": 16,
+        "model": "claude-opus-4-8",
+        "prompt": "hi",
+        "settings": null,
+        "system": "",
+        "temperature_float32": 0
+      },
+      "scripted_responses": [
+        {
+          "status": 408,
+          "body": "{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"bad\"}}"
+        }
+      ],
+      "wire_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/messages",
+          "raw_query": "",
+          "headers": {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "Anthropic-Version": "2023-06-01",
+            "Content-Length": "128",
+            "Content-Type": "application/json",
+            "User-Agent": "Anthropic/Go 1.56.0",
+            "X-Api-Key": "test-key",
+            "X-Stainless-Arch": "arm64",
+            "X-Stainless-Lang": "go",
+            "X-Stainless-Os": "MacOS",
+            "X-Stainless-Package-Version": "1.56.0",
+            "X-Stainless-Retry-Count": "0",
+            "X-Stainless-Runtime": "go",
+            "X-Stainless-Runtime-Version": "go1.26.4",
+            "X-Stainless-Timeout": "600"
+          },
+          "body": "{\"max_tokens\":16,\"messages\":[{\"content\":[{\"text\":\"hi\",\"type\":\"text\"}],\"role\":\"user\"}],\"model\":\"claude-opus-4-8\",\"temperature\":0}"
+        }
+      ],
+      "error_string": "anthropic: invalid_request (status 408) after 1 attempt(s): POST \"{BASE_URL}/v1/messages\": 408 Request Timeout {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"bad\"}}",
+      "error_kind": "invalid_request",
+      "error_status": 408,
+      "error_attempts": 1,
+      "error_is_provider_error_type": true,
+      "calls": 1,
+      "go_tests": [],
+      "probe": true
+    }
+  ],
+  "about": "Recorded HTTP traffic from each Go provider client against an httptest server (base URL replaced by the test server; {BASE_URL} in error strings). Retry policy in these runs: base 1 ms, max 2 ms, 3 attempts. headers are exactly what Go sent; platform-dependent header values: Content-Length, User-Agent, X-Goog-Api-Client, X-Stainless-Arch, X-Stainless-Os, X-Stainless-Runtime-Version. Body strings are the exact bytes sent (Google's body ends with a newline). completion_response uses Go field names Text/TokensIn/TokensOut. error_string is err.Error() and is what the runner stores in runs.error.",
+  "default_base_urls": {
+    "anthropic": "https://api.anthropic.com/ (path v1/messages)",
+    "openai": "https://api.openai.com/v1/ (path chat/completions)",
+    "xai": "https://api.x.ai/v1 (path chat/completions)",
+    "google": "https://generativelanguage.googleapis.com/ (path v1beta/models/{model}:generateContent)"
+  },
+  "context_timeout_mid_retry": {
+    "go_tests": [
+      "anthropic.TestCompleteContextTimeoutMidRetry",
+      "openai.TestCompleteContextTimeoutMidRetry",
+      "google.TestCompleteContextTimeoutMidRetry"
+    ],
+    "setup": "server always 429; retry policy base 500 ms, max 1 s; caller context timeout 100 ms",
+    "expect": {
+      "kind": "timeout",
+      "calls_lt": 3,
+      "typical_calls": 1
+    }
+  },
+  "xai_base_url": {
+    "go_tests": [
+      "xai.TestNewDefaultsToXAIBaseURL",
+      "xai.TestNewKeepsExplicitBaseURL"
+    ],
+    "default": "https://api.x.ai/v1",
+    "explicit_kept": "http://127.0.0.1:1"
+  }
+}

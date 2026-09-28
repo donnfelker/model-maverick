@@ -1,0 +1,31 @@
+id: task_sx_001
+capability: structured_extraction
+difficulty_tier: 2
+difficulty_knobs: { document_noise: 1, field_count: 2, nesting_depth: 1, distractor_content: 2 }
+prompt: |
+  Extract the invoice number and total amount due from the invoice below.
+  Return a JSON object with keys invoice_number and total_due.
+attachments:
+  - name: invoice.txt
+    content: |
+      INVOICE #INV-2041
+      Billed to: Northwind Traders
+      Total due: $1,842.50 by 2026-01-15.
+temperature: 0
+max_tokens: 512
+smoke_member: true
+dimension_weights: { schema_validity: 0.5, field_accuracy: 0.5 }
+grader_specs:
+  - type: json_schema
+    version: 1
+    weight_dimensions: { schema_validity: 1.0, field_accuracy: 1.0 }
+    spec:
+      schema:
+        type: object
+        required: [invoice_number, total_due]
+        properties:
+          invoice_number: { type: string }
+          total_due: { type: number }
+      checks:
+        - { path: $.invoice_number, regex: "INV-?2041" }
+        - { path: $.total_due, numeric: 1842.5, tolerance: 0.01 }

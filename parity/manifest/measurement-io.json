@@ -1,0 +1,769 @@
+{
+  "area": "measurement-io",
+  "packages": [
+    "internal/tasks",
+    "internal/graders",
+    "internal/graders/golden",
+    "internal/graders/jsonschema",
+    "internal/graders/judgerubric",
+    "internal/graders/keyfacts",
+    "internal/graders/rulescan",
+    "internal/graders/testutil",
+    "internal/runner",
+    "internal/providers",
+    "internal/providers/anthropic",
+    "internal/providers/openai",
+    "internal/providers/google",
+    "internal/providers/xai",
+    "internal/providers/fake",
+    "internal/providers/providertest",
+    "internal/livesmoke"
+  ],
+  "go_test_count": 144,
+  "go_test_count_by_file": {
+    "internal/graders/envelope_test.go": 11,
+    "internal/graders/golden/grader_test.go": 7,
+    "internal/graders/grader_test.go": 9,
+    "internal/graders/jsonschema/grader_test.go": 7,
+    "internal/graders/judgerubric/grader_test.go": 12,
+    "internal/graders/keyfacts/grader_test.go": 6,
+    "internal/graders/rulescan/grader_test.go": 6,
+    "internal/graders/testutil/golden_test.go": 2,
+    "internal/livesmoke/livesmoke_test.go": 1,
+    "internal/providers/anthropic/client_test.go": 9,
+    "internal/providers/errors_test.go": 4,
+    "internal/providers/fake/fake_test.go": 9,
+    "internal/providers/google/client_test.go": 6,
+    "internal/providers/openai/client_test.go": 7,
+    "internal/providers/retry_test.go": 8,
+    "internal/providers/xai/client_test.go": 4,
+    "internal/runner/assemble_test.go": 5,
+    "internal/runner/runner_test.go": 10,
+    "internal/tasks/loader_test.go": 12,
+    "internal/tasks/store_test.go": 9
+  },
+  "count_note": "go_test_count counts every `func Test*` (grep '^func Test') including the two TestMain harness functions (internal/tasks, internal/runner). Table-test subtests are recorded row by row inside the referenced fixture files (each row carries its own go_test id).",
+  "manifest_top_level_count": 144,
+  "tests": [
+    {
+      "go_test": "tasks.TestMain",
+      "file": "internal/tasks/store_test.go",
+      "where": "reference/engine-reference.md (Part 2)#tasks"
+    },
+    {
+      "go_test": "tasks.TestStoreRoundTrip",
+      "file": "internal/tasks/store_test.go",
+      "where": "reference/engine-reference.md (Part 2)#tasks"
+    },
+    {
+      "go_test": "tasks.TestStoreReloadDeactivatesRemovedTasks",
+      "file": "internal/tasks/store_test.go",
+      "where": "reference/engine-reference.md (Part 2)#tasks"
+    },
+    {
+      "go_test": "tasks.TestStoreReloadKeepsActiveFlag",
+      "file": "internal/tasks/store_test.go",
+      "where": "reference/engine-reference.md (Part 2)#tasks"
+    },
+    {
+      "go_test": "tasks.TestActivateUnknownVersion",
+      "file": "internal/tasks/store_test.go",
+      "where": "reference/engine-reference.md (Part 2)#tasks"
+    },
+    {
+      "go_test": "tasks.TestActivateFlipsExactlyOneVersion",
+      "file": "internal/tasks/store_test.go",
+      "where": "reference/engine-reference.md (Part 2)#tasks"
+    },
+    {
+      "go_test": "tasks.TestActivateAtomicity",
+      "file": "internal/tasks/store_test.go",
+      "where": "reference/engine-reference.md (Part 2)#tasks"
+    },
+    {
+      "go_test": "tasks.TestStoreRejectsEmptyCorpus",
+      "file": "internal/tasks/store_test.go",
+      "where": "reference/engine-reference.md (Part 2)#tasks"
+    },
+    {
+      "go_test": "tasks.TestStoreIsTransactional",
+      "file": "internal/tasks/store_test.go",
+      "where": "reference/engine-reference.md (Part 2)#tasks"
+    },
+    {
+      "go_test": "tasks.TestLoadValidCorpus",
+      "file": "internal/tasks/loader_test.go",
+      "where": "fixtures/measurement-io/tasks.json#load_valid_corpus_expect"
+    },
+    {
+      "go_test": "tasks.TestLoadMissingDir",
+      "file": "internal/tasks/loader_test.go",
+      "where": "fixtures/measurement-io/tasks.json#load_errors"
+    },
+    {
+      "go_test": "tasks.TestLoadEmptyDir",
+      "file": "internal/tasks/loader_test.go",
+      "where": "fixtures/measurement-io/tasks.json#load_errors"
+    },
+    {
+      "go_test": "tasks.TestValidateValidCorpus",
+      "file": "internal/tasks/loader_test.go",
+      "where": "fixtures/measurement-io/tasks.json#cases/valid"
+    },
+    {
+      "go_test": "tasks.TestValidateRejectingFixtures",
+      "file": "internal/tasks/loader_test.go",
+      "where": "fixtures/measurement-io/tasks.json#cases/invalid/*"
+    },
+    {
+      "go_test": "tasks.TestValidateTestSuiteUsesGraderUnsupportedWording",
+      "file": "internal/tasks/loader_test.go",
+      "where": "fixtures/measurement-io/tasks.json#cases/invalid/test_suite"
+    },
+    {
+      "go_test": "tasks.TestValidateUnknownFieldNamesTheField",
+      "file": "internal/tasks/loader_test.go",
+      "where": "fixtures/measurement-io/tasks.json#cases/invalid/unknown_field"
+    },
+    {
+      "go_test": "tasks.TestValidateOversizeSmokeInput",
+      "file": "internal/tasks/loader_test.go",
+      "where": "fixtures/measurement-io/tasks.json#cases/oversize_smoke"
+    },
+    {
+      "go_test": "tasks.TestValidateReportsEveryViolationInOneRun",
+      "file": "internal/tasks/loader_test.go",
+      "where": "fixtures/measurement-io/tasks.json#cases/multi_violation"
+    },
+    {
+      "go_test": "tasks.TestValidateDimensionMismatch",
+      "file": "internal/tasks/loader_test.go",
+      "where": "fixtures/measurement-io/tasks.json#cases/dimension_mismatch"
+    },
+    {
+      "go_test": "tasks.TestValidateJudgeRubricTasks",
+      "file": "internal/tasks/loader_test.go",
+      "where": "fixtures/measurement-io/tasks.json#cases/judge_rubric_valid,judge_rubric_invalid"
+    },
+    {
+      "go_test": "tasks.TestGraderSpecsSurviveJSONRoundTrip",
+      "file": "internal/tasks/loader_test.go",
+      "where": "fixtures/measurement-io/tasks.json#upsert_params"
+    },
+    {
+      "go_test": "keyfacts.TestKind",
+      "file": "internal/graders/keyfacts/grader_test.go",
+      "where": "fixtures/measurement-io/keyfacts.json#go_tests"
+    },
+    {
+      "go_test": "keyfacts.TestGolden",
+      "file": "internal/graders/keyfacts/grader_test.go",
+      "where": "fixtures/measurement-io/keyfacts.json#fixture_results"
+    },
+    {
+      "go_test": "keyfacts.TestValidateSpecAccepts",
+      "file": "internal/graders/keyfacts/grader_test.go",
+      "where": "fixtures/measurement-io/keyfacts.json#go_tests"
+    },
+    {
+      "go_test": "keyfacts.TestValidateSpecRejects",
+      "file": "internal/graders/keyfacts/grader_test.go",
+      "where": "fixtures/measurement-io/keyfacts.json#validate_spec_rejects"
+    },
+    {
+      "go_test": "keyfacts.TestNormalizeSearch",
+      "file": "internal/graders/keyfacts/grader_test.go",
+      "where": "fixtures/measurement-io/keyfacts.json#normalize_search"
+    },
+    {
+      "go_test": "keyfacts.TestHallucinationFreeClamped",
+      "file": "internal/graders/keyfacts/grader_test.go",
+      "where": "fixtures/measurement-io/keyfacts.json#grade_probes/0"
+    },
+    {
+      "go_test": "rulescan.TestKind",
+      "file": "internal/graders/rulescan/grader_test.go",
+      "where": "fixtures/measurement-io/rulescan.json#go_tests"
+    },
+    {
+      "go_test": "rulescan.TestGolden",
+      "file": "internal/graders/rulescan/grader_test.go",
+      "where": "fixtures/measurement-io/rulescan.json#fixture_results"
+    },
+    {
+      "go_test": "rulescan.TestValidateSpecAccepts",
+      "file": "internal/graders/rulescan/grader_test.go",
+      "where": "fixtures/measurement-io/rulescan.json#go_tests"
+    },
+    {
+      "go_test": "rulescan.TestValidateSpecRejects",
+      "file": "internal/graders/rulescan/grader_test.go",
+      "where": "fixtures/measurement-io/rulescan.json#validate_spec_rejects"
+    },
+    {
+      "go_test": "rulescan.TestCountLines",
+      "file": "internal/graders/rulescan/grader_test.go",
+      "where": "fixtures/measurement-io/rulescan.json#count_lines"
+    },
+    {
+      "go_test": "rulescan.TestLanguageMatches",
+      "file": "internal/graders/rulescan/grader_test.go",
+      "where": "fixtures/measurement-io/rulescan.json#language_matches"
+    },
+    {
+      "go_test": "golden.TestKind",
+      "file": "internal/graders/golden/grader_test.go",
+      "where": "fixtures/measurement-io/golden.json#go_tests"
+    },
+    {
+      "go_test": "golden.TestGolden",
+      "file": "internal/graders/golden/grader_test.go",
+      "where": "fixtures/measurement-io/golden.json#fixture_results"
+    },
+    {
+      "go_test": "golden.TestValidateSpecAccepts",
+      "file": "internal/graders/golden/grader_test.go",
+      "where": "fixtures/measurement-io/golden.json#go_tests"
+    },
+    {
+      "go_test": "golden.TestValidateSpecRejects",
+      "file": "internal/graders/golden/grader_test.go",
+      "where": "fixtures/measurement-io/golden.json#validate_spec_rejects"
+    },
+    {
+      "go_test": "golden.TestNormalize",
+      "file": "internal/graders/golden/grader_test.go",
+      "where": "fixtures/measurement-io/golden.json#normalize"
+    },
+    {
+      "go_test": "golden.TestParseNumber",
+      "file": "internal/graders/golden/grader_test.go",
+      "where": "fixtures/measurement-io/golden.json#parse_number"
+    },
+    {
+      "go_test": "golden.TestSplitItems",
+      "file": "internal/graders/golden/grader_test.go",
+      "where": "fixtures/measurement-io/golden.json#split_items"
+    },
+    {
+      "go_test": "graders.TestRegistryRegisterAndLookup",
+      "file": "internal/graders/grader_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#registry_cases"
+    },
+    {
+      "go_test": "graders.TestRegistryRegisterDuplicate",
+      "file": "internal/graders/grader_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#registry_cases"
+    },
+    {
+      "go_test": "graders.TestRegistryRegisterEmptyKind",
+      "file": "internal/graders/grader_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#registry_cases"
+    },
+    {
+      "go_test": "graders.TestRegistryMustRegisterDuplicatePanics",
+      "file": "internal/graders/grader_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#registry_cases"
+    },
+    {
+      "go_test": "graders.TestRegistryKindsSorted",
+      "file": "internal/graders/grader_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#registry_cases"
+    },
+    {
+      "go_test": "graders.TestRegistryGradeUnknownKind",
+      "file": "internal/graders/grader_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#registry_cases"
+    },
+    {
+      "go_test": "graders.TestRegistryGradeSuccess",
+      "file": "internal/graders/grader_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#registry_cases"
+    },
+    {
+      "go_test": "graders.TestRegistryGradeErrorMarksDimensionsAbsent",
+      "file": "internal/graders/grader_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#registry_cases"
+    },
+    {
+      "go_test": "graders.TestRegistryGradePreservesGraderError",
+      "file": "internal/graders/grader_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#registry_cases"
+    },
+    {
+      "go_test": "judgerubric.TestKind",
+      "file": "internal/graders/judgerubric/grader_test.go",
+      "where": "fixtures/measurement-io/judge_rubric.json#go_tests"
+    },
+    {
+      "go_test": "judgerubric.TestGolden",
+      "file": "internal/graders/judgerubric/grader_test.go",
+      "where": "fixtures/measurement-io/judge_rubric.json#fixture_results"
+    },
+    {
+      "go_test": "judgerubric.TestFamilySelectionTable",
+      "file": "internal/graders/judgerubric/grader_test.go",
+      "where": "fixtures/measurement-io/judge_rubric.json#family_selection"
+    },
+    {
+      "go_test": "judgerubric.TestNewRejectsInvalidPools",
+      "file": "internal/graders/judgerubric/grader_test.go",
+      "where": "fixtures/measurement-io/judge_rubric.json#error_strings"
+    },
+    {
+      "go_test": "judgerubric.TestOrderSwapAveragingGolden",
+      "file": "internal/graders/judgerubric/grader_test.go",
+      "where": "fixtures/measurement-io/judge_rubric.json#two_dim_case"
+    },
+    {
+      "go_test": "judgerubric.TestJudgeCallsOnTheWire",
+      "file": "internal/graders/judgerubric/grader_test.go",
+      "where": "fixtures/measurement-io/judge_rubric.json#two_dim_case"
+    },
+    {
+      "go_test": "judgerubric.TestJudgeCallFailureLeavesDimensionsAbsent",
+      "file": "internal/graders/judgerubric/grader_test.go",
+      "where": "fixtures/measurement-io/judge_rubric.json#error_strings"
+    },
+    {
+      "go_test": "judgerubric.TestStrictParseRejections",
+      "file": "internal/graders/judgerubric/grader_test.go",
+      "where": "fixtures/measurement-io/judge_rubric.json#parse_scores"
+    },
+    {
+      "go_test": "judgerubric.TestFencedReplyAccepted",
+      "file": "internal/graders/judgerubric/grader_test.go",
+      "where": "fixtures/measurement-io/judge_rubric.json#parse_scores"
+    },
+    {
+      "go_test": "judgerubric.TestGradeRequiresJudgedContext",
+      "file": "internal/graders/judgerubric/grader_test.go",
+      "where": "fixtures/measurement-io/judge_rubric.json#error_strings"
+    },
+    {
+      "go_test": "judgerubric.TestValidateSpecTable",
+      "file": "internal/graders/judgerubric/grader_test.go",
+      "where": "fixtures/measurement-io/judge_rubric.json#validate_spec"
+    },
+    {
+      "go_test": "judgerubric.TestPoolFromConfig",
+      "file": "internal/graders/judgerubric/grader_test.go",
+      "where": "fixtures/measurement-io/judge_rubric.json#error_strings"
+    },
+    {
+      "go_test": "jsonschema.TestKind",
+      "file": "internal/graders/jsonschema/grader_test.go",
+      "where": "fixtures/measurement-io/jsonschema.json#go_tests"
+    },
+    {
+      "go_test": "jsonschema.TestGolden",
+      "file": "internal/graders/jsonschema/grader_test.go",
+      "where": "fixtures/measurement-io/jsonschema.json#fixture_results"
+    },
+    {
+      "go_test": "jsonschema.TestValidateSpecAccepts",
+      "file": "internal/graders/jsonschema/grader_test.go",
+      "where": "fixtures/measurement-io/jsonschema.json#go_tests"
+    },
+    {
+      "go_test": "jsonschema.TestValidateSpecRejects",
+      "file": "internal/graders/jsonschema/grader_test.go",
+      "where": "fixtures/measurement-io/jsonschema.json#validate_spec_rejects"
+    },
+    {
+      "go_test": "jsonschema.TestExtractJSON",
+      "file": "internal/graders/jsonschema/grader_test.go",
+      "where": "fixtures/measurement-io/jsonschema.json#extract_json"
+    },
+    {
+      "go_test": "jsonschema.TestParsePath",
+      "file": "internal/graders/jsonschema/grader_test.go",
+      "where": "fixtures/measurement-io/jsonschema.json#go_tests"
+    },
+    {
+      "go_test": "jsonschema.TestValueEqual",
+      "file": "internal/graders/jsonschema/grader_test.go",
+      "where": "fixtures/measurement-io/jsonschema.json#go_tests"
+    },
+    {
+      "go_test": "graders.TestParseEnvelopeValid",
+      "file": "internal/graders/envelope_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#parse_envelope"
+    },
+    {
+      "go_test": "graders.TestParseEnvelopeValueYAML",
+      "file": "internal/graders/envelope_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#parse_envelope_value_yaml"
+    },
+    {
+      "go_test": "graders.TestParseEnvelopeValueNonStringKeys",
+      "file": "internal/graders/envelope_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#parse_envelope_value_non_string_keys"
+    },
+    {
+      "go_test": "graders.TestParseEnvelopeUnknownType",
+      "file": "internal/graders/envelope_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#parse_envelope"
+    },
+    {
+      "go_test": "graders.TestParseEnvelopeTestSuiteRejected",
+      "file": "internal/graders/envelope_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#parse_envelope"
+    },
+    {
+      "go_test": "graders.TestParseEnvelopeMissingFields",
+      "file": "internal/graders/envelope_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#parse_envelope"
+    },
+    {
+      "go_test": "graders.TestParseEnvelopeBadWeights",
+      "file": "internal/graders/envelope_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#parse_envelope"
+    },
+    {
+      "go_test": "graders.TestParseEnvelopeBadVersion",
+      "file": "internal/graders/envelope_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#parse_envelope"
+    },
+    {
+      "go_test": "graders.TestParseEnvelopeUnknownField",
+      "file": "internal/graders/envelope_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#parse_envelope"
+    },
+    {
+      "go_test": "graders.TestEnvelopeValidateSpecDelegates",
+      "file": "internal/graders/envelope_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#validate_spec_delegation"
+    },
+    {
+      "go_test": "graders.TestMapDimensions",
+      "file": "internal/graders/envelope_test.go",
+      "where": "fixtures/measurement-io/graders_framework.json#map_dimensions"
+    },
+    {
+      "go_test": "testutil.TestRunGoldenEcho",
+      "file": "internal/graders/testutil/golden_test.go",
+      "where": "fixtures/measurement-io/testutil_harness.json#cases"
+    },
+    {
+      "go_test": "testutil.TestRunGoldenDirEnvelopeFixture",
+      "file": "internal/graders/testutil/golden_test.go",
+      "where": "fixtures/measurement-io/testutil_harness.json#cases"
+    },
+    {
+      "go_test": "runner.TestMain",
+      "file": "internal/runner/runner_test.go",
+      "where": "reference/engine-reference.md (Part 2)#runner"
+    },
+    {
+      "go_test": "runner.TestRunStatusTaxonomy",
+      "file": "internal/runner/runner_test.go",
+      "where": "fixtures/measurement-io/runner.json#taxonomy_run"
+    },
+    {
+      "go_test": "runner.TestRunSkipsRetiredColumns",
+      "file": "internal/runner/runner_test.go",
+      "where": "reference/engine-reference.md (Part 2)#runner"
+    },
+    {
+      "go_test": "runner.TestRunSetupFailureRecordsProviderError",
+      "file": "internal/runner/runner_test.go",
+      "where": "fixtures/measurement-io/runner.json#setup_failures/bad_settings"
+    },
+    {
+      "go_test": "runner.TestConcurrencyBoundAndSequentialRepeats",
+      "file": "internal/runner/runner_test.go",
+      "where": "reference/engine-reference.md (Part 2)#runner"
+    },
+    {
+      "go_test": "runner.TestPacerSpacing",
+      "file": "internal/runner/runner_test.go",
+      "where": "reference/engine-reference.md (Part 2)#runner"
+    },
+    {
+      "go_test": "runner.TestRunnerHonorsRPMLimit",
+      "file": "internal/runner/runner_test.go",
+      "where": "reference/engine-reference.md (Part 2)#runner"
+    },
+    {
+      "go_test": "runner.TestBatchPersistsTwoTasksTwoColumnsThreeRepeats",
+      "file": "internal/runner/runner_test.go",
+      "where": "fixtures/measurement-io/runner.json#batch_integration"
+    },
+    {
+      "go_test": "runner.TestBatchPersistsErrorStatuses",
+      "file": "internal/runner/runner_test.go",
+      "where": "reference/engine-reference.md (Part 2)#runner"
+    },
+    {
+      "go_test": "runner.TestCostNumericRoundTrip",
+      "file": "internal/runner/runner_test.go",
+      "where": "fixtures/measurement-io/runner.json#cost"
+    },
+    {
+      "go_test": "runner.TestAssembleGoldenBasic",
+      "file": "internal/runner/assemble_test.go",
+      "where": "fixtures/measurement-io/runner.json#assemble/0"
+    },
+    {
+      "go_test": "runner.TestAssembleGoldenAttachments",
+      "file": "internal/runner/assemble_test.go",
+      "where": "fixtures/measurement-io/runner.json#assemble/1"
+    },
+    {
+      "go_test": "runner.TestAssembleByteIdenticalAcrossColumnsAndCalls",
+      "file": "internal/runner/assemble_test.go",
+      "where": "fixtures/measurement-io/runner.json#assemble/2"
+    },
+    {
+      "go_test": "runner.TestAssembleColumnSettings",
+      "file": "internal/runner/assemble_test.go",
+      "where": "fixtures/measurement-io/runner.json#assemble/3"
+    },
+    {
+      "go_test": "runner.TestAssembleMalformedInputs",
+      "file": "internal/runner/assemble_test.go",
+      "where": "fixtures/measurement-io/runner.json#assemble/4"
+    },
+    {
+      "go_test": "providers.TestWrapErrorClassification",
+      "file": "internal/providers/errors_test.go",
+      "where": "fixtures/measurement-io/providers_core.json#wrap_error_classification"
+    },
+    {
+      "go_test": "providers.TestKindOf",
+      "file": "internal/providers/errors_test.go",
+      "where": "fixtures/measurement-io/providers_core.json#kind_of"
+    },
+    {
+      "go_test": "providers.TestErrorMessage",
+      "file": "internal/providers/errors_test.go",
+      "where": "fixtures/measurement-io/providers_core.json#error_message"
+    },
+    {
+      "go_test": "providers.TestSettingHelpers",
+      "file": "internal/providers/errors_test.go",
+      "where": "fixtures/measurement-io/providers_core.json#settings_helpers"
+    },
+    {
+      "go_test": "providers.TestRetryPolicyDelayBounds",
+      "file": "internal/providers/retry_test.go",
+      "where": "fixtures/measurement-io/providers_core.json#retry_delay"
+    },
+    {
+      "go_test": "providers.TestRetryPolicyDelayUpperBoundExclusive",
+      "file": "internal/providers/retry_test.go",
+      "where": "fixtures/measurement-io/providers_core.json#retry_delay"
+    },
+    {
+      "go_test": "providers.TestRetrySucceedsFirstTry",
+      "file": "internal/providers/retry_test.go",
+      "where": "fixtures/measurement-io/providers_core.json#retry_loop"
+    },
+    {
+      "go_test": "providers.TestRetryRecoversFromRetryableErrors",
+      "file": "internal/providers/retry_test.go",
+      "where": "fixtures/measurement-io/providers_core.json#retry_loop"
+    },
+    {
+      "go_test": "providers.TestRetryExhaustsAndStampsAttempts",
+      "file": "internal/providers/retry_test.go",
+      "where": "fixtures/measurement-io/providers_core.json#retry_loop"
+    },
+    {
+      "go_test": "providers.TestRetryStopsOnNonRetryable",
+      "file": "internal/providers/retry_test.go",
+      "where": "fixtures/measurement-io/providers_core.json#retry_loop"
+    },
+    {
+      "go_test": "providers.TestRetryStopsOnTimeoutKind",
+      "file": "internal/providers/retry_test.go",
+      "where": "fixtures/measurement-io/providers_core.json#retry_loop"
+    },
+    {
+      "go_test": "providers.TestRetryHonorsContextMidBackoff",
+      "file": "internal/providers/retry_test.go",
+      "where": "fixtures/measurement-io/providers_core.json#retry_loop"
+    },
+    {
+      "go_test": "google.TestCompleteSuccessMapsUsage",
+      "file": "internal/providers/google/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains google.TestCompleteSuccessMapsUsage)"
+    },
+    {
+      "go_test": "google.TestCompleteRateLimitRetriesThenFails",
+      "file": "internal/providers/google/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains google.TestCompleteRateLimitRetriesThenFails)"
+    },
+    {
+      "go_test": "google.TestCompleteServerErrorRetriesThenFails",
+      "file": "internal/providers/google/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains google.TestCompleteServerErrorRetriesThenFails)"
+    },
+    {
+      "go_test": "google.TestCompleteRecoversAfterRetryableError",
+      "file": "internal/providers/google/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains google.TestCompleteRecoversAfterRetryableError)"
+    },
+    {
+      "go_test": "google.TestCompleteInvalidRequestDoesNotRetry",
+      "file": "internal/providers/google/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains google.TestCompleteInvalidRequestDoesNotRetry)"
+    },
+    {
+      "go_test": "google.TestCompleteContextTimeoutMidRetry",
+      "file": "internal/providers/google/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#context_timeout_mid_retry"
+    },
+    {
+      "go_test": "xai.TestNewDefaultsToXAIBaseURL",
+      "file": "internal/providers/xai/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#xai_base_url"
+    },
+    {
+      "go_test": "xai.TestNewKeepsExplicitBaseURL",
+      "file": "internal/providers/xai/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#xai_base_url"
+    },
+    {
+      "go_test": "xai.TestCompleteSuccessMapsUsage",
+      "file": "internal/providers/xai/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains xai.TestCompleteSuccessMapsUsage)"
+    },
+    {
+      "go_test": "xai.TestCompleteRateLimitUsesXAIProviderLabel",
+      "file": "internal/providers/xai/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains xai.TestCompleteRateLimitUsesXAIProviderLabel)"
+    },
+    {
+      "go_test": "anthropic.TestCompleteSuccessMapsUsage",
+      "file": "internal/providers/anthropic/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains anthropic.TestCompleteSuccessMapsUsage)"
+    },
+    {
+      "go_test": "anthropic.TestCompleteRateLimitRetriesThenFails",
+      "file": "internal/providers/anthropic/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains anthropic.TestCompleteRateLimitRetriesThenFails)"
+    },
+    {
+      "go_test": "anthropic.TestCompleteServerErrorRetriesThenFails",
+      "file": "internal/providers/anthropic/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains anthropic.TestCompleteServerErrorRetriesThenFails)"
+    },
+    {
+      "go_test": "anthropic.TestCompleteRecoversAfterRetryableError",
+      "file": "internal/providers/anthropic/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains anthropic.TestCompleteRecoversAfterRetryableError)"
+    },
+    {
+      "go_test": "anthropic.TestCompleteInvalidRequestDoesNotRetry",
+      "file": "internal/providers/anthropic/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains anthropic.TestCompleteInvalidRequestDoesNotRetry)"
+    },
+    {
+      "go_test": "anthropic.TestCompleteContextTimeoutMidRetry",
+      "file": "internal/providers/anthropic/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#context_timeout_mid_retry"
+    },
+    {
+      "go_test": "anthropic.TestCompleteWithoutSchemaRequestBodyUnchanged",
+      "file": "internal/providers/anthropic/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains anthropic.TestCompleteWithoutSchemaRequestBodyUnchanged)"
+    },
+    {
+      "go_test": "anthropic.TestCompleteForcedToolUseRequestShapeAndResponseParsing",
+      "file": "internal/providers/anthropic/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains anthropic.TestCompleteForcedToolUseRequestShapeAndResponseParsing)"
+    },
+    {
+      "go_test": "anthropic.TestCompleteForcedToolUseMissingToolUseBlockErrors",
+      "file": "internal/providers/anthropic/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains anthropic.TestCompleteForcedToolUseMissingToolUseBlockErrors)"
+    },
+    {
+      "go_test": "fake.TestCompleteIsDeterministic",
+      "file": "internal/providers/fake/fake_test.go",
+      "where": "fixtures/measurement-io/fake_provider.json#go_tests"
+    },
+    {
+      "go_test": "fake.TestCompleteCoversSeedModels",
+      "file": "internal/providers/fake/fake_test.go",
+      "where": "fixtures/measurement-io/fake_provider.json#go_tests"
+    },
+    {
+      "go_test": "fake.TestCompleteUnknownPairFailsLoudly",
+      "file": "internal/providers/fake/fake_test.go",
+      "where": "fixtures/measurement-io/fake_provider.json#go_tests"
+    },
+    {
+      "go_test": "fake.TestCompleteScriptedErrors",
+      "file": "internal/providers/fake/fake_test.go",
+      "where": "fixtures/measurement-io/fake_provider.json#go_tests"
+    },
+    {
+      "go_test": "fake.TestCompleteArtificialLatency",
+      "file": "internal/providers/fake/fake_test.go",
+      "where": "fixtures/measurement-io/fake_provider.json#go_tests"
+    },
+    {
+      "go_test": "fake.TestHashPromptIsExactMatchOnly",
+      "file": "internal/providers/fake/fake_test.go",
+      "where": "fixtures/measurement-io/fake_provider.json#go_tests"
+    },
+    {
+      "go_test": "fake.TestAddByPromptHash",
+      "file": "internal/providers/fake/fake_test.go",
+      "where": "fixtures/measurement-io/fake_provider.json#go_tests"
+    },
+    {
+      "go_test": "fake.TestAddValidation",
+      "file": "internal/providers/fake/fake_test.go",
+      "where": "fixtures/measurement-io/fake_provider.json#go_tests"
+    },
+    {
+      "go_test": "fake.TestNewRejectsMissingOrEmptyDir",
+      "file": "internal/providers/fake/fake_test.go",
+      "where": "fixtures/measurement-io/fake_provider.json#go_tests"
+    },
+    {
+      "go_test": "openai.TestCompleteSuccessMapsUsage",
+      "file": "internal/providers/openai/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains openai.TestCompleteSuccessMapsUsage)"
+    },
+    {
+      "go_test": "openai.TestCompleteRateLimitRetriesThenFails",
+      "file": "internal/providers/openai/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains openai.TestCompleteRateLimitRetriesThenFails)"
+    },
+    {
+      "go_test": "openai.TestCompleteServerErrorRetriesThenFails",
+      "file": "internal/providers/openai/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains openai.TestCompleteServerErrorRetriesThenFails)"
+    },
+    {
+      "go_test": "openai.TestCompleteRecoversAfterRetryableError",
+      "file": "internal/providers/openai/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains openai.TestCompleteRecoversAfterRetryableError)"
+    },
+    {
+      "go_test": "openai.TestCompleteInvalidRequestDoesNotRetry",
+      "file": "internal/providers/openai/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains openai.TestCompleteInvalidRequestDoesNotRetry)"
+    },
+    {
+      "go_test": "openai.TestCompleteEmptyChoicesIsProviderError",
+      "file": "internal/providers/openai/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#cases (go_tests contains openai.TestCompleteEmptyChoicesIsProviderError)"
+    },
+    {
+      "go_test": "openai.TestCompleteContextTimeoutMidRetry",
+      "file": "internal/providers/openai/client_test.go",
+      "where": "fixtures/measurement-io/providers_wire.json#context_timeout_mid_retry"
+    },
+    {
+      "go_test": "livesmoke.TestLiveSmoke",
+      "file": "internal/livesmoke/livesmoke_test.go",
+      "where": "reference/engine-reference.md (Part 2)#livesmoke"
+    }
+  ]
+}

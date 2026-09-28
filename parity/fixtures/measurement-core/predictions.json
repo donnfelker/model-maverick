@@ -1,0 +1,395 @@
+{
+  "brier_and_overconfidence": {
+    "cases": [
+      {
+        "expected": {
+          "brier": 0.23500000000000001,
+          "brier_f32": 0.23499999940395355,
+          "overconfidence": 0.050000000000000044,
+          "overconfidence_f32": 0.05000000074505806
+        },
+        "id": "mixed hand-computed",
+        "pairs": [
+          {
+            "o": true,
+            "p": 0.8
+          },
+          {
+            "o": false,
+            "p": 0.8
+          },
+          {
+            "o": true,
+            "p": 0.5
+          },
+          {
+            "o": false,
+            "p": 0.1
+          }
+        ]
+      },
+      {
+        "expected": {
+          "brier": 0,
+          "brier_f32": 0,
+          "overconfidence": 0,
+          "overconfidence_f32": 0
+        },
+        "id": "perfect",
+        "pairs": [
+          {
+            "o": true,
+            "p": 1
+          },
+          {
+            "o": false,
+            "p": 0
+          }
+        ]
+      },
+      {
+        "expected": {
+          "brier": 1,
+          "brier_f32": 1,
+          "overconfidence": 0,
+          "overconfidence_f32": 0
+        },
+        "id": "perfectly wrong",
+        "pairs": [
+          {
+            "o": false,
+            "p": 1
+          },
+          {
+            "o": true,
+            "p": 0
+          }
+        ]
+      },
+      {
+        "expected": {
+          "brier": 0.25,
+          "brier_f32": 0.25,
+          "overconfidence": 0,
+          "overconfidence_f32": 0
+        },
+        "id": "uninformative",
+        "pairs": [
+          {
+            "o": true,
+            "p": 0.5
+          },
+          {
+            "o": false,
+            "p": 0.5
+          }
+        ]
+      },
+      {
+        "expected": {
+          "brier": 0.48999999999999994,
+          "brier_f32": 0.49000000953674316,
+          "overconfidence": 0.7,
+          "overconfidence_f32": 0.699999988079071
+        },
+        "id": "single pair",
+        "pairs": [
+          {
+            "o": false,
+            "p": 0.7
+          }
+        ]
+      },
+      {
+        "expected": {
+          "brier": 0,
+          "brier_f32": 0,
+          "overconfidence": 0,
+          "overconfidence_f32": 0
+        },
+        "id": "no pairs",
+        "pairs": []
+      },
+      {
+        "expected": {
+          "brier": 0.16000000000000003,
+          "brier_f32": 0.1599999964237213,
+          "overconfidence": -0.4,
+          "overconfidence_f32": -0.4000000059604645
+        },
+        "id": "underconfident",
+        "pairs": [
+          {
+            "o": true,
+            "p": 0.6
+          },
+          {
+            "o": true,
+            "p": 0.6
+          }
+        ]
+      },
+      {
+        "expected": {
+          "brier": 0.81,
+          "brier_f32": 0.8100000023841858,
+          "overconfidence": 0.9,
+          "overconfidence_f32": 0.8999999761581421
+        },
+        "id": "overconfident",
+        "pairs": [
+          {
+            "o": false,
+            "p": 0.9
+          }
+        ]
+      },
+      {
+        "expected": {
+          "brier": 0.1799999952316286,
+          "brier_f32": 0.17999999225139618,
+          "overconfidence": -0.3999999940395355,
+          "overconfidence_f32": -0.4000000059604645
+        },
+        "id": "lock_order_night2 (jobs.TestLockBeforeRunOrdering)",
+        "pairs": [
+          {
+            "o": true,
+            "p": 0.800000011920929
+          },
+          {
+            "o": true,
+            "p": 0.800000011920929
+          },
+          {
+            "o": true,
+            "p": 0.800000011920929
+          },
+          {
+            "o": true,
+            "p": 0.4000000059604645
+          },
+          {
+            "o": true,
+            "p": 0.4000000059604645
+          },
+          {
+            "o": true,
+            "p": 0.4000000059604645
+          },
+          {
+            "o": true,
+            "p": 0.699999988079071
+          },
+          {
+            "o": true,
+            "p": 0.699999988079071
+          },
+          {
+            "o": true,
+            "p": 0.699999988079071
+          },
+          {
+            "o": true,
+            "p": 0.6000000238418579
+          },
+          {
+            "o": true,
+            "p": 0.6000000238418579
+          },
+          {
+            "o": true,
+            "p": 0.6000000238418579
+          },
+          {
+            "o": true,
+            "p": 0.5
+          },
+          {
+            "o": true,
+            "p": 0.5
+          },
+          {
+            "o": true,
+            "p": 0.5
+          }
+        ]
+      },
+      {
+        "expected": {
+          "brier": 0.3400000071525575,
+          "brier_f32": 0.3400000035762787,
+          "overconfidence": 0.30000001192092896,
+          "overconfidence_f32": 0.30000001192092896
+        },
+        "id": "structured_extraction (jobs.TestCalibrationRowsPerCapability)",
+        "pairs": [
+          {
+            "o": true,
+            "p": 0.800000011920929
+          },
+          {
+            "o": true,
+            "p": 0.800000011920929
+          },
+          {
+            "o": true,
+            "p": 0.800000011920929
+          },
+          {
+            "o": false,
+            "p": 0.800000011920929
+          },
+          {
+            "o": false,
+            "p": 0.800000011920929
+          },
+          {
+            "o": false,
+            "p": 0.800000011920929
+          }
+        ]
+      },
+      {
+        "expected": {
+          "brier": 0.25,
+          "brier_f32": 0.25,
+          "overconfidence": -0.5,
+          "overconfidence_f32": -0.5
+        },
+        "id": "factual_qa (jobs.TestCalibrationRowsPerCapability)",
+        "pairs": [
+          {
+            "o": true,
+            "p": 0.5
+          },
+          {
+            "o": true,
+            "p": 0.5
+          },
+          {
+            "o": true,
+            "p": 0.5
+          }
+        ]
+      }
+    ],
+    "go_test": "predictions.TestBrierGolden, predictions.TestOverconfidenceGolden",
+    "note": "o true=1 false=0. *_f32 is the value persisted to calibration (real column). Cases taken from jobs tests use p widened from float32 because predicted_pass_prob is a real column."
+  },
+  "derive": {
+    "expected": [
+      {
+        "capability": "factual_qa",
+        "difficulty_tier": 2,
+        "model_column_id": "col_a",
+        "pass_prob": 1
+      },
+      {
+        "capability": "structured_extraction",
+        "difficulty_tier": 1,
+        "model_column_id": "col_a",
+        "pass_prob": 0.8
+      },
+      {
+        "capability": "structured_extraction",
+        "difficulty_tier": 4,
+        "model_column_id": "col_a",
+        "pass_prob": 0.4
+      },
+      {
+        "capability": "structured_extraction",
+        "difficulty_tier": 1,
+        "model_column_id": "col_b",
+        "pass_prob": 0
+      }
+    ],
+    "go_test": "predictions.TestDeriveGolden",
+    "pass_rate_ewma": [
+      {
+        "capability": "structured_extraction",
+        "difficulty_tier": 1,
+        "ewma": 0.8,
+        "model_column_id": "col_a"
+      },
+      {
+        "capability": "structured_extraction",
+        "difficulty_tier": 4,
+        "ewma": 0.4,
+        "model_column_id": "col_a"
+      },
+      {
+        "capability": "factual_qa",
+        "difficulty_tier": 2,
+        "ewma": 1.0000002,
+        "model_column_id": "col_a"
+      },
+      {
+        "capability": "structured_extraction",
+        "difficulty_tier": 1,
+        "ewma": -1e-7,
+        "model_column_id": "col_b"
+      }
+    ],
+    "scheduled": [
+      {
+        "capability": "structured_extraction",
+        "difficulty_tier": 1,
+        "model_column_id": "col_b"
+      },
+      {
+        "capability": "structured_extraction",
+        "difficulty_tier": 1,
+        "model_column_id": "col_a"
+      },
+      {
+        "capability": "structured_extraction",
+        "difficulty_tier": 4,
+        "model_column_id": "col_a"
+      },
+      {
+        "capability": "structured_extraction",
+        "difficulty_tier": 3,
+        "model_column_id": "col_cold"
+      },
+      {
+        "capability": "structured_extraction",
+        "difficulty_tier": 1,
+        "model_column_id": "col_a"
+      },
+      {
+        "capability": "factual_qa",
+        "difficulty_tier": 2,
+        "model_column_id": "col_a"
+      }
+    ]
+  },
+  "derive_empty": [
+    {
+      "expected": [],
+      "go_test": "predictions.TestDeriveEmpty",
+      "pass_rate_ewma": [
+        {
+          "capability": "",
+          "difficulty_tier": 0,
+          "ewma": 0.5,
+          "model_column_id": "x"
+        }
+      ],
+      "scheduled": []
+    },
+    {
+      "expected": [],
+      "go_test": "predictions.TestDeriveEmpty",
+      "pass_rate_ewma": [],
+      "scheduled": [
+        {
+          "capability": "",
+          "difficulty_tier": 0,
+          "model_column_id": "x"
+        }
+      ]
+    }
+  ],
+  "tolerance": 1e-12
+}
