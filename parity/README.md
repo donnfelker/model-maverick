@@ -8,7 +8,7 @@ Nothing here is Go code. Data and contracts (SQL, fixture files, prompts, schema
 
 | Path | Content |
 |---|---|
-| `DIVERGENCES.md` | The intended differences between Go and Rust (D1 to D37). If a parity diff matches a row, the diff is correct. All other diffs are bugs. |
+| `DIVERGENCES.md` | The intended differences between Go and Rust (D1 to D39). If a parity diff matches a row, the diff is correct. All other diffs are bugs. |
 | `fixtures/<area>/` | Test cases with inputs and full-precision expected outputs, recorded wire exchanges, and all original `testdata/` files. |
 | `manifest/<area>.json` | Each Go test, with the fixture case or reference section that replaces it. |
 | `schema/` | The migrations, the final `schema.sql` (from `pg_dump` after all migrations), the old River queue schema (for a kept database only), the 98 sqlc queries, and `queries.md`. |

@@ -205,10 +205,13 @@ by deployment topology, same as the internal listener does today.
   body cap; honors a tenant-level telemetry opt-out (the proxy still routes but
   writes no outcome rows — G13 holds even where MM is in-path); chain execution
   on provider failure per the core rules; response
-  headers carry `X-Maverick-Recommendation-Id`, `X-Maverick-Model-Used`, and a
-  graduation link. Documented non-goals: production SLA, embeddings, images,
-  audio, batch, fine-tuning. The graduation path to Track 1/2 is printed on the
-  box — this is the demo door, never the production data plane.
+  headers carry `X-Maverick-Recommendation-Id` and `X-Maverick-Model-Used`.
+  Documented non-goals: production SLA, embeddings, images, audio, batch,
+  fine-tuning. This is the demo door, never the production data plane.
+- **Nice to have (not planned; removed by the owner 2026-09-28 as premature):**
+  a "graduation link" response header pointing trial users to the production
+  integration path (SDK or gateway plugin). Revisit once SDKs and a public docs
+  page exist.
 
 ## 5. Who uses which door — client coverage
 

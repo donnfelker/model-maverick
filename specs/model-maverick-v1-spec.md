@@ -705,6 +705,7 @@ Both present or both absent → `422 invalid_request`.
 - Telemetry goes through the `maverick-core` batcher: every 10 s or at 20 items, with a flush at shutdown, per tenant key. Telemetry off means zero bytes (D27).
 - The proxy applies a fixed-window rate limit per tenant key. The limit is lower than the API limit (§9.1). A rejected request gets `429 rate_limited` with `Retry-After` (D28).
 - Caller parameter values that depend on the model (for example reasoning effort tiers) are normalized to the nearest value that the routed model accepts. The accepted values are per-model constraints in the model catalog, and each chain entry carries them. When the catalog has no constraint for a field, the proxy applies the Go mappings: chat `reasoning_effort` `xhigh` to `high`, messages `output_config.effort` `xhigh` to `max` (D29).
+- The proxy rejects a request body larger than 32 MiB (`MAVERICK_PROXY_MAX_BODY_BYTES`) with `413 payload_too_large`, before any engine or provider call (D38).
 - The proxy strips `X-Maverick-API-Key` from every upstream request. The tenant's Maverick key never reaches a provider (D30).
 - OTel export uses `tracing-opentelemetry` and `opentelemetry-otlp` with W3C trace context. The content stays the same (one `maverick.recommendation` log record per settled request, and the counter `maverick_proxy_recommendations_total` by `measured` and `classification_method`). The payload bytes are not reproduced. The §14.3 redaction rules apply (D31).
 
@@ -888,6 +889,8 @@ The automatic outcome producer that replaced `POST /v1/outcomes` (G13). It is pl
 6. anything else → `other`
 
 `completed_unchecked` counts toward availability only and never enters outcome blending (v1.1 §7). `settings_applied` is stored in the outcome row's `details`. Rows land in `outcomes` and are read through `GET /v1/history/outcomes` (§9.6). (changed 2026-09-28 for the Rust port; the Go engine implements the prior rule: any 2xx without `check_pass: false` derives `success`, and there is no `settings_applied`)
+
+**Tenant telemetry opt-out** (added 2026-09-28 by owner decision, `parity/DIVERGENCES.md` D39). `tenant_constraints` gains `telemetry_opt_out` (boolean, default false), written through the constraints payload of `PUT /v1/config/constraints` and `PUT /internal/v1/tenants/{id}/constraints`. When it is true: every recommend response for the tenant carries `"telemetry": false` (otherwise `"telemetry": true`); the trial proxy and every SDK core send no telemetry for that tenant; and the engine accepts but drops every telemetry item from that tenant (counted as dropped, no `outcomes` row written). The proxy still routes the request (G13 holds even where MM is in the request path). The global component switches (`MAVERICK_PROXY_TELEMETRY=off`, `MODELMAVERICK_TELEMETRY=off`) still mean zero bytes regardless of the tenant setting.
 
 ---
 
