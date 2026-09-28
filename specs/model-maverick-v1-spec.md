@@ -699,6 +699,15 @@ Both present or both absent → `422 invalid_request`.
 
 **Declared-workload header.** Callers of the trial proxy and SDK cores MAY send `X-Maverick-Workload: <capability>[:<tier>]`; the component then sends the declared form instead of a projection. This is the recommended form for production routes. The engine itself only ever sees the declared or prompt form.
 
+**Trial proxy behavior** (adopted 2026-09-28 by owner approval for the Rust port; `parity/DIVERGENCES.md` D26 to D31; the Go proxy implements the prior rules in `reference/engine-reference.md` Part 6):
+
+- The chain executor obeys `Retry-After` on a 429 before it advances to the next entry (D26).
+- Telemetry goes through the `maverick-core` batcher: every 10 s or at 20 items, with a flush at shutdown, per tenant key. Telemetry off means zero bytes (D27).
+- The proxy applies a fixed-window rate limit per tenant key. The limit is lower than the API limit (§9.1). A rejected request gets `429 rate_limited` with `Retry-After` (D28).
+- Caller parameter values that depend on the model (for example reasoning effort tiers) are normalized to the nearest value that the routed model accepts. The accepted values are per-model constraints in the model catalog, and each chain entry carries them. When the catalog has no constraint for a field, the proxy applies the Go mappings: chat `reasoning_effort` `xhigh` to `high`, messages `output_config.effort` `xhigh` to `max` (D29).
+- The proxy strips `X-Maverick-API-Key` from every upstream request. The tenant's Maverick key never reaches a provider (D30).
+- OTel export uses `tracing-opentelemetry` and `opentelemetry-otlp` with W3C trace context. The content stays the same (one `maverick.recommendation` log record per settled request, and the counter `maverick_proxy_recommendations_total` by `measured` and `classification_method`). The payload bytes are not reproduced. The §14.3 redaction rules apply (D31).
+
 ### 8.2 Classification contract
 
 `classification` in every response:
@@ -1037,7 +1046,7 @@ Env vars, prefix `MAVERICK_`, parsed and validated at boot (fail fast, print the
 | `MAVERICK_CLASSIFIER_COLUMN` | `claude-haiku-4-5/direct` | §8.3 |
 | `MAVERICK_CLASSIFIER_ZERO_RETENTION_COLUMN` | unset | §8.3; must be a column with valid zero-retention evidence |
 | `MAVERICK_CLASSIFIER_DEADLINE` | `1.5s` | §8.3 total classifier deadline, retry included |
-| `MAVERICK_CLASSIFIER_DAILY_QUOTA` / `..._DAILY_SPEND_CAP_USD` | set from M6 cost measurement | §8.3 per-tenant default quota / global cap (G8) |
+| `MAVERICK_CLASSIFIER_DAILY_QUOTA` / `..._DAILY_SPEND_CAP_USD` | `1000` / `5.00` (placeholders set by the owner 2026-09-28; retune from M6 cost measurement) | §8.3 per-tenant default quota / global cap (G8) |
 | `MAVERICK_CAPTURE_MASTER_KEY_VERSION` / `MAVERICK_CAPTURE_PREVIOUS_MASTER_KEY` | `1` / unset | §10.4 key ring |
 | `MAVERICK_RANKING_AVAILABILITY_FLOOR` | `0.9` | §7.4 step 6 |
 | `MAVERICK_JUDGE_POOL` | `gemini-3.1-pro/direct,gpt-5.5/direct` | §5.5 |
