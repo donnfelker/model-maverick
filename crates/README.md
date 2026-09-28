@@ -1,19 +1,64 @@
-# Crate Layout
+# Crate layout
 
-This workspace keeps pure decision code away from I/O-bound crates. The domain crate is the target for fast mutation tests. Store is the only crate that owns SQL.
+The Cargo workspace is at the repo root. Every crate lives here under `crates/`. The
+version table and the shared lints are in the root `Cargo.toml`
+(`[workspace.dependencies]`, `[workspace.lints]`). Each crate inherits them with
+`{ workspace = true }`.
 
-| Crate | Role |
-|---|---|
-| `maverick-domain` | Pure IDs, task and grader types, scoring, ranking, policy, ceilings, checks, reasons, spend math, classifier math, fingerprints, and capture crypto. No Tokio I/O and no SQL. |
-| `maverick-config` | Environment parsing and startup validation. |
-| `maverick-store` | sqlx pools, migrations, queries, and transactions. |
-| `maverick-providers` | Provider clients, the deterministic fake provider, retry classification, and wire parsing. |
-| `maverick-runner` | Batch run composition and provider execution orchestration. |
-| `maverick-jobs` | graphile_worker handlers, batch leases, job chaining, and job recovery glue. |
-| `maverick-api` | axum REST API, MCP surfaces, middleware, and the internal seam. Business rules stay in domain and services. |
-| `maverick-alerts` | Alert persistence fan-out helpers and webhook/email delivery glue. |
-| `maverick-core` | Shared SDK/proxy core: alias grammar, workload projection, recommend client, chain executor, fail-open ladder, and telemetry batcher. |
-| `maverick-proxy` | Trial proxy binary. It has no database. |
-| `sdk-conformance` | Conformance harness library and binary for mock-engine and mock-provider scenarios. |
-| `maverick` | Engine CLI and process wiring. |
-| `parity-support` | Dev-only test helpers for loading parity fixtures and asserting approved divergences. |
+## Dependency direction
+
+```
+maverick (bin, CLI) ─┬─ maverick-api ──┬─ maverick-runner ─ maverick-providers ─┐
+                     │                 │                                        │
+                     ├─ maverick-jobs ─┼─ maverick-store ───────────────────────┤
+                     │                 │                                        │
+                     ├─ maverick-alerts┘                                        │
+                     └─ maverick-config                                         │
+                                                                                ▼
+                                                                        maverick-domain
+maverick-proxy (bin) ─ maverick-core                    (pure: no tokio I/O, no sqlx)
+```
+
+Rules that the split enforces:
+
+- `maverick-domain` is pure. It has no Tokio I/O and no sqlx. `cargo-mutants` runs on
+  it, so it stays fast to build. It holds ids, task and grader types, graders, scoring
+  (EWMA and Welford), ranking, policy, ceilings, bands, checks, reasons, prediction and
+  spend math, catalog lifecycle, capture crypto, fingerprints, key format, pure
+  classifier logic, and telemetry derivation.
+- `maverick-store` is the only crate with SQL. Everything reaches Postgres through it
+  (spec §2.2).
+- `maverick-api` has no business logic. It calls services, which call domain and store.
+- `maverick-core` is the shared SDK core. `maverick-proxy` links it directly and has no
+  database.
+
+## Crates
+
+| Crate | Kind | Role |
+|---|---|---|
+| `maverick-domain` | lib | Pure domain logic. cargo-mutants target. |
+| `maverick-config` | lib | Environment and YAML config, validation. |
+| `maverick-store` | lib | sqlx pool, migrations, queries, transactions. The only SQL. |
+| `maverick-providers` | lib | Provider clients, the fake provider, retry. |
+| `maverick-runner` | lib | The measurement runner (tasks through providers and graders). |
+| `maverick-jobs` | lib | graphile_worker jobs, the `batches` lease, spend guard, alerts, catalog jobs. |
+| `maverick-alerts` | lib | Alert derivation and delivery. |
+| `maverick-api` | lib | axum listeners, endpoints, and MCP (rmcp). No business logic. |
+| `maverick-core` | lib | The shared SDK core (recommend client, chain executor, fail-open ladder). Required name (AGENTS.md). |
+| `maverick-proxy` | bin | The trial proxy. No database. Required name (AGENTS.md). |
+| `sdk-conformance` | lib + bin | Mock engine, mock provider, twelve frozen scenarios. Required name (AGENTS.md). |
+| `maverick` | bin | Engine binary and CLI: serve, migrate, corpus, mcp-stdio, demo-run. |
+
+`parity-support` is the dev-only fixture-loading crate. The skeleton exists now. The
+helpers are a separate bead (pkg1.4).
+
+## Stack choices worth noting
+
+- TLS is rustls only. `reqwest`, `sqlx`, and `graphile_worker` are pinned with
+  `default-features = false` and the rustls features. No OpenSSL is in the tree
+  (`cargo tree -i openssl-sys` is empty). `cargo deny` enforces this in CI.
+- YAML uses `serde_norway`, a maintained fork. The original `serde_yaml` is archived.
+- OTLP export uses the HTTP + reqwest(rustls) transport, not tonic, to keep the tree on
+  rustls.
+- `graphile_worker` is pinned to the `0.13` minor. The plan allows owning a fork if it
+  stalls. Its sqlx driver is the same job queue Postgres uses; there is no Redis.

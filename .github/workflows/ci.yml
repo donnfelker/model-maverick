@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+env:
+  CARGO_TERM_COLOR: always
+  SQLX_OFFLINE: "true"
+
+jobs:
+  tiers:
+    name: ${{ matrix.tier }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tier:
+          - fast
+          - db
+          - parity
+          - e2e
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: rustup show
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-${{ matrix.tier }}
+          restore-keys: |
+            cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-
+            cargo-${{ runner.os }}-
+
+      - name: Install fast-tier cargo tools
+        if: matrix.tier == 'fast'
+        run: |
+          cargo install cargo-deny --version 0.20.2 --locked
+          cargo install sqlx-cli --version 0.9.0 --locked --no-default-features --features rustls,postgres
+
+      - name: Run tier
+        run: scripts/ci.sh "${{ matrix.tier }}"
+
+      - name: Upload CI logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-${{ matrix.tier }}-logs
+          path: target/ci/${{ matrix.tier }}
+
+  mutants:
+    name: mutants
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: rustup show
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-mutants
+          restore-keys: |
+            cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-
+            cargo-${{ runner.os }}-
+
+      - name: Install cargo-mutants
+        run: cargo install cargo-mutants --version 27.1.0 --locked
+
+      - name: Run mutants
+        run: scripts/ci.sh mutants
+
+      - name: Upload mutant logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-mutants-logs
+          path: target/ci/mutants
