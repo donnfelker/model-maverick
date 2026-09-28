@@ -58,7 +58,7 @@ These come from the guarantees G1 to G14 in `specs/model-maverick-v1-spec.md`.
 
 - Use plain `git`. Stage files by name. Do not use `git add -A`. Do not use `--no-verify`.
 - Make one commit for each unit of work, with a clear message. End the message with the co-author trailer that your harness gives you.
-- Do not push, and do not create pull requests, without approval from the owner.
+- Work directly on `main`. Do not create branches, worktrees, or pull requests. When a unit of work is done and its tests pass, commit it, run `git pull --rebase origin main`, and push to `origin main`. Never force-push.
 
 ## When to stop and ask the owner
 
