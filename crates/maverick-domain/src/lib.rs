@@ -8,5 +8,6 @@
 //!
 //! Package 2a fills this in, one module per work package.
 
+pub mod capture;
 pub mod ids;
 pub mod keys;
