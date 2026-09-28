@@ -6,4 +6,6 @@
 //! format, pure classifier logic, and telemetry derivation. `cargo-mutants` runs on
 //! this crate, so it stays fast to build.
 //!
-//! Package 2a fills this in. The skeleton is intentionally empty.
+//! Package 2a fills this in, one module per work package.
+
+pub mod ids;
