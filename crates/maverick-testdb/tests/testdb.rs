@@ -97,6 +97,17 @@ async fn the_schema_is_applied_and_each_test_has_its_own_rows() {
 }
 
 #[tokio::test]
+async fn the_schema_dump_shows_the_migrated_tables() {
+    let Some(db) = maverick_testdb::database(&WIDGETS).await else {
+        return;
+    };
+    let dump = db.dump_schema().await;
+    assert!(dump.contains("CREATE TABLE public.widgets ("), "{dump}");
+    assert!(dump.contains("weight real NOT NULL"), "{dump}");
+    db.close().await;
+}
+
+#[tokio::test]
 async fn close_drops_the_database_even_with_open_connections() {
     let Some(db) = maverick_testdb::database(&Schema::empty()).await else {
         return;

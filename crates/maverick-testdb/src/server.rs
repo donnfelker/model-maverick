@@ -30,6 +30,8 @@ const ORPHAN_AGE: Duration = Duration::from_secs(6 * 60 * 60);
 pub(crate) struct Server {
     /// URL of a database on the server that admin statements run in.
     pub(crate) admin_url: String,
+    /// The Docker container that runs the server, when this crate started it.
+    pub(crate) container_id: Option<String>,
 }
 
 pub(crate) enum Unavailable {
@@ -53,7 +55,10 @@ async fn start() -> Result<Server, Unavailable> {
                 "{DATABASE_URL_VAR} must be a postgres:// URL"
             )));
         }
-        return Ok(Server { admin_url: url });
+        return Ok(Server {
+            admin_url: url,
+            container_id: None,
+        });
     }
 
     let docker = Docker::connect_with_defaults()
@@ -100,6 +105,8 @@ async fn start() -> Result<Server, Unavailable> {
         .await
         .map_err(|err| Unavailable::Fatal(format!("postgres container port: {err}")))?;
 
+    let container_id = container.id().to_owned();
+
     // The container must outlive every test in the binary, and Rust never drops statics.
     // The next test binary on this host removes it with `reap_orphans` once this process
     // has exited.
@@ -107,6 +114,7 @@ async fn start() -> Result<Server, Unavailable> {
 
     Ok(Server {
         admin_url: format!("postgres://maverick:maverick@{host}:{port}/maverick?sslmode=disable"),
+        container_id: Some(container_id),
     })
 }
 

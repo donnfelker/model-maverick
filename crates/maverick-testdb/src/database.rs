@@ -29,6 +29,7 @@ pub struct TestDatabase {
     name: String,
     url: String,
     admin_url: String,
+    container_id: Option<String>,
     closed: bool,
 }
 
@@ -80,6 +81,41 @@ impl TestDatabase {
         PgConnection::connect(&self.url)
             .await
             .unwrap_or_else(|err| panic!("connect to test database {}: {err}", self.name))
+    }
+
+    /// Returns `pg_dump --schema-only --no-owner --no-privileges` of this database.
+    ///
+    /// With the test container, pg_dump runs inside it through `docker exec`, so its
+    /// version is the server version. With `MAVERICK_TEST_DATABASE_URL`, the `pg_dump` on
+    /// `PATH` runs; its output can differ from the container's.
+    pub async fn dump_schema(&self) -> String {
+        const FLAGS: [&str; 3] = ["--schema-only", "--no-owner", "--no-privileges"];
+        let mut command = match &self.container_id {
+            Some(id) => {
+                let mut command = tokio::process::Command::new("docker");
+                command
+                    .args(["exec", id.as_str(), "pg_dump"])
+                    .args(FLAGS)
+                    .args(["--username=maverick", "--dbname", self.name.as_str()]);
+                command
+            }
+            None => {
+                let mut command = tokio::process::Command::new("pg_dump");
+                command.args(FLAGS).args(["--dbname", self.url.as_str()]);
+                command
+            }
+        };
+        let output = command
+            .output()
+            .await
+            .unwrap_or_else(|err| panic!("run pg_dump for {}: {err}", self.name));
+        assert!(
+            output.status.success(),
+            "pg_dump for {} failed: {}",
+            self.name,
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8(output.stdout).expect("pg_dump output is UTF-8")
     }
 
     /// Drops the database now. Open connections to it are terminated.
@@ -138,6 +174,7 @@ async fn create(server: &Server, schema: &Schema) -> Result<TestDatabase, String
     Ok(TestDatabase {
         url: with_database(&server.admin_url, &name),
         admin_url: server.admin_url.clone(),
+        container_id: server.container_id.clone(),
         name,
         closed: false,
     })
