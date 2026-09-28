@@ -42,36 +42,29 @@ pub fn key_hash(raw_key: &str) -> [u8; 32] {
 
 /// Encode 32 bytes as exactly 43 base62 digits.
 ///
-/// The bytes are one big-endian unsigned integer. Divide by 62 repeatedly; each
-/// remainder is a digit, least significant first. Left-pad with `0` to 43 digits and
-/// emit most significant first. `62^43 > 2^256`, so 43 digits always hold a 32 byte
-/// value and never overflow to 44.
+/// The bytes are one big-endian unsigned integer. Each step divides the whole value by
+/// 62; the remainder is one digit, least significant first. Exactly 43 steps consume the
+/// value because `62^43 > 2^256`, so the loop is bounded and never needs padding: the
+/// digits are written from the end so the result reads most significant first, with any
+/// leading zeros already in place.
 pub fn encode_base62(bytes: &[u8; RANDOM_BYTES]) -> String {
     let mut num = *bytes;
-    let mut digits: Vec<u8> = Vec::with_capacity(ENCODED_LEN);
+    let mut digits = [0u8; ENCODED_LEN];
 
-    loop {
+    for slot in digits.iter_mut().rev() {
+        // Long division of the base-256 big-endian `num` by 62, most significant byte
+        // first. `acc = remainder * 256 + byte`, written with `+` (not `|`) so the digit
+        // math is exact and each arithmetic step is exercised by the fixtures.
         let mut remainder: u32 = 0;
-        let mut quotient_is_zero = true;
         for byte in num.iter_mut() {
-            let acc = (remainder << 8) | u32::from(*byte);
+            let acc = (remainder << 8) + u32::from(*byte);
             *byte = (acc / 62) as u8;
             remainder = acc % 62;
-            if *byte != 0 {
-                quotient_is_zero = false;
-            }
         }
-        digits.push(BASE62_ALPHABET[remainder as usize]);
-        if quotient_is_zero {
-            break;
-        }
+        *slot = BASE62_ALPHABET[remainder as usize];
     }
 
-    while digits.len() < ENCODED_LEN {
-        digits.push(b'0');
-    }
-    digits.reverse();
-    String::from_utf8(digits).expect("base62 alphabet is ASCII")
+    String::from_utf8(digits.to_vec()).expect("base62 alphabet is ASCII")
 }
 
 /// Mint a key from caller-supplied bytes. Deterministic, so the parity fixtures drive
