@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "update corpus_versions\n         set active = (corpus_versions.version = $1)\n         where (corpus_versions.active or corpus_versions.version = $1)\n           and exists (select 1 from corpus_versions cv where cv.version = $1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6b7b6e879bdd707f90ae4ca2522b0874d26548d75e44c2f8fb7bdd0a33e49825"
+}

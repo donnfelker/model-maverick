@@ -22,6 +22,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 ulid = { workspace = true }
 chrono = { workspace = true }
+rust_decimal = { workspace = true }
 
 [dev-dependencies]
 maverick-testdb = { workspace = true }

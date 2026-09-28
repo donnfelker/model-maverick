@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "update tasks\n         set active = false, updated_at = now()\n         where corpus_version = $1\n           and not (id = any($2::text[]))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0bd34a94db240215ae0ac22efda3df014137873620b3bfc09bf922a3d6b27ce2"
+}

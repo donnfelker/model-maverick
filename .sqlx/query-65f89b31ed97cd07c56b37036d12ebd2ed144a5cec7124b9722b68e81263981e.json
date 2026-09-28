@@ -1,0 +1,79 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "insert into corpus_versions (version, description, task_count, active)\n         values ($1, $2, $3, $4)\n         on conflict (version) do update set\n           description = excluded.description,\n           task_count = excluded.task_count\n         returning version, description, task_count, active, created_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "version",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "corpus_versions",
+            "name": "version"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "description",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "corpus_versions",
+            "name": "description"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "task_count",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "corpus_versions",
+            "name": "task_count"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "active",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "corpus_versions",
+            "name": "active"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "corpus_versions",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Int4",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "65f89b31ed97cd07c56b37036d12ebd2ed144a5cec7124b9722b68e81263981e"
+}

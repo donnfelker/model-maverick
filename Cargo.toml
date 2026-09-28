@@ -67,6 +67,7 @@ sqlx = { version = "0.9", default-features = false, features = [
     "json",
     "chrono",
     "uuid",
+    "rust_decimal",
 ] }
 # graphile_worker: pin the minor (plan §6: own a fork if it stalls). sqlx driver, rustls.
 graphile_worker = { version = "0.13.5", default-features = false, features = [
@@ -112,6 +113,8 @@ ulid = "3"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
 thiserror = "2"
 anyhow = "1"
+# numeric(12,6) money columns (reference Part 1 §4: arbitrary precision, never f64 in SQL).
+rust_decimal = "1"
 
 # --- test-only ---
 testcontainers = "0.28"

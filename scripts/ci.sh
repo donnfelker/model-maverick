@@ -60,17 +60,8 @@ run_sqlx_check() {
         return
     fi
 
-    if [[ -z "${DATABASE_URL:-}" ]]; then
-        cat >&2 <<'EOF'
-SQLx checked queries exist, but DATABASE_URL is not set.
-
-Set DATABASE_URL to a migrated Postgres database, then rerun:
-  DATABASE_URL=postgres://... scripts/ci.sh fast
-EOF
-        exit 2
-    fi
-
-    run_logged fast sqlx cargo sqlx prepare --check --workspace
+    # Uses DATABASE_URL when set; otherwise a throwaway migrated Postgres container.
+    run_logged fast sqlx scripts/sqlx-prepare.sh --check
 }
 
 run_fast() {
