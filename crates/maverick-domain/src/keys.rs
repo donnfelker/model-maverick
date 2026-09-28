@@ -247,6 +247,8 @@ mod tests {
         assert_eq!(f["random_bytes"].as_u64().unwrap() as usize, RANDOM_BYTES);
     }
 
+    // parity: auth.TestEncodeBase62PadsToFixedLength
+    // parity: auth.TestMintKeyFormat
     #[test]
     fn base62_and_mint_match_fixture_rows() {
         let f = fixture();
@@ -281,6 +283,7 @@ mod tests {
         }
     }
 
+    // parity: auth.TestMintKeyUnique
     #[test]
     fn mint_key_has_the_expected_format() {
         let key = mint_key();
@@ -311,6 +314,8 @@ mod tests {
         );
     }
 
+    // parity: auth.TestInternalAuthAcceptsEachRotationToken
+    // parity: auth.TestInternalAuthRejectsBadTokens
     #[test]
     fn internal_auth_cases_match_fixture() {
         let f = fixture();
