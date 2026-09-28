@@ -1,1 +1,9 @@
-#![doc = "Pure domain logic for Model Maverick."]
+//! Pure domain logic for the Model Maverick engine.
+//!
+//! This crate has no I/O and no SQL. It holds ids, task and grader types, graders,
+//! scoring (EWMA and Welford), ranking, policy, ceilings, bands, checks, reasons,
+//! prediction and spend math, catalog lifecycle, capture crypto, fingerprints, key
+//! format, pure classifier logic, and telemetry derivation. `cargo-mutants` runs on
+//! this crate, so it stays fast to build.
+//!
+//! Package 2a fills this in. The skeleton is intentionally empty.

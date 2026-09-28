@@ -1,10 +1,35 @@
 [package]
 name = "maverick"
-version = "0.1.0"
+description = "The engine binary and CLI entry point. Wires the crates and runs the subcommands: serve, migrate, corpus, mcp-stdio, demo-run."
+version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+publish.workspace = true
+authors.workspace = true
 repository.workspace = true
+
+[[bin]]
+name = "maverick"
+path = "src/main.rs"
 
 [lints]
 workspace = true
+
+[dependencies]
+maverick-domain = { workspace = true }
+maverick-config = { workspace = true }
+maverick-store = { workspace = true }
+maverick-providers = { workspace = true }
+maverick-runner = { workspace = true }
+maverick-jobs = { workspace = true }
+maverick-alerts = { workspace = true }
+maverick-api = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+opentelemetry = { workspace = true }
+opentelemetry_sdk = { workspace = true }
+opentelemetry-otlp = { workspace = true }

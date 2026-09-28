@@ -1,4 +1,7 @@
+# Pin the toolchain to current stable (AGENTS.md: current stable, 2024 edition).
+# rustup reads this file and uses stable for every cargo/rustc command in this repo,
+# even though the machine default is nightly.
 [toolchain]
-channel = "1.98.1"
-components = ["clippy", "rustfmt"]
+channel = "stable"
+components = ["rustfmt", "clippy"]
 profile = "minimal"
