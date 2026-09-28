@@ -225,7 +225,7 @@ The engine recommends from measurements on the column's own endpoint; the custom
                      │                                        │
            ┌─────────▼──────────┐                   ┌─────────▼──────────┐   ┌──────────────┐
            │  Postgres (shell)  │                   │ Postgres (engine)  │   │ provider APIs│
-           └────────────────────┘                   │ 21 tables + jobs   │   │ anthropic    │
+           └────────────────────┘                   │ 22 tables + jobs   │   │ anthropic    │
                                                     └────────────────────┘   │ openai google│
                                                                              │ xai          │
    customer app ──base URL──▶ maverick-proxy ──recommend/telemetry──▶ engine └──────▲───────┘
