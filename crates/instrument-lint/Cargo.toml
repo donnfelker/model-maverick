@@ -1,0 +1,18 @@
+[package]
+name = "instrument-lint"
+description = "CI lint for the G5 telemetry redaction control (D19): rejects any #[instrument] without skip_all. Dev tooling, not part of the engine."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# Tooling-only dependency, so it is declared here and not in [workspace.dependencies].
+# span-locations gives line and column numbers when tokenizing outside a proc macro.
+proc-macro2 = { version = "1.0.107", default-features = false, features = ["span-locations"] }

@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/instrument-lint",
     "crates/maverick",
     "crates/maverick-alerts",
     "crates/maverick-api",
