@@ -2391,6 +2391,7 @@ dependencies = [
  "chrono",
  "insta",
  "maverick-domain",
+ "maverick-testdb",
  "serde",
  "serde_json",
  "sqlx",
