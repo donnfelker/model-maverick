@@ -1,6 +1,20 @@
 [workspace]
 resolver = "3"
-members = ["crates/*"]
+members = [
+    "crates/maverick",
+    "crates/maverick-alerts",
+    "crates/maverick-api",
+    "crates/maverick-config",
+    "crates/maverick-core",
+    "crates/maverick-domain",
+    "crates/maverick-jobs",
+    "crates/maverick-providers",
+    "crates/maverick-proxy",
+    "crates/maverick-runner",
+    "crates/maverick-store",
+    "crates/parity-support",
+    "crates/sdk-conformance",
+]
 
 # Shared package metadata. Each crate sets `[package] ... .workspace = true` to inherit.
 [workspace.package]
