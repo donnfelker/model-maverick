@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {
+      "expected": [
+        "not_in_pool",
+        "not_in_allowlist",
+        "standing_constraint:max_cost_per_run",
+        "standing_constraint:max_latency_ms",
+        "status_retired",
+        "no_data"
+      ],
+      "go_test": "policy.TestReasonsEnum",
+      "id": "reasons"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+description: regex facts search the raw output; the literal fact needs its exact surface form
+spec:
+  facts:
+    - { id: term_24mo, any_of: ['\b24[- ]months?\b'], regex: true }
+    - { id: penalty_pct, any_of: ["five percent"] }
+output: |-
+  The term is 24 months with a 5% late penalty.
+expect:
+  dimensions: { fact_coverage: 0.5 }
+  detail_contains: ['"id":"term_24mo"', '"found":true']

@@ -1,0 +1,28 @@
+description: field_accuracy is the fraction of checks passed
+spec:
+  schema:
+    type: object
+    required: [parties, effective_date, payment]
+    properties:
+      parties: { type: array, items: { type: string } }
+      effective_date: { type: string }
+      payment:
+        type: object
+        properties:
+          amount_usd: { type: number }
+  checks:
+    - { path: $.effective_date, equals: "2025-03-01" }
+    - { path: $.payment.amount_usd, numeric: 12500, tolerance: 0 }
+    - { path: "$.parties[0]", equals: "Acme Corp" }
+    - { path: "$.parties[1]", equals: "Beta LLC" }
+output: |-
+  ```json
+  {
+    "parties": ["Acme Corp", "Gamma GmbH"],
+    "effective_date": "2025-03-01",
+    "payment": { "amount_usd": 12000 }
+  }
+  ```
+expect:
+  dimensions: { schema_validity: 1.0, field_accuracy: 0.5 }
+  detail_contains: ['"path":"$.parties[1]"', '"got":"\"Gamma GmbH\""']

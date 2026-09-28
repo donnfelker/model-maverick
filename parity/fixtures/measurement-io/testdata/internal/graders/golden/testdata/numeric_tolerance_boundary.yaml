@@ -1,0 +1,8 @@
+description: adversarial numeric-tolerance edge — a value exactly at the tolerance boundary is inside it
+spec:
+  answers:
+    - { numeric: 100, tolerance: 0.5 }
+output: "100.5"
+expect:
+  dimensions: { answer_correctness: 1.0 }
+  detail_contains: ['"mode":"numeric"']

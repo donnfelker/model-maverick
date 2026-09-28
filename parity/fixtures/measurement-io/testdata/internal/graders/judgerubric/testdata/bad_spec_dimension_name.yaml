@@ -1,0 +1,7 @@
+description: dimensions are lower_snake identifiers, like every grader's
+spec:
+  rubric:
+    - { dimension: Idiom, criterion: Idiomatic style. }
+output: irrelevant
+expect:
+  error: true

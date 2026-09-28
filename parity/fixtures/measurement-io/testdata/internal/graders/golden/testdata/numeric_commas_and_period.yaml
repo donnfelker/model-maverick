@@ -1,0 +1,7 @@
+description: thousands separators and a trailing period are normalized before numeric comparison
+spec:
+  answers:
+    - { numeric: 12500 }
+output: "12,500."
+expect:
+  dimensions: { answer_correctness: 1.0 }

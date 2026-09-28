@@ -1,0 +1,10 @@
+description: adversarial near-miss — a similar-but-wrong surface form does not count as the fact
+spec:
+  facts:
+    - { id: party_acme, any_of: ["Acme Corp", "Acme Corporation"] }
+    - { id: term_24mo, any_of: ["24 month", "24-month", "two-year"] }
+output: |-
+  The agreement names Acme Incorporated and runs for a 24 month term.
+expect:
+  dimensions: { fact_coverage: 0.5 }
+  detail_contains: ['"id":"party_acme"', '"found":false']

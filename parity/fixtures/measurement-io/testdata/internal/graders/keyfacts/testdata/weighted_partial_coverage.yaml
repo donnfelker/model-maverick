@@ -1,0 +1,10 @@
+description: coverage is the weighted fraction of facts found
+spec:
+  facts:
+    - { id: effective_date, any_of: ["March 1, 2025", "2025-03-01"], weight: 3 }
+    - { id: governing_law, any_of: ["Delaware"], weight: 1 }
+output: |-
+  The contract takes effect on 2025-03-01.
+expect:
+  dimensions: { fact_coverage: 0.75 }
+  detail_contains: ['"id":"governing_law"', '"found":false']

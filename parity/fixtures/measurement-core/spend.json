@@ -1,0 +1,160 @@
+{
+  "estimate_input_tokens": {
+    "cases": [
+      {
+        "chars": 0,
+        "expected": 600
+      },
+      {
+        "chars": 1,
+        "expected": 601
+      },
+      {
+        "chars": 4,
+        "expected": 601
+      },
+      {
+        "chars": 5,
+        "expected": 602
+      },
+      {
+        "chars": 1000,
+        "expected": 850
+      },
+      {
+        "expected": 602,
+        "note": "6 runes, 9 bytes: counts runes",
+        "text": "héllo→"
+      }
+    ],
+    "formula": "ceil(rune_count(assembled_prompt)/4) + 600, integer arithmetic (chars+3)/4 + 600",
+    "go_test": "jobs.TestEstimateInputTokens"
+  },
+  "messages": {
+    "cases": [
+      {
+        "apply_nightly_cap": true,
+        "job": "nightly_smoke",
+        "night": "2030-08-10",
+        "night_total": 5,
+        "nightly_cap_usd": 4.99,
+        "projected_usd": 5,
+        "refusal_message": "nightly_smoke refused for 2030-08-10: projected $5.0000 would bring night to $5.0000 (cap $4.99) and week to $5.0000 (cap $500.00)",
+        "warning_message": "nightly_smoke for 2030-08-10 projects $5.0000, bringing night to $5.0000 (cap $4.99) and week to $5.0000 of $500.00 cap (≥80%)",
+        "week_total": 5,
+        "weekly_cap_usd": 500
+      },
+      {
+        "apply_nightly_cap": false,
+        "job": "weekly_sweep",
+        "night": "2031-01-12",
+        "night_total": 0.0123456,
+        "nightly_cap_usd": 100,
+        "projected_usd": 0.0123456,
+        "refusal_message": "weekly_sweep refused for 2031-01-12: projected $0.0123 would bring week to $0.0123 (cap $0.00)",
+        "warning_message": "weekly_sweep for 2031-01-12 projects $0.0123, bringing week to $0.0123 of $0.00 cap (≥80%)",
+        "week_total": 0.0123456,
+        "weekly_cap_usd": 0.000001
+      },
+      {
+        "apply_nightly_cap": true,
+        "job": "nightly_smoke",
+        "night": "2030-10-10",
+        "night_total": 5.00005,
+        "nightly_cap_usd": 6,
+        "projected_usd": 5,
+        "refusal_message": "nightly_smoke refused for 2030-10-10: projected $5.0000 would bring night to $5.0000 (cap $6.00) and week to $12.3457 (cap $500.00)",
+        "warning_message": "nightly_smoke for 2030-10-10 projects $5.0000, bringing night to $5.0000 (cap $6.00) and week to $12.3457 of $500.00 cap (≥80%)",
+        "week_total": 12.345678,
+        "weekly_cap_usd": 500
+      }
+    ],
+    "note": "Rendered with the exact Go format strings. %.4f/%.2f use round-half-even on the binary value (Go strconv)."
+  },
+  "project_spend": {
+    "cases": [
+      {
+        "columns": [
+          {
+            "id": "col_golden",
+            "pricing": "{\"input_per_mtok\": 3.0, \"output_per_mtok\": 15.0}"
+          }
+        ],
+        "expected": {
+          "projected_usd": 0.01665,
+          "runs": 3
+        },
+        "go_test": "jobs.TestProjectSpendGolden/bare_prompt",
+        "id": "bare_prompt",
+        "repeats": 3,
+        "tasks": [
+          {
+            "attachments": "[]",
+            "id": "task_golden_bare",
+            "max_tokens": 200,
+            "prompt": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "prompt_chars": 1000
+          }
+        ]
+      },
+      {
+        "columns": [
+          {
+            "id": "col_golden",
+            "pricing": "{\"input_per_mtok\": 3.0, \"output_per_mtok\": 15.0}"
+          }
+        ],
+        "expected": {
+          "projected_usd": 0.004899,
+          "runs": 1
+        },
+        "go_test": "jobs.TestProjectSpendGolden/prompt_with_attachment",
+        "id": "prompt_with_attachment",
+        "repeats": 1,
+        "tasks": [
+          {
+            "attachments": "[{\"name\":\"doc\",\"content\":\"yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy\"}]",
+            "id": "task_golden_attach",
+            "max_tokens": 200,
+            "prompt": "abc",
+            "prompt_chars": 3
+          }
+        ]
+      },
+      {
+        "columns": [
+          {
+            "id": "col_golden",
+            "pricing": "{\"input_per_mtok\": 3.0, \"output_per_mtok\": 15.0}"
+          },
+          {
+            "id": "col_golden_2",
+            "pricing": "{\"input_per_mtok\": 1.0, \"output_per_mtok\": 2.0}"
+          }
+        ],
+        "expected": {
+          "projected_usd": 0.009,
+          "runs": 4
+        },
+        "go_test": "jobs.TestProjectSpendGolden/sums_tasks_columns_and_repeats",
+        "id": "sums_tasks_columns_and_repeats",
+        "repeats": 2,
+        "tasks": [
+          {
+            "attachments": "[]",
+            "id": "task_golden_multi",
+            "max_tokens": 100,
+            "prompt": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "prompt_chars": 400
+          }
+        ]
+      }
+    ],
+    "formula": "for each column (outer) for each task (inner): per_run = (est_in*input_per_mtok + max_tokens*output_per_mtok)/1e6; projected += per_run*repeats; runs += repeats",
+    "tolerance": 1e-9
+  },
+  "subject_example": {
+    "json": "{\"job\":\"nightly_smoke\",\"night\":\"2030-08-10\",\"night_spent_usd\":0,\"nightly_cap_usd\":4.99,\"planned_runs\":3,\"projected_usd\":5,\"week_spent_usd\":0,\"weekly_cap_usd\":500}",
+    "note": "json.Marshal(map) sorts keys bytewise; floats use Go shortest repr (5.0 -\u003e 5)"
+  }
+}

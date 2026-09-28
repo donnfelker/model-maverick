@@ -1,0 +1,707 @@
+{
+  "area": "measurement-core",
+  "packages": [
+    "internal/scoring",
+    "internal/jobs",
+    "internal/predictions",
+    "internal/alerts",
+    "internal/catalog"
+  ],
+  "go_test_count": 136,
+  "manifest_top_level_count": 136,
+  "note": "go_test_count counts every `func Test*` (including 3 TestMain harness functions). Subtest rows (name/subtest) are listed in addition to their parent. Fixture anchors use `file.json#section/case-id`. TestOverconfidenceGolden's 'calibrated' row (0.5 pass + 0.5 fail) is the same pairs as the 'uninformative' fixture case: overconfidence 0.",
+  "tests": [
+    {
+      "go_test": "alerts.TestEmailDeliver",
+      "where": "fixtures/measurement-core/alerts_wire.json#email"
+    },
+    {
+      "go_test": "alerts.TestFanoutDeliveryFailureIsolation",
+      "where": "reference/engine-reference.md (Part 3)#t-alerts-isolation"
+    },
+    {
+      "go_test": "alerts.TestFanoutNilIsSafe",
+      "where": "reference/engine-reference.md (Part 3)#t-alerts-nil"
+    },
+    {
+      "go_test": "alerts.TestFanoutRetriesThenSucceeds",
+      "where": "reference/engine-reference.md (Part 3)#t-alerts-retry"
+    },
+    {
+      "go_test": "alerts.TestNewEmailValidatesURL",
+      "where": "reference/engine-reference.md (Part 3)#t-alerts-email-url"
+    },
+    {
+      "go_test": "alerts.TestNewFromConfig",
+      "where": "reference/engine-reference.md (Part 3)#t-alerts-new"
+    },
+    {
+      "go_test": "alerts.TestNewWebhookRequiresSecretAndHTTPURL",
+      "where": "reference/engine-reference.md (Part 3)#t-alerts-webhook-new"
+    },
+    {
+      "go_test": "alerts.TestWebhookSignatureVerifies",
+      "where": "fixtures/measurement-core/alerts_wire.json#webhook"
+    },
+    {
+      "go_test": "alerts.TestStoreFailedInsertDoesNotNotify",
+      "where": "reference/engine-reference.md (Part 3)#t-alerts-store"
+    },
+    {
+      "go_test": "alerts.TestStoreNilNotifierWrites",
+      "where": "reference/engine-reference.md (Part 3)#t-alerts-store"
+    },
+    {
+      "go_test": "alerts.TestStoreNotifiesAfterInsert",
+      "where": "reference/engine-reference.md (Part 3)#t-alerts-store"
+    },
+    {
+      "go_test": "catalog.TestClientsFor",
+      "where": "reference/engine-reference.md (Part 3)#t-catalog-clients-for"
+    },
+    {
+      "go_test": "catalog.TestColumnLookupByIDAndLifecycleState",
+      "where": "reference/engine-reference.md (Part 3)#t-catalog-lookup"
+    },
+    {
+      "go_test": "catalog.TestCostGolden",
+      "where": "fixtures/measurement-core/catalog.json#cost"
+    },
+    {
+      "go_test": "catalog.TestCostGolden/claude_list_price_small_run",
+      "where": "fixtures/measurement-core/catalog.json#cost/claude list price small run"
+    },
+    {
+      "go_test": "catalog.TestCostGolden/structured_extraction_run",
+      "where": "fixtures/measurement-core/catalog.json#cost/structured extraction run"
+    },
+    {
+      "go_test": "catalog.TestCostGolden/one_mtok_each_way",
+      "where": "fixtures/measurement-core/catalog.json#cost/one mtok each way"
+    },
+    {
+      "go_test": "catalog.TestCostGolden/cheap_column",
+      "where": "fixtures/measurement-core/catalog.json#cost/cheap column"
+    },
+    {
+      "go_test": "catalog.TestCostGolden/fractional_prices",
+      "where": "fixtures/measurement-core/catalog.json#cost/fractional prices"
+    },
+    {
+      "go_test": "catalog.TestCostGolden/rounds_to_numeric(12,6)_precision",
+      "where": "fixtures/measurement-core/catalog.json#cost/rounds to numeric(12,6) precision"
+    },
+    {
+      "go_test": "catalog.TestCostGolden/zero_tokens",
+      "where": "fixtures/measurement-core/catalog.json#cost/zero tokens"
+    },
+    {
+      "go_test": "catalog.TestCostGolden/empty_pricing_snapshot",
+      "where": "fixtures/measurement-core/catalog.json#cost/empty pricing snapshot"
+    },
+    {
+      "go_test": "catalog.TestMain",
+      "where": "reference/engine-reference.md (Part 3)#t-catalog-testmain"
+    },
+    {
+      "go_test": "catalog.TestParsePricing",
+      "where": "fixtures/measurement-core/catalog.json#parse_pricing"
+    },
+    {
+      "go_test": "catalog.TestRunnable",
+      "where": "fixtures/measurement-core/catalog.json#runnable"
+    },
+    {
+      "go_test": "jobs.TestAggregateRebuildFoldsAndStaysIdempotent",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-rebuild"
+    },
+    {
+      "go_test": "jobs.TestAggregateRebuildHighStakesOverlay",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-rebuild"
+    },
+    {
+      "go_test": "jobs.TestAggregateRebuildTimeoutUsesAnalyticsJobTimeout",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-timeouts"
+    },
+    {
+      "go_test": "jobs.TestAggregateRebuildZeroesFailedRuns",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-rebuild"
+    },
+    {
+      "go_test": "jobs.TestFinishBatchAlertsAndEnqueueSurviveExpiredJobContext",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-finish-expired"
+    },
+    {
+      "go_test": "jobs.TestFinishBatchAlertsWhenEnqueueFailsDespiteExpiredJobContext",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-finish-enqueue-fail"
+    },
+    {
+      "go_test": "jobs.TestCalibrationRowsPerCapability",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-calibration"
+    },
+    {
+      "go_test": "jobs.TestCalibrationScoreTimeoutUsesAnalyticsJobTimeout",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-timeouts"
+    },
+    {
+      "go_test": "jobs.TestLockBeforeRunOrdering",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-calibration"
+    },
+    {
+      "go_test": "jobs.TestPredictionCalibrationChain",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-calibration"
+    },
+    {
+      "go_test": "jobs.TestCaptureExpiryDeletesExpiredAndLogsDelete",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-retention"
+    },
+    {
+      "go_test": "jobs.TestCaptureExpiryIdempotent",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-retention"
+    },
+    {
+      "go_test": "jobs.TestCaptureExpirySweepsSpentWindows",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-retention"
+    },
+    {
+      "go_test": "jobs.TestCaptureExpiryWorkRejectsBadHour",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-retention"
+    },
+    {
+      "go_test": "jobs.TestHistoryPruneDeletesAgedRowsKeepsRecent",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-retention"
+    },
+    {
+      "go_test": "jobs.TestHistoryPruneIdempotent",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-retention"
+    },
+    {
+      "go_test": "jobs.TestNewClientRejectsBadCaptureExpiryCron",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-bad-cron"
+    },
+    {
+      "go_test": "jobs.TestNewClientRejectsBadHistoryPruneCron",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-bad-cron"
+    },
+    {
+      "go_test": "jobs.TestRetentionJobArgsUniquePerWindow",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-retention"
+    },
+    {
+      "go_test": "jobs.TestCatalogSyncDriftAlerts",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-catalog-sync"
+    },
+    {
+      "go_test": "jobs.TestCatalogSyncStatusTransitions",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-catalog-sync"
+    },
+    {
+      "go_test": "jobs.TestRetirementGuardBlocksLastPoolMember",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-catalog-sync"
+    },
+    {
+      "go_test": "jobs.TestFullMatrixWeeklySweep",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-corpus-gates"
+    },
+    {
+      "go_test": "jobs.TestMain",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-testmain"
+    },
+    {
+      "go_test": "jobs.TestNightlySmokeJudgeDisagreementFeedsAmbiguity",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-judge"
+    },
+    {
+      "go_test": "jobs.TestNightlySmokeJudgeFailureAlert",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-judge"
+    },
+    {
+      "go_test": "jobs.TestLatencyProbesTimeoutUsesAnalyticsJobTimeout",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-timeouts"
+    },
+    {
+      "go_test": "jobs.TestLatencyProbesWriteLatencyDimensionsOnly",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-latency"
+    },
+    {
+      "go_test": "jobs.TestNightlySmokeChain",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-smoke-chain"
+    },
+    {
+      "go_test": "jobs.TestNightlySmokeRefusalRunsNothing",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-smoke-refusal"
+    },
+    {
+      "go_test": "jobs.TestNightlySmokeThreeNightsFlipMeasured",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-three-nights"
+    },
+    {
+      "go_test": "jobs.TestNightlySmokeTimeoutUsesConfiguredBatchJobTimeout",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-timeouts"
+    },
+    {
+      "go_test": "jobs.TestNightlySmokeWarningStillRuns",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-smoke-warning"
+    },
+    {
+      "go_test": "jobs.TestCronFiresOn",
+      "where": "fixtures/measurement-core/cron.json#fires_on"
+    },
+    {
+      "go_test": "jobs.TestPredictionLockDerivesAndIsImmutable",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-prediction-lock"
+    },
+    {
+      "go_test": "jobs.TestPredictionLockSweepNightWidens",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-prediction-lock"
+    },
+    {
+      "go_test": "jobs.TestPriceSyncUpdatesSnapshotAndIsIdempotent",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-price-sync"
+    },
+    {
+      "go_test": "jobs.TestPriceSyncWithoutSourceIsANoOp",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-price-sync"
+    },
+    {
+      "go_test": "jobs.TestRealCorpusSimulatedNight",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-corpus-gates"
+    },
+    {
+      "go_test": "jobs.TestRebuildChainsRegressionScan",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-regression-scan"
+    },
+    {
+      "go_test": "jobs.TestRegressionScanDropDedupAndDeepening",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-regression-scan"
+    },
+    {
+      "go_test": "jobs.TestRegressionScanParseFailureWatch",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-regression-scan"
+    },
+    {
+      "go_test": "jobs.TestRegressionScanSeverity",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-regression-scan"
+    },
+    {
+      "go_test": "jobs.TestRegressionScanShock",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-regression-scan"
+    },
+    {
+      "go_test": "jobs.TestRegressionScanTimeoutUsesAnalyticsJobTimeout",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-timeouts"
+    },
+    {
+      "go_test": "jobs.TestCronNext",
+      "where": "fixtures/measurement-core/cron.json#next"
+    },
+    {
+      "go_test": "jobs.TestNewClientRejectsBadNightlyCron",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-bad-cron"
+    },
+    {
+      "go_test": "jobs.TestParseCronAcceptsConfigDefaults",
+      "where": "fixtures/measurement-core/cron.json#parse_accept"
+    },
+    {
+      "go_test": "jobs.TestParseCronRejectsInvalid",
+      "where": "fixtures/measurement-core/cron.json#parse_reject"
+    },
+    {
+      "go_test": "jobs.TestEstimateInputTokens",
+      "where": "fixtures/measurement-core/spend.json#estimate_input_tokens"
+    },
+    {
+      "go_test": "jobs.TestProjectSpendGolden",
+      "where": "fixtures/measurement-core/spend.json#project_spend"
+    },
+    {
+      "go_test": "jobs.TestSpendGuardAllowsUnderCap",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-spend-guard"
+    },
+    {
+      "go_test": "jobs.TestSpendGuardRefusesOverNightlyCap",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-spend-guard"
+    },
+    {
+      "go_test": "jobs.TestSpendGuardRefusesOverWeeklyCap",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-spend-guard"
+    },
+    {
+      "go_test": "jobs.TestSpendGuardSumsWindowActuals",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-spend-guard"
+    },
+    {
+      "go_test": "jobs.TestSpendGuardWarnsAtEightyPercent",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-spend-guard"
+    },
+    {
+      "go_test": "jobs.TestIsoWeek",
+      "where": "fixtures/measurement-core/cron.json#iso_week"
+    },
+    {
+      "go_test": "jobs.TestWeeklySweepChain",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-weekly"
+    },
+    {
+      "go_test": "jobs.TestWeeklySweepIgnoresNightlyCap",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-weekly"
+    },
+    {
+      "go_test": "jobs.TestWeeklySweepRefusalAgainstWeeklyCap",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-weekly"
+    },
+    {
+      "go_test": "jobs.TestWeeklySweepTimeoutUsesConfiguredBatchJobTimeout",
+      "where": "reference/engine-reference.md (Part 3)#t-jobs-timeouts"
+    },
+    {
+      "go_test": "predictions.TestBrierGolden",
+      "where": "fixtures/measurement-core/predictions.json#brier_and_overconfidence"
+    },
+    {
+      "go_test": "predictions.TestBrierGolden/mixed_hand-computed",
+      "where": "fixtures/measurement-core/predictions.json#brier_and_overconfidence/mixed hand-computed"
+    },
+    {
+      "go_test": "predictions.TestBrierGolden/perfect",
+      "where": "fixtures/measurement-core/predictions.json#brier_and_overconfidence/perfect"
+    },
+    {
+      "go_test": "predictions.TestBrierGolden/perfectly_wrong",
+      "where": "fixtures/measurement-core/predictions.json#brier_and_overconfidence/perfectly wrong"
+    },
+    {
+      "go_test": "predictions.TestBrierGolden/uninformative",
+      "where": "fixtures/measurement-core/predictions.json#brier_and_overconfidence/uninformative"
+    },
+    {
+      "go_test": "predictions.TestBrierGolden/single_pair",
+      "where": "fixtures/measurement-core/predictions.json#brier_and_overconfidence/single pair"
+    },
+    {
+      "go_test": "predictions.TestBrierGolden/no_pairs",
+      "where": "fixtures/measurement-core/predictions.json#brier_and_overconfidence/no pairs"
+    },
+    {
+      "go_test": "predictions.TestOverconfidenceGolden",
+      "where": "fixtures/measurement-core/predictions.json#brier_and_overconfidence"
+    },
+    {
+      "go_test": "predictions.TestOverconfidenceGolden/mixed_hand-computed",
+      "where": "fixtures/measurement-core/predictions.json#brier_and_overconfidence/mixed hand-computed"
+    },
+    {
+      "go_test": "predictions.TestOverconfidenceGolden/underconfident",
+      "where": "fixtures/measurement-core/predictions.json#brier_and_overconfidence/underconfident"
+    },
+    {
+      "go_test": "predictions.TestOverconfidenceGolden/overconfident",
+      "where": "fixtures/measurement-core/predictions.json#brier_and_overconfidence/overconfident"
+    },
+    {
+      "go_test": "predictions.TestOverconfidenceGolden/calibrated",
+      "where": "fixtures/measurement-core/predictions.json#brier_and_overconfidence/uninformative"
+    },
+    {
+      "go_test": "predictions.TestOverconfidenceGolden/no_pairs",
+      "where": "fixtures/measurement-core/predictions.json#brier_and_overconfidence/no pairs"
+    },
+    {
+      "go_test": "predictions.TestDeriveEmpty",
+      "where": "fixtures/measurement-core/predictions.json#derive_empty"
+    },
+    {
+      "go_test": "predictions.TestDeriveGolden",
+      "where": "fixtures/measurement-core/predictions.json#derive"
+    },
+    {
+      "go_test": "scoring.TestObserve",
+      "where": "fixtures/measurement-core/observe.json#observe/full"
+    },
+    {
+      "go_test": "scoring.TestObserveEmpty",
+      "where": "fixtures/measurement-core/observe.json#observe/empty"
+    },
+    {
+      "go_test": "scoring.TestObserveSingleRunPercentiles",
+      "where": "fixtures/measurement-core/observe.json#observe/single_run_percentiles"
+    },
+    {
+      "go_test": "scoring.TestObserveSparseData",
+      "where": "fixtures/measurement-core/observe.json#observe/sparse"
+    },
+    {
+      "go_test": "scoring.TestFoldObservationsMultipleDimensions",
+      "where": "reference/engine-reference.md (Part 3)#t-scoring-fold-multi"
+    },
+    {
+      "go_test": "scoring.TestFoldObservationsThreeNights",
+      "where": "reference/engine-reference.md (Part 3)#t-scoring-fold-three-nights"
+    },
+    {
+      "go_test": "scoring.TestMain",
+      "where": "reference/engine-reference.md (Part 3)#t-scoring-testmain"
+    },
+    {
+      "go_test": "scoring.TestSaveScoresRoundTrip",
+      "where": "reference/engine-reference.md (Part 3)#t-scoring-save-scores"
+    },
+    {
+      "go_test": "scoring.TestEWMABoundsProperty",
+      "where": "reference/engine-reference.md (Part 3)#t-scoring-properties"
+    },
+    {
+      "go_test": "scoring.TestResumeEmptySeries",
+      "where": "fixtures/measurement-core/ewma.json#resume_empty"
+    },
+    {
+      "go_test": "scoring.TestResumeMatchesDirectFoldProperty",
+      "where": "reference/engine-reference.md (Part 3)#t-scoring-properties"
+    },
+    {
+      "go_test": "scoring.TestResumeReconstructsObservations",
+      "where": "fixtures/measurement-core/ewma.json#resume"
+    },
+    {
+      "go_test": "scoring.TestStreamEmpty",
+      "where": "fixtures/measurement-core/ewma.json#empty_stream"
+    },
+    {
+      "go_test": "scoring.TestStreamMeasuredFlipsAtMinNights",
+      "where": "fixtures/measurement-core/ewma.json#measured_flip"
+    },
+    {
+      "go_test": "scoring.TestStreamSeedAndFolds",
+      "where": "fixtures/measurement-core/ewma.json#stream_seed_and_folds"
+    },
+    {
+      "go_test": "scoring.TestOrderSwapDisagreementFeedsAmbiguity",
+      "where": "fixtures/measurement-core/penalties.json#shared_dimension_spread/order_swap_plus_deterministic"
+    },
+    {
+      "go_test": "scoring.TestOrderSwapMeanOnlyForRunQuality",
+      "where": "fixtures/measurement-core/run_quality.json#order_swap_mean_only"
+    },
+    {
+      "go_test": "scoring.TestOrderSwapObservations",
+      "where": "fixtures/measurement-core/orderswap.json"
+    },
+    {
+      "go_test": "scoring.TestOrderSwapObservations/nil_detail",
+      "where": "fixtures/measurement-core/orderswap.json#nil detail"
+    },
+    {
+      "go_test": "scoring.TestOrderSwapObservations/empty_detail",
+      "where": "fixtures/measurement-core/orderswap.json#empty detail"
+    },
+    {
+      "go_test": "scoring.TestOrderSwapObservations/no_order_swap",
+      "where": "fixtures/measurement-core/orderswap.json#no order swap"
+    },
+    {
+      "go_test": "scoring.TestOrderSwapObservations/single_call",
+      "where": "fixtures/measurement-core/orderswap.json#single call"
+    },
+    {
+      "go_test": "scoring.TestOrderSwapObservations/call_w/o_scores",
+      "where": "fixtures/measurement-core/orderswap.json#call w/o scores"
+    },
+    {
+      "go_test": "scoring.TestOrderSwapObservations/not_an_array",
+      "where": "fixtures/measurement-core/orderswap.json#not an array"
+    },
+    {
+      "go_test": "scoring.TestOrderSwapObservations/malformed_json",
+      "where": "fixtures/measurement-core/orderswap.json#malformed json"
+    },
+    {
+      "go_test": "scoring.TestOrderSwapObservations/non-object_array",
+      "where": "fixtures/measurement-core/orderswap.json#non-object array"
+    },
+    {
+      "go_test": "scoring.TestApplyAutofailZeroesRun",
+      "where": "fixtures/measurement-core/overlay.json#apply_autofail"
+    },
+    {
+      "go_test": "scoring.TestAutofail",
+      "where": "fixtures/measurement-core/overlay.json#autofail"
+    },
+    {
+      "go_test": "scoring.TestAutofail/no_details",
+      "where": "fixtures/measurement-core/overlay.json#autofail/no details"
+    },
+    {
+      "go_test": "scoring.TestAutofail/nil_detail",
+      "where": "fixtures/measurement-core/overlay.json#autofail/nil detail"
+    },
+    {
+      "go_test": "scoring.TestAutofail/empty_object",
+      "where": "fixtures/measurement-core/overlay.json#autofail/empty object"
+    },
+    {
+      "go_test": "scoring.TestAutofail/malformed_detail",
+      "where": "fixtures/measurement-core/overlay.json#autofail/malformed detail"
+    },
+    {
+      "go_test": "scoring.TestAutofail/critical_rule_failed",
+      "where": "fixtures/measurement-core/overlay.json#autofail/critical rule failed"
+    },
+    {
+      "go_test": "scoring.TestAutofail/critical_rule_passed",
+      "where": "fixtures/measurement-core/overlay.json#autofail/critical rule passed"
+    },
+    {
+      "go_test": "scoring.TestAutofail/forbidden_fact_with_autofail_found",
+      "where": "fixtures/measurement-core/overlay.json#autofail/forbidden fact with autofail found"
+    },
+    {
+      "go_test": "scoring.TestAutofail/forbidden_fact_without_autofail",
+      "where": "fixtures/measurement-core/overlay.json#autofail/forbidden fact without autofail"
+    },
+    {
+      "go_test": "scoring.TestAutofail/autofail_fact_absent_from_output",
+      "where": "fixtures/measurement-core/overlay.json#autofail/autofail fact absent from output"
+    },
+    {
+      "go_test": "scoring.TestAutofail/marker_in_later_grader",
+      "where": "fixtures/measurement-core/overlay.json#autofail/marker in later grader"
+    },
+    {
+      "go_test": "scoring.TestHighStakes",
+      "where": "fixtures/measurement-core/overlay.json#high_stakes"
+    },
+    {
+      "go_test": "scoring.TestOverlayGoldenSameOutputWithAndWithoutOverlay",
+      "where": "fixtures/measurement-core/overlay.json#overlay_golden_pair"
+    },
+    {
+      "go_test": "scoring.TestOverlayWeightsNativeCalibrationClass",
+      "where": "fixtures/measurement-core/overlay.json#overlay_weights/native_calibration_class"
+    },
+    {
+      "go_test": "scoring.TestOverlayWeightsStructuredExtraction",
+      "where": "fixtures/measurement-core/overlay.json#overlay_weights/structured_extraction"
+    },
+    {
+      "go_test": "scoring.TestAmbiguity",
+      "where": "fixtures/measurement-core/penalties.json#ambiguity/three,empty"
+    },
+    {
+      "go_test": "scoring.TestAmbiguityPenalty",
+      "where": "fixtures/measurement-core/penalties.json#ambiguity_penalty/default_lambda"
+    },
+    {
+      "go_test": "scoring.TestAmbiguityPenaltyFloorsAtZero",
+      "where": "fixtures/measurement-core/penalties.json#ambiguity_penalty/floors_at_zero"
+    },
+    {
+      "go_test": "scoring.TestJudgeOrderSwapDisagreement",
+      "where": "fixtures/measurement-core/penalties.json#shared_dimension_spread/judge_order_swap"
+    },
+    {
+      "go_test": "scoring.TestPenaltyProperties",
+      "where": "reference/engine-reference.md (Part 3)#t-scoring-properties"
+    },
+    {
+      "go_test": "scoring.TestSharedDimensionSpread",
+      "where": "fixtures/measurement-core/penalties.json#shared_dimension_spread/one_shared"
+    },
+    {
+      "go_test": "scoring.TestSharedDimensionSpreadBoundsProperty",
+      "where": "reference/engine-reference.md (Part 3)#t-scoring-properties"
+    },
+    {
+      "go_test": "scoring.TestSharedDimensionSpreadMultipleSharedDims",
+      "where": "fixtures/measurement-core/penalties.json#shared_dimension_spread/two_shared"
+    },
+    {
+      "go_test": "scoring.TestSharedDimensionSpreadNoSharedDimension",
+      "where": "fixtures/measurement-core/penalties.json#shared_dimension_spread/none_shared"
+    },
+    {
+      "go_test": "scoring.TestVariancePenalty",
+      "where": "fixtures/measurement-core/penalties.json#variance_penalty/three_repeats"
+    },
+    {
+      "go_test": "scoring.TestVariancePenaltyFloorsAtZero",
+      "where": "fixtures/measurement-core/penalties.json#variance_penalty/floors_at_zero"
+    },
+    {
+      "go_test": "scoring.TestVariancePenaltyNoGradableRepeats",
+      "where": "fixtures/measurement-core/penalties.json#variance_penalty/no_gradable"
+    },
+    {
+      "go_test": "scoring.TestVariancePenaltySigmaMatchesDirectFormula",
+      "where": "reference/engine-reference.md (Part 3)#t-scoring-properties"
+    },
+    {
+      "go_test": "scoring.TestVariancePenaltySingleRepeat",
+      "where": "fixtures/measurement-core/penalties.json#variance_penalty/single_repeat"
+    },
+    {
+      "go_test": "scoring.TestDetectRegressionsGradualDropFlagsAtCrossingNight",
+      "where": "fixtures/measurement-core/regression.json#detect/gradual_drop_8"
+    },
+    {
+      "go_test": "scoring.TestDetectRegressionsShockRespectsVarianceBand",
+      "where": "fixtures/measurement-core/regression.json#detect/variance_band_noisy,variance_band_quiet"
+    },
+    {
+      "go_test": "scoring.TestDetectRegressionsStableSeriesStaysQuiet",
+      "where": "fixtures/measurement-core/regression.json#detect/stable"
+    },
+    {
+      "go_test": "scoring.TestDetectRegressionsSuddenShock",
+      "where": "fixtures/measurement-core/regression.json#detect/sudden_shock"
+    },
+    {
+      "go_test": "scoring.TestDetectRegressionsTrailingWindowExpires",
+      "where": "fixtures/measurement-core/regression.json#detect/trailing_window_expires"
+    },
+    {
+      "go_test": "scoring.TestFilterAlertableDedupAndDeepening",
+      "where": "fixtures/measurement-core/regression.json#filter_alertable/dedup_and_deepening"
+    },
+    {
+      "go_test": "scoring.TestFilterAlertableWindowExpiry",
+      "where": "fixtures/measurement-core/regression.json#filter_alertable/inside_window_not_deeper,exactly_seven_days_rearms"
+    },
+    {
+      "go_test": "scoring.TestRegressionCrossesBar",
+      "where": "fixtures/measurement-core/regression.json#crosses_bar"
+    },
+    {
+      "go_test": "scoring.TestRunQualityAllGradersAbsent",
+      "where": "fixtures/measurement-core/run_quality.json#all_graders_absent"
+    },
+    {
+      "go_test": "scoring.TestRunQualityBoundsProperty",
+      "where": "reference/engine-reference.md (Part 3)#t-scoring-properties"
+    },
+    {
+      "go_test": "scoring.TestRunQualityIgnoresUnweightedDimensions",
+      "where": "fixtures/measurement-core/run_quality.json#ignores_unweighted"
+    },
+    {
+      "go_test": "scoring.TestRunQualityPassAtExactThreshold",
+      "where": "fixtures/measurement-core/run_quality.json#pass_at_exact_threshold"
+    },
+    {
+      "go_test": "scoring.TestRunQualityRenormalizesAbsentDimensions",
+      "where": "fixtures/measurement-core/run_quality.json#renormalizes_absent"
+    },
+    {
+      "go_test": "scoring.TestRunQualitySharedDimensionAveraged",
+      "where": "fixtures/measurement-core/run_quality.json#shared_dimension_averaged"
+    },
+    {
+      "go_test": "scoring.TestRunQualityStatusHandling",
+      "where": "fixtures/measurement-core/run_quality.json#status_provider_error,status_timeout,status_parse_failure_graded"
+    },
+    {
+      "go_test": "scoring.TestRunQualityWeightedSum",
+      "where": "fixtures/measurement-core/run_quality.json#weighted_sum"
+    }
+  ]
+}

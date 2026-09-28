@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelmaverick.dev/graders/golden_answer/spec.schema.json",
+  "title": "golden_answer grader spec (version 1)",
+  "type": "object",
+  "required": ["answers"],
+  "additionalProperties": false,
+  "properties": {
+    "answers": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/answer" }
+    }
+  },
+  "$defs": {
+    "answer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "value": { "type": "string", "minLength": 1 },
+        "numeric": { "type": "number" },
+        "tolerance": { "type": "number", "minimum": 0 },
+        "set": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "regex": { "type": "string", "minLength": 1 }
+      },
+      "oneOf": [
+        { "required": ["value"] },
+        { "required": ["numeric"] },
+        { "required": ["set"] },
+        { "required": ["regex"] }
+      ],
+      "dependentRequired": { "tolerance": ["numeric"] }
+    }
+  }
+}

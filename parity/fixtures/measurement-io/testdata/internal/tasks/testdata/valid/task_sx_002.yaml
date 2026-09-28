@@ -1,0 +1,41 @@
+id: task_sx_002
+capability: structured_extraction
+domain_tags: [finance]
+difficulty_tier: 5
+difficulty_knobs: { document_noise: 5, field_count: 5, nesting_depth: 4, distractor_content: 5 }
+prompt: |
+  From the filing excerpt, extract every subsidiary with its ownership
+  percentage and jurisdiction as a JSON array under the key "subsidiaries".
+  Exclude entities mentioned only as counterparties.
+attachments:
+  - name: filing.txt
+    content: |
+      Exhibit 21.1 — Subsidiaries of the Registrant
+
+      The Registrant holds 80% of the outstanding shares of Alpha GmbH
+      (organized under the laws of Germany) and 55% of Beta KK (organized
+      under the laws of Japan). In the ordinary course of business the
+      Registrant enters into hedging arrangements with Gamma LLC, a Delaware
+      limited liability company that is not affiliated with the Registrant.
+temperature: 0
+max_tokens: 2000
+smoke_member: true
+dimension_weights: { constraint_compliance: 0.4, completeness: 0.4, hallucination_free: 0.2 }
+grader_specs:
+  - type: rule_scan
+    version: 1
+    weight_dimensions: { constraint_compliance: 1.0 }
+    spec:
+      rules:
+        - { must_include: '"subsidiaries"', weight: 2, critical: true }
+        - { must_not_include: "Gamma", critical: true }
+  - type: key_facts
+    version: 1
+    weight_dimensions: { completeness: 1.0, hallucination_free: 1.0 }
+    spec:
+      facts:
+        - { id: alpha_gmbh, any_of: ["Alpha GmbH"], weight: 1 }
+        - { id: beta_kk, any_of: ["Beta KK"], weight: 1 }
+        - { id: alpha_pct, any_of: ["80%", "80 percent"], weight: 1 }
+      forbidden_facts:
+        - { id: gamma_llc, any_of: ["Gamma LLC"], weight: 1 }

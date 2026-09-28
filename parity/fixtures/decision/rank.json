@@ -1,0 +1,1504 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "exclusions": [],
+        "ranked": [
+          {
+            "column_id": "col_b",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0.6
+          },
+          {
+            "column_id": "col_a",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 1,
+            "v": 0.5
+          },
+          {
+            "column_id": "col_c",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": false,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 2,
+            "v": 0.19444444444444445
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankOrdering/balanced_band:_quality_diff_exactly_at_band_is_a_leader,_V_orders_the_band",
+      "id": "TestRankOrdering/balanced_band:_quality_diff_exactly_at_band_is_a_leader,_V_orders_the_band#1",
+      "input": {
+        "mode": "balanced",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_a",
+            "cost_per_run": 10,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 90,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_b",
+            "cost_per_run": 1,
+            "family": "openai",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 88.5,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_c",
+            "cost_per_run": 5,
+            "family": "google",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 87,
+            "violations": null
+          }
+        ],
+        "weights": null
+      }
+    },
+    {
+      "expected": {
+        "exclusions": [],
+        "ranked": [
+          {
+            "column_id": "col_b",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0.7755000000000003
+          },
+          {
+            "column_id": "col_a",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 1,
+            "v": 0.5
+          },
+          {
+            "column_id": "col_c",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": false,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 2,
+            "v": 0.2722222222222222
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankOrdering/balanced_band:_just_inside_the_band_joins_the_leaders",
+      "id": "TestRankOrdering/balanced_band:_just_inside_the_band_joins_the_leaders#1",
+      "input": {
+        "mode": "balanced",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_a",
+            "cost_per_run": 10,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 90,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_b",
+            "cost_per_run": 1,
+            "family": "openai",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 88.51,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_c",
+            "cost_per_run": 3,
+            "family": "google",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 80,
+            "violations": null
+          }
+        ],
+        "weights": null
+      }
+    },
+    {
+      "expected": {
+        "exclusions": [],
+        "ranked": [
+          {
+            "column_id": "col_a",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0.6224489795918368
+          },
+          {
+            "column_id": "col_b",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": false,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 1,
+            "v": 0.4633888888888887
+          },
+          {
+            "column_id": "col_c",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": false,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 2,
+            "v": 0.5
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankOrdering/balanced_band:_just_outside_the_band_stays_in_the_tail_despite_top_V",
+      "id": "TestRankOrdering/balanced_band:_just_outside_the_band_stays_in_the_tail_despite_top_V#1",
+      "input": {
+        "mode": "balanced",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_a",
+            "cost_per_run": 10,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 90,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_b",
+            "cost_per_run": 9,
+            "family": "openai",
+            "has_data": true,
+            "latency_p95": 5000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 88.49,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_c",
+            "cost_per_run": 1,
+            "family": "google",
+            "has_data": true,
+            "latency_p95": 100,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 80,
+            "violations": null
+          }
+        ],
+        "weights": null
+      }
+    },
+    {
+      "expected": {
+        "exclusions": [],
+        "ranked": [
+          {
+            "column_id": "col_a",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0.8
+          },
+          {
+            "column_id": "col_b",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": false,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 1,
+            "v": 0.5
+          },
+          {
+            "column_id": "col_c",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": false,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 2,
+            "v": 0.05555555555555556
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankOrdering/quality_mode_band_zero:_only_max_quality_leads,_tail_quality-ordered",
+      "id": "TestRankOrdering/quality_mode_band_zero:_only_max_quality_leads,_tail_quality-ordered#1",
+      "input": {
+        "mode": "quality",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_a",
+            "cost_per_run": 10,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 90,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_b",
+            "cost_per_run": 1,
+            "family": "openai",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 88.5,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_c",
+            "cost_per_run": 5,
+            "family": "google",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 87,
+            "violations": null
+          }
+        ],
+        "weights": null
+      }
+    },
+    {
+      "expected": {
+        "exclusions": [],
+        "ranked": [
+          {
+            "column_id": "col_b",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0.35
+          },
+          {
+            "column_id": "col_a",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 1,
+            "v": 0.5
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankOrdering/noise_tie:_cheaper_second_candidate_is_promoted",
+      "id": "TestRankOrdering/noise_tie:_cheaper_second_candidate_is_promoted#1",
+      "input": {
+        "mode": "balanced",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_a",
+            "cost_per_run": 5,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 90,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_b",
+            "cost_per_run": 2,
+            "family": "openai",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 89.7,
+            "violations": null
+          }
+        ],
+        "weights": null
+      }
+    },
+    {
+      "expected": {
+        "exclusions": [],
+        "ranked": [
+          {
+            "column_id": "col_a",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0.85
+          },
+          {
+            "column_id": "col_b",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 1,
+            "v": 0
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankOrdering/noise_tie:_cheaper_candidate_already_first_stays_first",
+      "id": "TestRankOrdering/noise_tie:_cheaper_candidate_already_first_stays_first#1",
+      "input": {
+        "mode": "balanced",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_a",
+            "cost_per_run": 2,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 90,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_b",
+            "cost_per_run": 5,
+            "family": "openai",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 89.7,
+            "violations": null
+          }
+        ],
+        "weights": null
+      }
+    },
+    {
+      "expected": {
+        "exclusions": [],
+        "ranked": [
+          {
+            "column_id": "col_a",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0.8
+          },
+          {
+            "column_id": "col_b",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": false,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 1,
+            "v": 0.1
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankOrdering/noise_tie:_gap_beyond_the_noise_band_keeps_V_order",
+      "id": "TestRankOrdering/noise_tie:_gap_beyond_the_noise_band_keeps_V_order#1",
+      "input": {
+        "mode": "quality",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_a",
+            "cost_per_run": 5,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 90,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_b",
+            "cost_per_run": 2,
+            "family": "openai",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 89.24,
+            "violations": null
+          }
+        ],
+        "weights": null
+      }
+    },
+    {
+      "expected": {
+        "exclusions": [],
+        "ranked": [
+          {
+            "column_id": "col_sonnet",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": false,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0.06666666666666668
+          },
+          {
+            "column_id": "col_gpt",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": false,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 1,
+            "v": 0.5
+          },
+          {
+            "column_id": "col_opus",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 2,
+            "v": 0.8
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankOrdering/noise_tie:_same-family_downgrade_preferred_over_cheaper_cross-family_swap",
+      "id": "TestRankOrdering/noise_tie:_same-family_downgrade_preferred_over_cheaper_cross-family_swap#1",
+      "input": {
+        "mode": "quality",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_opus",
+            "cost_per_run": 10,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 90,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_gpt",
+            "cost_per_run": 1,
+            "family": "openai",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 89.8,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_sonnet",
+            "cost_per_run": 4,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 89.6,
+            "violations": null
+          }
+        ],
+        "weights": null
+      }
+    },
+    {
+      "expected": {
+        "exclusions": [],
+        "ranked": [
+          {
+            "column_id": "col_gpt",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": false,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0.5
+          },
+          {
+            "column_id": "col_gemini",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": false,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 1,
+            "v": 0.06666666666666668
+          },
+          {
+            "column_id": "col_opus",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 2,
+            "v": 0.8
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankOrdering/noise_tie:_cheapest_cross-family_wins_when_no_same-family_sibling_is_in_the_band",
+      "id": "TestRankOrdering/noise_tie:_cheapest_cross-family_wins_when_no_same-family_sibling_is_in_the_band#1",
+      "input": {
+        "mode": "quality",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_opus",
+            "cost_per_run": 10,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 90,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_gpt",
+            "cost_per_run": 1,
+            "family": "openai",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 89.8,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_gemini",
+            "cost_per_run": 4,
+            "family": "google",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 89.6,
+            "violations": null
+          }
+        ],
+        "weights": null
+      }
+    },
+    {
+      "expected": {
+        "exclusions": [],
+        "ranked": [
+          {
+            "column_id": "col_s1",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0.17857142857142858
+          },
+          {
+            "column_id": "col_s2",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": false,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 1,
+            "v": 0.35
+          },
+          {
+            "column_id": "col_v",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": false
+            },
+            "rank": 2,
+            "v": 0.675
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankOrdering/preference_violator_with_top_quality_sinks_below_all_satisfiers",
+      "id": "TestRankOrdering/preference_violator_with_top_quality_sinks_below_all_satisfiers#1",
+      "input": {
+        "mode": "balanced",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_s1",
+            "cost_per_run": 5,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 90,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_s2",
+            "cost_per_run": 1,
+            "family": "openai",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 85,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_v",
+            "cost_per_run": 3,
+            "family": "google",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": false,
+            "quality": 99,
+            "violations": null
+          }
+        ],
+        "weights": null
+      }
+    },
+    {
+      "expected": {
+        "exclusions": [],
+        "ranked": [
+          {
+            "column_id": "col_a",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0.5
+          },
+          {
+            "column_id": "col_b",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 1,
+            "v": 0.35
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankOrdering/mode_defaults:_balanced_weights_favor_the_quality_edge",
+      "id": "TestRankOrdering/mode_defaults:_balanced_weights_favor_the_quality_edge#1",
+      "input": {
+        "mode": "balanced",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_a",
+            "cost_per_run": 10,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 90,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_b",
+            "cost_per_run": 1,
+            "family": "openai",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 89,
+            "violations": null
+          }
+        ],
+        "weights": null
+      }
+    },
+    {
+      "expected": {
+        "exclusions": [],
+        "ranked": [
+          {
+            "column_id": "col_b",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0.6
+          },
+          {
+            "column_id": "col_a",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 1,
+            "v": 0.25
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankOrdering/mode_defaults:_cost_weights_flip_the_same_pair",
+      "id": "TestRankOrdering/mode_defaults:_cost_weights_flip_the_same_pair#1",
+      "input": {
+        "mode": "cost",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_a",
+            "cost_per_run": 10,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 90,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_b",
+            "cost_per_run": 1,
+            "family": "openai",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 89,
+            "violations": null
+          }
+        ],
+        "weights": null
+      }
+    },
+    {
+      "expected": {
+        "exclusions": [],
+        "ranked": [
+          {
+            "column_id": "col_b",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0.7
+          },
+          {
+            "column_id": "col_a",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 1,
+            "v": 0.2
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankOrdering/tenant_weights_override_the_mode_defaults",
+      "id": "TestRankOrdering/tenant_weights_override_the_mode_defaults#1",
+      "input": {
+        "mode": "balanced",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_a",
+            "cost_per_run": 10,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 90,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_b",
+            "cost_per_run": 1,
+            "family": "openai",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 89,
+            "violations": null
+          }
+        ],
+        "weights": {
+          "cost": 0.7,
+          "latency": 0.1,
+          "quality": 0.2
+        }
+      }
+    },
+    {
+      "expected": {
+        "exclusions": [],
+        "ranked": [
+          {
+            "column_id": "col_b",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0.6
+          },
+          {
+            "column_id": "col_a",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 1,
+            "v": 0.25
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankOrdering/cost_mode_wide_band_makes_a_five-point-cheaper_column_the_pick",
+      "id": "TestRankOrdering/cost_mode_wide_band_makes_a_five-point-cheaper_column_the_pick#1",
+      "input": {
+        "mode": "cost",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_a",
+            "cost_per_run": 8,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 94,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_b",
+            "cost_per_run": 1,
+            "family": "openai",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 89,
+            "violations": null
+          }
+        ],
+        "weights": null
+      }
+    },
+    {
+      "expected": {
+        "exclusions": [],
+        "ranked": [
+          {
+            "column_id": "col_a",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0.5
+          },
+          {
+            "column_id": "col_b",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": false,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 1,
+            "v": 0.35
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankOrdering/balanced_band_keeps_the_same_five-point_gap_out_of_the_leaders",
+      "id": "TestRankOrdering/balanced_band_keeps_the_same_five-point_gap_out_of_the_leaders#1",
+      "input": {
+        "mode": "balanced",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_a",
+            "cost_per_run": 8,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 94,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_b",
+            "cost_per_run": 1,
+            "family": "openai",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 89,
+            "violations": null
+          }
+        ],
+        "weights": null
+      }
+    },
+    {
+      "expected": {
+        "exclusions": [],
+        "ranked": [
+          {
+            "column_id": "col_a",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0.5
+          },
+          {
+            "column_id": "col_b",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": false,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 1,
+            "v": 0.21428571428571427
+          },
+          {
+            "column_id": "col_c",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": false,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 2,
+            "v": 0.35
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankOrdering/absent_quality_sorts_to_the_end_of_the_tail_and_never_ties",
+      "id": "TestRankOrdering/absent_quality_sorts_to_the_end_of_the_tail_and_never_ties#1",
+      "input": {
+        "mode": "balanced",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_a",
+            "cost_per_run": 5,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 90,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_b",
+            "cost_per_run": 2,
+            "family": "openai",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 88,
+            "violations": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_c",
+            "cost_per_run": 0.1,
+            "family": "google",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": null,
+            "violations": null
+          }
+        ],
+        "weights": null
+      }
+    },
+    {
+      "expected": {
+        "exclusions": [],
+        "ranked": [
+          {
+            "column_id": "col_only",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0.5
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankSingleSurvivor",
+      "id": "TestRankSingleSurvivor#1",
+      "input": {
+        "mode": "balanced",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_only",
+            "cost_per_run": 2,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 500,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 94,
+            "violations": null
+          }
+        ],
+        "weights": null
+      }
+    },
+    {
+      "expected": {
+        "exclusions": [
+          {
+            "column_id": "col_b",
+            "detail": "no aggregate row for the workload cell",
+            "reason": "no_data"
+          }
+        ],
+        "ranked": [
+          {
+            "column_id": "col_a",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0.5
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankNoDataExclusion/mixed:_no-row_candidates_are_excluded_with_reason_no_data",
+      "id": "TestRankNoDataExclusion/mixed:_no-row_candidates_are_excluded_with_reason_no_data#1",
+      "input": {
+        "mode": "balanced",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_a",
+            "cost_per_run": 5,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 90,
+            "violations": null
+          },
+          {
+            "clears_difficulty": false,
+            "column_id": "col_b",
+            "cost_per_run": null,
+            "family": "openai",
+            "has_data": false,
+            "latency_p95": null,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": null,
+            "violations": null
+          }
+        ],
+        "weights": null
+      }
+    },
+    {
+      "expected": {
+        "exclusions": [],
+        "ranked": [
+          {
+            "column_id": "col_a",
+            "flags": {
+              "clears_difficulty": false,
+              "leader": true,
+              "measured": false,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0
+          },
+          {
+            "column_id": "col_b",
+            "flags": {
+              "clears_difficulty": false,
+              "leader": true,
+              "measured": false,
+              "prefs_satisfied": true
+            },
+            "rank": 1,
+            "v": 0
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankNoDataExclusion/all_no-row:_G1_keeps_every_candidate_flagged_measured_false",
+      "id": "TestRankNoDataExclusion/all_no-row:_G1_keeps_every_candidate_flagged_measured_false#1",
+      "input": {
+        "mode": "balanced",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": false,
+            "column_id": "col_a",
+            "cost_per_run": null,
+            "family": "anthropic",
+            "has_data": false,
+            "latency_p95": null,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": null,
+            "violations": null
+          },
+          {
+            "clears_difficulty": false,
+            "column_id": "col_b",
+            "cost_per_run": null,
+            "family": "openai",
+            "has_data": false,
+            "latency_p95": null,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": null,
+            "violations": null
+          }
+        ],
+        "weights": null
+      }
+    },
+    {
+      "expected": {
+        "exclusions": [],
+        "ranked": [
+          {
+            "column_id": "col_a",
+            "flags": {
+              "clears_difficulty": true,
+              "leader": true,
+              "measured": true,
+              "prefs_satisfied": true
+            },
+            "rank": 0,
+            "v": 0.5
+          },
+          {
+            "column_id": "col_b",
+            "flags": {
+              "clears_difficulty": false,
+              "leader": false,
+              "measured": false,
+              "prefs_satisfied": true
+            },
+            "rank": 1,
+            "v": 0.35
+          }
+        ]
+      },
+      "go_test": "recommend.TestRankFlagPassthrough",
+      "id": "TestRankFlagPassthrough#1",
+      "input": {
+        "mode": "balanced",
+        "params": {
+          "band_balanced": 1.5,
+          "band_cost": 5.5,
+          "band_quality": 0,
+          "noise_band": 0.75
+        },
+        "survivors": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_a",
+            "cost_per_run": 5,
+            "family": "anthropic",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": true,
+            "prefs_satisfied": true,
+            "quality": 90,
+            "violations": null
+          },
+          {
+            "clears_difficulty": false,
+            "column_id": "col_b",
+            "cost_per_run": 1,
+            "family": "openai",
+            "has_data": true,
+            "latency_p95": 1000,
+            "measured": false,
+            "prefs_satisfied": true,
+            "quality": 88,
+            "violations": null
+          }
+        ],
+        "weights": null
+      }
+    }
+  ]
+}

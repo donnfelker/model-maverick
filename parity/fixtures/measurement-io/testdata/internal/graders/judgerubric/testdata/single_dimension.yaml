@@ -1,0 +1,19 @@
+description: >-
+  A one-item rubric still gets two calls; reversing a single item changes
+  nothing, so the position-biased judge agrees with itself and disagreement
+  is 0.
+spec:
+  rubric:
+    - { dimension: overall, criterion: Overall quality of the rewrite. }
+output: |-
+  The rewritten paragraph keeps every fact and halves the word count.
+task:
+  id: task_rw_002
+  capability: rewriting_editing
+  prompt: Rewrite the paragraph to be half as long without losing facts.
+run:
+  model_column_id: col_anthropic_fixture
+expect:
+  dimensions: { overall: 1.0 }
+  detail_contains:
+    - '"disagreement":{"overall":0}'

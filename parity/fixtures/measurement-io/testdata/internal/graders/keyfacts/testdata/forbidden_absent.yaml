@@ -1,0 +1,10 @@
+description: no forbidden facts in the output leaves hallucination_free at 1
+spec:
+  facts:
+    - { id: party_acme, any_of: ["Acme Corp"] }
+  forbidden_facts:
+    - { id: distractor_2019_date, any_of: ["2019-06-15"] }
+output: |-
+  Acme Corp signed the agreement effective 2025-03-01.
+expect:
+  dimensions: { fact_coverage: 1.0, hallucination_free: 1.0 }

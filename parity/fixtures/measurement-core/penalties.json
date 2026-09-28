@@ -1,0 +1,286 @@
+{
+  "ambiguity": [
+    {
+      "expected": 0.10000000000000002,
+      "go_test": "scoring.TestAmbiguity",
+      "id": "three",
+      "spreads": [
+        0.1,
+        0,
+        0.2
+      ]
+    },
+    {
+      "expected": 0,
+      "go_test": "scoring.TestAmbiguity",
+      "id": "empty",
+      "spreads": []
+    },
+    {
+      "expected": 0.20000000000000004,
+      "go_test": "scoring.TestOrderSwapDisagreementFeedsAmbiguity",
+      "id": "order_swap",
+      "spreads": [
+        0.2,
+        0.2,
+        0.2
+      ]
+    }
+  ],
+  "ambiguity_penalty": [
+    {
+      "ambiguity": 0.1,
+      "expected": 0.734175170953614,
+      "go_test": "scoring.TestAmbiguityPenalty",
+      "id": "default_lambda",
+      "lambda_amb": 0.25,
+      "task_score": 0.759175170953614
+    },
+    {
+      "ambiguity": 0.1,
+      "expected": 0,
+      "go_test": "scoring.TestAmbiguityPenaltyFloorsAtZero",
+      "id": "floors_at_zero",
+      "lambda_amb": 0.25,
+      "task_score": 0.01
+    },
+    {
+      "ambiguity": 0.2,
+      "expected": 0.7999999999999999,
+      "go_test": "scoring.TestOrderSwapDisagreementFeedsAmbiguity",
+      "id": "order_swap",
+      "lambda_amb": 0.25,
+      "task_score": 0.85
+    }
+  ],
+  "shared_dimension_spread": [
+    {
+      "expected": {
+        "ok": true,
+        "spread": 0.10000000000000003
+      },
+      "go_test": "scoring.TestSharedDimensionSpread",
+      "grader_dims": [
+        {
+          "coverage": 1,
+          "faithfulness": 0.9
+        },
+        {
+          "faithfulness": 0.7
+        }
+      ],
+      "id": "one_shared"
+    },
+    {
+      "expected": {
+        "ok": true,
+        "spread": 0.05000000000000002
+      },
+      "go_test": "scoring.TestSharedDimensionSpreadMultipleSharedDims",
+      "grader_dims": [
+        {
+          "d1": 0.9,
+          "d2": 1
+        },
+        {
+          "d1": 0.7,
+          "d2": 1
+        }
+      ],
+      "id": "two_shared"
+    },
+    {
+      "expected": {
+        "ok": false,
+        "spread": 0
+      },
+      "go_test": "scoring.TestSharedDimensionSpreadNoSharedDimension",
+      "grader_dims": [
+        {
+          "d1": 0.9
+        },
+        {
+          "d2": 0.7
+        },
+        null
+      ],
+      "id": "none_shared"
+    },
+    {
+      "expected": {
+        "ok": true,
+        "spread": 0.10000000000000003
+      },
+      "go_test": "scoring.TestJudgeOrderSwapDisagreement",
+      "grader_dims": [
+        {
+          "overall": 0.8
+        },
+        {
+          "overall": 0.6
+        }
+      ],
+      "id": "judge_order_swap"
+    },
+    {
+      "expected": {
+        "ok": true,
+        "spread": 0.2
+      },
+      "go_test": "scoring.TestOrderSwapDisagreementFeedsAmbiguity",
+      "grader_dims": [
+        {
+          "answer_correctness": 1
+        },
+        {
+          "style": 0.9
+        },
+        {
+          "style": 0.5
+        }
+      ],
+      "id": "order_swap_plus_deterministic"
+    },
+    {
+      "expected": {
+        "ok": true,
+        "spread": 0.408248290463863
+      },
+      "go_test": "",
+      "grader_dims": [
+        {
+          "d": 0
+        },
+        {
+          "d": 0.5
+        },
+        {
+          "d": 1
+        }
+      ],
+      "id": "extra_three_observations"
+    }
+  ],
+  "sigma": "population standard deviation (divide by N)",
+  "task_pipeline": [
+    {
+      "expected": {
+        "ambiguity": 0.20000000000000004,
+        "task_score": 0.7999999999999999,
+        "variance_score": 0.85
+      },
+      "go_test": "jobs.TestNightlySmokeJudgeDisagreementFeedsAmbiguity",
+      "id": "judge_disagreement_pipeline",
+      "lambda_amb": 0.25,
+      "lambda_var": 0.5,
+      "q_runs": [
+        0.85,
+        0.85,
+        0.85
+      ],
+      "spreads": [
+        0.2,
+        0.2,
+        0.2
+      ]
+    }
+  ],
+  "tolerance": 1e-12,
+  "variance_penalty": [
+    {
+      "expected": {
+        "mu": 0.8000000000000002,
+        "n": 3,
+        "ok": true,
+        "score": 0.7591751709536139,
+        "sigma": 0.08164965809277264
+      },
+      "go_test": "scoring.TestVariancePenalty",
+      "id": "three_repeats",
+      "lambda_var": 0.5,
+      "q_runs": [
+        0.9,
+        0.7,
+        0.8
+      ]
+    },
+    {
+      "expected": {
+        "mu": 0.9,
+        "n": 1,
+        "ok": true,
+        "score": 0.9,
+        "sigma": 0
+      },
+      "go_test": "scoring.TestVariancePenaltySingleRepeat",
+      "id": "single_repeat",
+      "lambda_var": 0.5,
+      "q_runs": [
+        0.9
+      ]
+    },
+    {
+      "expected": {
+        "mu": 0.19999999999999998,
+        "n": 3,
+        "ok": true,
+        "score": 0,
+        "sigma": 0.282842712474619
+      },
+      "go_test": "scoring.TestVariancePenaltyFloorsAtZero",
+      "id": "floors_at_zero",
+      "lambda_var": 3,
+      "q_runs": [
+        0.6,
+        0,
+        0
+      ]
+    },
+    {
+      "expected": {
+        "mu": 0,
+        "n": 0,
+        "ok": false,
+        "score": 0,
+        "sigma": 0
+      },
+      "go_test": "scoring.TestVariancePenaltyNoGradableRepeats",
+      "id": "no_gradable",
+      "lambda_var": 0.5,
+      "q_runs": []
+    },
+    {
+      "expected": {
+        "mu": 0.5,
+        "n": 2,
+        "ok": true,
+        "score": 0.25,
+        "sigma": 0.5
+      },
+      "go_test": "",
+      "id": "extra_two",
+      "lambda_var": 0.5,
+      "q_runs": [
+        1,
+        0
+      ]
+    },
+    {
+      "expected": {
+        "mu": 0.85,
+        "n": 3,
+        "ok": true,
+        "score": 0.85,
+        "sigma": 0
+      },
+      "go_test": "",
+      "id": "extra_all_equal",
+      "lambda_var": 0.5,
+      "q_runs": [
+        0.85,
+        0.85,
+        0.85
+      ]
+    }
+  ]
+}

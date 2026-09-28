@@ -1,0 +1,119 @@
+{
+  "cases": [
+    {
+      "detail": "{\n\t\t\"judge\": {\"ref\": \"gemini-3.1-pro/direct\", \"family\": \"google\"},\n\t\t\"order_swap\": [\n\t\t\t{\"rubric_order\": [\"idiom\", \"readability\"], \"scores\": {\"idiom\": 0.9, \"readability\": 0.6}},\n\t\t\t{\"rubric_order\": [\"readability\", \"idiom\"], \"scores\": {\"idiom\": 0.5, \"readability\": 0.8}}\n\t\t],\n\t\t\"disagreement\": {\"idiom\": 0.4, \"readability\": 0.2}\n\t}",
+      "expected": {
+        "calls": [
+          {
+            "idiom": 0.9,
+            "readability": 0.6
+          },
+          {
+            "idiom": 0.5,
+            "readability": 0.8
+          }
+        ],
+        "ok": true
+      },
+      "id": "valid"
+    },
+    {
+      "detail": "",
+      "expected": {
+        "calls": null,
+        "ok": false
+      },
+      "id": "empty detail"
+    },
+    {
+      "detail": "{\"rules_passed\": 3}",
+      "expected": {
+        "calls": null,
+        "ok": false
+      },
+      "id": "no order_swap"
+    },
+    {
+      "detail": "{\"order_swap\": [{\"scores\": {\"idiom\": 0.9}}]}",
+      "expected": {
+        "calls": null,
+        "ok": false
+      },
+      "id": "single call"
+    },
+    {
+      "detail": "{\"order_swap\": [{\"scores\": {\"idiom\": 0.9}}, {\"scores\": {}}]}",
+      "expected": {
+        "calls": null,
+        "ok": false
+      },
+      "id": "call w/o scores"
+    },
+    {
+      "detail": "{\"order_swap\": {\"scores\": {\"idiom\": 0.9}}}",
+      "expected": {
+        "calls": null,
+        "ok": false
+      },
+      "id": "not an array"
+    },
+    {
+      "detail": "{\"order_swap\": [",
+      "expected": {
+        "calls": null,
+        "ok": false
+      },
+      "id": "malformed json"
+    },
+    {
+      "detail": "{\"order_swap\": [1, 2]}",
+      "expected": {
+        "calls": null,
+        "ok": false
+      },
+      "id": "non-object array"
+    },
+    {
+      "detail": "{\"order_swap\": [{\"scores\": {\"style\": 0.9}}, {\"scores\": {\"style\": 0.5}}]}",
+      "expected": {
+        "calls": [
+          {
+            "style": 0.9
+          },
+          {
+            "style": 0.5
+          }
+        ],
+        "ok": true
+      },
+      "id": "style pair"
+    },
+    {
+      "detail": "{\"order_swap\": [{\"scores\": {\"s\": 0.1}}, {\"scores\": {\"s\": 0.2}}, {\"scores\": {\"s\": 0.3}}]}",
+      "expected": {
+        "calls": [
+          {
+            "s": 0.1
+          },
+          {
+            "s": 0.2
+          },
+          {
+            "s": 0.3
+          }
+        ],
+        "ok": true
+      },
+      "id": "extra three calls"
+    },
+    {
+      "detail": null,
+      "expected": {
+        "calls": null,
+        "ok": false
+      },
+      "id": "nil detail"
+    }
+  ],
+  "go_test": "scoring.TestOrderSwapObservations, scoring.TestOrderSwapDisagreementFeedsAmbiguity"
+}

@@ -1,0 +1,20 @@
+description: fenced JSON block validates and both per-field checks pass
+spec:
+  schema:
+    type: object
+    required: [name, amount]
+    properties:
+      name: { type: string }
+      amount: { type: number }
+  checks:
+    - { path: $.name, equals: "Acme Corp" }
+    - { path: $.amount, numeric: 12500, tolerance: 0 }
+output: |-
+  Here is the extraction you asked for:
+
+  ```json
+  { "name": "Acme Corp", "amount": 12500 }
+  ```
+expect:
+  dimensions: { schema_validity: 1.0, field_accuracy: 1.0 }
+  detail_contains: ['"extraction":"fenced"', '"schema_valid":true']

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelmaverick.dev/graders/json_schema/spec.schema.json",
+  "title": "json_schema grader spec (version 1)",
+  "type": "object",
+  "required": ["schema"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": ["object", "boolean"]
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["path"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "pattern": "^\\$" },
+          "equals": {},
+          "regex": { "type": "string", "minLength": 1 },
+          "numeric": { "type": "number" },
+          "tolerance": { "type": "number", "minimum": 0 }
+        },
+        "oneOf": [
+          { "required": ["equals"] },
+          { "required": ["regex"] },
+          { "required": ["numeric"] }
+        ],
+        "dependentRequired": { "tolerance": ["numeric"] }
+      }
+    }
+  }
+}

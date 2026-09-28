@@ -1,0 +1,311 @@
+{
+  "alpha_one": {
+    "alpha": 1,
+    "go_test": "",
+    "steps": [
+      {
+        "ewma": 0.2,
+        "variance": 0,
+        "x": 0.2
+      },
+      {
+        "ewma": 0.9,
+        "variance": 0.12249999999999998,
+        "x": 0.9
+      },
+      {
+        "ewma": 0.4,
+        "variance": 0.08666666666666666,
+        "x": 0.4
+      }
+    ]
+  },
+  "empty_stream": {
+    "ewma": 0,
+    "go_test": "scoring.TestStreamEmpty",
+    "measured_min3": false,
+    "n": 0,
+    "variance": 0
+  },
+  "fold_observations_via_float32_storage": [
+    {
+      "alpha": 0.3,
+      "dimension": "quality",
+      "go_test": "scoring.TestFoldObservationsThreeNights",
+      "id": "three_nights",
+      "min_nights": 3,
+      "nights": [
+        {
+          "as_of": "2026-07-01",
+          "measured": false,
+          "n": 1,
+          "stored_ewma_f32": 0.800000011920929,
+          "stored_variance_f32": 0,
+          "x": 0.8
+        },
+        {
+          "as_of": "2026-07-02",
+          "measured": false,
+          "n": 2,
+          "stored_ewma_f32": 0.7400000095367432,
+          "stored_variance_f32": 0.010000001639127731,
+          "x": 0.6
+        },
+        {
+          "as_of": "2026-07-03",
+          "measured": true,
+          "n": 3,
+          "stored_ewma_f32": 0.7879999876022339,
+          "stored_variance_f32": 0.015555555000901222,
+          "x": 0.9
+        }
+      ],
+      "refold_last_night": {
+        "n": 3,
+        "rows_total": 3,
+        "stored_ewma_f32": 0.7879999876022339,
+        "stored_variance_f32": 0.015555555000901222
+      }
+    },
+    {
+      "alpha": 0.3,
+      "dimension": "latency_p95_ms",
+      "go_test": "scoring.TestFoldObservationsMultipleDimensions",
+      "id": "latency_single",
+      "min_nights": 3,
+      "nights": [
+        {
+          "as_of": "2026-07-01",
+          "measured": false,
+          "n": 1,
+          "stored_ewma_f32": 1450,
+          "stored_variance_f32": 0,
+          "x": 1450
+        }
+      ]
+    },
+    {
+      "alpha": 0.3,
+      "dimension": "quality",
+      "go_test": "",
+      "id": "extra_decline_11_nights",
+      "min_nights": 3,
+      "nights": [
+        {
+          "as_of": "2026-07-01",
+          "measured": false,
+          "n": 1,
+          "stored_ewma_f32": 0.8999999761581421,
+          "stored_variance_f32": 0,
+          "x": 0.9
+        },
+        {
+          "as_of": "2026-07-02",
+          "measured": false,
+          "n": 2,
+          "stored_ewma_f32": 0.8999999761581421,
+          "stored_variance_f32": 1.4210854397564648e-16,
+          "x": 0.9
+        },
+        {
+          "as_of": "2026-07-03",
+          "measured": true,
+          "n": 3,
+          "stored_ewma_f32": 0.8999999761581421,
+          "stored_variance_f32": 1.2631871163830345e-16,
+          "x": 0.9
+        },
+        {
+          "as_of": "2026-07-04",
+          "measured": true,
+          "n": 4,
+          "stored_ewma_f32": 0.8969999551773071,
+          "stored_variance_f32": 0.000018749909941107035,
+          "x": 0.89
+        },
+        {
+          "as_of": "2026-07-05",
+          "measured": true,
+          "n": 5,
+          "stored_ewma_f32": 0.8918999433517456,
+          "stored_variance_f32": 0.00006399997801054269,
+          "x": 0.88
+        },
+        {
+          "as_of": "2026-07-06",
+          "measured": true,
+          "n": 6,
+          "stored_ewma_f32": 0.8853299617767334,
+          "stored_variance_f32": 0.00013333337847143412,
+          "x": 0.87
+        },
+        {
+          "as_of": "2026-07-07",
+          "measured": true,
+          "n": 7,
+          "stored_ewma_f32": 0.8777309656143188,
+          "stored_variance_f32": 0.00022448950039688498,
+          "x": 0.86
+        },
+        {
+          "as_of": "2026-07-08",
+          "measured": true,
+          "n": 8,
+          "stored_ewma_f32": 0.8694116473197937,
+          "stored_variance_f32": 0.00033593710395507514,
+          "x": 0.85
+        },
+        {
+          "as_of": "2026-07-09",
+          "measured": true,
+          "n": 9,
+          "stored_ewma_f32": 0.8605881333351135,
+          "stored_variance_f32": 0.0004666666209232062,
+          "x": 0.84
+        },
+        {
+          "as_of": "2026-07-10",
+          "measured": true,
+          "n": 10,
+          "stored_ewma_f32": 0.8514117002487183,
+          "stored_variance_f32": 0.0006160000339150429,
+          "x": 0.83
+        },
+        {
+          "as_of": "2026-07-11",
+          "measured": true,
+          "n": 11,
+          "stored_ewma_f32": 0.841988205909729,
+          "stored_variance_f32": 0.00078347057569772,
+          "x": 0.82
+        }
+      ]
+    },
+    {
+      "alpha": 0.3,
+      "dimension": "latency_p50_ms",
+      "go_test": "",
+      "id": "extra_latency_series",
+      "min_nights": 3,
+      "nights": [
+        {
+          "as_of": "2026-07-01",
+          "measured": false,
+          "n": 1,
+          "stored_ewma_f32": 812,
+          "stored_variance_f32": 0,
+          "x": 812
+        },
+        {
+          "as_of": "2026-07-02",
+          "measured": false,
+          "n": 2,
+          "stored_ewma_f32": 805.4000244140625,
+          "stored_variance_f32": 121,
+          "x": 790
+        },
+        {
+          "as_of": "2026-07-03",
+          "measured": true,
+          "n": 3,
+          "stored_ewma_f32": 985.280029296875,
+          "stored_variance_f32": 81150.875,
+          "x": 1405
+        },
+        {
+          "as_of": "2026-07-04",
+          "measured": true,
+          "n": 4,
+          "stored_ewma_f32": 886.196044921875,
+          "stored_variance_f32": 83483.2578125,
+          "x": 655
+        },
+        {
+          "as_of": "2026-07-05",
+          "measured": true,
+          "n": 5,
+          "stored_ewma_f32": 830.3372192382812,
+          "stored_variance_f32": 74217.0390625,
+          "x": 700
+        }
+      ]
+    }
+  ],
+  "measured_flip": {
+    "alpha": 0.3,
+    "go_test": "scoring.TestStreamMeasuredFlipsAtMinNights",
+    "measured_by_night": [
+      false,
+      false,
+      true,
+      true
+    ],
+    "min_nights": 3,
+    "x_each_night": 0.8
+  },
+  "resume": {
+    "alpha": 0.3,
+    "expected": {
+      "after_fold_0_7": {
+        "ewma": 0.7615999999999999,
+        "n": 4,
+        "variance": 0.012500000000000022
+      },
+      "ewma": 0.788,
+      "n": 3,
+      "variance": 0.015555555555555581
+    },
+    "go_test": "scoring.TestResumeReconstructsObservations",
+    "series": [
+      0.8,
+      0.74,
+      0.788
+    ],
+    "tolerance": 1e-9
+  },
+  "resume_empty": {
+    "alpha": 0.3,
+    "expected": {
+      "after_fold_0_5_ewma": 0.5,
+      "n": 0
+    },
+    "go_test": "scoring.TestResumeEmptySeries",
+    "series": []
+  },
+  "stream_seed_and_folds": {
+    "alpha": 0.3,
+    "go_test": "scoring.TestStreamSeedAndFolds",
+    "steps": [
+      {
+        "ewma": 0.8,
+        "measured_min3": false,
+        "n": 1,
+        "variance": 0,
+        "x": 0.8
+      },
+      {
+        "ewma": 0.7399999999999999,
+        "measured_min3": false,
+        "n": 2,
+        "variance": 0.010000000000000002,
+        "x": 0.6
+      },
+      {
+        "ewma": 0.7879999999999999,
+        "measured_min3": true,
+        "n": 3,
+        "variance": 0.015555555555555566,
+        "x": 0.9
+      },
+      {
+        "ewma": 0.7615999999999998,
+        "measured_min3": true,
+        "n": 4,
+        "variance": 0.012500000000000008,
+        "x": 0.7
+      }
+    ]
+  },
+  "tolerance": 1e-12,
+  "tolerance_f32": "stored_*_f32 values are exact float32 values (widened to float64); a port must round to float32 at write and widen at read to reproduce them bit-for-bit"
+}

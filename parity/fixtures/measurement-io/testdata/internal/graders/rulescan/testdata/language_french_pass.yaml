@@ -1,0 +1,11 @@
+description: the language rule accepts French output for language fr
+spec:
+  rules:
+    - { language: fr }
+output: |-
+  Le contrat est signé par les deux parties et il entre en vigueur dans un
+  délai de trente jours. Les paiements sont dus à la fin de chaque mois, et
+  une pénalité ne peut pas être appliquée sans notification écrite.
+expect:
+  dimensions: { constraint_compliance: 1.0 }
+  detail_contains: ['"kind":"language"']

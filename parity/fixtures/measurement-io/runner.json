@@ -1,0 +1,734 @@
+{
+  "about": "runner: prompt assembly, cost, status mapping, pacing, runs rows. Times are Go time.Duration; nanos given.",
+  "assemble": [
+    {
+      "go_test": "runner.TestAssembleGoldenBasic",
+      "task": {
+        "id": "task_assemble_001",
+        "prompt": "Extract every defined term from the contract and return them as JSON.",
+        "attachments_json": "[]",
+        "temperature": 0,
+        "max_tokens": 1024
+      },
+      "column": {
+        "id": "col_assemble_001",
+        "provider": "anthropic",
+        "model_id": "claude-opus-4-8",
+        "endpoint": "direct",
+        "settings_json": "{}"
+      },
+      "expect": {
+        "model": "claude-opus-4-8",
+        "system": "",
+        "prompt_exact": "Extract every defined term from the contract and return them as JSON.",
+        "prompt_golden_file": "testdata/internal/runner/testdata/assemble_basic.golden",
+        "temperature": 0,
+        "max_tokens": 1024,
+        "settings": null
+      }
+    },
+    {
+      "go_test": "runner.TestAssembleGoldenAttachments",
+      "task": {
+        "prompt": "Summarize the agreement, citing the attached documents.",
+        "attachments_json": "[\n\t\t{\"name\": \"contract.txt\", \"content\": \"THIS AGREEMENT is made between Acme Corp and Beta LLC.\\nSection 1. Term: 24 months.\"},\n\t\t{\"name\": \"amendment.txt\", \"content\": \"Section 1 is amended to read: Term: 36 months.\"}\n\t]"
+      },
+      "expect": {
+        "prompt_exact": "Summarize the agreement, citing the attached documents.\n\n--- attachment: contract.txt ---\nTHIS AGREEMENT is made between Acme Corp and Beta LLC.\nSection 1. Term: 24 months.\n\n--- attachment: amendment.txt ---\nSection 1 is amended to read: Term: 36 months.",
+        "prompt_golden_file": "testdata/internal/runner/testdata/assemble_attachments.golden"
+      }
+    },
+    {
+      "go_test": "runner.TestAssembleByteIdenticalAcrossColumnsAndCalls",
+      "task": {
+        "prompt": "Answer from the notes.",
+        "attachments_json": "[{\"name\": \"notes.txt\", \"content\": \"alpha\\nbeta\"}]"
+      },
+      "columns": [
+        {
+          "model_id": "claude-opus-4-8",
+          "provider": "anthropic",
+          "settings_json": "{\"thinking\": true}"
+        },
+        {
+          "model_id": "gpt-5.5",
+          "provider": "openai",
+          "settings_json": "{}"
+        }
+      ],
+      "expect": {
+        "prompt_exact_all_calls": "Answer from the notes.\n\n--- attachment: notes.txt ---\nalpha\nbeta",
+        "models_differ": true
+      }
+    },
+    {
+      "go_test": "runner.TestAssembleColumnSettings",
+      "column_settings_json": "{\"thinking\": true, \"thinking_budget\": 2048}",
+      "expect_settings": {
+        "thinking": true,
+        "thinking_budget": 2048.0
+      },
+      "note": "settings decode as generic JSON: numbers become float64"
+    },
+    {
+      "go_test": "runner.TestAssembleMalformedInputs",
+      "cases": [
+        {
+          "attachments_json": "[{\"name\": broken",
+          "settings_json": "{}",
+          "error": "task task_assemble_001: parsing attachments: invalid character 'b' looking for beginning of value"
+        },
+        {
+          "attachments_json": "[]",
+          "settings_json": "{broken",
+          "error": "column col_assemble_001: parsing settings: invalid character 'b' looking for beginning of object key string"
+        }
+      ]
+    },
+    {
+      "probe": true,
+      "task": {
+        "prompt": "P",
+        "attachments_json": "[{\"name\":\"a.txt\",\"content\":\"A\"},{\"name\":\"\",\"content\":\"\"}]",
+        "temperature": 0.2,
+        "max_tokens": 5
+      },
+      "column": {
+        "model_id": "m",
+        "settings_json": "null"
+      },
+      "expect": {
+        "Model": "m",
+        "System": "",
+        "Prompt": "P\n\n--- attachment: a.txt ---\nA\n\n--- attachment:  ---\n",
+        "Temperature": 0.2,
+        "MaxTokens": 5,
+        "Settings": null
+      }
+    },
+    {
+      "probe": true,
+      "task": {
+        "prompt": "P",
+        "attachments_json": "null"
+      },
+      "column": {
+        "id": "c",
+        "settings_json": "[]"
+      },
+      "expect": {
+        "err": "column c: parsing settings: json: cannot unmarshal array into Go value of type map[string]interface {}",
+        "req": {
+          "Model": "",
+          "System": "",
+          "Prompt": "",
+          "Temperature": 0,
+          "MaxTokens": 0,
+          "Settings": null
+        }
+      }
+    }
+  ],
+  "cost": {
+    "formula": "usd = (tokens_in*input_per_mtok + tokens_out*output_per_mtok)/1e6; cost = round_half_away_from_zero(usd*1e6)/1e6 (float64). Persisted as the decimal string strconv.FormatFloat(cost,'f',6) into numeric(12,6).",
+    "go_test_TestCostNumericRoundTrip": {
+      "in": 0.003396,
+      "numeric": "0.003396",
+      "zero_numeric": "0.000000",
+      "zero_valid": true
+    },
+    "probes": [
+      {
+        "In": 120,
+        "Out": 18,
+        "InP": 3,
+        "OutP": 15,
+        "Cost": 0.00063,
+        "Numeric": "0.000630"
+      },
+      {
+        "In": 200,
+        "Out": 40,
+        "InP": 3,
+        "OutP": 15,
+        "Cost": 0.0012,
+        "Numeric": "0.001200"
+      },
+      {
+        "In": 118,
+        "Out": 17,
+        "InP": 2.5,
+        "OutP": 10,
+        "Cost": 0.000465,
+        "Numeric": "0.000465"
+      },
+      {
+        "In": 210,
+        "Out": 33,
+        "InP": 2.5,
+        "OutP": 10,
+        "Cost": 0.000855,
+        "Numeric": "0.000855"
+      },
+      {
+        "In": 1,
+        "Out": 0,
+        "InP": 0.5,
+        "OutP": 0,
+        "Cost": 1e-06,
+        "Numeric": "0.000001"
+      },
+      {
+        "In": 1,
+        "Out": 0,
+        "InP": 1.5,
+        "OutP": 0,
+        "Cost": 2e-06,
+        "Numeric": "0.000002"
+      },
+      {
+        "In": 3,
+        "Out": 0,
+        "InP": 0.5,
+        "OutP": 0,
+        "Cost": 2e-06,
+        "Numeric": "0.000002"
+      },
+      {
+        "In": 1,
+        "Out": 1,
+        "InP": 0.4,
+        "OutP": 0.1,
+        "Cost": 1e-06,
+        "Numeric": "0.000001"
+      },
+      {
+        "In": 1234567,
+        "Out": 7654321,
+        "InP": 3,
+        "OutP": 15,
+        "Cost": 118.518516,
+        "Numeric": "118.518516"
+      },
+      {
+        "In": 0,
+        "Out": 0,
+        "InP": 3,
+        "OutP": 15,
+        "Cost": 0,
+        "Numeric": "0.000000"
+      },
+      {
+        "In": 1,
+        "Out": 0,
+        "InP": 2.5,
+        "OutP": 0,
+        "Cost": 3e-06,
+        "Numeric": "0.000003"
+      },
+      {
+        "In": 7,
+        "Out": 0,
+        "InP": 0.35,
+        "OutP": 0,
+        "Cost": 2e-06,
+        "Numeric": "0.000002"
+      }
+    ]
+  },
+  "status_for_error": {
+    "canceled": "provider_error",
+    "deadline": "timeout",
+    "plain": "provider_error",
+    "rate limited": "provider_error",
+    "timeout kind": "timeout",
+    "wrapped deadline": "timeout"
+  },
+  "pacer_interval_by_rpm": {
+    "1": "1m0s (60000000000ns)",
+    "3000": "20ms (20000000ns)",
+    "60": "1s (1000000000ns)",
+    "6000": "10ms (10000000ns)",
+    "7": "8.571428571s (8571428571ns)",
+    "7000": "8.571428ms (8571428ns)"
+  },
+  "taxonomy_run": {
+    "go_test": "runner.TestRunStatusTaxonomy (plus probe task_tx_slow with 300 ms fake latency under a 100 ms runner timeout)",
+    "config": {
+      "timeout_ms": 100,
+      "repeats": 1
+    },
+    "column": {
+      "id": "col_tx",
+      "provider": "anthropic",
+      "model_id": "claude-taxonomy",
+      "status": "active",
+      "settings_json": "{}",
+      "pricing_json": "{\"input_per_mtok\": 3.0, \"output_per_mtok\": 15.0}"
+    },
+    "rows": [
+      {
+        "TaskID": "task_tx_timeout",
+        "Status": "timeout",
+        "Error": "fake: timeout: context deadline exceeded",
+        "Output": "",
+        "Cost": "",
+        "ErrorValid": true,
+        "OutputValid": false,
+        "CostValid": false,
+        "LatencyValid": true,
+        "TokensValid": false,
+        "TokensIn": 0,
+        "TokensOut": 0,
+        "Temperature": 0,
+        "RepeatIndex": 0,
+        "BatchID": "bat_fixed",
+        "MatrixVersion": "2026-07-01"
+      },
+      {
+        "TaskID": "task_tx_invalid",
+        "Status": "provider_error",
+        "Error": "fake: invalid_request (status 400)",
+        "Output": "",
+        "Cost": "",
+        "ErrorValid": true,
+        "OutputValid": false,
+        "CostValid": false,
+        "LatencyValid": true,
+        "TokensValid": false,
+        "TokensIn": 0,
+        "TokensOut": 0,
+        "Temperature": 0,
+        "RepeatIndex": 0,
+        "BatchID": "bat_fixed",
+        "MatrixVersion": "2026-07-01"
+      },
+      {
+        "TaskID": "task_tx_unknown",
+        "Status": "provider_error",
+        "Error": "fake provider: no fixture for model \"claude-taxonomy\" prompt hash 16ab3ddda1644583f87cfd37dcf4e15f2ca2733710a1b47b4855bb0b5cf29a36 (add it to testdata)",
+        "Output": "",
+        "Cost": "",
+        "ErrorValid": true,
+        "OutputValid": false,
+        "CostValid": false,
+        "LatencyValid": true,
+        "TokensValid": false,
+        "TokensIn": 0,
+        "TokensOut": 0,
+        "Temperature": 0,
+        "RepeatIndex": 0,
+        "BatchID": "bat_fixed",
+        "MatrixVersion": "2026-07-01"
+      },
+      {
+        "TaskID": "task_tx_5xx",
+        "Status": "provider_error",
+        "Error": "fake: provider_error (status 500)",
+        "Output": "",
+        "Cost": "",
+        "ErrorValid": true,
+        "OutputValid": false,
+        "CostValid": false,
+        "LatencyValid": true,
+        "TokensValid": false,
+        "TokensIn": 0,
+        "TokensOut": 0,
+        "Temperature": 0,
+        "RepeatIndex": 0,
+        "BatchID": "bat_fixed",
+        "MatrixVersion": "2026-07-01"
+      },
+      {
+        "TaskID": "task_tx_rate",
+        "Status": "provider_error",
+        "Error": "fake: rate_limited (status 429)",
+        "Output": "",
+        "Cost": "",
+        "ErrorValid": true,
+        "OutputValid": false,
+        "CostValid": false,
+        "LatencyValid": true,
+        "TokensValid": false,
+        "TokensIn": 0,
+        "TokensOut": 0,
+        "Temperature": 0,
+        "RepeatIndex": 0,
+        "BatchID": "bat_fixed",
+        "MatrixVersion": "2026-07-01"
+      },
+      {
+        "TaskID": "task_tx_ok",
+        "Status": "ok",
+        "Error": "",
+        "Output": "{\"fine\": true}",
+        "Cost": "0.000450",
+        "ErrorValid": false,
+        "OutputValid": true,
+        "CostValid": true,
+        "LatencyValid": true,
+        "TokensValid": true,
+        "TokensIn": 100,
+        "TokensOut": 10,
+        "Temperature": 0,
+        "RepeatIndex": 0,
+        "BatchID": "bat_fixed",
+        "MatrixVersion": "2026-07-01"
+      },
+      {
+        "TaskID": "task_tx_slow",
+        "Status": "timeout",
+        "Error": "fake: timeout: context deadline exceeded",
+        "Output": "",
+        "Cost": "",
+        "ErrorValid": true,
+        "OutputValid": false,
+        "CostValid": false,
+        "LatencyValid": true,
+        "TokensValid": false,
+        "TokensIn": 0,
+        "TokensOut": 0,
+        "Temperature": 0,
+        "RepeatIndex": 0,
+        "BatchID": "bat_fixed",
+        "MatrixVersion": "2026-07-01"
+      }
+    ],
+    "summary": {
+      "err": "",
+      "summary": {
+        "BatchID": "bat_fixed",
+        "Total": 7,
+        "ByStatus": {
+          "ok": 1,
+          "provider_error": 4,
+          "timeout": 2
+        },
+        "CostUSD": 0.00045
+      }
+    },
+    "note": "row order is completion order (concurrent); compare as a set keyed by task_id. The Go test itself uses the default 120 s timeout and no slow task: 6 rows, ok 1, provider_error 4, timeout 1."
+  },
+  "setup_failures": {
+    "bad_attachments": [
+      "provider_error | task task_att: parsing attachments: invalid character 'b' looking for beginning of value"
+    ],
+    "bad_pricing": {
+      "err": "",
+      "rows": [
+        "provider_error | pricing snapshot has a negative price"
+      ],
+      "summary": {
+        "BatchID": "bat_x",
+        "Total": 1,
+        "ByStatus": {
+          "provider_error": 1
+        },
+        "CostUSD": 0
+      }
+    },
+    "bad_pricing_json": {
+      "err": "",
+      "rows": [
+        "provider_error | parsing pricing snapshot: unexpected end of JSON input"
+      ],
+      "summary": {
+        "BatchID": "bat_x",
+        "Total": 1,
+        "ByStatus": {
+          "provider_error": 1
+        },
+        "CostUSD": 0
+      }
+    },
+    "bad_settings": {
+      "err": "",
+      "rows": [
+        "provider_error | column col_b: parsing settings: invalid character 'n' looking for beginning of object key string"
+      ],
+      "summary": {
+        "BatchID": "bat_x",
+        "Total": 1,
+        "ByStatus": {
+          "provider_error": 1
+        },
+        "CostUSD": 0
+      }
+    },
+    "no_client": {
+      "err": "",
+      "rows": [
+        "provider_error | no provider client configured for \"openai\" (column col_n)"
+      ],
+      "summary": {
+        "BatchID": "bat_x",
+        "Total": 1,
+        "ByStatus": {
+          "provider_error": 1
+        },
+        "CostUSD": 0
+      }
+    }
+  },
+  "batch_integration": {
+    "go_test": "runner.TestBatchPersistsTwoTasksTwoColumnsThreeRepeats",
+    "columns": [
+      {
+        "provider": "anthropic",
+        "model_id": "claude-runner-a",
+        "pricing_json": "{\"input_per_mtok\": 3.00, \"output_per_mtok\": 15.00, \"currency\": \"USD\", \"as_of\": \"2026-07-01\", \"source\": \"list\"}"
+      },
+      {
+        "provider": "openai",
+        "model_id": "gpt-runner-b",
+        "pricing_json": "{\"input_per_mtok\": 2.50, \"output_per_mtok\": 10.00, \"currency\": \"USD\", \"as_of\": \"2026-07-01\", \"source\": \"list\"}"
+      }
+    ],
+    "fake_fixtures": [
+      {
+        "model": "claude-runner-a",
+        "prompt": "Runner integration prompt one.",
+        "output": "a1",
+        "tokens_in": 120,
+        "tokens_out": 18,
+        "latency_ms": 5
+      },
+      {
+        "model": "claude-runner-a",
+        "prompt": "Runner integration prompt two.",
+        "output": "a2",
+        "tokens_in": 200,
+        "tokens_out": 40,
+        "latency_ms": 5
+      },
+      {
+        "model": "gpt-runner-b",
+        "prompt": "Runner integration prompt one.",
+        "output": "b1",
+        "tokens_in": 118,
+        "tokens_out": 17,
+        "latency_ms": 5
+      },
+      {
+        "model": "gpt-runner-b",
+        "prompt": "Runner integration prompt two.",
+        "output": "b2",
+        "tokens_in": 210,
+        "tokens_out": 33,
+        "latency_ms": 5
+      }
+    ],
+    "config": {
+      "repeats": 3,
+      "timeout_s": 30
+    },
+    "batch_repeats": 0,
+    "expect": {
+      "total": 12,
+      "ok": 12,
+      "per_pair_cost": {
+        "one×a": 0.00063,
+        "two×a": 0.0012,
+        "one×b": 0.000465,
+        "two×b": 0.000855
+      },
+      "repeat_indexes_per_pair": [
+        0,
+        1,
+        2
+      ],
+      "latency_ms_min": 5,
+      "summary_cost_equals_sum_of_rows_within": 1e-09,
+      "matrix_version": "= corpus version string",
+      "batch_id": "generated bat_<ULID>"
+    }
+  },
+  "retry_delay_default_policy": [
+    {
+      "Attempt": 0,
+      "Jitter": 0,
+      "Delay": "2s",
+      "Nanos": 2000000000
+    },
+    {
+      "Attempt": 1,
+      "Jitter": 0,
+      "Delay": "125ms",
+      "Nanos": 125000000
+    },
+    {
+      "Attempt": 2,
+      "Jitter": 0,
+      "Delay": "250ms",
+      "Nanos": 250000000
+    },
+    {
+      "Attempt": 3,
+      "Jitter": 0,
+      "Delay": "500ms",
+      "Nanos": 500000000
+    },
+    {
+      "Attempt": 4,
+      "Jitter": 0,
+      "Delay": "1s",
+      "Nanos": 1000000000
+    },
+    {
+      "Attempt": 5,
+      "Jitter": 0,
+      "Delay": "2s",
+      "Nanos": 2000000000
+    },
+    {
+      "Attempt": 6,
+      "Jitter": 0,
+      "Delay": "2s",
+      "Nanos": 2000000000
+    },
+    {
+      "Attempt": 7,
+      "Jitter": 0,
+      "Delay": "2s",
+      "Nanos": 2000000000
+    },
+    {
+      "Attempt": 0,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": 1,
+      "Jitter": 0.5,
+      "Delay": "187.5ms",
+      "Nanos": 187500000
+    },
+    {
+      "Attempt": 2,
+      "Jitter": 0.5,
+      "Delay": "375ms",
+      "Nanos": 375000000
+    },
+    {
+      "Attempt": 3,
+      "Jitter": 0.5,
+      "Delay": "750ms",
+      "Nanos": 750000000
+    },
+    {
+      "Attempt": 4,
+      "Jitter": 0.5,
+      "Delay": "1.5s",
+      "Nanos": 1500000000
+    },
+    {
+      "Attempt": 5,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": 6,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": 7,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": 0,
+      "Jitter": 0.999999,
+      "Delay": "3.999998s",
+      "Nanos": 3999998000
+    },
+    {
+      "Attempt": 1,
+      "Jitter": 0.999999,
+      "Delay": "249.999875ms",
+      "Nanos": 249999875
+    },
+    {
+      "Attempt": 2,
+      "Jitter": 0.999999,
+      "Delay": "499.99975ms",
+      "Nanos": 499999750
+    },
+    {
+      "Attempt": 3,
+      "Jitter": 0.999999,
+      "Delay": "999.9995ms",
+      "Nanos": 999999500
+    },
+    {
+      "Attempt": 4,
+      "Jitter": 0.999999,
+      "Delay": "1.999999s",
+      "Nanos": 1999999000
+    },
+    {
+      "Attempt": 5,
+      "Jitter": 0.999999,
+      "Delay": "3.999998s",
+      "Nanos": 3999998000
+    },
+    {
+      "Attempt": 6,
+      "Jitter": 0.999999,
+      "Delay": "3.999998s",
+      "Nanos": 3999998000
+    },
+    {
+      "Attempt": 7,
+      "Jitter": 0.999999,
+      "Delay": "3.999998s",
+      "Nanos": 3999998000
+    },
+    {
+      "Attempt": 31,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": 32,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": 33,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": 63,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": 64,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": -1,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": 1,
+      "Jitter": 0.3333333333333333,
+      "Delay": "base100ms max400ms: 66.666666ms",
+      "Nanos": 66666666
+    }
+  ]
+}

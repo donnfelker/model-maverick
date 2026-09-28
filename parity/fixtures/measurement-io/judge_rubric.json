@@ -1,0 +1,696 @@
+{
+  "about": "judge_rubric grader (spec 5.5). Judge requests are providers.CompletionRequest values (field names Model/System/Prompt/Temperature/MaxTokens/Settings). Error strings are exact Go output except '{SPEC_SCHEMA_URL}' / '{TASK_SCHEMA_URL}', which Go renders as 'file://<process cwd>/spec.schema.json#' (cwd-dependent, see QUIRK in behavior doc). Text after the 'jsonschema validation failed with' marker is santhosh-tekuri/jsonschema v6 library wording; parity requirement is the prefix up to and including '<kind> spec: ' plus the pass/fail decision, and 'contains' checks named in go_test_expect.",
+  "system_prompt_exact": "You are an impartial grading judge. Score the output under evaluation against each rubric dimension on a scale from 0.0 to 1.0, anchoring your judgment to the reference material when it is provided. Respond with only a JSON object of the form {\"scores\": {\"<dimension>\": <number>}} covering every rubric dimension exactly once. No prose, no markdown.",
+  "two_dim_case": {
+    "go_tests": [
+      "judgerubric.TestOrderSwapAveragingGolden",
+      "judgerubric.TestJudgeCallsOnTheWire"
+    ],
+    "pool": [
+      {
+        "ref": "gemini-3.1-pro/direct",
+        "family": "google",
+        "model": "gemini-3.1-pro"
+      },
+      {
+        "ref": "gpt-5.5/direct",
+        "family": "openai",
+        "model": "gpt-5.5"
+      }
+    ],
+    "judged_column": "col_judged",
+    "judged_family": "anthropic",
+    "spec_raw": "{\n\t\"judge_prompt\": \"Grade the review comment below.\",\n\t\"rubric\": [\n\t\t{\"dimension\": \"idiom\", \"criterion\": \"The suggestion follows Go idioms.\"},\n\t\t{\"dimension\": \"readability\", \"criterion\": \"The comment is clear and actionable.\"}\n\t],\n\t\"reference\": \"REFERENCE MATERIAL: prefer errors.As over type assertions.\"\n}",
+    "task": {
+      "id": "task_rw_001",
+      "capability": "rewriting_editing",
+      "prompt": "TASK PROMPT: review the Go diff.",
+      "attachments_json": "[{\"name\": \"diff.go\", \"content\": \"ATTACHMENT: err, ok := e.(*fs.PathError)\"}]"
+    },
+    "output": "MODEL OUTPUT: use errors.As; a bare type assertion misses wrapped errors.",
+    "scripted_replies_in_call_order": [
+      "{\"scores\": {\"idiom\": 0.9, \"readability\": 0.6}}",
+      "{\"scores\": {\"idiom\": 0.5, \"readability\": 0.8}}"
+    ],
+    "expected_judge_requests": [
+      {
+        "Model": "gemini-3.1-pro",
+        "System": "You are an impartial grading judge. Score the output under evaluation against each rubric dimension on a scale from 0.0 to 1.0, anchoring your judgment to the reference material when it is provided. Respond with only a JSON object of the form {\"scores\": {\"<dimension>\": <number>}} covering every rubric dimension exactly once. No prose, no markdown.",
+        "Prompt": "Grade the review comment below.\n\n--- task prompt ---\nTASK PROMPT: review the Go diff.\n\n--- attachment: diff.go ---\nATTACHMENT: err, ok := e.(*fs.PathError)\n\n--- rubric ---\n1. idiom: The suggestion follows Go idioms.\n2. readability: The comment is clear and actionable.\n\n--- reference material ---\nREFERENCE MATERIAL: prefer errors.As over type assertions.\n\n--- output under evaluation ---\nMODEL OUTPUT: use errors.As; a bare type assertion misses wrapped errors.\n\n--- response format ---\n{\"scores\": {\"idiom\": <0.0-1.0>, \"readability\": <0.0-1.0>}}",
+        "Temperature": 0,
+        "MaxTokens": 1024,
+        "Settings": null
+      },
+      {
+        "Model": "gemini-3.1-pro",
+        "System": "You are an impartial grading judge. Score the output under evaluation against each rubric dimension on a scale from 0.0 to 1.0, anchoring your judgment to the reference material when it is provided. Respond with only a JSON object of the form {\"scores\": {\"<dimension>\": <number>}} covering every rubric dimension exactly once. No prose, no markdown.",
+        "Prompt": "Grade the review comment below.\n\n--- task prompt ---\nTASK PROMPT: review the Go diff.\n\n--- attachment: diff.go ---\nATTACHMENT: err, ok := e.(*fs.PathError)\n\n--- rubric ---\n1. readability: The comment is clear and actionable.\n2. idiom: The suggestion follows Go idioms.\n\n--- reference material ---\nREFERENCE MATERIAL: prefer errors.As over type assertions.\n\n--- output under evaluation ---\nMODEL OUTPUT: use errors.As; a bare type assertion misses wrapped errors.\n\n--- response format ---\n{\"scores\": {\"readability\": <0.0-1.0>, \"idiom\": <0.0-1.0>}}",
+        "Temperature": 0,
+        "MaxTokens": 1024,
+        "Settings": null
+      }
+    ],
+    "expected_dimensions": {
+      "idiom": 0.7,
+      "readability": 0.7
+    },
+    "expected_detail_exact_bytes": "{\"judge\":{\"ref\":\"gemini-3.1-pro/direct\",\"family\":\"google\",\"model\":\"gemini-3.1-pro\"},\"judged_family\":\"anthropic\",\"order_swap\":[{\"rubric_order\":[\"idiom\",\"readability\"],\"scores\":{\"idiom\":0.9,\"readability\":0.6}},{\"rubric_order\":[\"readability\",\"idiom\"],\"scores\":{\"idiom\":0.5,\"readability\":0.8}}],\"disagreement\":{\"idiom\":0.4,\"readability\":0.20000000000000007}}",
+    "tolerance": 1e-09
+  },
+  "minimal_case_openai_judged": {
+    "note": "no judge_prompt, no reference; judged family openai so the google primary judges; criterion contains quotes",
+    "spec_raw": "{\"rubric\":[{\"dimension\":\"overall\",\"criterion\":\"Overall \\\"quality\\\".\"}]}",
+    "task_prompt": "P",
+    "output": "O",
+    "scripted_replies_in_call_order": [
+      "{\"scores\":{\"overall\":1}}",
+      "{\"scores\":{\"overall\":0.5}}"
+    ],
+    "expected_judge_requests": [
+      {
+        "Model": "gemini-3.1-pro",
+        "System": "You are an impartial grading judge. Score the output under evaluation against each rubric dimension on a scale from 0.0 to 1.0, anchoring your judgment to the reference material when it is provided. Respond with only a JSON object of the form {\"scores\": {\"<dimension>\": <number>}} covering every rubric dimension exactly once. No prose, no markdown.",
+        "Prompt": "--- task prompt ---\nP\n\n--- rubric ---\n1. overall: Overall \"quality\".\n\n--- output under evaluation ---\nO\n\n--- response format ---\n{\"scores\": {\"overall\": <0.0-1.0>}}",
+        "Temperature": 0,
+        "MaxTokens": 1024,
+        "Settings": null
+      },
+      {
+        "Model": "gemini-3.1-pro",
+        "System": "You are an impartial grading judge. Score the output under evaluation against each rubric dimension on a scale from 0.0 to 1.0, anchoring your judgment to the reference material when it is provided. Respond with only a JSON object of the form {\"scores\": {\"<dimension>\": <number>}} covering every rubric dimension exactly once. No prose, no markdown.",
+        "Prompt": "--- task prompt ---\nP\n\n--- rubric ---\n1. overall: Overall \"quality\".\n\n--- output under evaluation ---\nO\n\n--- response format ---\n{\"scores\": {\"overall\": <0.0-1.0>}}",
+        "Temperature": 0,
+        "MaxTokens": 1024,
+        "Settings": null
+      }
+    ],
+    "expected_dimensions": {
+      "overall": 0.75
+    }
+  },
+  "family_selection": {
+    "go_test": "judgerubric.TestFamilySelectionTable",
+    "reply_both_calls": "{\"scores\": {\"idiom\": 0.8, \"readability\": 0.8}}",
+    "rows": [
+      {
+        "judged": "anthropic",
+        "judge_model": "gemini-3.1-pro",
+        "judge_family": "google",
+        "calls_to_primary": 2,
+        "calls_to_secondary": 0
+      },
+      {
+        "judged": "openai",
+        "judge_model": "gemini-3.1-pro",
+        "judge_family": "google",
+        "calls_to_primary": 2,
+        "calls_to_secondary": 0
+      },
+      {
+        "judged": "google",
+        "judge_model": "gpt-5.5",
+        "judge_family": "openai",
+        "calls_to_primary": 0,
+        "calls_to_secondary": 2
+      },
+      {
+        "judged": "xai",
+        "judge_model": "gemini-3.1-pro",
+        "judge_family": "google",
+        "calls_to_primary": 2,
+        "calls_to_secondary": 0
+      }
+    ]
+  },
+  "parse_scores": {
+    "rubric": [
+      "idiom",
+      "readability"
+    ],
+    "cases": [
+      {
+        "reply": "The idiom is decent, maybe 0.7?",
+        "error": "parsing judge reply: invalid character 'T' looking for beginning of value",
+        "go_test": "judgerubric.TestStrictParseRejections/prose",
+        "expect_error_contains": "parsing judge reply",
+        "full_grade_error_via_registry": "grader judge_rubric: judge_rubric: judge gemini-3.1-pro/direct call 1/2: parsing judge reply: invalid character 'T' looking for beginning of value"
+      },
+      {
+        "reply": "{\"scores\": {\"idiom\": 0.9}}",
+        "error": "judge reply is missing dimension \"readability\"",
+        "go_test": "judgerubric.TestStrictParseRejections/missing_dimension",
+        "expect_error_contains": "missing dimension \"readability\"",
+        "full_grade_error_via_registry": "grader judge_rubric: judge_rubric: judge gemini-3.1-pro/direct call 1/2: judge reply is missing dimension \"readability\""
+      },
+      {
+        "reply": "{\"scores\": {\"idiom\": 0.9, \"readability\": 0.6, \"tone\": 1}}",
+        "error": "judge reply scores dimensions [tone] that are not in the rubric",
+        "go_test": "judgerubric.TestStrictParseRejections/extra_dimension",
+        "expect_error_contains": "not in the rubric",
+        "full_grade_error_via_registry": "grader judge_rubric: judge_rubric: judge gemini-3.1-pro/direct call 1/2: judge reply scores dimensions [tone] that are not in the rubric"
+      },
+      {
+        "reply": "{\"scores\": {\"idiom\": 1.5, \"readability\": 0.6}}",
+        "error": "judge reply scores \"idiom\" = 1.5, outside [0, 1]",
+        "go_test": "judgerubric.TestStrictParseRejections/above_range",
+        "expect_error_contains": "outside [0, 1]",
+        "full_grade_error_via_registry": "grader judge_rubric: judge_rubric: judge gemini-3.1-pro/direct call 1/2: judge reply scores \"idiom\" = 1.5, outside [0, 1]"
+      },
+      {
+        "reply": "{\"scores\": {\"idiom\": -0.1, \"readability\": 0.6}}",
+        "error": "judge reply scores \"idiom\" = -0.1, outside [0, 1]",
+        "go_test": "judgerubric.TestStrictParseRejections/below_range",
+        "expect_error_contains": "outside [0, 1]",
+        "full_grade_error_via_registry": "grader judge_rubric: judge_rubric: judge gemini-3.1-pro/direct call 1/2: judge reply scores \"idiom\" = -0.1, outside [0, 1]"
+      },
+      {
+        "reply": "{\"scores\": {\"idiom\": 0.9, \"readability\": 0.6}} trailing",
+        "error": "parsing judge reply: trailing data after the scores object",
+        "go_test": "judgerubric.TestStrictParseRejections/trailing_data",
+        "expect_error_contains": "trailing data",
+        "full_grade_error_via_registry": "grader judge_rubric: judge_rubric: judge gemini-3.1-pro/direct call 1/2: parsing judge reply: trailing data after the scores object"
+      },
+      {
+        "reply": "{\"scores\": {\"idiom\": 0.9, \"readability\": 0.6}, \"rationale\": \"x\"}",
+        "error": "parsing judge reply: json: unknown field \"rationale\"",
+        "go_test": "judgerubric.TestStrictParseRejections/unknown_field",
+        "expect_error_contains": "parsing judge reply",
+        "full_grade_error_via_registry": "grader judge_rubric: judge_rubric: judge gemini-3.1-pro/direct call 1/2: parsing judge reply: json: unknown field \"rationale\""
+      },
+      {
+        "reply": "{\"scores\": {}}",
+        "error": "judge reply has no scores",
+        "go_test": "judgerubric.TestStrictParseRejections/empty_scores",
+        "expect_error_contains": "no scores",
+        "full_grade_error_via_registry": "grader judge_rubric: judge_rubric: judge gemini-3.1-pro/direct call 1/2: judge reply has no scores"
+      },
+      {
+        "reply": "{\"scores\": null}",
+        "error": "judge reply has no scores",
+        "go_test": "judgerubric.TestStrictParseRejections/null_scores",
+        "expect_error_contains": "no scores",
+        "full_grade_error_via_registry": "grader judge_rubric: judge_rubric: judge gemini-3.1-pro/direct call 1/2: judge reply has no scores"
+      },
+      {
+        "reply": "{\"scores\": {\"idiom\": \"great\", \"readability\": 0.6}}",
+        "error": "parsing judge reply: json: cannot unmarshal string into Go struct field .scores of type float64",
+        "go_test": "judgerubric.TestStrictParseRejections/non-numeric_score",
+        "expect_error_contains": "parsing judge reply",
+        "full_grade_error_via_registry": "grader judge_rubric: judge_rubric: judge gemini-3.1-pro/direct call 1/2: parsing judge reply: json: cannot unmarshal string into Go struct field .scores of type float64"
+      },
+      {
+        "reply": "```json\n{\"scores\": {\"idiom\": 0.9, \"readability\": 0.6}}",
+        "error": "parsing judge reply: invalid character '`' looking for beginning of value",
+        "go_test": "judgerubric.TestStrictParseRejections/unclosed_fence",
+        "expect_error_contains": "parsing judge reply",
+        "full_grade_error_via_registry": "grader judge_rubric: judge_rubric: judge gemini-3.1-pro/direct call 1/2: parsing judge reply: invalid character '`' looking for beginning of value"
+      },
+      {
+        "reply": "",
+        "error": "parsing judge reply: EOF",
+        "go_test": "judgerubric.TestStrictParseRejections/empty_reply",
+        "expect_error_contains": "parsing judge reply",
+        "full_grade_error_via_registry": "grader judge_rubric: judge_rubric: judge gemini-3.1-pro/direct call 1/2: parsing judge reply: EOF"
+      },
+      {
+        "reply": "[0.9, 0.6]",
+        "error": "parsing judge reply: json: cannot unmarshal array into Go value of type struct { Scores map[string]float64 \"json:\\\"scores\\\"\" }",
+        "go_test": "judgerubric.TestStrictParseRejections/array_not_object",
+        "expect_error_contains": "parsing judge reply",
+        "full_grade_error_via_registry": "grader judge_rubric: judge_rubric: judge gemini-3.1-pro/direct call 1/2: parsing judge reply: json: cannot unmarshal array into Go value of type struct { Scores map[string]float64 \"json:\\\"scores\\\"\" }"
+      },
+      {
+        "reply": "{\"scores\": {\"idiom\": 0.9}} {\"scores\": {\"readability\": 0.6}}",
+        "error": "parsing judge reply: trailing data after the scores object",
+        "go_test": "judgerubric.TestStrictParseRejections/two_objects",
+        "expect_error_contains": "trailing data",
+        "full_grade_error_via_registry": "grader judge_rubric: judge_rubric: judge gemini-3.1-pro/direct call 1/2: parsing judge reply: trailing data after the scores object"
+      },
+      {
+        "reply": "```json\n{\"scores\": {\"idiom\": 0.9, \"readability\": 0.6}}\n```",
+        "scores": {
+          "idiom": 0.9,
+          "readability": 0.6
+        },
+        "go_test": "judgerubric.TestFencedReplyAccepted"
+      },
+      {
+        "reply": "```\n{\"scores\": {\"idiom\": 0.9, \"readability\": 0.6}}\n```",
+        "scores": {
+          "idiom": 0.9,
+          "readability": 0.6
+        },
+        "probe": true
+      },
+      {
+        "reply": "```JSON\n{\"scores\": {\"idiom\": 0.9, \"readability\": 0.6}}\n```",
+        "error": "parsing judge reply: invalid character 'J' looking for beginning of value",
+        "probe": true
+      },
+      {
+        "reply": "{\"Scores\": {\"idiom\": 0.9, \"readability\": 0.6}}",
+        "scores": {
+          "idiom": 0.9,
+          "readability": 0.6
+        },
+        "probe": true
+      },
+      {
+        "reply": "{\"SCORES\": {\"idiom\": 0.9, \"readability\": 0.6}}",
+        "scores": {
+          "idiom": 0.9,
+          "readability": 0.6
+        },
+        "probe": true
+      },
+      {
+        "reply": "{\"scores\": {\"idiom\": 0.9, \"readability\": 0.6, \"idiom\": 0.1}}",
+        "scores": {
+          "idiom": 0.1,
+          "readability": 0.6
+        },
+        "probe": true
+      },
+      {
+        "reply": "{\"scores\": {\"idiom\": null, \"readability\": 0.6}}",
+        "scores": {
+          "idiom": 0,
+          "readability": 0.6
+        },
+        "probe": true
+      },
+      {
+        "reply": "{\"scores\": {\"idiom\": 1, \"readability\": 0}}",
+        "scores": {
+          "idiom": 1,
+          "readability": 0
+        },
+        "probe": true
+      },
+      {
+        "reply": "{\"scores\": {\"Idiom\": 0.9, \"readability\": 0.6}}",
+        "error": "judge reply is missing dimension \"idiom\"",
+        "probe": true
+      },
+      {
+        "reply": "{\"scores\": {\"idiom\": 0.9, \"readability\": 0.6}}\n\n",
+        "scores": {
+          "idiom": 0.9,
+          "readability": 0.6
+        },
+        "probe": true
+      },
+      {
+        "reply": "{\"scores\": {\"idiom\": 0.9, \"readability\": 0.6}, \"scores\": {\"idiom\": 0.2, \"readability\": 0.3}}",
+        "scores": {
+          "idiom": 0.2,
+          "readability": 0.3
+        },
+        "probe": true
+      },
+      {
+        "reply": "{}",
+        "error": "judge reply has no scores",
+        "probe": true
+      },
+      {
+        "reply": "null",
+        "error": "judge reply has no scores",
+        "probe": true
+      },
+      {
+        "reply": "{\"scores\": {\"idiom\": 1e-1, \"readability\": 6E-1}}",
+        "scores": {
+          "idiom": 0.1,
+          "readability": 0.6
+        },
+        "probe": true
+      },
+      {
+        "reply": "Here you go: ```json\n{\"scores\": {\"idiom\": 0.9, \"readability\": 0.6}}\n```",
+        "error": "parsing judge reply: invalid character 'H' looking for beginning of value",
+        "probe": true
+      }
+    ]
+  },
+  "strict_parse_rejections_go_test": [],
+  "error_strings": [
+    {
+      "case": "registry unknown kind x",
+      "error": "graders: grade: no grader registered for kind \"x\""
+    },
+    {
+      "case": "first call provider error",
+      "error": "grader judge_rubric: judge_rubric: judge gemini-3.1-pro/direct call 1/2: scripted judge outage"
+    },
+    {
+      "case": "first call prose reply",
+      "error": "judge_rubric: judge gemini-3.1-pro/direct call 1/2: parsing judge reply: invalid character 'p' looking for beginning of value"
+    },
+    {
+      "case": "nil task",
+      "error": "judge_rubric: grading requires the task (reference-anchored inputs, spec 5.5)"
+    },
+    {
+      "case": "nil run",
+      "error": "judge_rubric: grading requires the judged model column"
+    },
+    {
+      "case": "resolver error",
+      "error": "judge_rubric: resolving family of column col_unknown: unknown column \"col_unknown\""
+    },
+    {
+      "case": "validator instance",
+      "error": "judge_rubric: validation-only instance cannot grade (wire New with a judge pool and family resolver)"
+    },
+    {
+      "case": "empty rubric",
+      "error": "judge_rubric: spec has no rubric items"
+    },
+    {
+      "case": "selectJudge empty family",
+      "error": "judge_rubric: judged column resolved to an empty family"
+    },
+    {
+      "case": "selectJudge no cross family",
+      "error": "judge_rubric: no cross-family judge for family \"google\" in the pool"
+    },
+    {
+      "case": "bad attachments",
+      "error": "judge_rubric: assembling task prompt: parsing attachments: invalid character 'b' looking for beginning of object key string"
+    },
+    {
+      "case": "New missing client",
+      "error": "judgerubric: pool[1] (gpt-5.5/direct) has no provider client"
+    },
+    {
+      "case": "New missing family",
+      "error": "judgerubric: pool[1] (gpt-5.5/direct) has no family"
+    },
+    {
+      "case": "New missing model",
+      "error": "judgerubric: pool[1] (gpt-5.5/direct) has no model"
+    },
+    {
+      "case": "New missing ref",
+      "error": "judgerubric: pool[1] has no ref"
+    },
+    {
+      "case": "New empty pool",
+      "error": "judgerubric: pool has 0 members; spec 5.5 requires 2"
+    },
+    {
+      "case": "New one member",
+      "error": "judgerubric: pool has 1 members; spec 5.5 requires 2"
+    },
+    {
+      "case": "New same family",
+      "error": "judgerubric: pool members gemini-3.1-pro/direct and gemini-3-flash/direct share family \"google\"; spec 5.5 requires two families"
+    },
+    {
+      "case": "New missing resolver",
+      "error": "judgerubric: a judged-family resolver is required"
+    },
+    {
+      "case": "PoolFromConfig malformed",
+      "error": "judgerubric: pool ref \"gemini-3.1-pro\" is not \"model/endpoint\""
+    },
+    {
+      "case": "PoolFromConfig unknown column",
+      "error": "judgerubric: no model column matches pool ref \"claude-opus-5/direct\""
+    },
+    {
+      "case": "PoolFromConfig missing client",
+      "error": "judgerubric: no provider client configured for \"google\" (pool ref \"gemini-3.1-pro/direct\")"
+    },
+    {
+      "case": "splitRef a/b/c",
+      "error": "a/b | c | ok"
+    },
+    {
+      "case": "splitRef /x",
+      "error": " |  | not ok"
+    },
+    {
+      "case": "splitRef x/",
+      "error": " |  | not ok"
+    },
+    {
+      "case": "splitRef a//b",
+      "error": "a/ | b | ok"
+    }
+  ],
+  "validate_spec": [
+    {
+      "go_test": "judgerubric.TestValidateSpecTable",
+      "spec_raw": "twoDimSpec (see two_dim_case.spec_raw)",
+      "valid": true
+    },
+    {
+      "go_test": "judgerubric.TestValidateSpecTable",
+      "spec_raw": "{\"rubric\": [{\"dimension\": \"overall\", \"criterion\": \"Overall quality.\"}]}",
+      "valid": true
+    },
+    {
+      "go_test": "judgerubric.TestValidateSpecTable/not_an_object",
+      "spec_raw": "[1, 2]",
+      "valid": false,
+      "go_error": "judge_rubric spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '': got array, want object"
+    },
+    {
+      "go_test": "judgerubric.TestValidateSpecTable/missing_rubric",
+      "spec_raw": "{\"reference\": \"ref\"}",
+      "valid": false,
+      "go_error": "judge_rubric spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '': missing property 'rubric'"
+    },
+    {
+      "go_test": "judgerubric.TestValidateSpecTable/empty_rubric",
+      "spec_raw": "{\"rubric\": []}",
+      "valid": false,
+      "go_error": "judge_rubric spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/rubric': minItems: got 0, want 1"
+    },
+    {
+      "go_test": "judgerubric.TestValidateSpecTable/duplicate_dimension",
+      "spec_raw": "{\"rubric\": [{\"dimension\": \"idiom\", \"criterion\": \"a\"}, {\"dimension\": \"idiom\", \"criterion\": \"b\"}]}",
+      "valid": false,
+      "go_error": "judge_rubric spec: rubric[1]: duplicate dimension \"idiom\""
+    },
+    {
+      "go_test": "judgerubric.TestValidateSpecTable/bad_dimension_name",
+      "spec_raw": "{\"rubric\": [{\"dimension\": \"Idiom\", \"criterion\": \"a\"}]}",
+      "valid": false,
+      "go_error": "judge_rubric spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/rubric/0/dimension': 'Idiom' does not match pattern '^[a-z][a-z0-9_]*$'"
+    },
+    {
+      "go_test": "judgerubric.TestValidateSpecTable/blank_criterion",
+      "spec_raw": "{\"rubric\": [{\"dimension\": \"idiom\", \"criterion\": \"   \"}]}",
+      "valid": false,
+      "go_error": "judge_rubric spec: rubric[0] (idiom): criterion is blank"
+    },
+    {
+      "go_test": "judgerubric.TestValidateSpecTable/missing_criterion",
+      "spec_raw": "{\"rubric\": [{\"dimension\": \"idiom\"}]}",
+      "valid": false,
+      "go_error": "judge_rubric spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/rubric/0': missing property 'criterion'"
+    },
+    {
+      "go_test": "judgerubric.TestValidateSpecTable/unknown_item_field",
+      "spec_raw": "{\"rubric\": [{\"dimension\": \"idiom\", \"criterion\": \"a\", \"weight\": 2}]}",
+      "valid": false,
+      "go_error": "judge_rubric spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/rubric/0': additional properties 'weight' not allowed"
+    },
+    {
+      "go_test": "judgerubric.TestValidateSpecTable/unknown_top_field",
+      "spec_raw": "{\"rubric\": [{\"dimension\": \"idiom\", \"criterion\": \"a\"}], \"scale\": 5}",
+      "valid": false,
+      "go_error": "judge_rubric spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '': additional properties 'scale' not allowed"
+    },
+    {
+      "go_test": "judgerubric.TestValidateSpecTable/empty_judge_prompt",
+      "spec_raw": "{\"rubric\": [{\"dimension\": \"idiom\", \"criterion\": \"a\"}], \"judge_prompt\": \"\"}",
+      "valid": false,
+      "go_error": "judge_rubric spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/judge_prompt': minLength: got 0, want 1"
+    },
+    {
+      "go_test": "judgerubric.TestValidateSpecTable/non-string_ref",
+      "spec_raw": "{\"rubric\": [{\"dimension\": \"idiom\", \"criterion\": \"a\"}], \"reference\": 42}",
+      "valid": false,
+      "go_error": "judge_rubric spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/reference': got number, want string"
+    },
+    {
+      "go_test": "judgerubric.TestValidateSpecTable/invalid_json",
+      "spec_raw": "{",
+      "valid": false,
+      "go_error": "judge_rubric spec: unexpected EOF"
+    }
+  ],
+  "fixture_results": [
+    {
+      "file": "bad_spec_dimension_name.yaml",
+      "description": "dimensions are lower_snake identifiers, like every grader's",
+      "spec_json": {
+        "rubric": [
+          {
+            "criterion": "Idiomatic style.",
+            "dimension": "Idiom"
+          }
+        ]
+      },
+      "output": "irrelevant",
+      "validate_error": "judge_rubric spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/rubric/0/dimension': 'Idiom' does not match pattern '^[a-z][a-z0-9_]*$'",
+      "failure_counter": 0
+    },
+    {
+      "file": "bad_spec_duplicate_dimension.yaml",
+      "description": "two rubric items must not name the same dimension",
+      "spec_json": {
+        "rubric": [
+          {
+            "criterion": "First idiom criterion.",
+            "dimension": "idiom"
+          },
+          {
+            "criterion": "Second idiom criterion.",
+            "dimension": "idiom"
+          }
+        ]
+      },
+      "output": "irrelevant",
+      "validate_error": "judge_rubric spec: rubric[1]: duplicate dimension \"idiom\"",
+      "failure_counter": 0
+    },
+    {
+      "file": "bad_spec_item_weight.yaml",
+      "description": "rubric items carry no weights — per-dimension weighting is the envelope's weight_dimensions and the task's dimension_weights (spec 5.4, 6.1)",
+      "spec_json": {
+        "rubric": [
+          {
+            "criterion": "Idiomatic style.",
+            "dimension": "idiom",
+            "weight": 2
+          }
+        ]
+      },
+      "output": "irrelevant",
+      "validate_error": "judge_rubric spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/rubric/0': additional properties 'weight' not allowed",
+      "failure_counter": 0
+    },
+    {
+      "file": "bad_spec_missing_rubric.yaml",
+      "description": "a spec without rubric items fails validation",
+      "spec_json": {
+        "reference": "some reference material"
+      },
+      "output": "irrelevant",
+      "validate_error": "judge_rubric spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '': missing property 'rubric'",
+      "failure_counter": 0
+    },
+    {
+      "file": "order_swap_position_bias.yaml",
+      "description": "A position-biased judge (scores the first-listed dimension 1.0, the second 0.6) is averaged flat by the spec 5.5 order swap: both dimensions come out at the 0.8 mean and the 0.4 disagreement lands in the detail blob.",
+      "spec_json": {
+        "judge_prompt": "Grade the Go review comment below.",
+        "reference": "Reference guidance: prefer errors.As over type assertions on wrapped errors.",
+        "rubric": [
+          {
+            "criterion": "The suggestion follows Go idioms.",
+            "dimension": "idiom"
+          },
+          {
+            "criterion": "The comment is clear and actionable.",
+            "dimension": "readability"
+          }
+        ]
+      },
+      "output": "Use errors.As here; a bare type assertion misses wrapped errors.",
+      "dimensions": {
+        "idiom": 0.8,
+        "readability": 0.8
+      },
+      "detail": {
+        "judge": {
+          "ref": "gemini-3.1-pro/direct",
+          "family": "google",
+          "model": "gemini-3.1-pro"
+        },
+        "judged_family": "anthropic",
+        "order_swap": [
+          {
+            "rubric_order": [
+              "idiom",
+              "readability"
+            ],
+            "scores": {
+              "idiom": 1,
+              "readability": 0.6
+            }
+          },
+          {
+            "rubric_order": [
+              "readability",
+              "idiom"
+            ],
+            "scores": {
+              "idiom": 0.6,
+              "readability": 1
+            }
+          }
+        ],
+        "disagreement": {
+          "idiom": 0.4,
+          "readability": 0.4
+        }
+      },
+      "detail_exact_bytes": "{\"judge\":{\"ref\":\"gemini-3.1-pro/direct\",\"family\":\"google\",\"model\":\"gemini-3.1-pro\"},\"judged_family\":\"anthropic\",\"order_swap\":[{\"rubric_order\":[\"idiom\",\"readability\"],\"scores\":{\"idiom\":1,\"readability\":0.6}},{\"rubric_order\":[\"readability\",\"idiom\"],\"scores\":{\"idiom\":0.6,\"readability\":1}}],\"disagreement\":{\"idiom\":0.4,\"readability\":0.4}}",
+      "failure_counter": 0
+    },
+    {
+      "file": "single_dimension.yaml",
+      "description": "A one-item rubric still gets two calls; reversing a single item changes nothing, so the position-biased judge agrees with itself and disagreement is 0.",
+      "spec_json": {
+        "rubric": [
+          {
+            "criterion": "Overall quality of the rewrite.",
+            "dimension": "overall"
+          }
+        ]
+      },
+      "output": "The rewritten paragraph keeps every fact and halves the word count.",
+      "dimensions": {
+        "overall": 1
+      },
+      "detail": {
+        "judge": {
+          "ref": "gemini-3.1-pro/direct",
+          "family": "google",
+          "model": "gemini-3.1-pro"
+        },
+        "judged_family": "anthropic",
+        "order_swap": [
+          {
+            "rubric_order": [
+              "overall"
+            ],
+            "scores": {
+              "overall": 1
+            }
+          },
+          {
+            "rubric_order": [
+              "overall"
+            ],
+            "scores": {
+              "overall": 1
+            }
+          }
+        ],
+        "disagreement": {
+          "overall": 0
+        }
+      },
+      "detail_exact_bytes": "{\"judge\":{\"ref\":\"gemini-3.1-pro/direct\",\"family\":\"google\",\"model\":\"gemini-3.1-pro\"},\"judged_family\":\"anthropic\",\"order_swap\":[{\"rubric_order\":[\"overall\"],\"scores\":{\"overall\":1}},{\"rubric_order\":[\"overall\"],\"scores\":{\"overall\":1}}],\"disagreement\":{\"overall\":0}}",
+      "failure_counter": 0
+    }
+  ],
+  "position_biased_judge": "test double used by judgerubric.TestGolden: it cuts the request prompt at the first '--- response format ---', finds every match of regex \"([a-z][a-z0-9_]*)\": <0\\.0-1\\.0> in order, and scores match i as 1.0 - 0.4*i (so 1.0, 0.6, ...), replying json.Marshal({\"scores\": {...}})."
+}

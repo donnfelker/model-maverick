@@ -1,0 +1,123 @@
+{
+  "base62_alphabet": "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+  "base62_cases": [
+    {
+      "expected_base62": "0000000000000000000000000000000000000000000",
+      "id": "zeros",
+      "input_hex": "0000000000000000000000000000000000000000000000000000000000000000",
+      "key_hash_hex": "228a19b7820635717ce607e03b1d7e5cdc498f98ef3e12f82661cf4d07671024",
+      "last4": "0000",
+      "raw_key": "mk_live_0000000000000000000000000000000000000000000"
+    },
+    {
+      "expected_base62": "0000000000000000000000000000000000000000001",
+      "id": "one",
+      "input_hex": "0000000000000000000000000000000000000000000000000000000000000001",
+      "key_hash_hex": "ce0841d8085ab7cc6209eef6302a098fa30ecb87e1dc959f7c5ac9ddf8c86683",
+      "last4": "0001",
+      "raw_key": "mk_live_0000000000000000000000000000000000000000001"
+    },
+    {
+      "expected_base62": "0000000000000000000000000000000000000000010",
+      "id": "sixty_two",
+      "input_hex": "000000000000000000000000000000000000000000000000000000000000003e",
+      "key_hash_hex": "eb276a89809241b6071b593e3aa59c2efedd48d947ae80860f2157f83e5671b1",
+      "last4": "0010",
+      "raw_key": "mk_live_0000000000000000000000000000000000000000010"
+    },
+    {
+      "expected_base62": "003aUlTJC7tjlCTQj2uNU3MFagCXG9LRKRcwGkBIDlf",
+      "id": "seq_00_1f",
+      "input_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "key_hash_hex": "dfae55dedec91168c50d62680ca9ca04f6b14335f29205d3c074f48f0532485d",
+      "last4": "IDlf",
+      "raw_key": "mk_live_003aUlTJC7tjlCTQj2uNU3MFagCXG9LRKRcwGkBIDlf"
+    },
+    {
+      "expected_base62": "yhjskwdA6OZ1AL1YmHWZWm8LLG7HjnuCA2j5rOw8Xp1",
+      "id": "all_ff",
+      "input_hex": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "key_hash_hex": "a960d83cdd4c3f078ccab3bc0fb81077bf8cb58b928c6ff1ce9d24c0d599b2fc",
+      "last4": "8Xp1",
+      "raw_key": "mk_live_yhjskwdA6OZ1AL1YmHWZWm8LLG7HjnuCA2j5rOw8Xp1"
+    },
+    {
+      "expected_base62": "ULrwNTJa3CHVaAVmO8lHlO4Afd3drtx651MXvhT4GuW",
+      "id": "high_bit",
+      "input_hex": "8000000000000000000000000000000000000000000000000000000000000000",
+      "key_hash_hex": "bc112d470515d74b032475e2b8ce45b2490919b8d6bb4347b236588c425a944c",
+      "last4": "4GuW",
+      "raw_key": "mk_live_ULrwNTJa3CHVaAVmO8lHlO4Afd3drtx651MXvhT4GuW"
+    }
+  ],
+  "encoded_length": 43,
+  "internal_auth_cases": [
+    {
+      "authorization": "Bearer ops:alpha",
+      "label": "ops",
+      "ok": true
+    },
+    {
+      "authorization": "Bearer rails:beta",
+      "label": "rails",
+      "ok": true
+    },
+    {
+      "authorization": "",
+      "label": "",
+      "ok": false
+    },
+    {
+      "authorization": "Bearer ",
+      "label": "",
+      "ok": false
+    },
+    {
+      "authorization": "Bearer alpha",
+      "label": "",
+      "ok": false
+    },
+    {
+      "authorization": "Bearer ops",
+      "label": "",
+      "ok": false
+    },
+    {
+      "authorization": "Bearer ops:beta",
+      "label": "",
+      "ok": false
+    },
+    {
+      "authorization": "Bearer ops:alpha:extra",
+      "label": "",
+      "ok": false
+    },
+    {
+      "authorization": "Basic b3BzOmFscGhh",
+      "label": "",
+      "ok": false
+    },
+    {
+      "authorization": "ops:alpha",
+      "label": "",
+      "ok": false
+    },
+    {
+      "authorization": "bearer ops:alpha",
+      "label": "",
+      "ok": false
+    },
+    {
+      "authorization": "Bearer  ops:alpha",
+      "label": "",
+      "ok": false
+    }
+  ],
+  "internal_digest_example": {
+    "input": "ops:alpha",
+    "sha256_hex": "064a3fa2250e37868c93975512b7209aa928ccf599175cbfe707e83c2030998e"
+  },
+  "internal_tokens_config": "ops:alpha,rails:beta",
+  "key_prefix": "mk_live_",
+  "random_bytes": 32
+}

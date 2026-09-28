@@ -1,0 +1,472 @@
+{
+  "alert_message_example": "classifier claude-haiku-4-5/direct/v2 failed 9.5% of calls over the last 15m0s (threshold 5%); prompt-path requests are receiving the fallback classification",
+  "cases": [
+    {
+      "events": [
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 1
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 2
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 3
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 4
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 5
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 6
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 7
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 8
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 9
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 10
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 11
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 12
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 13
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 14
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 15
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 16
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 17
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 18
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 19
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": true,
+          "fire": false,
+          "rate": 0.05,
+          "samples": 20
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": true,
+          "fire": true,
+          "rate": 0.09523809523809523,
+          "samples": 21
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": true,
+          "fire": false,
+          "rate": 0.13636363636363635,
+          "samples": 22
+        },
+        {
+          "at": "2026-07-06T12:00:00Z",
+          "failed": true,
+          "fire": false,
+          "rate": 0.17391304347826086,
+          "samples": 23
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 1
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 2
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 3
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 4
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 5
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 6
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 7
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 8
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 9
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 10
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 11
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 12
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 13
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 14
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 15
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 16
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 17
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 18
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0,
+          "samples": 19
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": true,
+          "fire": false,
+          "rate": 0.05,
+          "samples": 20
+        },
+        {
+          "at": "2026-07-06T12:16:00Z",
+          "failed": true,
+          "fire": true,
+          "rate": 0.09523809523809523,
+          "samples": 21
+        }
+      ],
+      "go_test": "classify.TestResolveDegradedAlert",
+      "id": "resolve_degraded_alert_sequence"
+    },
+    {
+      "events": [
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": true,
+          "fire": false,
+          "rate": 1,
+          "samples": 1
+        },
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0.5,
+          "samples": 2
+        },
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0.3333333333333333,
+          "samples": 3
+        },
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0.25,
+          "samples": 4
+        },
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0.2,
+          "samples": 5
+        },
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0.16666666666666666,
+          "samples": 6
+        },
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0.14285714285714285,
+          "samples": 7
+        },
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0.125,
+          "samples": 8
+        },
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0.1111111111111111,
+          "samples": 9
+        },
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0.1,
+          "samples": 10
+        },
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0.09090909090909091,
+          "samples": 11
+        },
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0.08333333333333333,
+          "samples": 12
+        },
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0.07692307692307693,
+          "samples": 13
+        },
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0.07142857142857142,
+          "samples": 14
+        },
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0.06666666666666667,
+          "samples": 15
+        },
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0.0625,
+          "samples": 16
+        },
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0.058823529411764705,
+          "samples": 17
+        },
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0.05555555555555555,
+          "samples": 18
+        },
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0.05263157894736842,
+          "samples": 19
+        },
+        {
+          "at": "2026-07-07T00:00:00Z",
+          "failed": false,
+          "fire": false,
+          "rate": 0.05,
+          "samples": 20
+        },
+        {
+          "at": "2026-07-07T00:15:00Z",
+          "failed": true,
+          "fire": true,
+          "note": "event at exactly now-15m is kept (Before(cutoff) is strict)",
+          "rate": 0.09523809523809523,
+          "samples": 21
+        }
+      ],
+      "id": "window_edge_inclusive"
+    }
+  ]
+}

@@ -1,0 +1,1415 @@
+{
+  "about": "corpus loader + Validate. Each entry: directory (relative to fixtures testdata/internal/tasks/testdata or an inline docs map written to a temp dir), then the exact Violation list. 'String' is Violation.String(). Error strings are exact Go output except '{SPEC_SCHEMA_URL}' / '{TASK_SCHEMA_URL}', which Go renders as 'file://<process cwd>/spec.schema.json#' (cwd-dependent, see QUIRK in behavior doc). Text after the 'jsonschema validation failed with' marker is santhosh-tekuri/jsonschema v6 library wording; parity requirement is the prefix up to and including '<kind> spec: ' plus the pass/fail decision, and 'contains' checks named in go_test_expect. YAML error text after 'yaml_invalid: ' is goccy/go-yaml wording (see QUIRK).",
+  "validation_registry_kinds": [
+    "golden_answer",
+    "json_schema",
+    "judge_rubric",
+    "key_facts",
+    "rule_scan"
+  ],
+  "cases": [
+    {
+      "id": "valid",
+      "go_tests": [
+        "tasks.TestValidateValidCorpus",
+        "tasks.TestLoadValidCorpus"
+      ],
+      "dir": "testdata/internal/tasks/testdata/valid",
+      "tasks_in_load_order": [
+        "task_fq_001.yaml#task_fq_001",
+        "task_sx_001.yaml#task_sx_001",
+        "task_sx_002.yaml#task_sx_002",
+        "task_sx_017.yaml#task_sx_017"
+      ],
+      "errors": [],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [2 3 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [2 3 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability structured_extraction has 3 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability structured_extraction has 3 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability structured_extraction has no tasks at tier(s) [1 4]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability structured_extraction has no tasks at tier(s) [1 4]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability structured_extraction has 2 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability structured_extraction has 2 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "invalid/bad_id",
+      "go_tests": [
+        "tasks.TestValidateRejectingFixtures/bad_id"
+      ],
+      "dir": "testdata/internal/tasks/testdata/invalid/bad_id",
+      "tasks_in_load_order": [
+        "Task-FQ-01.yaml#Task-FQ-01"
+      ],
+      "errors": [
+        {
+          "File": "Task-FQ-01.yaml",
+          "TaskID": "Task-FQ-01",
+          "Rule": "bad_task_id",
+          "Message": "id \"Task-FQ-01\" is not an authored slug matching ^task_[a-z0-9]+(_[a-z0-9]+)*$",
+          "String": "Task-FQ-01.yaml: task Task-FQ-01: bad_task_id: id \"Task-FQ-01\" is not an authored slug matching ^task_[a-z0-9]+(_[a-z0-9]+)*$"
+        }
+      ],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "invalid/unknown_capability",
+      "go_tests": [
+        "tasks.TestValidateRejectingFixtures/unknown_capability"
+      ],
+      "dir": "testdata/internal/tasks/testdata/invalid/unknown_capability",
+      "tasks_in_load_order": [
+        "task_uc_001.yaml#task_uc_001"
+      ],
+      "errors": [
+        {
+          "File": "task_uc_001.yaml",
+          "TaskID": "task_uc_001",
+          "Rule": "unknown_capability",
+          "Message": "capability \"telepathy\" is not one of the v1 capabilities: code_generation, structured_extraction, summarization_synthesis, multi_step_reasoning, instruction_schema_following, long_context_qa, factual_qa, rewriting_editing, translation_multilingual, critique_and_judging",
+          "String": "task_uc_001.yaml: task task_uc_001: unknown_capability: capability \"telepathy\" is not one of the v1 capabilities: code_generation, structured_extraction, summarization_synthesis, multi_step_reasoning, instruction_schema_following, long_context_qa, factual_qa, rewriting_editing, translation_multilingual, critique_and_judging"
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "invalid/tier_range",
+      "go_tests": [
+        "tasks.TestValidateRejectingFixtures/tier_range"
+      ],
+      "dir": "testdata/internal/tasks/testdata/invalid/tier_range",
+      "tasks_in_load_order": [
+        "task_tr_000.yaml#task_tr_000",
+        "task_tr_006.yaml#task_tr_006"
+      ],
+      "errors": [
+        {
+          "File": "task_tr_000.yaml",
+          "TaskID": "task_tr_000",
+          "Rule": "tier_out_of_range",
+          "Message": "difficulty_tier 0 is not in 1..5",
+          "String": "task_tr_000.yaml: task task_tr_000: tier_out_of_range: difficulty_tier 0 is not in 1..5"
+        },
+        {
+          "File": "task_tr_006.yaml",
+          "TaskID": "task_tr_006",
+          "Rule": "tier_out_of_range",
+          "Message": "difficulty_tier 6 is not in 1..5",
+          "String": "task_tr_006.yaml: task task_tr_006: tier_out_of_range: difficulty_tier 6 is not in 1..5"
+        }
+      ],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 2 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 2 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 2 3 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 2 3 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "invalid/weights_sum",
+      "go_tests": [
+        "tasks.TestValidateRejectingFixtures/weights_sum"
+      ],
+      "dir": "testdata/internal/tasks/testdata/invalid/weights_sum",
+      "tasks_in_load_order": [
+        "task_ws_001.yaml#task_ws_001"
+      ],
+      "errors": [
+        {
+          "File": "task_ws_001.yaml",
+          "TaskID": "task_ws_001",
+          "Rule": "weights_sum",
+          "Message": "dimension_weights sum to 0.9; they must sum to 1 (spec 5.6)",
+          "String": "task_ws_001.yaml: task task_ws_001: weights_sum: dimension_weights sum to 0.9; they must sum to 1 (spec 5.6)"
+        }
+      ],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "invalid/unknown_grader",
+      "go_tests": [
+        "tasks.TestValidateRejectingFixtures/unknown_grader"
+      ],
+      "dir": "testdata/internal/tasks/testdata/invalid/unknown_grader",
+      "tasks_in_load_order": [
+        "task_ug_001.yaml#task_ug_001"
+      ],
+      "errors": [
+        {
+          "File": "task_ug_001.yaml",
+          "TaskID": "task_ug_001",
+          "Rule": "unknown_grader_type",
+          "Message": "grader_specs[0]: graders: envelope: unknown type \"quantum_score\"",
+          "String": "task_ug_001.yaml: task task_ug_001: unknown_grader_type: grader_specs[0]: graders: envelope: unknown type \"quantum_score\""
+        }
+      ],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "invalid/test_suite",
+      "go_tests": [
+        "tasks.TestValidateRejectingFixtures/test_suite",
+        "tasks.TestValidateTestSuiteUsesGraderUnsupportedWording"
+      ],
+      "dir": "testdata/internal/tasks/testdata/invalid/test_suite",
+      "tasks_in_load_order": [
+        "task_ts_001.yaml#task_ts_001"
+      ],
+      "errors": [
+        {
+          "File": "task_ts_001.yaml",
+          "TaskID": "task_ts_001",
+          "Rule": "grader_unsupported",
+          "Message": "grader_specs[0]: graders: envelope: grader_unsupported: type \"test_suite\" is reserved until v1.1",
+          "String": "task_ts_001.yaml: task task_ts_001: grader_unsupported: grader_specs[0]: graders: envelope: grader_unsupported: type \"test_suite\" is reserved until v1.1"
+        }
+      ],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability code_generation has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability code_generation has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability code_generation has no tasks at tier(s) [1 2 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability code_generation has no tasks at tier(s) [1 2 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability code_generation has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability code_generation has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "invalid/bad_grader_payload",
+      "go_tests": [
+        "tasks.TestValidateRejectingFixtures/bad_grader_payload"
+      ],
+      "dir": "testdata/internal/tasks/testdata/invalid/bad_grader_payload",
+      "tasks_in_load_order": [
+        "task_bp_001.yaml#task_bp_001"
+      ],
+      "errors": [
+        {
+          "File": "task_bp_001.yaml",
+          "TaskID": "task_bp_001",
+          "Rule": "grader_spec_invalid",
+          "Message": "grader_specs[0]: graders: envelope: golden_answer spec: golden_answer spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/answers': minItems: got 0, want 1",
+          "String": "task_bp_001.yaml: task task_bp_001: grader_spec_invalid: grader_specs[0]: graders: envelope: golden_answer spec: golden_answer spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/answers': minItems: got 0, want 1"
+        }
+      ],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "invalid/smoke_anchors",
+      "go_tests": [
+        "tasks.TestValidateRejectingFixtures/smoke_anchors"
+      ],
+      "dir": "testdata/internal/tasks/testdata/invalid/smoke_anchors",
+      "tasks_in_load_order": [
+        "task_sa_001.yaml#task_sa_001"
+      ],
+      "errors": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_anchor_missing",
+          "Message": "capability factual_qa: smoke set has no easy anchor (tier <= 2) (spec 5.6)",
+          "String": "smoke_anchor_missing: capability factual_qa: smoke set has no easy anchor (tier <= 2) (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_anchor_missing",
+          "Message": "capability factual_qa: smoke set has no hard anchor (tier >= 4) (spec 5.6)",
+          "String": "smoke_anchor_missing: capability factual_qa: smoke set has no hard anchor (tier >= 4) (spec 5.6)"
+        }
+      ],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 2 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 2 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 1 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 1 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "invalid/duplicate_id",
+      "go_tests": [
+        "tasks.TestValidateRejectingFixtures/duplicate_id"
+      ],
+      "dir": "testdata/internal/tasks/testdata/invalid/duplicate_id",
+      "tasks_in_load_order": [
+        "a/task_dup_001.yaml#task_dup_001",
+        "b/task_dup_001.yaml#task_dup_001"
+      ],
+      "errors": [
+        {
+          "File": "b/task_dup_001.yaml",
+          "TaskID": "task_dup_001",
+          "Rule": "duplicate_task_id",
+          "Message": "id already used by a/task_dup_001.yaml",
+          "String": "b/task_dup_001.yaml: task task_dup_001: duplicate_task_id: id already used by a/task_dup_001.yaml"
+        }
+      ],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 2 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 2 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 3 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 3 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "invalid/unknown_field",
+      "go_tests": [
+        "tasks.TestValidateRejectingFixtures/unknown_field",
+        "tasks.TestValidateUnknownFieldNamesTheField"
+      ],
+      "dir": "testdata/internal/tasks/testdata/invalid/unknown_field",
+      "tasks_in_load_order": null,
+      "errors": [
+        {
+          "File": "task_uf_001.yaml",
+          "TaskID": "",
+          "Rule": "yaml_invalid",
+          "Message": "[7:1] unknown field \"notes\"\n   4 | prompt: |\n   5 |   What is the capital of France? Answer with the city name only.\n   6 | max_tokens: 16\n>  7 | notes: remember to review this one before the next corpus bump\n       ^\n   8 | dimension_weights: { answer_correctness: 1.0 }\n   9 | grader_specs:\n  10 |   - type: golden_answer\n  11 |",
+          "String": "task_uf_001.yaml: yaml_invalid: [7:1] unknown field \"notes\"\n   4 | prompt: |\n   5 |   What is the capital of France? Answer with the city name only.\n   6 | max_tokens: 16\n>  7 | notes: remember to review this one before the next corpus bump\n       ^\n   8 | dimension_weights: { answer_correctness: 1.0 }\n   9 | grader_specs:\n  10 |   - type: golden_answer\n  11 |"
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "multi_violation",
+      "go_tests": [
+        "tasks.TestValidateReportsEveryViolationInOneRun"
+      ],
+      "docs": {
+        "task_multi_001.yaml": "id: Bad-ID\ncapability: telepathy\ndifficulty_tier: 9\nprompt: |\n  Broken on several axes at once.\nmax_tokens: 16\ndimension_weights: { answer_correctness: 0.5 }\ngrader_specs:\n  - type: quantum_score\n    version: 1\n    weight_dimensions: { answer_correctness: 1.0 }\n    spec: { answers: [] }\n"
+      },
+      "tasks_in_load_order": [
+        "task_multi_001.yaml#Bad-ID"
+      ],
+      "errors": [
+        {
+          "File": "task_multi_001.yaml",
+          "TaskID": "Bad-ID",
+          "Rule": "bad_task_id",
+          "Message": "id \"Bad-ID\" is not an authored slug matching ^task_[a-z0-9]+(_[a-z0-9]+)*$",
+          "String": "task_multi_001.yaml: task Bad-ID: bad_task_id: id \"Bad-ID\" is not an authored slug matching ^task_[a-z0-9]+(_[a-z0-9]+)*$"
+        },
+        {
+          "File": "task_multi_001.yaml",
+          "TaskID": "Bad-ID",
+          "Rule": "filename_mismatch",
+          "Message": "file task_multi_001.yaml must be named after its task id \"Bad-ID\"",
+          "String": "task_multi_001.yaml: task Bad-ID: filename_mismatch: file task_multi_001.yaml must be named after its task id \"Bad-ID\""
+        },
+        {
+          "File": "task_multi_001.yaml",
+          "TaskID": "Bad-ID",
+          "Rule": "unknown_capability",
+          "Message": "capability \"telepathy\" is not one of the v1 capabilities: code_generation, structured_extraction, summarization_synthesis, multi_step_reasoning, instruction_schema_following, long_context_qa, factual_qa, rewriting_editing, translation_multilingual, critique_and_judging",
+          "String": "task_multi_001.yaml: task Bad-ID: unknown_capability: capability \"telepathy\" is not one of the v1 capabilities: code_generation, structured_extraction, summarization_synthesis, multi_step_reasoning, instruction_schema_following, long_context_qa, factual_qa, rewriting_editing, translation_multilingual, critique_and_judging"
+        },
+        {
+          "File": "task_multi_001.yaml",
+          "TaskID": "Bad-ID",
+          "Rule": "tier_out_of_range",
+          "Message": "difficulty_tier 9 is not in 1..5",
+          "String": "task_multi_001.yaml: task Bad-ID: tier_out_of_range: difficulty_tier 9 is not in 1..5"
+        },
+        {
+          "File": "task_multi_001.yaml",
+          "TaskID": "Bad-ID",
+          "Rule": "weights_sum",
+          "Message": "dimension_weights sum to 0.5; they must sum to 1 (spec 5.6)",
+          "String": "task_multi_001.yaml: task Bad-ID: weights_sum: dimension_weights sum to 0.5; they must sum to 1 (spec 5.6)"
+        },
+        {
+          "File": "task_multi_001.yaml",
+          "TaskID": "Bad-ID",
+          "Rule": "unknown_grader_type",
+          "Message": "grader_specs[0]: graders: envelope: unknown type \"quantum_score\"",
+          "String": "task_multi_001.yaml: task Bad-ID: unknown_grader_type: grader_specs[0]: graders: envelope: unknown type \"quantum_score\""
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "dimension_mismatch",
+      "go_tests": [
+        "tasks.TestValidateDimensionMismatch"
+      ],
+      "docs": {
+        "task_dm_001.yaml": "id: task_dm_001\ncapability: factual_qa\ndifficulty_tier: 2\nprompt: |\n  What is the capital of France? Answer with the city name only.\nmax_tokens: 16\ndimension_weights: { answer_correctness: 0.5, completeness: 0.5 }\ngrader_specs:\n  - type: golden_answer\n    version: 1\n    weight_dimensions: { answer_correctness: 1.0, fluency: 1.0 }\n    spec:\n      answers:\n        - { value: \"Paris\" }\n"
+      },
+      "tasks_in_load_order": [
+        "task_dm_001.yaml#task_dm_001"
+      ],
+      "errors": [
+        {
+          "File": "task_dm_001.yaml",
+          "TaskID": "task_dm_001",
+          "Rule": "dimension_mismatch",
+          "Message": "grader_specs[0]: weight_dimensions names \"fluency\", which is not in the task's dimension_weights",
+          "String": "task_dm_001.yaml: task task_dm_001: dimension_mismatch: grader_specs[0]: weight_dimensions names \"fluency\", which is not in the task's dimension_weights"
+        },
+        {
+          "File": "task_dm_001.yaml",
+          "TaskID": "task_dm_001",
+          "Rule": "dimension_unfed",
+          "Message": "dimension_weights[\"completeness\"] is fed by no grader's weight_dimensions",
+          "String": "task_dm_001.yaml: task task_dm_001: dimension_unfed: dimension_weights[\"completeness\"] is fed by no grader's weight_dimensions"
+        }
+      ],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "oversize_smoke",
+      "go_tests": [
+        "tasks.TestValidateOversizeSmokeInput"
+      ],
+      "docs": "task_lc_001.yaml is the small doc below; task_lc_002.yaml is identical except id task_lc_002, difficulty_tier 4, and the attachment content is the string 'long context filler. ' repeated 6553 times (137613 bytes; (32768*4)/20 = 6553) written after 6 spaces of block indentation, followed by a newline. See tasks.TestValidateOversizeSmokeInput.",
+      "tasks_in_load_order": [
+        "task_lc_001.yaml#task_lc_001",
+        "task_lc_002.yaml#task_lc_002"
+      ],
+      "errors": [
+        {
+          "File": "task_lc_002.yaml",
+          "TaskID": "task_lc_002",
+          "Rule": "smoke_input_too_large",
+          "Message": "smoke task input is ~34420 tokens; smoke-set inputs must be <= 32768 (spec 5.6)",
+          "String": "task_lc_002.yaml: task task_lc_002: smoke_input_too_large: smoke task input is ~34420 tokens; smoke-set inputs must be <= 32768 (spec 5.6)"
+        }
+      ],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability long_context_qa has 2 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability long_context_qa has 2 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability long_context_qa has no tasks at tier(s) [1 3 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability long_context_qa has no tasks at tier(s) [1 3 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability long_context_qa has 2 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability long_context_qa has 2 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ],
+      "small_doc": "id: task_lc_001\ncapability: long_context_qa\ndifficulty_tier: 2\nsmoke_member: true\nprompt: |\n  Which section of the attached document defines the term \"Filler\"?\nmax_tokens: 128\ndimension_weights: { answer_correctness: 1.0 }\ngrader_specs:\n  - type: golden_answer\n    version: 1\n    weight_dimensions: { answer_correctness: 1.0 }\n    spec:\n      answers:\n        - { value: \"Section 12\" }\nattachments:\n  - name: doc.txt\n    content: |\n      Section 12 defines the term \"Filler\".\n"
+    },
+    {
+      "id": "judge_rubric_valid",
+      "go_tests": [
+        "tasks.TestValidateJudgeRubricTasks/valid_judge_task_loads"
+      ],
+      "docs": {
+        "task_rw_090.yaml": "id: task_rw_090\ncapability: rewriting_editing\ndifficulty_tier: 2\nprompt: |\n  Rewrite the paragraph for clarity without changing its meaning.\nmax_tokens: 400\ndimension_weights: { tone_register_target: 0.5, constraint_compliance: 0.5 }\ngrader_specs:\n  - type: judge_rubric\n    version: 1\n    weight_dimensions: { tone_register_target: 1.0 }\n    spec:\n      judge_prompt: Grade the rewrite below against the rubric.\n      rubric:\n        - { dimension: tone_register_target, criterion: Matches the requested register. }\n      reference: |\n        Reference rewrite: the meeting moved to Tuesday; bring the Q3 numbers.\n  - type: rule_scan\n    version: 1\n    weight_dimensions: { constraint_compliance: 1.0 }\n    spec:\n      rules:\n        - { must_not_include: \"as an ai\" }\n"
+      },
+      "errors": [],
+      "warnings": "capability_task_count, capability_tier_span, smoke_count for rewriting_editing (not asserted)"
+    },
+    {
+      "id": "judge_rubric_invalid",
+      "go_tests": [
+        "tasks.TestValidateJudgeRubricTasks/bad_judge_spec_rejected"
+      ],
+      "docs": {
+        "task_rw_091.yaml": "id: task_rw_091\ncapability: rewriting_editing\ndifficulty_tier: 2\nprompt: |\n  Rewrite the paragraph for clarity.\nmax_tokens: 400\ndimension_weights: { tone_register_target: 1.0 }\ngrader_specs:\n  - type: judge_rubric\n    version: 1\n    weight_dimensions: { tone_register_target: 1.0 }\n    spec:\n      rubric:\n        - { dimension: tone_register_target, criterion: First. }\n        - { dimension: tone_register_target, criterion: Duplicate. }\n"
+      },
+      "errors": [
+        {
+          "File": "task_rw_091.yaml",
+          "TaskID": "task_rw_091",
+          "Rule": "grader_spec_invalid",
+          "Message": "grader_specs[0]: graders: envelope: judge_rubric spec: judge_rubric spec: rubric[1]: duplicate dimension \"tone_register_target\"",
+          "String": "task_rw_091.yaml: task task_rw_091: grader_spec_invalid: grader_specs[0]: graders: envelope: judge_rubric spec: judge_rubric spec: rubric[1]: duplicate dimension \"tone_register_target\""
+        }
+      ]
+    },
+    {
+      "id": "probe/bad_values",
+      "probe": true,
+      "docs": {
+        "task_x_003.yaml": "id: task_x_003\ncapability: factual_qa\ndifficulty_tier: 2\nprompt: |\n  What is the capital of France?\nmax_tokens: 0\ntemperature: -1\npass_threshold: 0\nattachments:\n  - { name: a }\ndimension_weights: { answer_correctness: 1.5 }\ngrader_specs:\n  - type: golden_answer\n    version: 1\n    weight_dimensions: { answer_correctness: 1.0 }\n    spec:\n      answers:\n        - { value: \"Paris\" }\n"
+      },
+      "tasks_in_load_order": [
+        "task_x_003.yaml#task_x_003"
+      ],
+      "errors": [
+        {
+          "File": "task_x_003.yaml",
+          "TaskID": "task_x_003",
+          "Rule": "invalid_field",
+          "Message": "max_tokens 0 must be >= 1",
+          "String": "task_x_003.yaml: task task_x_003: invalid_field: max_tokens 0 must be >= 1"
+        },
+        {
+          "File": "task_x_003.yaml",
+          "TaskID": "task_x_003",
+          "Rule": "invalid_field",
+          "Message": "temperature -1 must be a finite number >= 0",
+          "String": "task_x_003.yaml: task task_x_003: invalid_field: temperature -1 must be a finite number >= 0"
+        },
+        {
+          "File": "task_x_003.yaml",
+          "TaskID": "task_x_003",
+          "Rule": "invalid_field",
+          "Message": "pass_threshold 0 must be in (0, 1]",
+          "String": "task_x_003.yaml: task task_x_003: invalid_field: pass_threshold 0 must be in (0, 1]"
+        },
+        {
+          "File": "task_x_003.yaml",
+          "TaskID": "task_x_003",
+          "Rule": "invalid_field",
+          "Message": "attachments[0] needs both name and content",
+          "String": "task_x_003.yaml: task task_x_003: invalid_field: attachments[0] needs both name and content"
+        },
+        {
+          "File": "task_x_003.yaml",
+          "TaskID": "task_x_003",
+          "Rule": "invalid_field",
+          "Message": "dimension_weights[\"answer_correctness\"] = 1.5 must be in (0, 1]",
+          "String": "task_x_003.yaml: task task_x_003: invalid_field: dimension_weights[\"answer_correctness\"] = 1.5 must be in (0, 1]"
+        },
+        {
+          "File": "task_x_003.yaml",
+          "TaskID": "task_x_003",
+          "Rule": "weights_sum",
+          "Message": "dimension_weights sum to 1.5; they must sum to 1 (spec 5.6)",
+          "String": "task_x_003.yaml: task task_x_003: weights_sum: dimension_weights sum to 1.5; they must sum to 1 (spec 5.6)"
+        }
+      ],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "probe/duplicate_key",
+      "probe": true,
+      "docs": {
+        "task_x_006.yaml": "id: task_x_006\nid: task_x_006\ncapability: factual_qa\ndifficulty_tier: 2\nprompt: |\n  What is the capital of France?\nmax_tokens: 16\ndimension_weights: { answer_correctness: 1.0 }\ngrader_specs:\n  - type: golden_answer\n    version: 1\n    weight_dimensions: { answer_correctness: 1.0 }\n    spec:\n      answers:\n        - { value: \"Paris\" }\n"
+      },
+      "tasks_in_load_order": null,
+      "errors": [
+        {
+          "File": "task_x_006.yaml",
+          "TaskID": "",
+          "Rule": "yaml_invalid",
+          "Message": "[2:1] mapping key \"id\" already defined at [1:1]\n   1 | id: task_x_006\n>  2 | id: task_x_006\n       ^\n   3 | capability: factual_qa\n   4 | difficulty_tier: 2\n   5 | prompt: |\n   6 |",
+          "String": "task_x_006.yaml: yaml_invalid: [2:1] mapping key \"id\" already defined at [1:1]\n   1 | id: task_x_006\n>  2 | id: task_x_006\n       ^\n   3 | capability: factual_qa\n   4 | difficulty_tier: 2\n   5 | prompt: |\n   6 |"
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "probe/empty_file",
+      "probe": true,
+      "docs": {
+        "task_x_002.yaml": ""
+      },
+      "tasks_in_load_order": [
+        "task_x_002.yaml#"
+      ],
+      "errors": [
+        {
+          "File": "task_x_002.yaml",
+          "TaskID": "",
+          "Rule": "missing_field",
+          "Message": "id is required",
+          "String": "task_x_002.yaml: missing_field: id is required"
+        },
+        {
+          "File": "task_x_002.yaml",
+          "TaskID": "",
+          "Rule": "missing_field",
+          "Message": "capability is required",
+          "String": "task_x_002.yaml: missing_field: capability is required"
+        },
+        {
+          "File": "task_x_002.yaml",
+          "TaskID": "",
+          "Rule": "missing_field",
+          "Message": "difficulty_tier is required",
+          "String": "task_x_002.yaml: missing_field: difficulty_tier is required"
+        },
+        {
+          "File": "task_x_002.yaml",
+          "TaskID": "",
+          "Rule": "missing_field",
+          "Message": "prompt is required",
+          "String": "task_x_002.yaml: missing_field: prompt is required"
+        },
+        {
+          "File": "task_x_002.yaml",
+          "TaskID": "",
+          "Rule": "missing_field",
+          "Message": "max_tokens is required",
+          "String": "task_x_002.yaml: missing_field: max_tokens is required"
+        },
+        {
+          "File": "task_x_002.yaml",
+          "TaskID": "",
+          "Rule": "missing_field",
+          "Message": "dimension_weights is required",
+          "String": "task_x_002.yaml: missing_field: dimension_weights is required"
+        },
+        {
+          "File": "task_x_002.yaml",
+          "TaskID": "",
+          "Rule": "missing_field",
+          "Message": "grader_specs is required",
+          "String": "task_x_002.yaml: missing_field: grader_specs is required"
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "probe/envelope_missing_version",
+      "probe": true,
+      "docs": {
+        "task_x_008.yaml": "id: task_x_008\ncapability: factual_qa\ndifficulty_tier: 2\nprompt: |\n  What is the capital of France?\nmax_tokens: 16\ndimension_weights: { answer_correctness: 1.0 }\ngrader_specs:\n  - type: golden_answer\n    weight_dimensions: { answer_correctness: 1.0 }\n    spec:\n      answers:\n        - { value: \"Paris\" }\n"
+      },
+      "tasks_in_load_order": [
+        "task_x_008.yaml#task_x_008"
+      ],
+      "errors": [
+        {
+          "File": "task_x_008.yaml",
+          "TaskID": "task_x_008",
+          "Rule": "grader_envelope",
+          "Message": "grader_specs[0]: graders: envelope: missing version",
+          "String": "task_x_008.yaml: task task_x_008: grader_envelope: grader_specs[0]: graders: envelope: missing version"
+        }
+      ],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "probe/filename_mismatch",
+      "probe": true,
+      "docs": {
+        "task_other.yaml": "id: task_x_005\ncapability: factual_qa\ndifficulty_tier: 2\nprompt: |\n  What is the capital of France?\nmax_tokens: 16\ndimension_weights: { answer_correctness: 1.0 }\ngrader_specs:\n  - type: golden_answer\n    version: 1\n    weight_dimensions: { answer_correctness: 1.0 }\n    spec:\n      answers:\n        - { value: \"Paris\" }\n"
+      },
+      "tasks_in_load_order": [
+        "task_other.yaml#task_x_005"
+      ],
+      "errors": [
+        {
+          "File": "task_other.yaml",
+          "TaskID": "task_x_005",
+          "Rule": "filename_mismatch",
+          "Message": "file task_other.yaml must be named after its task id \"task_x_005\"",
+          "String": "task_other.yaml: task task_x_005: filename_mismatch: file task_other.yaml must be named after its task id \"task_x_005\""
+        }
+      ],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "probe/missing_everything",
+      "probe": true,
+      "docs": {
+        "task_x_001.yaml": "id: task_x_001\n"
+      },
+      "tasks_in_load_order": [
+        "task_x_001.yaml#task_x_001"
+      ],
+      "errors": [
+        {
+          "File": "task_x_001.yaml",
+          "TaskID": "task_x_001",
+          "Rule": "missing_field",
+          "Message": "capability is required",
+          "String": "task_x_001.yaml: task task_x_001: missing_field: capability is required"
+        },
+        {
+          "File": "task_x_001.yaml",
+          "TaskID": "task_x_001",
+          "Rule": "missing_field",
+          "Message": "difficulty_tier is required",
+          "String": "task_x_001.yaml: task task_x_001: missing_field: difficulty_tier is required"
+        },
+        {
+          "File": "task_x_001.yaml",
+          "TaskID": "task_x_001",
+          "Rule": "missing_field",
+          "Message": "prompt is required",
+          "String": "task_x_001.yaml: task task_x_001: missing_field: prompt is required"
+        },
+        {
+          "File": "task_x_001.yaml",
+          "TaskID": "task_x_001",
+          "Rule": "missing_field",
+          "Message": "max_tokens is required",
+          "String": "task_x_001.yaml: task task_x_001: missing_field: max_tokens is required"
+        },
+        {
+          "File": "task_x_001.yaml",
+          "TaskID": "task_x_001",
+          "Rule": "missing_field",
+          "Message": "dimension_weights is required",
+          "String": "task_x_001.yaml: task task_x_001: missing_field: dimension_weights is required"
+        },
+        {
+          "File": "task_x_001.yaml",
+          "TaskID": "task_x_001",
+          "Rule": "missing_field",
+          "Message": "grader_specs is required",
+          "String": "task_x_001.yaml: task task_x_001: missing_field: grader_specs is required"
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "probe/no_grader_specs",
+      "probe": true,
+      "docs": {
+        "task_x_009.yaml": "id: task_x_009\ncapability: factual_qa\ndifficulty_tier: 2\nprompt: hi\nmax_tokens: 5\ndimension_weights: { a: 1 }\n"
+      },
+      "tasks_in_load_order": [
+        "task_x_009.yaml#task_x_009"
+      ],
+      "errors": [
+        {
+          "File": "task_x_009.yaml",
+          "TaskID": "task_x_009",
+          "Rule": "missing_field",
+          "Message": "grader_specs is required",
+          "String": "task_x_009.yaml: task task_x_009: missing_field: grader_specs is required"
+        }
+      ],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "probe/non_yaml_ignored",
+      "probe": true,
+      "docs": {
+        "task_x_013.yaml": "id: task_x_013\ncapability: factual_qa\ndifficulty_tier: 2\nprompt: |\n  What is the capital of France?\nmax_tokens: 16\ndimension_weights: { answer_correctness: 1.0 }\ngrader_specs:\n  - type: golden_answer\n    version: 1\n    weight_dimensions: { answer_correctness: 1.0 }\n    spec:\n      answers:\n        - { value: \"Paris\" }\n",
+        "README.md": "# not a task",
+        "x.json": "{}"
+      },
+      "tasks_in_load_order": [
+        "task_x_013.yaml#task_x_013"
+      ],
+      "errors": [],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "probe/prompt_whitespace",
+      "probe": true,
+      "docs": {
+        "task_x_010.yaml": "id: task_x_010\ncapability: factual_qa\ndifficulty_tier: 2\nprompt: \"   \"\nmax_tokens: 16\ndimension_weights: { answer_correctness: 1.0 }\ngrader_specs:\n  - type: golden_answer\n    version: 1\n    weight_dimensions: { answer_correctness: 1.0 }\n    spec:\n      answers:\n        - { value: \"Paris\" }\n"
+      },
+      "tasks_in_load_order": [
+        "task_x_010.yaml#task_x_010"
+      ],
+      "errors": [
+        {
+          "File": "task_x_010.yaml",
+          "TaskID": "task_x_010",
+          "Rule": "missing_field",
+          "Message": "prompt is required",
+          "String": "task_x_010.yaml: task task_x_010: missing_field: prompt is required"
+        }
+      ],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "probe/smoke_single_easy",
+      "probe": true,
+      "docs": {
+        "task_x_012.yaml": "id: task_x_012\nsmoke_member: true\ncapability: factual_qa\ndifficulty_tier: 2\nprompt: |\n  What is the capital of France?\nmax_tokens: 16\ndimension_weights: { answer_correctness: 1.0 }\ngrader_specs:\n  - type: golden_answer\n    version: 1\n    weight_dimensions: { answer_correctness: 1.0 }\n    spec:\n      answers:\n        - { value: \"Paris\" }\n"
+      },
+      "tasks_in_load_order": [
+        "task_x_012.yaml#task_x_012"
+      ],
+      "errors": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_anchor_missing",
+          "Message": "capability factual_qa: smoke set has no hard anchor (tier >= 4) (spec 5.6)",
+          "String": "smoke_anchor_missing: capability factual_qa: smoke set has no hard anchor (tier >= 4) (spec 5.6)"
+        }
+      ],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 1 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 1 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "probe/temperature_nan",
+      "probe": true,
+      "docs": {
+        "task_x_015.yaml": "id: task_x_015\ntemperature: .nan\ncapability: factual_qa\ndifficulty_tier: 2\nprompt: |\n  What is the capital of France?\nmax_tokens: 16\ndimension_weights: { answer_correctness: 1.0 }\ngrader_specs:\n  - type: golden_answer\n    version: 1\n    weight_dimensions: { answer_correctness: 1.0 }\n    spec:\n      answers:\n        - { value: \"Paris\" }\n"
+      },
+      "tasks_in_load_order": [
+        "task_x_015.yaml#task_x_015"
+      ],
+      "errors": [
+        {
+          "File": "task_x_015.yaml",
+          "TaskID": "task_x_015",
+          "Rule": "invalid_field",
+          "Message": "temperature NaN must be a finite number >= 0",
+          "String": "task_x_015.yaml: task task_x_015: invalid_field: temperature NaN must be a finite number >= 0"
+        }
+      ],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "probe/test_suite_and_unknown",
+      "probe": true,
+      "docs": {
+        "task_x_016.yaml": "id: task_x_016\ncapability: factual_qa\ndifficulty_tier: 2\nprompt: |\n  What is the capital of France?\nmax_tokens: 16\ndimension_weights: { answer_correctness: 1.0 }\ngrader_specs:\n  - type: test_suite\n    version: 1\n    weight_dimensions: { answer_correctness: 1.0 }\n    spec:\n      answers:\n        - { value: \"Paris\" }\n"
+      },
+      "tasks_in_load_order": [
+        "task_x_016.yaml#task_x_016"
+      ],
+      "errors": [
+        {
+          "File": "task_x_016.yaml",
+          "TaskID": "task_x_016",
+          "Rule": "grader_unsupported",
+          "Message": "grader_specs[0]: graders: envelope: grader_unsupported: type \"test_suite\" is reserved until v1.1",
+          "String": "task_x_016.yaml: task task_x_016: grader_unsupported: grader_specs[0]: graders: envelope: grader_unsupported: type \"test_suite\" is reserved until v1.1"
+        }
+      ],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "probe/tier_zero",
+      "probe": true,
+      "docs": {
+        "task_x_014.yaml": "id: task_x_014\ncapability: factual_qa\ndifficulty_tier: 0\nprompt: |\n  What is the capital of France?\nmax_tokens: 16\ndimension_weights: { answer_correctness: 1.0 }\ngrader_specs:\n  - type: golden_answer\n    version: 1\n    weight_dimensions: { answer_correctness: 1.0 }\n    spec:\n      answers:\n        - { value: \"Paris\" }\n"
+      },
+      "tasks_in_load_order": [
+        "task_x_014.yaml#task_x_014"
+      ],
+      "errors": [
+        {
+          "File": "task_x_014.yaml",
+          "TaskID": "task_x_014",
+          "Rule": "tier_out_of_range",
+          "Message": "difficulty_tier 0 is not in 1..5",
+          "String": "task_x_014.yaml: task task_x_014: tier_out_of_range: difficulty_tier 0 is not in 1..5"
+        }
+      ],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 2 3 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 2 3 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "probe/weights_float_tolerance",
+      "probe": true,
+      "docs": {
+        "task_x_011.yaml": "id: task_x_011\ncapability: factual_qa\ndifficulty_tier: 2\nprompt: |\n  What is the capital of France?\nmax_tokens: 16\ndimension_weights: { answer_correctness: 0.5, b: 0.4995 }\ngrader_specs:\n  - type: golden_answer\n    version: 1\n    weight_dimensions: { answer_correctness: 1.0, b: 1.0 }\n    spec:\n      answers:\n        - { value: \"Paris\" }\n"
+      },
+      "tasks_in_load_order": [
+        "task_x_011.yaml#task_x_011"
+      ],
+      "errors": [],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    },
+    {
+      "id": "probe/wrong_type",
+      "probe": true,
+      "docs": {
+        "task_x_007.yaml": "id: task_x_007\ncapability: factual_qa\ndifficulty_tier: two\nprompt: |\n  What is the capital of France?\nmax_tokens: 16\ndimension_weights: { answer_correctness: 1.0 }\ngrader_specs:\n  - type: golden_answer\n    version: 1\n    weight_dimensions: { answer_correctness: 1.0 }\n    spec:\n      answers:\n        - { value: \"Paris\" }\n"
+      },
+      "tasks_in_load_order": null,
+      "errors": [
+        {
+          "File": "task_x_007.yaml",
+          "TaskID": "",
+          "Rule": "yaml_invalid",
+          "Message": "[3:18] cannot unmarshal string into Go struct field yamlTask.DifficultyTier of type int\n   1 | id: task_x_007\n   2 | capability: factual_qa\n>  3 | difficulty_tier: two\n                        ^\n   4 | prompt: |\n   5 |   What is the capital of France?\n   6 | max_tokens: 16\n   7 |",
+          "String": "task_x_007.yaml: yaml_invalid: [3:18] cannot unmarshal string into Go struct field yamlTask.DifficultyTier of type int\n   1 | id: task_x_007\n   2 | capability: factual_qa\n>  3 | difficulty_tier: two\n                        ^\n   4 | prompt: |\n   5 |   What is the capital of France?\n   6 | max_tokens: 16\n   7 |"
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "probe/yml_extension_and_nested",
+      "probe": true,
+      "docs": {
+        "sub/dir/task_x_004.yml": "id: task_x_004\ncapability: factual_qa\ndifficulty_tier: 2\nprompt: |\n  What is the capital of France?\nmax_tokens: 16\ndimension_weights: { answer_correctness: 1.0 }\ngrader_specs:\n  - type: golden_answer\n    version: 1\n    weight_dimensions: { answer_correctness: 1.0 }\n    spec:\n      answers:\n        - { value: \"Paris\" }\n"
+      },
+      "tasks_in_load_order": [
+        "sub/dir/task_x_004.yml#task_x_004"
+      ],
+      "errors": [],
+      "warnings": [
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_task_count",
+          "Message": "capability factual_qa has 1 tasks; spec 5.6 requires 20-25",
+          "String": "capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "capability_tier_span",
+          "Message": "capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)",
+          "String": "capability_tier_span: capability factual_qa has no tasks at tier(s) [1 3 4 5]; tasks must span all five tiers (spec 5.6)"
+        },
+        {
+          "File": "",
+          "TaskID": "",
+          "Rule": "smoke_count",
+          "Message": "capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5",
+          "String": "smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5"
+        }
+      ]
+    }
+  ],
+  "load_errors": {
+    "tasks.TestLoadMissingDir": {
+      "dir": "testdata/nope",
+      "error": "tasks: load testdata/nope: lstat testdata/nope: no such file or directory",
+      "note": "Go wraps the OS lstat error; only 'tasks: load <dir>: ' prefix is contractual"
+    },
+    "tasks.TestLoadEmptyDir": {
+      "dir": "<empty temp dir>",
+      "error": "tasks: load <dir>: no *.yaml task files found"
+    }
+  },
+  "load_valid_corpus_expect": {
+    "go_test": "tasks.TestLoadValidCorpus",
+    "task_count": 4,
+    "task_sx_017": {
+      "capability": "structured_extraction",
+      "difficulty_tier": 3,
+      "domain_tags": [
+        "legal"
+      ],
+      "difficulty_knobs.nesting_depth": 2,
+      "attachments": [
+        {
+          "name": "agreement.txt",
+          "content_contains": "Acme Corporation"
+        }
+      ],
+      "max_tokens": 2000,
+      "temperature": 0,
+      "pass_threshold": 0.7,
+      "smoke_member": false,
+      "grader_specs_count": 2,
+      "grader_specs[0]": {
+        "type": "json_schema",
+        "version": 1
+      },
+      "dimension_weights": {
+        "schema_validity": 0.3,
+        "field_accuracy": 0.4,
+        "completeness": 0.2,
+        "hallucination_free": 0.1
+      }
+    },
+    "task_sx_001": {
+      "smoke_member": true,
+      "difficulty_tier": 2,
+      "pass_threshold": 0.7,
+      "pass_threshold_source": "default"
+    },
+    "task_sx_002": {
+      "smoke_member": true,
+      "difficulty_tier": 5
+    }
+  },
+  "upsert_params": {
+    "go_test": "tasks.TestGraderSpecsSurviveJSONRoundTrip",
+    "task_sx_017": {
+      "active": true,
+      "attachments": "[{\"name\":\"agreement.txt\",\"content\":\"SERVICES AGREEMENT\\n\\nThis Services Agreement is entered into as of 2025-03-01 (the\\n\\\"Effective Date\\\") by and between Acme Corporation (\\\"Provider\\\") and\\nBolt Industries LLC (\\\"Client\\\").\\n\\n1. Term. The initial term of this Agreement is twenty-four (24) months\\n   from the Effective Date.\\n2. Fees. Client shall pay Provider a monthly fee of $12,500, due net 30.\\n3. Prior Drafts. The draft agreement circulated on 2019-06-15 is\\n   superseded in its entirety and is of no force or effect.\\n\"}]",
+      "capability": "structured_extraction",
+      "corpus_version": "v-test",
+      "difficulty_knobs": "{\"distractor_content\":4,\"document_noise\":3,\"field_count\":3,\"nesting_depth\":2}",
+      "difficulty_tier": 3,
+      "dimension_weights": "{\"completeness\":0.2,\"field_accuracy\":0.4,\"hallucination_free\":0.1,\"schema_validity\":0.3}",
+      "domain_tags": [
+        "legal"
+      ],
+      "grader_specs": "[{\"spec\":{\"checks\":[{\"equals\":\"2025-03-01\",\"path\":\"$.effective_date\"},{\"numeric\":12500,\"path\":\"$.payment.amount_usd\",\"tolerance\":0}],\"schema\":{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"properties\":{\"effective_date\":{\"type\":\"string\"},\"parties\":{\"items\":{\"type\":\"string\"},\"minItems\":2,\"type\":\"array\"},\"payment\":{\"properties\":{\"amount_usd\":{\"type\":\"number\"}},\"required\":[\"amount_usd\"],\"type\":\"object\"},\"term\":{\"type\":\"string\"}},\"required\":[\"parties\",\"effective_date\",\"term\",\"payment\"],\"type\":\"object\"}},\"type\":\"json_schema\",\"version\":1,\"weight_dimensions\":{\"field_accuracy\":1,\"schema_validity\":1}},{\"spec\":{\"facts\":[{\"any_of\":[\"Acme Corp\",\"Acme Corporation\"],\"id\":\"party_acme\",\"weight\":1},{\"any_of\":[\"Bolt Industries\"],\"id\":\"party_bolt\",\"weight\":1},{\"any_of\":[\"24 month\",\"two-year\",\"24-month\",\"twenty-four (24) months\"],\"id\":\"term_24mo\",\"weight\":1}],\"forbidden_facts\":[{\"any_of\":[\"2019-06-15\"],\"id\":\"distractor_2019_date\",\"weight\":1}]},\"type\":\"key_facts\",\"version\":1,\"weight_dimensions\":{\"completeness\":1,\"hallucination_free\":1}}]",
+      "id": "task_sx_017",
+      "max_tokens": 2000,
+      "pass_threshold": 0.7,
+      "prompt": "Extract the parties, effective date, term, and payment obligations from the\nfollowing services agreement. Return JSON matching the provided schema.\n",
+      "smoke_member": false,
+      "temperature": 0
+    },
+    "task_fq_001_partial": {
+      "attachments": "[]",
+      "difficulty_knobs": "{\"entity_confusability\":1,\"fact_obscurity\":1,\"false_premises\":1,\"required_precision\":1}",
+      "domain_tags": [],
+      "grader_specs": "[{\"spec\":{\"answers\":[{\"value\":\"1969\"},{\"numeric\":1969,\"tolerance\":0}]},\"type\":\"golden_answer\",\"version\":1,\"weight_dimensions\":{\"answer_correctness\":1}}]"
+    },
+    "note": "JSON columns are json.Marshal output: object keys sorted, no whitespace, HTML-unsafe chars escaped (<,>,& as \\u003c etc.). grader_specs elements are the YAML envelope re-encoded (keys sorted). temperature/pass_threshold are float32 on the wire to Postgres real."
+  },
+  "estimated_input_tokens": [
+    {
+      "estimated_input_tokens": 23,
+      "id": "task_fq_001"
+    },
+    {
+      "estimated_input_tokens": 54,
+      "id": "task_sx_001"
+    },
+    {
+      "estimated_input_tokens": 146,
+      "id": "task_sx_002"
+    },
+    {
+      "estimated_input_tokens": 157,
+      "id": "task_sx_017"
+    }
+  ]
+}

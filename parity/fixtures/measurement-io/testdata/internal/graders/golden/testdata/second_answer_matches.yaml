@@ -1,0 +1,13 @@
+description: any accepted answer suffices; detail records which one and its mode
+envelope:
+  type: golden_answer
+  version: 1
+  weight_dimensions: { final_answer_correctness: 1.0 }
+  spec:
+    answers:
+      - { value: forty-two }
+      - { numeric: 42, tolerance: 0 }
+output: "42"
+expect:
+  dimensions: { answer_correctness: 1.0 }
+  detail_contains: ['"answer_index":1', '"mode":"numeric"']

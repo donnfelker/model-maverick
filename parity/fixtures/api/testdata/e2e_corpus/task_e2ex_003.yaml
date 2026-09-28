@@ -1,0 +1,36 @@
+id: task_e2ex_003
+capability: structured_extraction
+domain_tags: [legal]
+difficulty_tier: 3
+difficulty_knobs: { document_noise: 3, field_count: 3, nesting_depth: 2, distractor_content: 3 }
+prompt: |
+  Extract the effective date and the monthly fee in USD from the services
+  agreement below. Return a JSON object with keys effective_date and
+  monthly_fee_usd.
+attachments:
+  - name: agreement.txt
+    content: |
+      SERVICES AGREEMENT
+
+      This Services Agreement is entered into as of 2025-03-01 (the
+      "Effective Date"). Client shall pay Provider a monthly fee of
+      $12,500, due net 30. The draft circulated on 2019-06-15 is
+      superseded in its entirety.
+temperature: 0
+max_tokens: 512
+smoke_member: false
+dimension_weights: { schema_validity: 0.5, field_accuracy: 0.5 }
+grader_specs:
+  - type: json_schema
+    version: 1
+    weight_dimensions: { schema_validity: 1.0, field_accuracy: 1.0 }
+    spec:
+      schema:
+        type: object
+        required: [effective_date, monthly_fee_usd]
+        properties:
+          effective_date: { type: string }
+          monthly_fee_usd: { type: number }
+      checks:
+        - { path: $.effective_date, equals: "2025-03-01" }
+        - { path: $.monthly_fee_usd, numeric: 12500, tolerance: 0 }

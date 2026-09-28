@@ -1,0 +1,9 @@
+description: a passing critical rule has no special effect; the non-critical miss just costs its weight
+spec:
+  rules:
+    - { must_not_include: DELETE, critical: true, weight: 1 }
+    - { must_include: ORDER BY, weight: 1 }
+output: SELECT name FROM users WHERE id = 1;
+expect:
+  dimensions: { constraint_compliance: 0.5 }
+  detail_contains: ['"critical_failed":false']

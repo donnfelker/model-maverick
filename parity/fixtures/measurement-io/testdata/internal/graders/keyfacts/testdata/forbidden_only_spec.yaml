@@ -1,0 +1,8 @@
+description: a pure hallucination-trap spec emits only hallucination_free
+spec:
+  forbidden_facts:
+    - { id: fabricated_citation, any_of: ["Smith v. Jones"] }
+output: |-
+  No case law supports this claim.
+expect:
+  dimensions: { hallucination_free: 1.0 }

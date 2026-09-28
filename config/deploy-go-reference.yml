@@ -1,0 +1,138 @@
+# Model Maverick — Kamal 2 deployment (spec §14.2). Single Hetzner box runs
+# everything:
+#
+#   - kamal-proxy fronts the PUBLIC listener only (:8080 — /v1/*, /mcp, /up)
+#     with automatic HTTPS and /up healthchecks.
+#   - The INTERNAL listener (:8081 — /internal/v1/*, /health/detail) is NEVER
+#     proxied (spec §2.1/§13). It is published to the host loopback only
+#     (127.0.0.1:8081 below), so it is unreachable from the public internet.
+#     Operators reach it over an SSH tunnel:
+#       ssh -N -L 8081:127.0.0.1:8081 root@<HETZNER_SERVER_IP>
+#       curl -H "Authorization: Bearer <secret>" http://localhost:8081/internal/v1/alerts
+#     (or from the host itself: curl http://127.0.0.1:8081/...).
+#   - Postgres 16 runs as a Kamal accessory on the same host. The app reaches
+#     it as "maverick-postgres" over the shared `kamal` Docker network; its
+#     data lives on the named volume `postgres-data`, and its port is bound to
+#     the host loopback only so the operator can run pg_dump from the box
+#     (docs/operations.md "Backups"). `kamal accessory remove postgres`
+#     DELETES that data — back up first.
+#
+# Migrations: `.kamal/hooks/pre-app-boot` runs `maverick migrate` (same image,
+# same binary) in a one-off container via `kamal app exec --version` before
+# each new app container boots — so the schema is current before kamal-proxy
+# routes traffic to the new version. Run it by hand anytime with the
+# `kamal migrate` alias below.
+#
+# Placeholders to fill in before `kamal setup` (see also .kamal/secrets):
+#   <HETZNER_SERVER_IP>   the server's public IP (servers + accessory host)
+#   maverick.example.com  the public DNS name — an A record pointing at that
+#                         IP must exist BEFORE deploying (Let's Encrypt)
+#   registry              your registry server/username (example uses GHCR)
+
+service: maverick
+image: <REGISTRY_USERNAME>/maverick
+
+servers:
+  web:
+    hosts:
+      - <HETZNER_SERVER_IP>
+    options:
+      # The internal listener, loopback-only. No proxy route exists for it
+      # and no public interface carries it (spec §14.2).
+      publish: "127.0.0.1:8081:8081"
+
+proxy:
+  host: maverick.example.com
+  app_port: 8080
+  ssl: true # Let's Encrypt; requires the DNS A record and port 443 open
+  healthcheck:
+    path: /up # Kamal 2's default, pinned explicitly (spec §14.2)
+    interval: 3
+    timeout: 5
+
+registry:
+  server: ghcr.io # drop this line for Docker Hub
+  username: <REGISTRY_USERNAME>
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+builder:
+  arch: amd64 # Hetzner x86 boxes; build cross-arch from an ARM laptop
+
+env:
+  # Secret values are sourced from .kamal/secrets (never stored in this
+  # file) and written to an env file on the host rather than passed inline.
+  # The split mirrors internal/config/config.go: credentials and key
+  # material are secret; addresses and tunables are clear.
+  secret:
+    - MAVERICK_DATABASE_URL # DSN incl. password → the postgres accessory
+    - MAVERICK_INTERNAL_TOKENS # "label:secret,..." for /internal/v1/*
+    - MAVERICK_CAPTURE_MASTER_KEY # 32-byte hex; capture encryption
+    - MAVERICK_ANTHROPIC_API_KEY # provider credentials (optional; empty
+    - MAVERICK_OPENAI_API_KEY #   value = provider disabled)
+    - MAVERICK_GOOGLE_API_KEY
+    - MAVERICK_XAI_API_KEY
+    - MAVERICK_SMTP_URL # optional; carries SMTP credentials
+    - MAVERICK_ALERTS_WEBHOOK_SECRET # required iff the webhook URL is set
+  clear:
+    # Listeners — must line up with the Dockerfile EXPOSE, proxy.app_port,
+    # and the loopback publish above.
+    MAVERICK_PUBLIC_ADDR: ":8080"
+    MAVERICK_INTERNAL_ADDR: ":8081"
+    # Every remaining MAVERICK_* variable is optional with the defaults
+    # shown (authoritative in internal/config/config.go). Uncomment to
+    # override; `kamal redeploy` applies env changes.
+    # MAVERICK_ALERTS_WEBHOOK_URL: "https://ops.example.com/hooks/maverick"
+    # MAVERICK_CLASSIFIER_COLUMN: "claude-haiku-4-5/direct"
+    # MAVERICK_JUDGE_POOL: "gemini-3.1-pro/direct,gpt-5.5/direct"
+    # MAVERICK_RUNNER_REPEATS: "3"
+    # MAVERICK_RUNNER_TIMEOUT: "120s"
+    # MAVERICK_PROVIDERS_ANTHROPIC_MAX_CONCURRENCY: "8"   # per provider:
+    # MAVERICK_PROVIDERS_ANTHROPIC_RPM_LIMIT: "0"         # ANTHROPIC, OPENAI,
+    #                                                     # GOOGLE, XAI
+    # MAVERICK_SPEND_NIGHTLY_CAP_USD: "100"
+    # MAVERICK_SPEND_WEEKLY_CAP_USD: "500"
+    # MAVERICK_SCORING_ALPHA: "0.3"
+    # MAVERICK_SCORING_LAMBDA_VAR: "0.5"
+    # MAVERICK_SCORING_LAMBDA_AMB: "0.25"
+    # MAVERICK_SCORING_MIN_NIGHTS: "3"
+    # MAVERICK_RANKING_BAND_QUALITY: "0"
+    # MAVERICK_RANKING_BAND_BALANCED: "1.5"
+    # MAVERICK_RANKING_BAND_COST: "5.5"
+    # MAVERICK_RANKING_NOISE_BAND: "0.75"
+    # MAVERICK_CEILING_BUFFER: "0.05"
+    # MAVERICK_CATALOG_COLD_START_NIGHTS: "5"
+    # MAVERICK_RATELIMIT_RPM: "300"
+    # MAVERICK_HISTORY_RETENTION_DAYS: "365"
+    # MAVERICK_CAPTURE_MAX_WINDOW_MINUTES: "1440"
+    # MAVERICK_CAPTURE_RETENTION_HOURS: "72"
+    # Cron schedules (five-field, evaluated in UTC — docs/operations.md).
+    # MAVERICK_CRON_PREDICTION_LOCK: "50 2 * * *"
+    # MAVERICK_CRON_NIGHTLY: "0 3 * * *"
+    # MAVERICK_CRON_WEEKLY: "0 4 * * 0"
+    # MAVERICK_CRON_LATENCY_PROBES: "0 * * * *"
+    # MAVERICK_CRON_PRICE_SYNC: "0 6 * * *"
+    # MAVERICK_CRON_CATALOG_SYNC: "10 6 * * *"
+    # MAVERICK_CRON_CAPTURE_EXPIRY: "0 * * * *"
+    # MAVERICK_CRON_HISTORY_PRUNE: "0 5 * * *"
+
+accessories:
+  postgres:
+    image: postgres:16
+    host: <HETZNER_SERVER_IP>
+    # Loopback-only bind for host-side psql/pg_dump; not publicly reachable.
+    # The app itself connects over the kamal Docker network instead
+    # (host "maverick-postgres" in MAVERICK_DATABASE_URL).
+    port: "127.0.0.1:5432:5432"
+    env:
+      clear:
+        POSTGRES_DB: maverick
+        POSTGRES_USER: maverick
+      secret:
+        - POSTGRES_PASSWORD
+    directories:
+      - postgres-data:/var/lib/postgresql/data
+
+aliases:
+  # One-off migrate against the currently deployed image:  kamal migrate
+  migrate: app exec --primary "migrate"

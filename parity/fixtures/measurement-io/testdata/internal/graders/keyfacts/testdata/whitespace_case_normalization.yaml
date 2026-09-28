@@ -1,0 +1,10 @@
+description: literal matching folds case and collapses whitespace, including line breaks
+spec:
+  facts:
+    - { id: term_24mo, any_of: ["24 month"] }
+output: |-
+  The agreement runs for a 24
+  MONTH term.
+expect:
+  dimensions: { fact_coverage: 1.0 }
+  detail_contains: ['"matched_form":"24 month"']

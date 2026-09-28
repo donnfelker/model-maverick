@@ -1,0 +1,189 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "cost": 0.1,
+        "latency": 0.1,
+        "quality": 0.8
+      },
+      "function": "default_weights",
+      "go_test": null,
+      "id": "default_weights/quality",
+      "input": "quality"
+    },
+    {
+      "expected": {
+        "cost": 0.35,
+        "latency": 0.15,
+        "quality": 0.5
+      },
+      "function": "default_weights",
+      "go_test": null,
+      "id": "default_weights/balanced",
+      "input": "balanced"
+    },
+    {
+      "expected": {
+        "cost": 0.6,
+        "latency": 0.15,
+        "quality": 0.25
+      },
+      "function": "default_weights",
+      "go_test": null,
+      "id": "default_weights/cost",
+      "input": "cost"
+    },
+    {
+      "expected": {
+        "cost": 0.35,
+        "latency": 0.15,
+        "quality": 0.5
+      },
+      "function": "default_weights",
+      "go_test": null,
+      "id": "default_weights/",
+      "input": ""
+    },
+    {
+      "expected": {
+        "cost": 0.35,
+        "latency": 0.15,
+        "quality": 0.5
+      },
+      "function": "default_weights",
+      "go_test": null,
+      "id": "default_weights/bogus",
+      "input": "bogus"
+    },
+    {
+      "expected": 94.3,
+      "function": "display_score",
+      "go_test": null,
+      "id": "display_score/94.25",
+      "input": 94.25
+    },
+    {
+      "expected": 94.4,
+      "function": "display_score",
+      "go_test": null,
+      "id": "display_score/94.35",
+      "input": 94.35
+    },
+    {
+      "expected": 94.3,
+      "function": "display_score",
+      "go_test": null,
+      "id": "display_score/94.349999",
+      "input": 94.349999
+    },
+    {
+      "expected": 88.1,
+      "function": "display_score",
+      "go_test": null,
+      "id": "display_score/88.05",
+      "input": 88.05
+    },
+    {
+      "expected": 0.1,
+      "function": "display_score",
+      "go_test": null,
+      "id": "display_score/0.05",
+      "input": 0.05
+    },
+    {
+      "expected": 0.2,
+      "function": "display_score",
+      "go_test": null,
+      "id": "display_score/0.15",
+      "input": 0.15
+    },
+    {
+      "expected": 100,
+      "function": "display_score",
+      "go_test": null,
+      "id": "display_score/99.95",
+      "input": 99.95
+    },
+    {
+      "expected": 87.5,
+      "function": "display_score",
+      "go_test": null,
+      "id": "display_score/87.456",
+      "input": 87.456
+    },
+    {
+      "expected": 72.5,
+      "function": "display_score",
+      "go_test": null,
+      "id": "display_score/72.5",
+      "input": 72.5
+    },
+    {
+      "expected": 72.5,
+      "function": "display_score",
+      "go_test": null,
+      "id": "display_score/72.45",
+      "input": 72.45
+    },
+    {
+      "expected": false,
+      "function": "high_stakes",
+      "go_test": null,
+      "id": "high_stakes/[]",
+      "input": null
+    },
+    {
+      "expected": false,
+      "function": "high_stakes",
+      "go_test": null,
+      "id": "high_stakes/[]",
+      "input": []
+    },
+    {
+      "expected": true,
+      "function": "high_stakes",
+      "go_test": null,
+      "id": "high_stakes/[legal]",
+      "input": [
+        "legal"
+      ]
+    },
+    {
+      "expected": true,
+      "function": "high_stakes",
+      "go_test": null,
+      "id": "high_stakes/[medical x]",
+      "input": [
+        "medical",
+        "x"
+      ]
+    },
+    {
+      "expected": true,
+      "function": "high_stakes",
+      "go_test": null,
+      "id": "high_stakes/[financial]",
+      "input": [
+        "financial"
+      ]
+    },
+    {
+      "expected": false,
+      "function": "high_stakes",
+      "go_test": null,
+      "id": "high_stakes/[Legal]",
+      "input": [
+        "Legal"
+      ]
+    },
+    {
+      "expected": false,
+      "function": "high_stakes",
+      "go_test": null,
+      "id": "high_stakes/[health]",
+      "input": [
+        "health"
+      ]
+    }
+  ]
+}

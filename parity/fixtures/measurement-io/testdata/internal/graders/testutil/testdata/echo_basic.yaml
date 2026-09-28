@@ -1,0 +1,8 @@
+description: multiline output scores chars and nonempty
+spec: {}
+output: |-
+  The quick brown fox
+  jumps over the lazy dog
+expect:
+  dimensions: { chars: 0.43, nonempty: 1.0 }
+  detail_contains: ['"length":43']

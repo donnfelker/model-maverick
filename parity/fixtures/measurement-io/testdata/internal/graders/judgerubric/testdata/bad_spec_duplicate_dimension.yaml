@@ -1,0 +1,9 @@
+description: two rubric items must not name the same dimension
+spec:
+  rubric:
+    - { dimension: idiom, criterion: First idiom criterion. }
+    - { dimension: idiom, criterion: Second idiom criterion. }
+output: irrelevant
+expect:
+  error: true
+  error_contains: duplicate dimension

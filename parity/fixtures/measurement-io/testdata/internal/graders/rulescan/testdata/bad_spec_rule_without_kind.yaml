@@ -1,0 +1,8 @@
+description: a rule carrying only weight and critical has no kind and is rejected
+spec:
+  rules:
+    - { weight: 2, critical: true }
+output: irrelevant
+expect:
+  error: true
+  error_contains: rule_scan spec

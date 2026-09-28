@@ -1,0 +1,17 @@
+description: adversarial — malformed JSON (dangling value) is a 0 score, not a grader error
+spec:
+  schema:
+    type: object
+    required: [name, amount]
+    properties:
+      name: { type: string }
+      amount: { type: number }
+  checks:
+    - { path: $.amount, numeric: 12500, tolerance: 0 }
+output: |-
+  ```json
+  { "name": "Acme Corp", "amount": }
+  ```
+expect:
+  dimensions: { schema_validity: 0.0, field_accuracy: 0.0 }
+  detail_contains: ['"extraction":"none"', '"schema_valid":false']

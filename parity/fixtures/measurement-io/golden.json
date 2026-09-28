@@ -1,0 +1,771 @@
+{
+  "about": "golden_answer grader. Error strings are exact Go output except '{SPEC_SCHEMA_URL}' / '{TASK_SCHEMA_URL}', which Go renders as 'file://<process cwd>/spec.schema.json#' (cwd-dependent, see QUIRK in behavior doc). Text after the 'jsonschema validation failed with' marker is santhosh-tekuri/jsonschema v6 library wording; parity requirement is the prefix up to and including '<kind> spec: ' plus the pass/fail decision, and 'contains' checks named in go_test_expect.",
+  "go_tests": {
+    "golden.TestKind": {
+      "expect_kind": "golden_answer"
+    },
+    "golden.TestValidateSpecAccepts": {
+      "spec": {
+        "answers": [
+          {
+            "value": "Paris"
+          },
+          {
+            "numeric": 42,
+            "tolerance": 0.5
+          },
+          {
+            "set": [
+              "a",
+              "b"
+            ]
+          },
+          {
+            "regex": "(?i)yes"
+          }
+        ]
+      },
+      "expect": "valid"
+    }
+  },
+  "validate_spec_rejects": [
+    {
+      "id": "not json",
+      "go_test": "golden.TestValidateSpecRejects/not_json",
+      "spec_raw": "{\"answers\": ",
+      "expect_error_contains": "golden_answer spec",
+      "go_error": "golden_answer spec: unexpected EOF"
+    },
+    {
+      "id": "missing answers",
+      "go_test": "golden.TestValidateSpecRejects/missing_answers",
+      "spec_raw": "{}",
+      "expect_error_contains": "golden_answer spec",
+      "go_error": "golden_answer spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '': missing property 'answers'"
+    },
+    {
+      "id": "empty answers",
+      "go_test": "golden.TestValidateSpecRejects/empty_answers",
+      "spec_raw": "{\"answers\": []}",
+      "expect_error_contains": "golden_answer spec",
+      "go_error": "golden_answer spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/answers': minItems: got 0, want 1"
+    },
+    {
+      "id": "answer without mode",
+      "go_test": "golden.TestValidateSpecRejects/answer_without_mode",
+      "spec_raw": "{\"answers\": [{}]}",
+      "expect_error_contains": "golden_answer spec",
+      "go_error": "golden_answer spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/answers/0': 'oneOf' failed, none matched\n  - at '/answers/0': missing property 'value'\n  - at '/answers/0': missing property 'numeric'\n  - at '/answers/0': missing property 'set'\n  - at '/answers/0': missing property 'regex'"
+    },
+    {
+      "id": "answer with two modes",
+      "go_test": "golden.TestValidateSpecRejects/answer_with_two_modes",
+      "spec_raw": "{\"answers\": [{\"value\": \"a\", \"numeric\": 1}]}",
+      "expect_error_contains": "golden_answer spec",
+      "go_error": "golden_answer spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/answers/0': 'oneOf' failed, subschemas 0, 1 matched"
+    },
+    {
+      "id": "tolerance without numeric",
+      "go_test": "golden.TestValidateSpecRejects/tolerance_without_numeric",
+      "spec_raw": "{\"answers\": [{\"value\": \"a\", \"tolerance\": 0.1}]}",
+      "expect_error_contains": "golden_answer spec",
+      "go_error": "golden_answer spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/answers/0': properties 'numeric' required, if 'tolerance' exists"
+    },
+    {
+      "id": "negative tolerance",
+      "go_test": "golden.TestValidateSpecRejects/negative_tolerance",
+      "spec_raw": "{\"answers\": [{\"numeric\": 1, \"tolerance\": -1}]}",
+      "expect_error_contains": "golden_answer spec",
+      "go_error": "golden_answer spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/answers/0/tolerance': minimum: got -1, want 0"
+    },
+    {
+      "id": "empty set",
+      "go_test": "golden.TestValidateSpecRejects/empty_set",
+      "spec_raw": "{\"answers\": [{\"set\": []}]}",
+      "expect_error_contains": "golden_answer spec",
+      "go_error": "golden_answer spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/answers/0/set': minItems: got 0, want 1"
+    },
+    {
+      "id": "value normalizes to empty",
+      "go_test": "golden.TestValidateSpecRejects/value_normalizes_to_empty",
+      "spec_raw": "{\"answers\": [{\"value\": \"...\"}]}",
+      "expect_error_contains": "normalizes to empty",
+      "go_error": "golden_answer spec: answers[0]: value normalizes to empty"
+    },
+    {
+      "id": "bad regex",
+      "go_test": "golden.TestValidateSpecRejects/bad_regex",
+      "spec_raw": "{\"answers\": [{\"regex\": \"(\"}]}",
+      "expect_error_contains": "answers[0]",
+      "go_error": "golden_answer spec: answers[0]: error parsing regexp: missing closing ): `\\A(?:()\\z`"
+    },
+    {
+      "id": "unknown field",
+      "go_test": "golden.TestValidateSpecRejects/unknown_field",
+      "spec_raw": "{\"answers\": [{\"value\": \"a\", \"mode\": \"exact\"}]}",
+      "expect_error_contains": "golden_answer spec",
+      "go_error": "golden_answer spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/answers/0': additional properties 'mode' not allowed"
+    },
+    {
+      "id": "set item normalizes empty (probe)",
+      "spec_raw": "{\"answers\": [{\"set\": [\"a\", \"!\"]}]}",
+      "go_error": "golden_answer spec: answers[0]: set[1] normalizes to empty"
+    }
+  ],
+  "normalize": [
+    {
+      "in": "  Paris.  ",
+      "out": "paris",
+      "go_test": "golden.TestNormalize"
+    },
+    {
+      "in": "The\tQuick   Brown\nFox!",
+      "out": "the quick brown fox",
+      "go_test": "golden.TestNormalize"
+    },
+    {
+      "in": "already clean",
+      "out": "already clean",
+      "go_test": "golden.TestNormalize"
+    },
+    {
+      "in": "?!.",
+      "out": "",
+      "go_test": "golden.TestNormalize"
+    },
+    {
+      "in": "Paris. .",
+      "out": "paris.",
+      "probe": true
+    },
+    {
+      "in": "İstanbul",
+      "out": "istanbul",
+      "probe": true
+    },
+    {
+      "in": "STRASSE",
+      "out": "strasse",
+      "probe": true
+    },
+    {
+      "in": "ß",
+      "out": "ß",
+      "probe": true
+    },
+    {
+      "in": "Ǆ",
+      "out": "ǆ",
+      "probe": true
+    },
+    {
+      "in": " Paris ",
+      "out": "paris",
+      "probe": true
+    },
+    {
+      "in": "Paris​",
+      "out": "paris​",
+      "probe": true
+    },
+    {
+      "in": "a . b",
+      "out": "a . b",
+      "probe": true
+    },
+    {
+      "in": "PARIS…",
+      "out": "paris…",
+      "probe": true
+    },
+    {
+      "in": "　x　",
+      "out": "x",
+      "probe": true
+    },
+    {
+      "in": "Σ",
+      "out": "σ",
+      "probe": true
+    }
+  ],
+  "parse_number": [
+    {
+      "in": "42",
+      "value": 42,
+      "ok": true,
+      "go_test": "golden.TestParseNumber"
+    },
+    {
+      "in": " 12,500. ",
+      "value": 12500,
+      "ok": true,
+      "go_test": "golden.TestParseNumber"
+    },
+    {
+      "in": "-3.25",
+      "value": -3.25,
+      "ok": true,
+      "go_test": "golden.TestParseNumber"
+    },
+    {
+      "in": "1,234,567.5",
+      "value": 1234567.5,
+      "ok": true,
+      "go_test": "golden.TestParseNumber"
+    },
+    {
+      "in": "3.14!",
+      "value": 3.14,
+      "ok": true,
+      "go_test": "golden.TestParseNumber"
+    },
+    {
+      "in": "the answer is 42",
+      "value": 0,
+      "ok": false,
+      "go_test": "golden.TestParseNumber"
+    },
+    {
+      "in": "",
+      "value": 0,
+      "ok": false,
+      "go_test": "golden.TestParseNumber"
+    },
+    {
+      "in": "1,2",
+      "value": 0,
+      "ok": false,
+      "go_test": "golden.TestParseNumber"
+    },
+    {
+      "in": "Inf",
+      "value": "+Inf",
+      "ok": true,
+      "probe": true
+    },
+    {
+      "in": "-inf",
+      "value": "-Inf",
+      "ok": true,
+      "probe": true
+    },
+    {
+      "in": "NaN",
+      "value": "NaN",
+      "ok": true,
+      "probe": true
+    },
+    {
+      "in": "nan",
+      "value": "NaN",
+      "ok": true,
+      "probe": true
+    },
+    {
+      "in": "infinity",
+      "value": "+Inf",
+      "ok": true,
+      "probe": true
+    },
+    {
+      "in": "1_000",
+      "value": 1000,
+      "ok": true,
+      "probe": true
+    },
+    {
+      "in": "0x10",
+      "value": 0,
+      "ok": false,
+      "probe": true
+    },
+    {
+      "in": "0x1p-2",
+      "value": 0.25,
+      "ok": true,
+      "probe": true
+    },
+    {
+      "in": "1e3",
+      "value": 1000,
+      "ok": true,
+      "probe": true
+    },
+    {
+      "in": "+5",
+      "value": 5,
+      "ok": true,
+      "probe": true
+    },
+    {
+      "in": "12,34,567",
+      "value": 0,
+      "ok": false,
+      "probe": true
+    },
+    {
+      "in": "1,2345",
+      "value": 0,
+      "ok": false,
+      "probe": true
+    },
+    {
+      "in": ",123",
+      "value": 0,
+      "ok": false,
+      "probe": true
+    },
+    {
+      "in": "1,234,",
+      "value": 0,
+      "ok": false,
+      "probe": true
+    },
+    {
+      "in": "٤٢",
+      "value": 0,
+      "ok": false,
+      "probe": true
+    },
+    {
+      "in": "42?!.",
+      "value": 42,
+      "ok": true,
+      "probe": true
+    },
+    {
+      "in": "4 2",
+      "value": 0,
+      "ok": false,
+      "probe": true
+    },
+    {
+      "in": "1.",
+      "value": 1,
+      "ok": true,
+      "probe": true
+    },
+    {
+      "in": ".5",
+      "value": 0.5,
+      "ok": true,
+      "probe": true
+    },
+    {
+      "in": "1,234.567,890",
+      "value": 1234.56789,
+      "ok": true,
+      "probe": true
+    },
+    {
+      "in": "１２",
+      "value": 0,
+      "ok": false,
+      "probe": true
+    },
+    {
+      "in": "1e400",
+      "value": 0,
+      "ok": false,
+      "probe": true
+    },
+    {
+      "in": "0.1",
+      "value": 0.1,
+      "ok": true,
+      "probe": true
+    }
+  ],
+  "split_items": [
+    {
+      "in": "- Red\n2. green;  BLUE, \n\n",
+      "out": [
+        "red",
+        "green",
+        "blue"
+      ],
+      "go_test": "golden.TestSplitItems"
+    },
+    {
+      "in": "* a\n** b\n• c",
+      "out": [
+        "a",
+        "b",
+        "c"
+      ],
+      "probe": true
+    },
+    {
+      "in": "1) x\n10. y\n3.z",
+      "out": [
+        "x",
+        "y",
+        "3.z"
+      ],
+      "probe": true
+    },
+    {
+      "in": "-a",
+      "out": [
+        "-a"
+      ],
+      "probe": true
+    },
+    {
+      "in": "a,,b;;c",
+      "out": [
+        "a",
+        "b",
+        "c"
+      ],
+      "probe": true
+    },
+    {
+      "in": "1.5, 2.5",
+      "out": [
+        "1.5",
+        "2.5"
+      ],
+      "probe": true
+    },
+    {
+      "in": "- ",
+      "out": [
+        "-"
+      ],
+      "probe": true
+    },
+    {
+      "in": "red\r\nblue",
+      "out": [
+        "red",
+        "blue"
+      ],
+      "probe": true
+    }
+  ],
+  "fixture_results": [
+    {
+      "file": "bad_spec_two_modes.yaml",
+      "description": "an answer declaring two modes is rejected at validation",
+      "spec_json": {
+        "answers": [
+          {
+            "regex": "paris",
+            "value": "Paris"
+          }
+        ]
+      },
+      "output": "irrelevant",
+      "validate_error": "golden_answer spec: jsonschema validation failed with '{SPEC_SCHEMA_URL}'\n- at '/answers/0': 'oneOf' failed, subschemas 0, 3 matched",
+      "failure_counter": 0
+    },
+    {
+      "file": "exact_miss.yaml",
+      "description": "a wrong answer scores 0, not an error",
+      "spec_json": {
+        "answers": [
+          {
+            "value": "Paris"
+          }
+        ]
+      },
+      "output": "London",
+      "dimensions": {
+        "answer_correctness": 0
+      },
+      "detail": {
+        "matched": false,
+        "answer_index": -1,
+        "answers": [
+          {
+            "index": 0,
+            "mode": "value",
+            "matched": false
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"matched\":false,\"answer_index\":-1,\"answers\":[{\"index\":0,\"mode\":\"value\",\"matched\":false}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "exact_normalized_pass.yaml",
+      "description": "exact mode matches after whitespace collapse, case fold, and trailing punctuation strip",
+      "spec_json": {
+        "answers": [
+          {
+            "value": "paris"
+          }
+        ]
+      },
+      "output": "  Paris.  ",
+      "dimensions": {
+        "answer_correctness": 1
+      },
+      "detail": {
+        "matched": true,
+        "mode": "value",
+        "answer_index": 0,
+        "answers": [
+          {
+            "index": 0,
+            "mode": "value",
+            "matched": true
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"matched\":true,\"mode\":\"value\",\"answer_index\":0,\"answers\":[{\"index\":0,\"mode\":\"value\",\"matched\":true}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "numeric_commas_and_period.yaml",
+      "description": "thousands separators and a trailing period are normalized before numeric comparison",
+      "spec_json": {
+        "answers": [
+          {
+            "numeric": 12500
+          }
+        ]
+      },
+      "output": "12,500.",
+      "dimensions": {
+        "answer_correctness": 1
+      },
+      "detail": {
+        "matched": true,
+        "mode": "numeric",
+        "answer_index": 0,
+        "answers": [
+          {
+            "index": 0,
+            "mode": "numeric",
+            "matched": true
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"matched\":true,\"mode\":\"numeric\",\"answer_index\":0,\"answers\":[{\"index\":0,\"mode\":\"numeric\",\"matched\":true}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "numeric_outside_tolerance.yaml",
+      "description": "just past the tolerance boundary scores 0",
+      "spec_json": {
+        "answers": [
+          {
+            "numeric": 100,
+            "tolerance": 0.5
+          }
+        ]
+      },
+      "output": "100.75",
+      "dimensions": {
+        "answer_correctness": 0
+      },
+      "detail": {
+        "matched": false,
+        "answer_index": -1,
+        "answers": [
+          {
+            "index": 0,
+            "mode": "numeric",
+            "matched": false
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"matched\":false,\"answer_index\":-1,\"answers\":[{\"index\":0,\"mode\":\"numeric\",\"matched\":false}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "numeric_tolerance_boundary.yaml",
+      "description": "adversarial numeric-tolerance edge — a value exactly at the tolerance boundary is inside it",
+      "spec_json": {
+        "answers": [
+          {
+            "numeric": 100,
+            "tolerance": 0.5
+          }
+        ]
+      },
+      "output": "100.5",
+      "dimensions": {
+        "answer_correctness": 1
+      },
+      "detail": {
+        "matched": true,
+        "mode": "numeric",
+        "answer_index": 0,
+        "answers": [
+          {
+            "index": 0,
+            "mode": "numeric",
+            "matched": true
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"matched\":true,\"mode\":\"numeric\",\"answer_index\":0,\"answers\":[{\"index\":0,\"mode\":\"numeric\",\"matched\":true}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "regex_anchored_pass.yaml",
+      "description": "regex mode matches the whole trimmed output",
+      "spec_json": {
+        "answers": [
+          {
+            "regex": "(?i)yes[.!]?"
+          }
+        ]
+      },
+      "output": "Yes.",
+      "dimensions": {
+        "answer_correctness": 1
+      },
+      "detail": {
+        "matched": true,
+        "mode": "regex",
+        "answer_index": 0,
+        "answers": [
+          {
+            "index": 0,
+            "mode": "regex",
+            "matched": true
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"matched\":true,\"mode\":\"regex\",\"answer_index\":0,\"answers\":[{\"index\":0,\"mode\":\"regex\",\"matched\":true}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "regex_substring_rejected.yaml",
+      "description": "regex mode is anchored — a mid-output match is not enough",
+      "spec_json": {
+        "answers": [
+          {
+            "regex": "\\d+"
+          }
+        ]
+      },
+      "output": "The answer is 42",
+      "dimensions": {
+        "answer_correctness": 0
+      },
+      "detail": {
+        "matched": false,
+        "answer_index": -1,
+        "answers": [
+          {
+            "index": 0,
+            "mode": "regex",
+            "matched": false
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"matched\":false,\"answer_index\":-1,\"answers\":[{\"index\":0,\"mode\":\"regex\",\"matched\":false}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "second_answer_matches.yaml",
+      "description": "any accepted answer suffices; detail records which one and its mode",
+      "spec_json": {
+        "answers": [
+          {
+            "value": "forty-two"
+          },
+          {
+            "numeric": 42,
+            "tolerance": 0
+          }
+        ]
+      },
+      "output": "42",
+      "dimensions": {
+        "answer_correctness": 1
+      },
+      "detail": {
+        "matched": true,
+        "mode": "numeric",
+        "answer_index": 1,
+        "answers": [
+          {
+            "index": 0,
+            "mode": "value",
+            "matched": false
+          },
+          {
+            "index": 1,
+            "mode": "numeric",
+            "matched": true
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"matched\":true,\"mode\":\"numeric\",\"answer_index\":1,\"answers\":[{\"index\":0,\"mode\":\"value\",\"matched\":false},{\"index\":1,\"mode\":\"numeric\",\"matched\":true}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "set_equality_any_order.yaml",
+      "description": "set mode accepts a bulleted list in any order",
+      "spec_json": {
+        "answers": [
+          {
+            "set": [
+              "red",
+              "green",
+              "blue"
+            ]
+          }
+        ]
+      },
+      "output": "- Blue\n- red\n- GREEN",
+      "dimensions": {
+        "answer_correctness": 1
+      },
+      "detail": {
+        "matched": true,
+        "mode": "set",
+        "answer_index": 0,
+        "answers": [
+          {
+            "index": 0,
+            "mode": "set",
+            "matched": true
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"matched\":true,\"mode\":\"set\",\"answer_index\":0,\"answers\":[{\"index\":0,\"mode\":\"set\",\"matched\":true}]}",
+      "failure_counter": 0
+    },
+    {
+      "file": "set_extra_item_fails.yaml",
+      "description": "set-equality is exact — an extra member fails",
+      "spec_json": {
+        "answers": [
+          {
+            "set": [
+              "red",
+              "green",
+              "blue"
+            ]
+          }
+        ]
+      },
+      "output": "red, green, blue, yellow",
+      "dimensions": {
+        "answer_correctness": 0
+      },
+      "detail": {
+        "matched": false,
+        "answer_index": -1,
+        "answers": [
+          {
+            "index": 0,
+            "mode": "set",
+            "matched": false
+          }
+        ]
+      },
+      "detail_exact_bytes": "{\"matched\":false,\"answer_index\":-1,\"answers\":[{\"index\":0,\"mode\":\"set\",\"matched\":false}]}",
+      "failure_counter": 0
+    }
+  ],
+  "parse_number_note": "value strings '+Inf', '-Inf', 'NaN' denote IEEE specials (Go strconv.ParseFloat accepts inf/infinity/nan case-insensitively and hex floats and underscores)."
+}

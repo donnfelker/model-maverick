@@ -1,0 +1,519 @@
+{
+  "note": "expected is the observation map; absent keys mean the dimension is not observed this batch",
+  "observe": [
+    {
+      "expected": {
+        "ambiguity": 0.05,
+        "cost_per_run_usd": 0.02,
+        "latency_p50_ms": 300,
+        "latency_p95_ms": 600,
+        "pass_rate": 0.5,
+        "quality": 0.7
+      },
+      "go_test": "scoring.TestObserve",
+      "id": "full",
+      "runs": [
+        {
+          "cost_usd": 0.01,
+          "latency_ms": 100,
+          "pass": true
+        },
+        {
+          "cost_usd": 0.02,
+          "latency_ms": 200,
+          "pass": true
+        },
+        {
+          "cost_usd": 0.03,
+          "latency_ms": 300,
+          "pass": false
+        },
+        {
+          "cost_usd": 0.02,
+          "latency_ms": 400,
+          "pass": true
+        },
+        {
+          "cost_usd": 0.01,
+          "latency_ms": 500,
+          "pass": false
+        },
+        {
+          "cost_usd": 0.03,
+          "latency_ms": 600,
+          "pass": false
+        }
+      ],
+      "tasks": [
+        {
+          "ambiguity": 0.1,
+          "gradable": true,
+          "score": 0.8
+        },
+        {
+          "ambiguity": 0,
+          "gradable": true,
+          "score": 0.6
+        },
+        {
+          "ambiguity": 0,
+          "gradable": false,
+          "score": 0
+        }
+      ]
+    },
+    {
+      "expected": {
+        "ambiguity": 0,
+        "latency_p50_ms": 250,
+        "latency_p95_ms": 250,
+        "pass_rate": 1,
+        "quality": 1
+      },
+      "go_test": "scoring.TestObserveSingleRunPercentiles",
+      "id": "single_run_percentiles",
+      "runs": [
+        {
+          "cost_usd": null,
+          "latency_ms": 250,
+          "pass": true
+        }
+      ],
+      "tasks": [
+        {
+          "ambiguity": 0,
+          "gradable": true,
+          "score": 1
+        }
+      ]
+    },
+    {
+      "expected": {
+        "pass_rate": 0
+      },
+      "go_test": "scoring.TestObserveSparseData",
+      "id": "sparse",
+      "runs": [
+        {
+          "cost_usd": null,
+          "latency_ms": null,
+          "pass": false
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": null,
+          "pass": false
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": null,
+          "pass": false
+        }
+      ],
+      "tasks": [
+        {
+          "ambiguity": 0,
+          "gradable": false,
+          "score": 0
+        }
+      ]
+    },
+    {
+      "expected": {},
+      "go_test": "scoring.TestObserveEmpty",
+      "id": "empty",
+      "runs": null,
+      "tasks": null
+    },
+    {
+      "expected": {
+        "ambiguity": 0,
+        "latency_p50_ms": 370,
+        "latency_p95_ms": 703,
+        "pass_rate": 0.5,
+        "quality": 0.5
+      },
+      "go_test": "",
+      "id": "extra_unsorted_latencies_20",
+      "runs": [
+        {
+          "cost_usd": null,
+          "latency_ms": 740,
+          "pass": true
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": 703,
+          "pass": false
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": 666,
+          "pass": true
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": 629,
+          "pass": false
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": 592,
+          "pass": true
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": 555,
+          "pass": false
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": 518,
+          "pass": true
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": 481,
+          "pass": false
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": 444,
+          "pass": true
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": 407,
+          "pass": false
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": 370,
+          "pass": true
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": 333,
+          "pass": false
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": 296,
+          "pass": true
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": 259,
+          "pass": false
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": 222,
+          "pass": true
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": 185,
+          "pass": false
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": 148,
+          "pass": true
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": 111,
+          "pass": false
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": 74,
+          "pass": true
+        },
+        {
+          "cost_usd": null,
+          "latency_ms": 37,
+          "pass": false
+        }
+      ],
+      "tasks": [
+        {
+          "ambiguity": 0,
+          "gradable": true,
+          "score": 0.5
+        }
+      ]
+    },
+    {
+      "expected": {
+        "ambiguity": 0.05,
+        "quality": 0.4
+      },
+      "go_test": "",
+      "id": "extra_tasks_but_no_runs",
+      "runs": null,
+      "tasks": [
+        {
+          "ambiguity": 0.05,
+          "gradable": true,
+          "score": 0.4
+        }
+      ]
+    }
+  ],
+  "percentile": {
+    "cases": [
+      {
+        "expected": 300,
+        "p": 0.5,
+        "sorted": [
+          100,
+          200,
+          300,
+          400,
+          500,
+          600
+        ]
+      },
+      {
+        "expected": 600,
+        "p": 0.95,
+        "sorted": [
+          100,
+          200,
+          300,
+          400,
+          500,
+          600
+        ]
+      },
+      {
+        "expected": 100,
+        "p": 0,
+        "sorted": [
+          100,
+          200,
+          300,
+          400,
+          500,
+          600
+        ]
+      },
+      {
+        "expected": 600,
+        "p": 1,
+        "sorted": [
+          100,
+          200,
+          300,
+          400,
+          500,
+          600
+        ]
+      },
+      {
+        "expected": 250,
+        "p": 0.5,
+        "sorted": [
+          250
+        ]
+      },
+      {
+        "expected": 250,
+        "p": 0.95,
+        "sorted": [
+          250
+        ]
+      },
+      {
+        "expected": 250,
+        "p": 0,
+        "sorted": [
+          250
+        ]
+      },
+      {
+        "expected": 250,
+        "p": 1,
+        "sorted": [
+          250
+        ]
+      },
+      {
+        "expected": 10,
+        "p": 0.5,
+        "sorted": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20
+        ]
+      },
+      {
+        "expected": 19,
+        "p": 0.95,
+        "sorted": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20
+        ]
+      },
+      {
+        "expected": 1,
+        "p": 0,
+        "sorted": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20
+        ]
+      },
+      {
+        "expected": 20,
+        "p": 1,
+        "sorted": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20
+        ]
+      },
+      {
+        "expected": 10,
+        "p": 0.5,
+        "sorted": [
+          10,
+          20
+        ]
+      },
+      {
+        "expected": 20,
+        "p": 0.95,
+        "sorted": [
+          10,
+          20
+        ]
+      },
+      {
+        "expected": 10,
+        "p": 0,
+        "sorted": [
+          10,
+          20
+        ]
+      },
+      {
+        "expected": 20,
+        "p": 1,
+        "sorted": [
+          10,
+          20
+        ]
+      },
+      {
+        "expected": 6,
+        "p": 0.5,
+        "sorted": [
+          5,
+          6,
+          7
+        ]
+      },
+      {
+        "expected": 7,
+        "p": 0.95,
+        "sorted": [
+          5,
+          6,
+          7
+        ]
+      },
+      {
+        "expected": 5,
+        "p": 0,
+        "sorted": [
+          5,
+          6,
+          7
+        ]
+      },
+      {
+        "expected": 7,
+        "p": 1,
+        "sorted": [
+          5,
+          6,
+          7
+        ]
+      }
+    ],
+    "rule": "nearest-rank: rank = ceil(p*n) clamped to [1,n]; value = sorted[rank-1]; no interpolation"
+  },
+  "tolerance": 1e-12
+}

@@ -1,0 +1,8 @@
+Summarize the agreement, citing the attached documents.
+
+--- attachment: contract.txt ---
+THIS AGREEMENT is made between Acme Corp and Beta LLC.
+Section 1. Term: 24 months.
+
+--- attachment: amendment.txt ---
+Section 1 is amended to read: Term: 36 months.

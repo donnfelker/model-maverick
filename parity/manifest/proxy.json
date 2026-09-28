@@ -1,0 +1,300 @@
+{
+  "area": "proxy",
+  "packages": [
+    "internal/proxy",
+    "cmd/maverick-proxy (config surface only)"
+  ],
+  "go_test_count": 34,
+  "top_level_tests_listed": 34,
+  "extra_fixture_scenarios": [
+    "x_chat_429_advances",
+    "x_chat_connect_error_advances",
+    "x_chat_header_timeout_advances",
+    "x_chat_all_fail_exhausted_502",
+    "x_chat_no_credential_502",
+    "x_chat_google_xai_paths",
+    "x_chat_stream_after_503",
+    "x_messages_streaming_sse",
+    "x_messages_mid_stream_abort",
+    "x_chat_404_relayed",
+    "x_chat_invalid_json_400",
+    "x_chat_model_not_string_400",
+    "x_chat_missing_model_400_alias",
+    "x_messages_concrete_model_400",
+    "x_engine_malformed_json_502",
+    "x_engine_empty_chain_502",
+    "x_chat_prompt_escaping_and_array",
+    "x_chat_body_reencoding",
+    "x_chat_upstream_sets_maverick_header",
+    "x_chat_sse_content_type_case",
+    "x_method_not_allowed",
+    "x_unknown_path_404",
+    "x_post_up_405"
+  ],
+  "tests": [
+    {
+      "go_test": "proxy.TestParseAlias",
+      "where": "fixtures/proxy/unit.json#parse_alias"
+    },
+    {
+      "go_test": "proxy.TestChatCompletions_ConcreteModelRejected",
+      "where": "fixtures/proxy/scenarios.json#chat_concrete_model_rejected"
+    },
+    {
+      "go_test": "proxy.TestChatCompletions_MalformedAliasRejected",
+      "where": "fixtures/proxy/scenarios.json#chat_malformed_alias_rejected"
+    },
+    {
+      "go_test": "proxy.TestChatCompletions_HappyPath",
+      "where": "fixtures/proxy/scenarios.json#chat_happy_path"
+    },
+    {
+      "go_test": "proxy.TestChatCompletions_FirstEntry503SecondEntryUsed",
+      "where": "fixtures/proxy/scenarios.json#chat_first_503_second_used"
+    },
+    {
+      "go_test": "proxy.TestChatCompletions_Semantic400NoFallback",
+      "where": "fixtures/proxy/scenarios.json#chat_semantic_400_no_fallback"
+    },
+    {
+      "go_test": "proxy.TestChatCompletions_BYOKVsEnvKey",
+      "where": "fixtures/proxy/scenarios.json#chat_byok_native_provider | fixtures/proxy/scenarios.json#chat_cross_provider_env_key"
+    },
+    {
+      "go_test": "proxy.TestChatCompletions_PoolModeAliasParsedIntoRecommend",
+      "where": "fixtures/proxy/scenarios.json#chat_pool_mode_alias"
+    },
+    {
+      "go_test": "proxy.TestChatCompletions_PromptFormExtractedFromLastUserMessage",
+      "where": "fixtures/proxy/scenarios.json#chat_prompt_last_user"
+    },
+    {
+      "go_test": "proxy.TestChatCompletions_DeclaredFallbackWhenNoUserText",
+      "where": "fixtures/proxy/scenarios.json#chat_declared_fallback"
+    },
+    {
+      "go_test": "proxy.TestChatCompletions_TelemetryOffMeansZeroTelemetryCalls",
+      "where": "fixtures/proxy/scenarios.json#chat_telemetry_off | reference/engine-reference.md (Part 6)#t-telemetry-off"
+    },
+    {
+      "go_test": "proxy.TestChatCompletions_StreamingSSEPassThroughByteIdentical",
+      "where": "fixtures/proxy/scenarios.json#chat_streaming_sse"
+    },
+    {
+      "go_test": "proxy.TestMessages_ClaudeCodeBetaBodyAndHeaderPassThrough",
+      "where": "fixtures/proxy/scenarios.json#messages_beta_body_and_header_passthrough"
+    },
+    {
+      "go_test": "proxy.TestMessages_ClientAuthorizationNeverReachesUpstream",
+      "where": "fixtures/proxy/scenarios.json#messages_client_authorization_stripped"
+    },
+    {
+      "go_test": "proxy.TestChatCompletions_ClientXAPIKeyNeverReachesUpstream",
+      "where": "fixtures/proxy/scenarios.json#chat_client_x_api_key_stripped"
+    },
+    {
+      "go_test": "proxy.TestChatCompletions_HopByHopHeadersStripped",
+      "where": "fixtures/proxy/scenarios.json#chat_hop_by_hop_stripped"
+    },
+    {
+      "go_test": "proxy.TestCustomHeaderForwarded",
+      "where": "fixtures/proxy/scenarios.json#chat_custom_header_forwarded | fixtures/proxy/scenarios.json#messages_custom_header_forwarded"
+    },
+    {
+      "go_test": "proxy.TestMessages_RoutesAnthropicOnlySkipsOthers",
+      "where": "fixtures/proxy/scenarios.json#messages_anthropic_only_skip_others"
+    },
+    {
+      "go_test": "proxy.TestMessages_DefaultAnthropicVersionWhenClientOmitsIt",
+      "where": "fixtures/proxy/scenarios.json#messages_default_anthropic_version"
+    },
+    {
+      "go_test": "proxy.TestMessages_BYOKXAPIKeyForwardedForNativeProvider",
+      "where": "fixtures/proxy/scenarios.json#messages_byok_x_api_key"
+    },
+    {
+      "go_test": "proxy.TestMessages_ZeroAnthropicEntriesNoExecutableCandidates",
+      "where": "fixtures/proxy/scenarios.json#messages_zero_anthropic_502"
+    },
+    {
+      "go_test": "proxy.TestQueryStringForwarded",
+      "where": "fixtures/proxy/scenarios.json#messages_query_string_forwarded | fixtures/proxy/scenarios.json#chat_query_string_forwarded"
+    },
+    {
+      "go_test": "proxy.TestMessages_EffortXHighNormalizedToMax",
+      "where": "fixtures/proxy/scenarios.json#messages_effort_xhigh_to_max"
+    },
+    {
+      "go_test": "proxy.TestChatCompletions_ReasoningEffortXHighNormalizedToHigh",
+      "where": "fixtures/proxy/scenarios.json#chat_reasoning_effort_xhigh_to_high"
+    },
+    {
+      "go_test": "proxy.TestEffortNormalization_LeavesEverythingElseAlone",
+      "where": "fixtures/proxy/unit.json#rewrite_model-1..4"
+    },
+    {
+      "go_test": "proxy.TestOTel_HappyPathEmitsLogRecord",
+      "where": "fixtures/proxy/scenarios.json#otel_happy_path_log_record | reference/engine-reference.md (Part 6)#t-otel-happy-and-t-otel-cold"
+    },
+    {
+      "go_test": "proxy.TestOTel_MeasuredFalseFallbackCounted",
+      "where": "fixtures/proxy/scenarios.json#otel_measured_false_fallback_counted | reference/engine-reference.md (Part 6)#t-otel-happy-and-t-otel-cold"
+    },
+    {
+      "go_test": "proxy.TestOTel_CounterCumulativeAcrossExports",
+      "where": "reference/engine-reference.md (Part 6)#t-otel-cumulative"
+    },
+    {
+      "go_test": "proxy.TestOTel_DisabledEmitsNothing",
+      "where": "fixtures/proxy/scenarios.json#otel_disabled_emits_nothing | reference/engine-reference.md (Part 6)#t-otel-disabled"
+    },
+    {
+      "go_test": "proxy.TestUp",
+      "where": "fixtures/proxy/scenarios.json#up"
+    },
+    {
+      "go_test": "proxy.TestChatCompletions_EngineErrorIs502",
+      "where": "fixtures/proxy/scenarios.json#chat_engine_error_502"
+    },
+    {
+      "go_test": "proxy.TestExtractLastUserText",
+      "where": "fixtures/proxy/unit.json#extract_last_user_text"
+    },
+    {
+      "go_test": "proxy.TestExtractLastUserText_Caps",
+      "where": "fixtures/proxy/unit.json#extract_last_user_text-21"
+    },
+    {
+      "go_test": "proxy.TestRewriteModel",
+      "where": "fixtures/proxy/unit.json#rewrite_model-0"
+    },
+    {
+      "go_test": "proxy.TestChatCompletions_BYOKVsEnvKey/native_provider_uses_client_credential",
+      "where": "fixtures/proxy/scenarios.json#chat_byok_native_provider"
+    },
+    {
+      "go_test": "proxy.TestChatCompletions_BYOKVsEnvKey/cross-provider_pick_uses_env_key,_not_client_credential",
+      "where": "fixtures/proxy/scenarios.json#chat_cross_provider_env_key"
+    },
+    {
+      "go_test": "proxy.TestCustomHeaderForwarded/chat_surface",
+      "where": "fixtures/proxy/scenarios.json#chat_custom_header_forwarded"
+    },
+    {
+      "go_test": "proxy.TestCustomHeaderForwarded/messages_surface",
+      "where": "fixtures/proxy/scenarios.json#messages_custom_header_forwarded"
+    },
+    {
+      "go_test": "proxy.TestQueryStringForwarded/messages_surface",
+      "where": "fixtures/proxy/scenarios.json#messages_query_string_forwarded"
+    },
+    {
+      "go_test": "proxy.TestQueryStringForwarded/chat_surface",
+      "where": "fixtures/proxy/scenarios.json#chat_query_string_forwarded"
+    },
+    {
+      "go_test": "proxy.TestParseAlias/top-level_auto",
+      "where": "fixtures/proxy/unit.json#parse_alias-0"
+    },
+    {
+      "go_test": "proxy.TestParseAlias/top-level_quality",
+      "where": "fixtures/proxy/unit.json#parse_alias-1"
+    },
+    {
+      "go_test": "proxy.TestParseAlias/top-level_cost",
+      "where": "fixtures/proxy/unit.json#parse_alias-2"
+    },
+    {
+      "go_test": "proxy.TestParseAlias/pool_with_auto",
+      "where": "fixtures/proxy/unit.json#parse_alias-3"
+    },
+    {
+      "go_test": "proxy.TestParseAlias/pool_with_quality",
+      "where": "fixtures/proxy/unit.json#parse_alias-4"
+    },
+    {
+      "go_test": "proxy.TestParseAlias/pool_with_cost",
+      "where": "fixtures/proxy/unit.json#parse_alias-5"
+    },
+    {
+      "go_test": "proxy.TestParseAlias/concrete_model",
+      "where": "fixtures/proxy/unit.json#parse_alias-6"
+    },
+    {
+      "go_test": "proxy.TestParseAlias/concrete_anthropic_model",
+      "where": "fixtures/proxy/unit.json#parse_alias-7"
+    },
+    {
+      "go_test": "proxy.TestParseAlias/empty_string",
+      "where": "fixtures/proxy/unit.json#parse_alias-8"
+    },
+    {
+      "go_test": "proxy.TestParseAlias/bare_prefix",
+      "where": "fixtures/proxy/unit.json#parse_alias-9"
+    },
+    {
+      "go_test": "proxy.TestParseAlias/unknown_top-level_mode",
+      "where": "fixtures/proxy/unit.json#parse_alias-10"
+    },
+    {
+      "go_test": "proxy.TestParseAlias/unknown_pool_mode",
+      "where": "fixtures/proxy/unit.json#parse_alias-11"
+    },
+    {
+      "go_test": "proxy.TestParseAlias/empty_pool",
+      "where": "fixtures/proxy/unit.json#parse_alias-12"
+    },
+    {
+      "go_test": "proxy.TestParseAlias/empty_mode_after_colon",
+      "where": "fixtures/proxy/unit.json#parse_alias-13"
+    },
+    {
+      "go_test": "proxy.TestParseAlias/double_colon",
+      "where": "fixtures/proxy/unit.json#parse_alias-14"
+    },
+    {
+      "go_test": "proxy.TestExtractLastUserText/string_content,_last_user_message_wins",
+      "where": "fixtures/proxy/unit.json#extract_last_user_text-0"
+    },
+    {
+      "go_test": "proxy.TestExtractLastUserText/array_content,_concatenates_text_parts_only",
+      "where": "fixtures/proxy/unit.json#extract_last_user_text-1"
+    },
+    {
+      "go_test": "proxy.TestExtractLastUserText/no_user_message_at_all",
+      "where": "fixtures/proxy/unit.json#extract_last_user_text-2"
+    },
+    {
+      "go_test": "proxy.TestExtractLastUserText/no_messages_field",
+      "where": "fixtures/proxy/unit.json#extract_last_user_text-3"
+    },
+    {
+      "go_test": "proxy.TestExtractLastUserText/last_user_message_has_only_non-text_parts",
+      "where": "fixtures/proxy/unit.json#extract_last_user_text-4"
+    },
+    {
+      "go_test": "proxy.TestExtractLastUserText/last_user_message_content_is_empty_string",
+      "where": "fixtures/proxy/unit.json#extract_last_user_text-5"
+    },
+    {
+      "go_test": "proxy.TestExtractLastUserText/malformed_JSON",
+      "where": "fixtures/proxy/unit.json#extract_last_user_text-6"
+    },
+    {
+      "go_test": "proxy.TestEffortNormalization_LeavesEverythingElseAlone/messages:_effort_high_untouched",
+      "where": "fixtures/proxy/unit.json#rewrite_model-1"
+    },
+    {
+      "go_test": "proxy.TestEffortNormalization_LeavesEverythingElseAlone/messages:_absent_output_config_stays_absent",
+      "where": "fixtures/proxy/unit.json#rewrite_model-2"
+    },
+    {
+      "go_test": "proxy.TestEffortNormalization_LeavesEverythingElseAlone/chat:_reasoning_effort_medium_untouched",
+      "where": "fixtures/proxy/unit.json#rewrite_model-3"
+    },
+    {
+      "go_test": "proxy.TestEffortNormalization_LeavesEverythingElseAlone/chat:_absent_reasoning_effort_stays_absent",
+      "where": "fixtures/proxy/unit.json#rewrite_model-4"
+    }
+  ]
+}

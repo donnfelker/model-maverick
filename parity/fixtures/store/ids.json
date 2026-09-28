@@ -1,0 +1,43 @@
+{
+  "description": "internal/store/ids: ID minting. New(prefix) returns prefix + \"_\" + ULID (26 chars, Crockford base32, upper case). Cases are property checks; ULIDs are random so no literal output exists.",
+  "prefixes": {
+    "PrefixTenant": "ten",
+    "PrefixAPIKey": "key",
+    "PrefixModelColumn": "col",
+    "PrefixPool": "pool",
+    "PrefixTask": "task",
+    "PrefixRun": "run",
+    "PrefixRecommendation": "rec",
+    "PrefixOutcome": "out",
+    "PrefixCaptureWindow": "cw",
+    "PrefixDebugCapture": "cap",
+    "PrefixCaptureAccess": "cal",
+    "PrefixAlert": "alr",
+    "PrefixBatch": "bat"
+  },
+  "ulid_alphabet": "0123456789ABCDEFGHJKMNPQRSTVWXYZ",
+  "cases": [
+    {
+      "id": "format",
+      "go_test": "ids.TestNewFormat",
+      "input": {"prefix": "run"},
+      "expect": {
+        "regex": "^run_[0-9A-HJKMNP-TV-Z]{26}$",
+        "split_on_first_underscore": {"prefix": "run", "rest_length": 26},
+        "rest_is_uppercase": true
+      }
+    },
+    {
+      "id": "unique-concurrent",
+      "go_test": "ids.TestNewUnique",
+      "input": {"prefix": "bat", "threads": 8, "ids_per_thread": 200},
+      "expect": {"all_distinct": true, "total": 1600}
+    },
+    {
+      "id": "example-shape",
+      "go_test": "",
+      "note": "extra: literal shape example only (not a Go test). The first 10 chars encode the millisecond timestamp, so lexical order of IDs minted in one process is creation order.",
+      "example": "rec_01K6B3Z9Q8W4XJ5V7T2N0M1P3R"
+    }
+  ]
+}

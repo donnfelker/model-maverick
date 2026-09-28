@@ -1,0 +1,11 @@
+description: every required fact found through one of its accepted surface forms
+spec:
+  facts:
+    - { id: party_acme, any_of: ["Acme Corp", "Acme Corporation"], weight: 1 }
+    - { id: term_24mo, any_of: ["24 month", "two-year", "24-month"], weight: 1 }
+output: |-
+  The agreement is between Acme Corporation and Beta LLC and runs for a
+  24-month term.
+expect:
+  dimensions: { fact_coverage: 1.0 }
+  detail_contains: ['"id":"party_acme"', '"found":true']

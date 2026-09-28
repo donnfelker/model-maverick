@@ -1,0 +1,1960 @@
+{
+  "description": "Every distinct error envelope observed in the recorded black-box corpus (parity/blackbox/api-recorded.jsonl), de-duplicated after masking ULID ids. message_exact/body_exact carry the real ids of the example record. Use together with reference/engine-reference.md (Part 5) section 'Error catalog' which lists every template the code can produce, including ones no test exercises.",
+  "count": 122,
+  "envelopes": [
+    {
+      "status": 401,
+      "code": "unauthorized",
+      "message_exact": "missing or invalid API key",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"unauthorized\",\"message\":\"missing or invalid API key\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/debug/captures"
+      },
+      "example_test": "TestTenantCaptureReadEndpointsRequireAuth",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "unknown query parameter \"tenant_id\"",
+      "details_exact": {
+        "parameter": "tenant_id"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"unknown query parameter \\\"tenant_id\\\"\",\"details\":{\"parameter\":\"tenant_id\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/debug/captures?tenant_id=ten_01M3KQRAK3DD71KA0AJ0MYHZEM"
+      },
+      "example_test": "TestTenantListCapturesStrictlyScoped",
+      "example_seq": 8
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "cursor \"not a token\" must be an opaque pagination token",
+      "details_exact": {
+        "parameter": "cursor",
+        "value": "not a token"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"cursor \\\"not a token\\\" must be an opaque pagination token\",\"details\":{\"parameter\":\"cursor\",\"value\":\"not a token\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/debug/captures?cursor=not%20a%20token"
+      },
+      "example_test": "TestTenantListCapturesPagination",
+      "example_seq": 8
+    },
+    {
+      "status": 404,
+      "code": "not_found",
+      "message_exact": "resource not found",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"not_found\",\"message\":\"resource not found\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/debug/captures/cap_01M3KQRAMB5VNMB29S79X5SHHJ/prompt"
+      },
+      "example_test": "TestTenantReadCrossTenant404IndistinguishableAndLogged",
+      "example_seq": 3
+    },
+    {
+      "status": 410,
+      "code": "capture_expired",
+      "message_exact": "capture has expired and its ciphertext is deleted or pending deletion",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"capture_expired\",\"message\":\"capture has expired and its ciphertext is deleted or pending deletion\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/debug/captures/cap_01M3KQRAMQMAXA0TQJTT6VG9YM/prompt"
+      },
+      "example_test": "TestTenantReadExpiredButPresent410",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "duration_minutes is required",
+      "details_exact": {
+        "field": "duration_minutes"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"duration_minutes is required\",\"details\":{\"field\":\"duration_minutes\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/debug/capture-windows"
+      },
+      "example_test": "TestCaptureWindowCreateValidation422",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "duration_minutes must be between 1 and 1440 (capture.max_window_minutes, spec §9.8)",
+      "details_exact": {
+        "duration_minutes": 0,
+        "max_window_minutes": 1440
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"duration_minutes must be between 1 and 1440 (capture.max_window_minutes, spec §9.8)\",\"details\":{\"duration_minutes\":0,\"max_window_minutes\":1440}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/debug/capture-windows"
+      },
+      "example_test": "TestCaptureWindowCreateValidation422",
+      "example_seq": 2
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "duration_minutes must be between 1 and 1440 (capture.max_window_minutes, spec §9.8)",
+      "details_exact": {
+        "duration_minutes": -5,
+        "max_window_minutes": 1440
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"duration_minutes must be between 1 and 1440 (capture.max_window_minutes, spec §9.8)\",\"details\":{\"duration_minutes\":-5,\"max_window_minutes\":1440}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/debug/capture-windows"
+      },
+      "example_test": "TestCaptureWindowCreateValidation422",
+      "example_seq": 3
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "duration_minutes must be between 1 and 1440 (capture.max_window_minutes, spec §9.8)",
+      "details_exact": {
+        "duration_minutes": 1441,
+        "max_window_minutes": 1440
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"duration_minutes must be between 1 and 1440 (capture.max_window_minutes, spec §9.8)\",\"details\":{\"duration_minutes\":1441,\"max_window_minutes\":1440}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/debug/capture-windows"
+      },
+      "example_test": "TestCaptureWindowCreateValidation422",
+      "example_seq": 4
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "malformed request body: json: unknown field \"nope\"",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"malformed request body: json: unknown field \\\"nope\\\"\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/debug/capture-windows"
+      },
+      "example_test": "TestCaptureWindowCreateValidation422",
+      "example_seq": 5
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "confidence_below must be a number in (0, 1]",
+      "details_exact": {
+        "confidence_below": 0
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"confidence_below must be a number in (0, 1]\",\"details\":{\"confidence_below\":0}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/debug/capture-windows"
+      },
+      "example_test": "TestCaptureWindowCreateValidation422",
+      "example_seq": 6
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "confidence_below must be a number in (0, 1]",
+      "details_exact": {
+        "confidence_below": 1.5
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"confidence_below must be a number in (0, 1]\",\"details\":{\"confidence_below\":1.5}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/debug/capture-windows"
+      },
+      "example_test": "TestCaptureWindowCreateValidation422",
+      "example_seq": 7
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "api_key_id does not name one of your API keys",
+      "details_exact": {
+        "api_key_id": "key_01UNKNOWN"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"api_key_id does not name one of your API keys\",\"details\":{\"api_key_id\":\"key_01UNKNOWN\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/debug/capture-windows"
+      },
+      "example_test": "TestCaptureWindowCreateValidation422",
+      "example_seq": 8
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "api_key_id does not name one of your API keys",
+      "details_exact": {
+        "api_key_id": "key_01M3KQRANVJB794ZAF9FX3VR5E"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"api_key_id does not name one of your API keys\",\"details\":{\"api_key_id\":\"key_01M3KQRANVJB794ZAF9FX3VR5E\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/debug/capture-windows"
+      },
+      "example_test": "TestCaptureWindowCreateValidation422",
+      "example_seq": 9
+    },
+    {
+      "status": 409,
+      "code": "zero_retention_conflict",
+      "message_exact": "tenant is configured zero-retention; debug capture windows cannot be created (spec §9.8, G5)",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"zero_retention_conflict\",\"message\":\"tenant is configured zero-retention; debug capture windows cannot be created (spec §9.8, G5)\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/debug/capture-windows"
+      },
+      "example_test": "TestCaptureWindowCreateZeroRetention409",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "only the current classifier_version can be replayed in v1",
+      "details_exact": {
+        "classifier_version": "other-column/v0",
+        "current": "claude-haiku-4-5/direct/v2"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"only the current classifier_version can be replayed in v1\",\"details\":{\"classifier_version\":\"other-column/v0\",\"current\":\"claude-haiku-4-5/direct/v2\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/debug/replay/cap_01M3KQRASHAQ6VVSWHWJRDVKVY"
+      },
+      "example_test": "TestReplayClassifierVersion",
+      "example_seq": 4
+    },
+    {
+      "status": 422,
+      "code": "unknown_model",
+      "message_exact": "model_column_ids entry \"col_does_not_exist\" in pool \"default\" is not in the model catalog",
+      "details_exact": {
+        "entry": "col_does_not_exist",
+        "pool": "default"
+      },
+      "body_exact": "{\"error\":{\"code\":\"unknown_model\",\"message\":\"model_column_ids entry \\\"col_does_not_exist\\\" in pool \\\"default\\\" is not in the model catalog\",\"details\":{\"entry\":\"col_does_not_exist\",\"pool\":\"default\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/pools"
+      },
+      "example_test": "TestConfigPoolsUnknownModel",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "exactly one pool must be is_default: true (got 0)",
+      "details_exact": {
+        "default_count": 0
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"exactly one pool must be is_default: true (got 0)\",\"details\":{\"default_count\":0}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/pools"
+      },
+      "example_test": "TestConfigPoolsDefaultRule",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "exactly one pool must be is_default: true (got 2)",
+      "details_exact": {
+        "default_count": 2
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"exactly one pool must be is_default: true (got 2)\",\"details\":{\"default_count\":2}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/pools"
+      },
+      "example_test": "TestConfigPoolsDefaultRule",
+      "example_seq": 3
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "pool name \"same\" appears more than once",
+      "details_exact": {
+        "pool": "same"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"pool name \\\"same\\\" appears more than once\",\"details\":{\"pool\":\"same\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/pools"
+      },
+      "example_test": "TestConfigPoolsDuplicateName",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "pool_would_be_empty",
+      "message_exact": "pool \"graveyard\" would have no usable columns: every column is retired",
+      "details_exact": {
+        "constraint": "status_retired",
+        "pool": "graveyard"
+      },
+      "body_exact": "{\"error\":{\"code\":\"pool_would_be_empty\",\"message\":\"pool \\\"graveyard\\\" would have no usable columns: every column is retired\",\"details\":{\"constraint\":\"status_retired\",\"pool\":\"graveyard\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/pools"
+      },
+      "example_test": "TestConfigPoolsAllRetired",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "pool_would_be_empty",
+      "message_exact": "constraint \"max_cost_per_run\" would leave pool \"pricey-only\" with zero candidates for structured_extraction tier 3",
+      "details_exact": {
+        "capability": "structured_extraction",
+        "constraint": "max_cost_per_run",
+        "difficulty_tier": 3,
+        "pool": "pricey-only"
+      },
+      "body_exact": "{\"error\":{\"code\":\"pool_would_be_empty\",\"message\":\"constraint \\\"max_cost_per_run\\\" would leave pool \\\"pricey-only\\\" with zero candidates for structured_extraction tier 3\",\"details\":{\"capability\":\"structured_extraction\",\"constraint\":\"max_cost_per_run\",\"difficulty_tier\":3,\"pool\":\"pricey-only\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/pools"
+      },
+      "example_test": "TestConfigPoolsRejectedByStoredConstraint",
+      "example_seq": 3
+    },
+    {
+      "status": 422,
+      "code": "pool_would_be_empty",
+      "message_exact": "constraint \"max_cost_per_run\" would leave pool \"default\" with zero candidates for code_generation tier 4",
+      "details_exact": {
+        "capability": "code_generation",
+        "constraint": "max_cost_per_run",
+        "difficulty_tier": 4,
+        "pool": "default"
+      },
+      "body_exact": "{\"error\":{\"code\":\"pool_would_be_empty\",\"message\":\"constraint \\\"max_cost_per_run\\\" would leave pool \\\"default\\\" with zero candidates for code_generation tier 4\",\"details\":{\"capability\":\"code_generation\",\"constraint\":\"max_cost_per_run\",\"difficulty_tier\":4,\"pool\":\"default\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/constraints"
+      },
+      "example_test": "TestConfigConstraintsWouldEmptyPool",
+      "example_seq": 2
+    },
+    {
+      "status": 422,
+      "code": "pool_would_be_empty",
+      "message_exact": "constraint \"max_latency_ms\" would leave pool \"default\" with zero candidates for long_context_qa tier 5",
+      "details_exact": {
+        "capability": "long_context_qa",
+        "constraint": "max_latency_ms",
+        "difficulty_tier": 5,
+        "pool": "default"
+      },
+      "body_exact": "{\"error\":{\"code\":\"pool_would_be_empty\",\"message\":\"constraint \\\"max_latency_ms\\\" would leave pool \\\"default\\\" with zero candidates for long_context_qa tier 5\",\"details\":{\"capability\":\"long_context_qa\",\"constraint\":\"max_latency_ms\",\"difficulty_tier\":5,\"pool\":\"default\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/constraints"
+      },
+      "example_test": "TestConfigConstraintsLatencyWouldEmptyPool",
+      "example_seq": 2
+    },
+    {
+      "status": 422,
+      "code": "pool_would_be_empty",
+      "message_exact": "constraint \"max_cost_per_run\" would leave pool \"expensive\" with zero candidates for code_generation tier 3",
+      "details_exact": {
+        "capability": "code_generation",
+        "constraint": "max_cost_per_run",
+        "difficulty_tier": 3,
+        "pool": "expensive"
+      },
+      "body_exact": "{\"error\":{\"code\":\"pool_would_be_empty\",\"message\":\"constraint \\\"max_cost_per_run\\\" would leave pool \\\"expensive\\\" with zero candidates for code_generation tier 3\",\"details\":{\"capability\":\"code_generation\",\"constraint\":\"max_cost_per_run\",\"difficulty_tier\":3,\"pool\":\"expensive\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/constraints"
+      },
+      "example_test": "TestConfigConstraintsNameTheEmptiedPool",
+      "example_seq": 2
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "weights for \"code_generation\" must sum to 1 (got 0.9000)",
+      "details_exact": {
+        "capability": "code_generation",
+        "sum": 0.9000000134110451
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"weights for \\\"code_generation\\\" must sum to 1 (got 0.9000)\",\"details\":{\"capability\":\"code_generation\",\"sum\":0.9000000134110451}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/weights"
+      },
+      "example_test": "TestConfigWeightsValidation",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "quality_bar for \"code_generation\" must be greater than 0 and at most 1",
+      "details_exact": {
+        "capability": "code_generation",
+        "field": "quality_bar"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"quality_bar for \\\"code_generation\\\" must be greater than 0 and at most 1\",\"details\":{\"capability\":\"code_generation\",\"field\":\"quality_bar\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/weights"
+      },
+      "example_test": "TestConfigWeightsValidation",
+      "example_seq": 2
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "weights[0].w_latency is required",
+      "details_exact": {
+        "field": "weights[0].w_latency"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"weights[0].w_latency is required\",\"details\":{\"field\":\"weights[0].w_latency\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/weights"
+      },
+      "example_test": "TestConfigWeightsValidation",
+      "example_seq": 3
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "weights for \"code_generation\" must sum to 1 (got 1.2000)",
+      "details_exact": {
+        "capability": "code_generation",
+        "sum": 1.200000025331974
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"weights for \\\"code_generation\\\" must sum to 1 (got 1.2000)\",\"details\":{\"capability\":\"code_generation\",\"sum\":1.200000025331974}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/weights"
+      },
+      "example_test": "TestConfigWeightsValidation",
+      "example_seq": 4
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "w_quality for \"code_generation\" must be between 0 and 1",
+      "details_exact": {
+        "capability": "code_generation",
+        "field": "w_quality"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"w_quality for \\\"code_generation\\\" must be between 0 and 1\",\"details\":{\"capability\":\"code_generation\",\"field\":\"w_quality\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/weights"
+      },
+      "example_test": "TestConfigWeightsValidation",
+      "example_seq": 5
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "capability \"telepathy\" is not a v1 capability",
+      "details_exact": {
+        "capability": "telepathy"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"capability \\\"telepathy\\\" is not a v1 capability\",\"details\":{\"capability\":\"telepathy\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/weights"
+      },
+      "example_test": "TestConfigWeightsValidation",
+      "example_seq": 8
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "capability \"code_generation\" appears more than once",
+      "details_exact": {
+        "capability": "code_generation"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"capability \\\"code_generation\\\" appears more than once\",\"details\":{\"capability\":\"code_generation\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/weights"
+      },
+      "example_test": "TestConfigWeightsValidation",
+      "example_seq": 9
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "weights for \"code_generation\" must sum to 1 (got 0.9800)",
+      "details_exact": {
+        "capability": "code_generation",
+        "sum": 0.9800000190734863
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"weights for \\\"code_generation\\\" must sum to 1 (got 0.9800)\",\"details\":{\"capability\":\"code_generation\",\"sum\":0.9800000190734863}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/weights"
+      },
+      "example_test": "TestConfigWeightsSumTolerance",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "malformed request body: unexpected EOF",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"malformed request body: unexpected EOF\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/pools"
+      },
+      "example_test": "TestConfigStrictDecoding",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "request body has trailing content",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"request body has trailing content\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/pools"
+      },
+      "example_test": "TestConfigStrictDecoding",
+      "example_seq": 2
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "pools is required",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"pools is required\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/pools"
+      },
+      "example_test": "TestConfigStrictDecoding",
+      "example_seq": 3
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "constraints is required",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"constraints is required\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/constraints"
+      },
+      "example_test": "TestConfigStrictDecoding",
+      "example_seq": 4
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "max_cost_per_run must be greater than 0",
+      "details_exact": {
+        "field": "max_cost_per_run"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"max_cost_per_run must be greater than 0\",\"details\":{\"field\":\"max_cost_per_run\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/constraints"
+      },
+      "example_test": "TestConfigStrictDecoding",
+      "example_seq": 5
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "pools[0].name is required",
+      "details_exact": {
+        "field": "pools[0].name"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"pools[0].name is required\",\"details\":{\"field\":\"pools[0].name\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/pools"
+      },
+      "example_test": "TestConfigStrictDecoding",
+      "example_seq": 6
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "request body is required",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"request body is required\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/pools"
+      },
+      "example_test": "TestConfigStrictDecoding",
+      "example_seq": 7
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "pools[0].model_column_ids is required",
+      "details_exact": {
+        "field": "pools[0].model_column_ids"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"pools[0].model_column_ids is required\",\"details\":{\"field\":\"pools[0].model_column_ids\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/pools"
+      },
+      "example_test": "TestConfigStrictDecoding",
+      "example_seq": 8
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "weights is required",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"weights is required\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/weights"
+      },
+      "example_test": "TestConfigStrictDecoding",
+      "example_seq": 9
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "max_latency_ms must be greater than 0",
+      "details_exact": {
+        "field": "max_latency_ms"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"max_latency_ms must be greater than 0\",\"details\":{\"field\":\"max_latency_ms\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/constraints"
+      },
+      "example_test": "TestConfigStrictDecoding",
+      "example_seq": 10
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "malformed request body: json: unknown field \"color\"",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"malformed request body: json: unknown field \\\"color\\\"\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/pools"
+      },
+      "example_test": "TestConfigStrictDecoding",
+      "example_seq": 11
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "malformed request body: json: unknown field \"surprise\"",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"malformed request body: json: unknown field \\\"surprise\\\"\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/pools"
+      },
+      "example_test": "TestConfigStrictDecoding",
+      "example_seq": 12
+    },
+    {
+      "status": 413,
+      "code": "payload_too_large",
+      "message_exact": "request body exceeds the limit",
+      "details_exact": {
+        "limit_bytes": 2097152
+      },
+      "body_exact": "{\"error\":{\"code\":\"payload_too_large\",\"message\":\"request body exceeds the limit\",\"details\":{\"limit_bytes\":2097152}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/pools"
+      },
+      "example_test": "TestConfigOversizeBodyDeclaredLength413",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "capability \"nope\" is not a v1 capability",
+      "details_exact": {
+        "capability": "nope"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"capability \\\"nope\\\" is not a v1 capability\",\"details\":{\"capability\":\"nope\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/history/recommendations?capability=nope"
+      },
+      "example_test": "TestHistoryRecommendationsFilters",
+      "example_seq": 4
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "cursor is not a valid pagination token",
+      "details_exact": {
+        "parameter": "cursor"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"cursor is not a valid pagination token\",\"details\":{\"parameter\":\"cursor\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/history/recommendations?cursor=%21%21garbage"
+      },
+      "example_test": "TestHistoryInvalidCursor422",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "limit \"0\" must be an integer between 1 and 200",
+      "details_exact": {
+        "parameter": "limit",
+        "value": "0"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"limit \\\"0\\\" must be an integer between 1 and 200\",\"details\":{\"parameter\":\"limit\",\"value\":\"0\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/history/recommendations?limit=0"
+      },
+      "example_test": "TestHistoryInvalidLimit422",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "limit \"-1\" must be an integer between 1 and 200",
+      "details_exact": {
+        "parameter": "limit",
+        "value": "-1"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"limit \\\"-1\\\" must be an integer between 1 and 200\",\"details\":{\"parameter\":\"limit\",\"value\":\"-1\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/history/recommendations?limit=-1"
+      },
+      "example_test": "TestHistoryInvalidLimit422",
+      "example_seq": 2
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "limit \"201\" must be an integer between 1 and 200",
+      "details_exact": {
+        "parameter": "limit",
+        "value": "201"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"limit \\\"201\\\" must be an integer between 1 and 200\",\"details\":{\"parameter\":\"limit\",\"value\":\"201\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/history/recommendations?limit=201"
+      },
+      "example_test": "TestHistoryInvalidLimit422",
+      "example_seq": 3
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "limit \"abc\" must be an integer between 1 and 200",
+      "details_exact": {
+        "parameter": "limit",
+        "value": "abc"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"limit \\\"abc\\\" must be an integer between 1 and 200\",\"details\":{\"parameter\":\"limit\",\"value\":\"abc\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/history/recommendations?limit=abc"
+      },
+      "example_test": "TestHistoryInvalidLimit422",
+      "example_seq": 4
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "limit \"2.5\" must be an integer between 1 and 200",
+      "details_exact": {
+        "parameter": "limit",
+        "value": "2.5"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"limit \\\"2.5\\\" must be an integer between 1 and 200\",\"details\":{\"parameter\":\"limit\",\"value\":\"2.5\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/history/recommendations?limit=2.5"
+      },
+      "example_test": "TestHistoryInvalidLimit422",
+      "example_seq": 5
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "unknown query parameter \"offset\"",
+      "details_exact": {
+        "parameter": "offset"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"unknown query parameter \\\"offset\\\"\",\"details\":{\"parameter\":\"offset\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/history/recommendations?offset=10"
+      },
+      "example_test": "TestHistoryUnknownParam422",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "since \"yesterday\" must be an RFC 3339 timestamp or YYYY-MM-DD date",
+      "details_exact": {
+        "parameter": "since",
+        "value": "yesterday"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"since \\\"yesterday\\\" must be an RFC 3339 timestamp or YYYY-MM-DD date\",\"details\":{\"parameter\":\"since\",\"value\":\"yesterday\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/history/recommendations?since=yesterday"
+      },
+      "example_test": "TestHistoryInvalidSince422",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "outcome \"shrug\" is not one of [success parse_failure quality_insufficient latency_exceeded provider_error other]",
+      "details_exact": {
+        "field": "outcome",
+        "value": "shrug"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"outcome \\\"shrug\\\" is not one of [success parse_failure quality_insufficient latency_exceeded provider_error other]\",\"details\":{\"field\":\"outcome\",\"value\":\"shrug\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/history/outcomes?outcome=shrug"
+      },
+      "example_test": "TestHistoryOutcomesListAndFilters",
+      "example_seq": 8
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "unknown query parameter \"tier\"",
+      "details_exact": {
+        "parameter": "tier"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"unknown query parameter \\\"tier\\\"\",\"details\":{\"parameter\":\"tier\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/history/models/col_01M3KQRCDJKH27V40GHDGVQY0G?tier=3"
+      },
+      "example_test": "TestHistoryModelSeriesFilters",
+      "example_seq": 6
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "dimension \"vibes\" is not one of [quality pass_rate ambiguity latency_p50_ms latency_p95_ms cost_per_run_usd]",
+      "details_exact": {
+        "field": "dimension",
+        "value": "vibes"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"dimension \\\"vibes\\\" is not one of [quality pass_rate ambiguity latency_p50_ms latency_p95_ms cost_per_run_usd]\",\"details\":{\"field\":\"dimension\",\"value\":\"vibes\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/history/models/col_01M3KQRCDJKH27V40GHDGVQY0G?dimension=vibes"
+      },
+      "example_test": "TestHistoryModelSeriesFilters",
+      "example_seq": 7
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "difficulty 6 is out of range 1-5",
+      "details_exact": {
+        "difficulty": 6
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"difficulty 6 is out of range 1-5\",\"details\":{\"difficulty\":6}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/history/models/col_01M3KQRCDJKH27V40GHDGVQY0G?difficulty=6"
+      },
+      "example_test": "TestHistoryModelSeriesFilters",
+      "example_seq": 8
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "difficulty \"three\" must be an integer difficulty tier",
+      "details_exact": {
+        "parameter": "difficulty",
+        "value": "three"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"difficulty \\\"three\\\" must be an integer difficulty tier\",\"details\":{\"parameter\":\"difficulty\",\"value\":\"three\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/history/models/col_01M3KQRCDJKH27V40GHDGVQY0G?difficulty=three"
+      },
+      "example_test": "TestHistoryModelSeriesFilters",
+      "example_seq": 9
+    },
+    {
+      "status": 401,
+      "code": "unauthorized",
+      "message_exact": "missing or invalid internal token",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"unauthorized\",\"message\":\"missing or invalid internal token\",\"details\":{}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "GET",
+        "path": "/internal/v1/captures"
+      },
+      "example_test": "TestOperatorCaptureEndpointsRequireAuth",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "unknown query parameter \"bogus\"",
+      "details_exact": {
+        "parameter": "bogus"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"unknown query parameter \\\"bogus\\\"\",\"details\":{\"parameter\":\"bogus\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "GET",
+        "path": "/internal/v1/captures?bogus=1"
+      },
+      "example_test": "TestOperatorListCapturesFilters",
+      "example_seq": 8
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "cursor \"not-valid-base64  \" must be an opaque pagination token",
+      "details_exact": {
+        "parameter": "cursor",
+        "value": "not-valid-base64  "
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"cursor \\\"not-valid-base64  \\\" must be an opaque pagination token\",\"details\":{\"parameter\":\"cursor\",\"value\":\"not-valid-base64  \"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "GET",
+        "path": "/internal/v1/captures?cursor=not-valid-base64%20%20"
+      },
+      "example_test": "TestOperatorListCapturesPagination",
+      "example_seq": 8
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "name is required",
+      "details_exact": {
+        "field": "name"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"name is required\",\"details\":{\"field\":\"name\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "POST",
+        "path": "/internal/v1/tenants"
+      },
+      "example_test": "TestInternalTenantCreateValidation",
+      "example_seq": 2
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "malformed request body: json: unknown field \"plan\"",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"malformed request body: json: unknown field \\\"plan\\\"\",\"details\":{}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "POST",
+        "path": "/internal/v1/tenants"
+      },
+      "example_test": "TestInternalTenantCreateValidation",
+      "example_seq": 4
+    },
+    {
+      "status": 404,
+      "code": "not_found",
+      "message_exact": "tenant ten_00000000000000000000000000 does not exist",
+      "details_exact": {
+        "tenant_id": "ten_00000000000000000000000000"
+      },
+      "body_exact": "{\"error\":{\"code\":\"not_found\",\"message\":\"tenant ten_00000000000000000000000000 does not exist\",\"details\":{\"tenant_id\":\"ten_00000000000000000000000000\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "GET",
+        "path": "/internal/v1/tenants/ten_00000000000000000000000000"
+      },
+      "example_test": "TestInternalTenantGetSummary",
+      "example_seq": 3
+    },
+    {
+      "status": 403,
+      "code": "tenant_suspended",
+      "message_exact": "tenant is suspended",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"tenant_suspended\",\"message\":\"tenant is suspended\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/models"
+      },
+      "example_test": "TestInternalTenantSuspendActivateToggleReachesPublicListener",
+      "example_seq": 5
+    },
+    {
+      "status": 404,
+      "code": "not_found",
+      "message_exact": "tenant ten_missing does not exist",
+      "details_exact": {
+        "tenant_id": "ten_missing"
+      },
+      "body_exact": "{\"error\":{\"code\":\"not_found\",\"message\":\"tenant ten_missing does not exist\",\"details\":{\"tenant_id\":\"ten_missing\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "POST",
+        "path": "/internal/v1/tenants/ten_missing/suspend"
+      },
+      "example_test": "TestInternalTenantSuspendActivateToggleReachesPublicListener",
+      "example_seq": 8
+    },
+    {
+      "status": 404,
+      "code": "not_found",
+      "message_exact": "api key key_missing does not exist",
+      "details_exact": {
+        "api_key_id": "key_missing"
+      },
+      "body_exact": "{\"error\":{\"code\":\"not_found\",\"message\":\"api key key_missing does not exist\",\"details\":{\"api_key_id\":\"key_missing\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "DELETE",
+        "path": "/internal/v1/api-keys/key_missing"
+      },
+      "example_test": "TestInternalAPIKeyRawReturnedExactlyOnce",
+      "example_seq": 8
+    },
+    {
+      "status": 422,
+      "code": "unknown_model",
+      "message_exact": "model_column_ids entry \"col_missing\" in pool \"default\" is not in the model catalog",
+      "details_exact": {
+        "entry": "col_missing",
+        "pool": "default"
+      },
+      "body_exact": "{\"error\":{\"code\":\"unknown_model\",\"message\":\"model_column_ids entry \\\"col_missing\\\" in pool \\\"default\\\" is not in the model catalog\",\"details\":{\"entry\":\"col_missing\",\"pool\":\"default\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/pools"
+      },
+      "example_test": "TestInternalConfigG4ParityByteExact",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "weights for \"factual_qa\" must sum to 1 (got 1.5000)",
+      "details_exact": {
+        "capability": "factual_qa",
+        "sum": 1.5
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"weights for \\\"factual_qa\\\" must sum to 1 (got 1.5000)\",\"details\":{\"capability\":\"factual_qa\",\"sum\":1.5}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/weights"
+      },
+      "example_test": "TestInternalConfigG4ParityByteExact",
+      "example_seq": 5
+    },
+    {
+      "status": 422,
+      "code": "pool_would_be_empty",
+      "message_exact": "constraint \"max_cost_per_run\" would leave pool \"default\" with zero candidates for factual_qa tier 3",
+      "details_exact": {
+        "capability": "factual_qa",
+        "constraint": "max_cost_per_run",
+        "difficulty_tier": 3,
+        "pool": "default"
+      },
+      "body_exact": "{\"error\":{\"code\":\"pool_would_be_empty\",\"message\":\"constraint \\\"max_cost_per_run\\\" would leave pool \\\"default\\\" with zero candidates for factual_qa tier 3\",\"details\":{\"capability\":\"factual_qa\",\"constraint\":\"max_cost_per_run\",\"difficulty_tier\":3,\"pool\":\"default\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "PUT",
+        "path": "/v1/config/constraints"
+      },
+      "example_test": "TestInternalConfigG4ParityByteExact",
+      "example_seq": 7
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "a column for anthropic/claude-int-create/direct with identical settings already exists",
+      "details_exact": {
+        "endpoint": "direct",
+        "model_id": "claude-int-create",
+        "provider": "anthropic"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"a column for anthropic/claude-int-create/direct with identical settings already exists\",\"details\":{\"endpoint\":\"direct\",\"model_id\":\"claude-int-create\",\"provider\":\"anthropic\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "POST",
+        "path": "/internal/v1/columns"
+      },
+      "example_test": "TestInternalColumnCreateEntersColdStart",
+      "example_seq": 2
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "provider is required",
+      "details_exact": {
+        "field": "provider"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"provider is required\",\"details\":{\"field\":\"provider\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "POST",
+        "path": "/internal/v1/columns"
+      },
+      "example_test": "TestInternalColumnCreateEntersColdStart",
+      "example_seq": 3
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "provider \"aliyun\" must be one of [anthropic openai google xai]",
+      "details_exact": {
+        "field": "provider",
+        "value": "aliyun"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"provider \\\"aliyun\\\" must be one of [anthropic openai google xai]\",\"details\":{\"field\":\"provider\",\"value\":\"aliyun\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "POST",
+        "path": "/internal/v1/columns"
+      },
+      "example_test": "TestInternalColumnCreateEntersColdStart",
+      "example_seq": 4
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "endpoint \"tunnel\" must be one of [direct vertex bedrock azure openrouter]",
+      "details_exact": {
+        "field": "endpoint",
+        "value": "tunnel"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"endpoint \\\"tunnel\\\" must be one of [direct vertex bedrock azure openrouter]\",\"details\":{\"field\":\"endpoint\",\"value\":\"tunnel\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "POST",
+        "path": "/internal/v1/columns"
+      },
+      "example_test": "TestInternalColumnCreateEntersColdStart",
+      "example_seq": 5
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "settings must be a JSON object",
+      "details_exact": {
+        "field": "settings"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"settings must be a JSON object\",\"details\":{\"field\":\"settings\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "POST",
+        "path": "/internal/v1/columns"
+      },
+      "example_test": "TestInternalColumnCreateEntersColdStart",
+      "example_seq": 6
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "quality_source_column_id \"col_missing\" is not in the model catalog",
+      "details_exact": {
+        "field": "quality_source_column_id",
+        "value": "col_missing"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"quality_source_column_id \\\"col_missing\\\" is not in the model catalog\",\"details\":{\"field\":\"quality_source_column_id\",\"value\":\"col_missing\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "POST",
+        "path": "/internal/v1/columns"
+      },
+      "example_test": "TestInternalColumnCreateEntersColdStart",
+      "example_seq": 7
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "malformed request body: json: unknown field \"status\"",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"malformed request body: json: unknown field \\\"status\\\"\",\"details\":{}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "POST",
+        "path": "/internal/v1/columns"
+      },
+      "example_test": "TestInternalColumnCreateEntersColdStart",
+      "example_seq": 8
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "execution_aliases has 11 keys, want at most 10",
+      "details_exact": {
+        "field": "execution_aliases"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"execution_aliases has 11 keys, want at most 10\",\"details\":{\"field\":\"execution_aliases\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "POST",
+        "path": "/internal/v1/columns"
+      },
+      "example_test": "TestInternalColumnCreateEntersColdStart",
+      "example_seq": 9
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "execution_aliases[\"openrouter\"] must be non-empty and at most 200 characters",
+      "details_exact": {
+        "field": "execution_aliases",
+        "key": "openrouter"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"execution_aliases[\\\"openrouter\\\"] must be non-empty and at most 200 characters\",\"details\":{\"field\":\"execution_aliases\",\"key\":\"openrouter\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "POST",
+        "path": "/internal/v1/columns"
+      },
+      "example_test": "TestInternalColumnCreateEntersColdStart",
+      "example_seq": 10
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "pricing is not a valid snapshot: pricing snapshot has a negative price",
+      "details_exact": {
+        "field": "pricing"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"pricing is not a valid snapshot: pricing snapshot has a negative price\",\"details\":{\"field\":\"pricing\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "POST",
+        "path": "/internal/v1/columns"
+      },
+      "example_test": "TestInternalColumnCreateEntersColdStart",
+      "example_seq": 11
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "execution_aliases must be an object with string values",
+      "details_exact": {
+        "field": "execution_aliases"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"execution_aliases must be an object with string values\",\"details\":{\"field\":\"execution_aliases\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "POST",
+        "path": "/internal/v1/columns"
+      },
+      "example_test": "TestInternalColumnCreateEntersColdStart",
+      "example_seq": 12
+    },
+    {
+      "status": 404,
+      "code": "not_found",
+      "message_exact": "model column col_missing does not exist",
+      "details_exact": {
+        "column_id": "col_missing"
+      },
+      "body_exact": "{\"error\":{\"code\":\"not_found\",\"message\":\"model column col_missing does not exist\",\"details\":{\"column_id\":\"col_missing\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "PUT",
+        "path": "/internal/v1/columns/col_missing"
+      },
+      "example_test": "TestInternalColumnUpdateStatusPricingDeprecation",
+      "example_seq": 3
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "status \"sunset\" must be one of [cold_start active deprecated retired]",
+      "details_exact": {
+        "field": "status",
+        "value": "sunset"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"status \\\"sunset\\\" must be one of [cold_start active deprecated retired]\",\"details\":{\"field\":\"status\",\"value\":\"sunset\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "PUT",
+        "path": "/internal/v1/columns/col_01M3KQRCK5PR806BZ88XTZT7XY"
+      },
+      "example_test": "TestInternalColumnUpdateStatusPricingDeprecation",
+      "example_seq": 4
+    },
+    {
+      "status": 422,
+      "code": "pool_would_be_empty",
+      "message_exact": "retiring column col_01M3KQRCKDKH0R403JGAVA1QJ6 would leave pool(s) \"solo\" of tenant ten_01M3KQRCKBV3QYPB5Q733GC4P6 with zero usable columns; amend the pools first (spec 4.1)",
+      "details_exact": {
+        "column_id": "col_01M3KQRCKDKH0R403JGAVA1QJ6",
+        "pools": [
+          {
+            "tenant_id": "ten_01M3KQRCKBV3QYPB5Q733GC4P6",
+            "pool": "solo",
+            "constraint": "status_retired"
+          }
+        ]
+      },
+      "body_exact": "{\"error\":{\"code\":\"pool_would_be_empty\",\"message\":\"retiring column col_01M3KQRCKDKH0R403JGAVA1QJ6 would leave pool(s) \\\"solo\\\" of tenant ten_01M3KQRCKBV3QYPB5Q733GC4P6 with zero usable columns; amend the pools first (spec 4.1)\",\"details\":{\"column_id\":\"col_01M3KQRCKDKH0R403JGAVA1QJ6\",\"pools\":[{\"tenant_id\":\"ten_01M3KQRCKBV3QYPB5Q733GC4P6\",\"pool\":\"solo\",\"constraint\":\"status_retired\"}]}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "PUT",
+        "path": "/internal/v1/columns/col_01M3KQRCKDKH0R403JGAVA1QJ6"
+      },
+      "example_test": "TestInternalColumnRetireGuardBlocksThenAllowsAfterAmend",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "since \"notatime\" must be an RFC 3339 timestamp or YYYY-MM-DD date",
+      "details_exact": {
+        "parameter": "since",
+        "value": "notatime"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"since \\\"notatime\\\" must be an RFC 3339 timestamp or YYYY-MM-DD date\",\"details\":{\"parameter\":\"since\",\"value\":\"notatime\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "GET",
+        "path": "/internal/v1/alerts?since=notatime"
+      },
+      "example_test": "TestInternalAlertsFeedFilters",
+      "example_seq": 4
+    },
+    {
+      "status": 404,
+      "code": "not_found",
+      "message_exact": "corpus version never-loaded does not exist; load it first (maverick corpus load)",
+      "details_exact": {
+        "version": "never-loaded"
+      },
+      "body_exact": "{\"error\":{\"code\":\"not_found\",\"message\":\"corpus version never-loaded does not exist; load it first (maverick corpus load)\",\"details\":{\"version\":\"never-loaded\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "POST",
+        "path": "/internal/v1/corpus/activate"
+      },
+      "example_test": "TestInternalCorpusActivateFlipsActiveVersion",
+      "example_seq": 2
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "version is required",
+      "details_exact": {
+        "field": "version"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"version is required\",\"details\":{\"field\":\"version\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "POST",
+        "path": "/internal/v1/corpus/activate"
+      },
+      "example_test": "TestInternalCorpusActivateFlipsActiveVersion",
+      "example_seq": 3
+    },
+    {
+      "status": 429,
+      "code": "rate_limited",
+      "message_exact": "rate limit exceeded",
+      "details_exact": {
+        "limit": 2
+      },
+      "body_exact": "{\"error\":{\"code\":\"rate_limited\",\"message\":\"rate limit exceeded\",\"details\":{\"limit\":2}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/mcp"
+      },
+      "example_test": "TestMCPRateLimitAppliesToMCPRequests",
+      "example_seq": 3
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "capability \"poetry\" is not a v1 capability",
+      "details_exact": {
+        "capability": "poetry"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"capability \\\"poetry\\\" is not a v1 capability\",\"details\":{\"capability\":\"poetry\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/policies?capability=poetry"
+      },
+      "example_test": "TestPoliciesUnknownCapability",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "unknown query parameter \"mode\"",
+      "details_exact": {
+        "parameter": "mode"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"unknown query parameter \\\"mode\\\"\",\"details\":{\"parameter\":\"mode\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/policies?mode=cost"
+      },
+      "example_test": "TestPoliciesUnknownQueryParameter",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "unknown_pool",
+      "message_exact": "pool \"nope\" is not configured for this tenant",
+      "details_exact": {
+        "pool": "nope"
+      },
+      "body_exact": "{\"error\":{\"code\":\"unknown_pool\",\"message\":\"pool \\\"nope\\\" is not configured for this tenant\",\"details\":{\"pool\":\"nope\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/policies?pool=nope"
+      },
+      "example_test": "TestPoliciesUnknownPool",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "unknown_pool",
+      "message_exact": "tenant has no default pool",
+      "details_exact": {
+        "pool": ""
+      },
+      "body_exact": "{\"error\":{\"code\":\"unknown_pool\",\"message\":\"tenant has no default pool\",\"details\":{\"pool\":\"\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/policies"
+      },
+      "example_test": "TestPoliciesNoDefaultPool",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "unknown_pool",
+      "message_exact": "pool \"team-a\" is not configured for this tenant",
+      "details_exact": {
+        "pool": "team-a"
+      },
+      "body_exact": "{\"error\":{\"code\":\"unknown_pool\",\"message\":\"pool \\\"team-a\\\" is not configured for this tenant\",\"details\":{\"pool\":\"team-a\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/policies?pool=team-a"
+      },
+      "example_test": "TestPoliciesCrossTenantIsolation",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "workload.prompt exceeds 500000 characters (spec §8.1)",
+      "details_exact": {
+        "field": "workload.prompt"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"workload.prompt exceeds 500000 characters (spec §8.1)\",\"details\":{\"field\":\"workload.prompt\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/recommend"
+      },
+      "example_test": "TestRecommendPromptOverCharLimit422",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "prompt-form workloads take no difficulty or domain_tags; classification supplies them (spec §8.1)",
+      "details_exact": {
+        "field": "workload.prompt"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"prompt-form workloads take no difficulty or domain_tags; classification supplies them (spec §8.1)\",\"details\":{\"field\":\"workload.prompt\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/recommend"
+      },
+      "example_test": "TestRecommendPromptRejectsDeclaredFields",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "malformed request body: json: unknown field \"model\"",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"malformed request body: json: unknown field \\\"model\\\"\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/recommend"
+      },
+      "example_test": "TestRecommendRequestErrors",
+      "example_seq": 4
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "malformed request body: json: unknown field \"tier\"",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"malformed request body: json: unknown field \\\"tier\\\"\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/recommend"
+      },
+      "example_test": "TestRecommendRequestErrors",
+      "example_seq": 5
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "malformed request body: json: unknown field \"max_tokens\"",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"malformed request body: json: unknown field \\\"max_tokens\\\"\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/recommend"
+      },
+      "example_test": "TestRecommendRequestErrors",
+      "example_seq": 6
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "workload is required",
+      "details_exact": {
+        "field": "workload"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"workload is required\",\"details\":{\"field\":\"workload\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/recommend"
+      },
+      "example_test": "TestRecommendRequestErrors",
+      "example_seq": 7
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "workload must carry exactly one of capability or prompt (spec §8.1)",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"workload must carry exactly one of capability or prompt (spec §8.1)\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/recommend"
+      },
+      "example_test": "TestRecommendRequestErrors",
+      "example_seq": 8
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "workload.prompt must not be empty",
+      "details_exact": {
+        "field": "workload.prompt"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"workload.prompt must not be empty\",\"details\":{\"field\":\"workload.prompt\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/recommend"
+      },
+      "example_test": "TestRecommendRequestErrors",
+      "example_seq": 10
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "workload.capability \"poetry\" is not a v1 capability",
+      "details_exact": {
+        "capability": "poetry"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"workload.capability \\\"poetry\\\" is not a v1 capability\",\"details\":{\"capability\":\"poetry\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/recommend"
+      },
+      "example_test": "TestRecommendRequestErrors",
+      "example_seq": 11
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "workload.difficulty 0 is out of range 1-5",
+      "details_exact": {
+        "difficulty": 0
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"workload.difficulty 0 is out of range 1-5\",\"details\":{\"difficulty\":0}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/recommend"
+      },
+      "example_test": "TestRecommendRequestErrors",
+      "example_seq": 12
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "workload.difficulty 6 is out of range 1-5",
+      "details_exact": {
+        "difficulty": 6
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"workload.difficulty 6 is out of range 1-5\",\"details\":{\"difficulty\":6}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/recommend"
+      },
+      "example_test": "TestRecommendRequestErrors",
+      "example_seq": 13
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "malformed request body: json: cannot unmarshal number 2.5 into Go struct field WorkloadRequest.workload.difficulty of type int",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"malformed request body: json: cannot unmarshal number 2.5 into Go struct field WorkloadRequest.workload.difficulty of type int\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/recommend"
+      },
+      "example_test": "TestRecommendRequestErrors",
+      "example_seq": 14
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "mode \"turbo\" is not one of quality, balanced, cost",
+      "details_exact": {
+        "mode": "turbo"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"mode \\\"turbo\\\" is not one of quality, balanced, cost\",\"details\":{\"mode\":\"turbo\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/recommend"
+      },
+      "example_test": "TestRecommendRequestErrors",
+      "example_seq": 15
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "constraints.max_cost_per_run must be greater than 0",
+      "details_exact": {
+        "field": "max_cost_per_run"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"constraints.max_cost_per_run must be greater than 0\",\"details\":{\"field\":\"max_cost_per_run\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/recommend"
+      },
+      "example_test": "TestRecommendRequestErrors",
+      "example_seq": 16
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "constraints.max_latency_ms must be greater than 0",
+      "details_exact": {
+        "field": "max_latency_ms"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"constraints.max_latency_ms must be greater than 0\",\"details\":{\"field\":\"max_latency_ms\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/recommend"
+      },
+      "example_test": "TestRecommendRequestErrors",
+      "example_seq": 17
+    },
+    {
+      "status": 422,
+      "code": "unknown_model",
+      "message_exact": "allowed_models entry \"definitely-not-a-model\" is not in the model catalog",
+      "details_exact": {
+        "entry": "definitely-not-a-model"
+      },
+      "body_exact": "{\"error\":{\"code\":\"unknown_model\",\"message\":\"allowed_models entry \\\"definitely-not-a-model\\\" is not in the model catalog\",\"details\":{\"entry\":\"definitely-not-a-model\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/recommend"
+      },
+      "example_test": "TestRecommendRequestErrors",
+      "example_seq": 19
+    },
+    {
+      "status": 422,
+      "code": "model_not_in_pool",
+      "message_exact": "allowed_models entry \"model-col_01M3KQRCWKMZ4RM5W7Z7SCQ50N\" is not in pool \"default\"",
+      "details_exact": {
+        "entry": "model-col_01M3KQRCWKMZ4RM5W7Z7SCQ50N",
+        "pool": "default"
+      },
+      "body_exact": "{\"error\":{\"code\":\"model_not_in_pool\",\"message\":\"allowed_models entry \\\"model-col_01M3KQRCWKMZ4RM5W7Z7SCQ50N\\\" is not in pool \\\"default\\\"\",\"details\":{\"entry\":\"model-col_01M3KQRCWKMZ4RM5W7Z7SCQ50N\",\"pool\":\"default\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/recommend"
+      },
+      "example_test": "TestRecommendRequestErrors",
+      "example_seq": 20
+    },
+    {
+      "status": 404,
+      "code": "not_found",
+      "message_exact": "check spec \"checks/poetry/v1\" is not registered",
+      "details_exact": {
+        "ref": "checks/poetry/v1"
+      },
+      "body_exact": "{\"error\":{\"code\":\"not_found\",\"message\":\"check spec \\\"checks/poetry/v1\\\" is not registered\",\"details\":{\"ref\":\"checks/poetry/v1\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/checks/poetry/v1"
+      },
+      "example_test": "TestChecksUnknownRef404",
+      "example_seq": 1
+    },
+    {
+      "status": 429,
+      "code": "rate_limited",
+      "message_exact": "rate limit exceeded",
+      "details_exact": {
+        "limit": 1
+      },
+      "body_exact": "{\"error\":{\"code\":\"rate_limited\",\"message\":\"rate limit exceeded\",\"details\":{\"limit\":1}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "GET",
+        "path": "/v1/models"
+      },
+      "example_test": "TestV1RateLimitIsPerKey",
+      "example_seq": 2
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "malformed request body: invalid character 'a' looking for beginning of value",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"malformed request body: invalid character 'a' looking for beginning of value\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/recommend"
+      },
+      "example_test": "TestV1BodyAtCapIsNotRejected",
+      "example_seq": 1
+    },
+    {
+      "status": 404,
+      "code": "not_found",
+      "message_exact": "tenant ten_x does not exist",
+      "details_exact": {
+        "tenant_id": "ten_x"
+      },
+      "body_exact": "{\"error\":{\"code\":\"not_found\",\"message\":\"tenant ten_x does not exist\",\"details\":{\"tenant_id\":\"ten_x\"}}}\n",
+      "request": {
+        "listener": "internal",
+        "method": "GET",
+        "path": "/internal/v1/tenants/ten_x"
+      },
+      "example_test": "TestInternalUnknownPathsReturnEnvelope",
+      "example_seq": 3
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "items has 501 entries, exceeding the 500-entry limit",
+      "details_exact": {
+        "count": 501,
+        "limit": 500
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"items has 501 entries, exceeding the 500-entry limit\",\"details\":{\"count\":501,\"limit\":500}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/telemetry"
+      },
+      "example_test": "TestTelemetryEnvelopeInvalidRequest422",
+      "example_seq": 1
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "malformed request body: json: cannot unmarshal string into Go value of type handlers.telemetryEnvelope",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"malformed request body: json: cannot unmarshal string into Go value of type handlers.telemetryEnvelope\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/telemetry"
+      },
+      "example_test": "TestTelemetryEnvelopeInvalidRequest422",
+      "example_seq": 2
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "malformed request body: json: cannot unmarshal string into Go struct field telemetryEnvelope.items of type []json.RawMessage",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"malformed request body: json: cannot unmarshal string into Go struct field telemetryEnvelope.items of type []json.RawMessage\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/telemetry"
+      },
+      "example_test": "TestTelemetryEnvelopeInvalidRequest422",
+      "example_seq": 3
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "malformed request body: json: cannot unmarshal array into Go value of type handlers.telemetryEnvelope",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"malformed request body: json: cannot unmarshal array into Go value of type handlers.telemetryEnvelope\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/telemetry"
+      },
+      "example_test": "TestTelemetryEnvelopeInvalidRequest422",
+      "example_seq": 6
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "items is required",
+      "details_exact": {
+        "field": "items"
+      },
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"items is required\",\"details\":{\"field\":\"items\"}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/telemetry"
+      },
+      "example_test": "TestTelemetryEnvelopeInvalidRequest422",
+      "example_seq": 7
+    },
+    {
+      "status": 422,
+      "code": "invalid_request",
+      "message_exact": "malformed request body: json: cannot unmarshal object into Go struct field telemetryEnvelope.items of type []json.RawMessage",
+      "details_exact": {},
+      "body_exact": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"malformed request body: json: cannot unmarshal object into Go struct field telemetryEnvelope.items of type []json.RawMessage\",\"details\":{}}}\n",
+      "request": {
+        "listener": "public",
+        "method": "POST",
+        "path": "/v1/telemetry"
+      },
+      "example_test": "TestTelemetryEnvelopeInvalidRequest422",
+      "example_seq": 9
+    }
+  ]
+}

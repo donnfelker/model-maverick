@@ -1,0 +1,496 @@
+{
+  "cases": [
+    {
+      "expected": 5,
+      "function": "ceiling",
+      "go_test": "recommend.TestCeilingGoldens/clears_all_five_tiers",
+      "id": "TestCeilingGoldens/clears_all_five_tiers#1",
+      "input": {
+        "bar": 0.8,
+        "buffer": 0.05,
+        "pass_rates": [
+          {
+            "ewma": 0.99,
+            "measured": true,
+            "tier": 1
+          },
+          {
+            "ewma": 0.97,
+            "measured": true,
+            "tier": 2
+          },
+          {
+            "ewma": 0.95,
+            "measured": true,
+            "tier": 3
+          },
+          {
+            "ewma": 0.9,
+            "measured": true,
+            "tier": 4
+          },
+          {
+            "ewma": 0.86,
+            "measured": true,
+            "tier": 5
+          }
+        ]
+      }
+    },
+    {
+      "expected": 5,
+      "function": "ceiling",
+      "go_test": "recommend.TestCeilingGoldens/pass_rate_exactly_at_bar_plus_buffer_clears",
+      "id": "TestCeilingGoldens/pass_rate_exactly_at_bar_plus_buffer_clears#1",
+      "input": {
+        "bar": 0.8,
+        "buffer": 0.05,
+        "pass_rates": [
+          {
+            "ewma": 0.85,
+            "measured": true,
+            "tier": 1
+          },
+          {
+            "ewma": 0.85,
+            "measured": true,
+            "tier": 2
+          },
+          {
+            "ewma": 0.85,
+            "measured": true,
+            "tier": 3
+          },
+          {
+            "ewma": 0.85,
+            "measured": true,
+            "tier": 4
+          },
+          {
+            "ewma": 0.85,
+            "measured": true,
+            "tier": 5
+          }
+        ]
+      }
+    },
+    {
+      "expected": 1,
+      "function": "ceiling",
+      "go_test": "recommend.TestCeilingGoldens/0.8499_fails_just_under_the_buffered_bar",
+      "id": "TestCeilingGoldens/0.8499_fails_just_under_the_buffered_bar#1",
+      "input": {
+        "bar": 0.8,
+        "buffer": 0.05,
+        "pass_rates": [
+          {
+            "ewma": 0.99,
+            "measured": true,
+            "tier": 1
+          },
+          {
+            "ewma": 0.8499,
+            "measured": true,
+            "tier": 2
+          },
+          {
+            "ewma": 0.99,
+            "measured": true,
+            "tier": 3
+          },
+          {
+            "ewma": 0.99,
+            "measured": true,
+            "tier": 4
+          },
+          {
+            "ewma": 0.99,
+            "measured": true,
+            "tier": 5
+          }
+        ]
+      }
+    },
+    {
+      "expected": 2,
+      "function": "ceiling",
+      "go_test": "recommend.TestCeilingGoldens/exact_boundary_mid-grid:_0.85_clears,_next_tier_0.8499_stops",
+      "id": "TestCeilingGoldens/exact_boundary_mid-grid:_0.85_clears,_next_tier_0.8499_stops#1",
+      "input": {
+        "bar": 0.8,
+        "buffer": 0.05,
+        "pass_rates": [
+          {
+            "ewma": 0.95,
+            "measured": true,
+            "tier": 1
+          },
+          {
+            "ewma": 0.85,
+            "measured": true,
+            "tier": 2
+          },
+          {
+            "ewma": 0.8499,
+            "measured": true,
+            "tier": 3
+          },
+          {
+            "ewma": 0.99,
+            "measured": true,
+            "tier": 4
+          },
+          {
+            "ewma": 0.99,
+            "measured": true,
+            "tier": 5
+          }
+        ]
+      }
+    },
+    {
+      "expected": 1,
+      "function": "ceiling",
+      "go_test": "recommend.TestCeilingGoldens/gap_tier:_no_data_at_tier_2_caps_the_ceiling_at_1_despite_clearing_tier_3",
+      "id": "TestCeilingGoldens/gap_tier:_no_data_at_tier_2_caps_the_ceiling_at_1_despite_clearing_tier_3#1",
+      "input": {
+        "bar": 0.8,
+        "buffer": 0.05,
+        "pass_rates": [
+          {
+            "ewma": 0.99,
+            "measured": true,
+            "tier": 1
+          },
+          {
+            "ewma": 0.99,
+            "measured": true,
+            "tier": 3
+          }
+        ]
+      }
+    },
+    {
+      "expected": 1,
+      "function": "ceiling",
+      "go_test": "recommend.TestCeilingGoldens/unmeasured_cell_counts_as_not_clearing",
+      "id": "TestCeilingGoldens/unmeasured_cell_counts_as_not_clearing#1",
+      "input": {
+        "bar": 0.8,
+        "buffer": 0.05,
+        "pass_rates": [
+          {
+            "ewma": 0.99,
+            "measured": true,
+            "tier": 1
+          },
+          {
+            "ewma": 0.99,
+            "measured": false,
+            "tier": 2
+          },
+          {
+            "ewma": 0.99,
+            "measured": true,
+            "tier": 3
+          }
+        ]
+      }
+    },
+    {
+      "expected": 0,
+      "function": "ceiling",
+      "go_test": "recommend.TestCeilingGoldens/no_data_at_all",
+      "id": "TestCeilingGoldens/no_data_at_all#1",
+      "input": {
+        "bar": 0.8,
+        "buffer": 0.05,
+        "pass_rates": []
+      }
+    },
+    {
+      "expected": 0,
+      "function": "ceiling",
+      "go_test": "recommend.TestCeilingGoldens/nil_map",
+      "id": "TestCeilingGoldens/nil_map#1",
+      "input": {
+        "bar": 0.8,
+        "buffer": 0.05,
+        "pass_rates": []
+      }
+    },
+    {
+      "expected": 0,
+      "function": "ceiling",
+      "go_test": "recommend.TestCeilingGoldens/tier_1_below_the_bar_means_ceiling_0_regardless_of_higher_tiers",
+      "id": "TestCeilingGoldens/tier_1_below_the_bar_means_ceiling_0_regardless_of_higher_tiers#1",
+      "input": {
+        "bar": 0.8,
+        "buffer": 0.05,
+        "pass_rates": [
+          {
+            "ewma": 0.7,
+            "measured": true,
+            "tier": 1
+          },
+          {
+            "ewma": 0.99,
+            "measured": true,
+            "tier": 2
+          },
+          {
+            "ewma": 0.99,
+            "measured": true,
+            "tier": 3
+          },
+          {
+            "ewma": 0.99,
+            "measured": true,
+            "tier": 4
+          },
+          {
+            "ewma": 0.99,
+            "measured": true,
+            "tier": 5
+          }
+        ]
+      }
+    },
+    {
+      "expected": 1,
+      "function": "ceiling",
+      "go_test": "recommend.TestCeilingGoldens/only_tier_1_present",
+      "id": "TestCeilingGoldens/only_tier_1_present#1",
+      "input": {
+        "bar": 0.8,
+        "buffer": 0.05,
+        "pass_rates": [
+          {
+            "ewma": 0.9,
+            "measured": true,
+            "tier": 1
+          }
+        ]
+      }
+    },
+    {
+      "expected": 3,
+      "function": "ceiling",
+      "go_test": "recommend.TestCeilingGoldens/monotone_decreasing_grid_stops_where_the_rate_crosses_the_bar",
+      "id": "TestCeilingGoldens/monotone_decreasing_grid_stops_where_the_rate_crosses_the_bar#1",
+      "input": {
+        "bar": 0.8,
+        "buffer": 0.05,
+        "pass_rates": [
+          {
+            "ewma": 0.98,
+            "measured": true,
+            "tier": 1
+          },
+          {
+            "ewma": 0.94,
+            "measured": true,
+            "tier": 2
+          },
+          {
+            "ewma": 0.88,
+            "measured": true,
+            "tier": 3
+          },
+          {
+            "ewma": 0.79,
+            "measured": true,
+            "tier": 4
+          },
+          {
+            "ewma": 0.61,
+            "measured": true,
+            "tier": 5
+          }
+        ]
+      }
+    },
+    {
+      "expected": 5,
+      "function": "ceiling",
+      "go_test": "recommend.TestCeilingHonorsPerTenantBar",
+      "id": "TestCeilingHonorsPerTenantBar#1",
+      "input": {
+        "bar": 0.8,
+        "buffer": 0.05,
+        "pass_rates": [
+          {
+            "ewma": 0.94,
+            "measured": true,
+            "tier": 1
+          },
+          {
+            "ewma": 0.92,
+            "measured": true,
+            "tier": 2
+          },
+          {
+            "ewma": 0.91,
+            "measured": true,
+            "tier": 3
+          },
+          {
+            "ewma": 0.9,
+            "measured": true,
+            "tier": 4
+          },
+          {
+            "ewma": 0.9,
+            "measured": true,
+            "tier": 5
+          }
+        ]
+      }
+    },
+    {
+      "expected": 0,
+      "function": "ceiling",
+      "go_test": "recommend.TestCeilingHonorsPerTenantBar",
+      "id": "TestCeilingHonorsPerTenantBar#2",
+      "input": {
+        "bar": 0.9,
+        "buffer": 0.05,
+        "pass_rates": [
+          {
+            "ewma": 0.94,
+            "measured": true,
+            "tier": 1
+          },
+          {
+            "ewma": 0.92,
+            "measured": true,
+            "tier": 2
+          },
+          {
+            "ewma": 0.91,
+            "measured": true,
+            "tier": 3
+          },
+          {
+            "ewma": 0.9,
+            "measured": true,
+            "tier": 4
+          },
+          {
+            "ewma": 0.9,
+            "measured": true,
+            "tier": 5
+          }
+        ]
+      }
+    },
+    {
+      "expected": true,
+      "function": "clears",
+      "go_test": "recommend.TestClears",
+      "id": "TestClears#1",
+      "input": {
+        "ceiling": 5,
+        "difficulty": 5
+      }
+    },
+    {
+      "expected": true,
+      "function": "clears",
+      "go_test": "recommend.TestClears",
+      "id": "TestClears#2",
+      "input": {
+        "ceiling": 3,
+        "difficulty": 3
+      }
+    },
+    {
+      "expected": false,
+      "function": "clears",
+      "go_test": "recommend.TestClears",
+      "id": "TestClears#3",
+      "input": {
+        "ceiling": 3,
+        "difficulty": 4
+      }
+    },
+    {
+      "expected": false,
+      "function": "clears",
+      "go_test": "recommend.TestClears",
+      "id": "TestClears#4",
+      "input": {
+        "ceiling": 0,
+        "difficulty": 1
+      }
+    },
+    {
+      "expected": true,
+      "function": "clears",
+      "go_test": "recommend.TestClears",
+      "id": "TestClears#5",
+      "input": {
+        "ceiling": 1,
+        "difficulty": 1
+      }
+    },
+    {
+      "expected": {
+        "col_a": {
+          "code_generation": 0,
+          "factual_qa": 2
+        },
+        "col_b": {
+          "factual_qa": 1
+        }
+      },
+      "function": "ceilings",
+      "go_test": "recommend.TestCeilingsGrid",
+      "id": "TestCeilingsGrid#1",
+      "input": {
+        "bar_by_capability": {
+          "code_generation": 0.95,
+          "factual_qa": 0.8
+        },
+        "buffer": 0.05,
+        "cells": [
+          {
+            "capability": "factual_qa",
+            "column_id": "col_a",
+            "ewma": 0.95,
+            "measured": true,
+            "tier": 1
+          },
+          {
+            "capability": "factual_qa",
+            "column_id": "col_a",
+            "ewma": 0.9,
+            "measured": true,
+            "tier": 2
+          },
+          {
+            "capability": "factual_qa",
+            "column_id": "col_a",
+            "ewma": 0.7,
+            "measured": true,
+            "tier": 3
+          },
+          {
+            "capability": "code_generation",
+            "column_id": "col_a",
+            "ewma": 0.95,
+            "measured": true,
+            "tier": 1
+          },
+          {
+            "capability": "factual_qa",
+            "column_id": "col_b",
+            "ewma": 0.92,
+            "measured": true,
+            "tier": 1
+          }
+        ]
+      }
+    }
+  ]
+}

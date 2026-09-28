@@ -1,0 +1,10 @@
+description: a fact id reused by a forbidden fact is rejected at validation
+spec:
+  facts:
+    - { id: party_acme, any_of: ["Acme Corp"] }
+  forbidden_facts:
+    - { id: party_acme, any_of: ["Acme GmbH"] }
+output: irrelevant
+expect:
+  error: true
+  error_contains: duplicate fact id

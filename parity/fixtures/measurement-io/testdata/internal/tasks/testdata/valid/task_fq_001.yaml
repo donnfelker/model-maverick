@@ -1,0 +1,19 @@
+id: task_fq_001
+capability: factual_qa
+difficulty_tier: 1
+difficulty_knobs: { fact_obscurity: 1, entity_confusability: 1, false_premises: 1, required_precision: 1 }
+prompt: |
+  In which year did the Apollo 11 mission land humans on the Moon? Answer
+  with the year only.
+temperature: 0
+max_tokens: 16
+smoke_member: false
+dimension_weights: { answer_correctness: 1.0 }
+grader_specs:
+  - type: golden_answer
+    version: 1
+    weight_dimensions: { answer_correctness: 1.0 }
+    spec:
+      answers:
+        - { value: "1969" }
+        - { numeric: 1969, tolerance: 0 }

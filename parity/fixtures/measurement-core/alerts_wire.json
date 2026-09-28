@@ -1,0 +1,69 @@
+{
+  "_note": "messages rendered with the exact Go format strings (see behavior doc); the regression example uses the drop finding of the 8-night decline series starting 2031-06-01",
+  "email": {
+    "cases": [
+      {
+        "alert_id": "alr_01TESTTESTTESTTESTTESTTEST",
+        "expected_data": "From: alerts@example.com\r\nTo: ops@example.com, oncall@example.com\r\nSubject: [maverick] warning: regression\r\nDate: Thu, 08 May 2031 03:30:00 +0000\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nquality regression (drop) on col_x structured_extraction tier 3\r\n\r\nalert: alr_01TESTTESTTESTTESTTESTTEST\r\nsubject: {\"model_column_id\":\"col_x\",\"capability\":\"structured_extraction\",\"difficulty_tier\":3,\"dimension\":\"quality\",\"as_of\":\"2031-05-08\"}\r\n",
+        "from": "alerts@example.com",
+        "to": [
+          "ops@example.com",
+          "oncall@example.com"
+        ]
+      },
+      {
+        "alert_id": "alr_01J0000000000000000000000",
+        "expected_data": "From: alerts@example.com\r\nTo: ops@example.com\r\nSubject: [maverick] warning: parse_failure_rate\r\nDate: Fri, 25 Jul 2031 04:05:06 +0000\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\ncol_fresh parse-failure rate 20.0% over 10 runs on 2031-07-25 (\u003e 5% and \u003e 2× trailing 7-day rate 0.0%; spec 11)\r\n\r\nalert: alr_01J0000000000000000000000\r\nsubject: {\"night\": \"2031-07-25\", \"batch_id\": \"bat_regr_pf\", \"total_runs\": 10, \"trailing_rate\": 0, \"parse_failures\": 2, \"model_column_id\": \"col_fresh\", \"parse_failure_rate\": 0.2}\r\n",
+        "from": "alerts@example.com",
+        "to": [
+          "ops@example.com"
+        ]
+      }
+    ],
+    "go_test": "alerts.TestEmailDeliver",
+    "note": "expected_data is the DATA payload before SMTP dot-stuffing/terminator"
+  },
+  "messages": {
+    "job_failure_chain": "aggregate_rebuild 2030-08-02 could not enqueue regression_scan for batch bat_X: boom",
+    "job_failure_completion": "weekly_sweep 2030-08-01 completed 83/1326 runs (6.3%)",
+    "job_failure_enqueue": "weekly_sweep 2030-08-02 could not enqueue aggregate_rebuild for batch bat_X: boom: river insert unavailable",
+    "job_failure_judge": "nightly_smoke 2030-07-20: judge failed 3/3 gradings (100.0%, threshold 10%; spec 5.5)",
+    "job_failure_retention": "capture_expiry failed: jobs: capture_expiry: committing: boom",
+    "parse_failure_rate": "col_fresh parse-failure rate 20.0% over 10 runs on 2031-07-25 (\u003e 5% and \u003e 2× trailing 7-day rate 0.0%; spec 11)",
+    "pool_would_be_empty_drift_critical": "pool \"pool-driftempty\" of tenant ten_X has no usable columns under current aggregates (0 surviving; spec 7.2 drift check)",
+    "pool_would_be_empty_drift_warning": "pool \"pool-driftwarn\" of tenant ten_Y is within one column of empty under current aggregates (1 surviving; spec 7.2 drift check)",
+    "regression": "quality regression (drop) on col_x structured_extraction tier 3: 90.0 → 86.9 (−3.1 pts) as of 2031-06-08"
+  },
+  "webhook": {
+    "algorithm": "HMAC-SHA256 over the exact request body bytes, key = secret bytes, header value 'sha256=' + lowercase hex",
+    "cases": [
+      {
+        "alert": {
+          "created_at": "2031-05-08T03:30:00Z",
+          "id": "alr_01TESTTESTTESTTESTTESTTEST",
+          "kind": "regression",
+          "message": "quality regression (drop) on col_x structured_extraction tier 3",
+          "severity": "warning",
+          "subject_raw": "{\"model_column_id\":\"col_x\",\"capability\":\"structured_extraction\",\"difficulty_tier\":3,\"dimension\":\"quality\",\"as_of\":\"2031-05-08\"}"
+        },
+        "expected_body": "{\"id\":\"alr_01TESTTESTTESTTESTTESTTEST\",\"kind\":\"regression\",\"severity\":\"warning\",\"subject\":{\"model_column_id\":\"col_x\",\"capability\":\"structured_extraction\",\"difficulty_tier\":3,\"dimension\":\"quality\",\"as_of\":\"2031-05-08\"},\"message\":\"quality regression (drop) on col_x structured_extraction tier 3\",\"created_at\":\"2031-05-08T03:30:00Z\"}",
+        "expected_signature_header": "sha256=63ae6c462efff3f9a8d7d9e231d809946ffc0ceed124d546b3f47290b33f91f1",
+        "secret": "whsec_test"
+      },
+      {
+        "alert": {
+          "created_at": "2031-07-25T04:05:06.123456Z",
+          "id": "alr_01J0000000000000000000000",
+          "kind": "parse_failure_rate",
+          "message": "col_fresh parse-failure rate 20.0% over 10 runs on 2031-07-25 (\u003e 5% and \u003e 2× trailing 7-day rate 0.0%; spec 11)",
+          "severity": "warning",
+          "subject_raw": "{\"night\": \"2031-07-25\", \"batch_id\": \"bat_regr_pf\", \"total_runs\": 10, \"trailing_rate\": 0, \"parse_failures\": 2, \"model_column_id\": \"col_fresh\", \"parse_failure_rate\": 0.2}"
+        },
+        "expected_body": "{\"id\":\"alr_01J0000000000000000000000\",\"kind\":\"parse_failure_rate\",\"severity\":\"warning\",\"subject\":{\"night\":\"2031-07-25\",\"batch_id\":\"bat_regr_pf\",\"total_runs\":10,\"trailing_rate\":0,\"parse_failures\":2,\"model_column_id\":\"col_fresh\",\"parse_failure_rate\":0.2},\"message\":\"col_fresh parse-failure rate 20.0% over 10 runs on 2031-07-25 (\\u003e 5% and \\u003e 2× trailing 7-day rate 0.0%; spec 11)\",\"created_at\":\"2031-07-25T04:05:06.123456Z\"}",
+        "expected_signature_header": "sha256=da30c4d20d60b2e0b7c80eee6efe39e90f41930f0b35da0ca6f3ba72e1467c7c",
+        "secret": "whsec_test"
+      }
+    ],
+    "go_test": "alerts.TestWebhookSignatureVerifies"
+  }
+}

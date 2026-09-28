@@ -1,0 +1,348 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "captured": true,
+        "window_id": "cw_active"
+      },
+      "go_test": "tracing.TestDecide/active_window_no_scopes_captures",
+      "id": "active window no scopes captures",
+      "input": {
+        "api_key_id": "key_a",
+        "confidence": 1,
+        "now": "2026-07-07T12:00:00Z",
+        "windows": [
+          {
+            "api_key_id": null,
+            "confidence_below": null,
+            "ends_at": "2026-07-07T13:00:00Z",
+            "id": "cw_active",
+            "starts_at": "2026-07-07T11:00:00Z"
+          }
+        ],
+        "zero_retention": false
+      }
+    },
+    {
+      "expected": {
+        "captured": false,
+        "window_id": null
+      },
+      "go_test": "tracing.TestDecide/zero_retention_never_captures_even_with_an_active_window_(G5)",
+      "id": "zero retention never captures even with an active window (G5)",
+      "input": {
+        "api_key_id": "key_a",
+        "confidence": 0.1,
+        "now": "2026-07-07T12:00:00Z",
+        "windows": [
+          {
+            "api_key_id": null,
+            "confidence_below": null,
+            "ends_at": "2026-07-07T13:00:00Z",
+            "id": "cw_active",
+            "starts_at": "2026-07-07T11:00:00Z"
+          }
+        ],
+        "zero_retention": true
+      }
+    },
+    {
+      "expected": {
+        "captured": false,
+        "window_id": null
+      },
+      "go_test": "tracing.TestDecide/no_windows",
+      "id": "no windows",
+      "input": {
+        "api_key_id": "key_a",
+        "confidence": 0.1,
+        "now": "2026-07-07T12:00:00Z",
+        "windows": [],
+        "zero_retention": false
+      }
+    },
+    {
+      "expected": {
+        "captured": true,
+        "window_id": "cw_scoped"
+      },
+      "go_test": "tracing.TestDecide/key_scope_match_captures",
+      "id": "key scope match captures",
+      "input": {
+        "api_key_id": "key_a",
+        "confidence": 1,
+        "now": "2026-07-07T12:00:00Z",
+        "windows": [
+          {
+            "api_key_id": "key_a",
+            "confidence_below": null,
+            "ends_at": "2026-07-07T13:00:00Z",
+            "id": "cw_scoped",
+            "starts_at": "2026-07-07T11:00:00Z"
+          }
+        ],
+        "zero_retention": false
+      }
+    },
+    {
+      "expected": {
+        "captured": false,
+        "window_id": null
+      },
+      "go_test": "tracing.TestDecide/key_scope_mismatch_skips",
+      "id": "key scope mismatch skips",
+      "input": {
+        "api_key_id": "key_a",
+        "confidence": 1,
+        "now": "2026-07-07T12:00:00Z",
+        "windows": [
+          {
+            "api_key_id": "key_b",
+            "confidence_below": null,
+            "ends_at": "2026-07-07T13:00:00Z",
+            "id": "cw_scoped",
+            "starts_at": "2026-07-07T11:00:00Z"
+          }
+        ],
+        "zero_retention": false
+      }
+    },
+    {
+      "expected": {
+        "captured": true,
+        "window_id": "cw_conf"
+      },
+      "go_test": "tracing.TestDecide/confidence_below_threshold_captures",
+      "id": "confidence below threshold captures",
+      "input": {
+        "api_key_id": "key_a",
+        "confidence": 0.91,
+        "now": "2026-07-07T12:00:00Z",
+        "windows": [
+          {
+            "api_key_id": null,
+            "confidence_below": 0.95,
+            "ends_at": "2026-07-07T13:00:00Z",
+            "id": "cw_conf",
+            "starts_at": "2026-07-07T11:00:00Z"
+          }
+        ],
+        "zero_retention": false
+      }
+    },
+    {
+      "expected": {
+        "captured": false,
+        "window_id": null
+      },
+      "go_test": "tracing.TestDecide/confidence_equal_to_threshold_skips",
+      "id": "confidence equal to threshold skips",
+      "input": {
+        "api_key_id": "key_a",
+        "confidence": 0.91,
+        "now": "2026-07-07T12:00:00Z",
+        "windows": [
+          {
+            "api_key_id": null,
+            "confidence_below": 0.91,
+            "ends_at": "2026-07-07T13:00:00Z",
+            "id": "cw_conf",
+            "starts_at": "2026-07-07T11:00:00Z"
+          }
+        ],
+        "zero_retention": false
+      }
+    },
+    {
+      "expected": {
+        "captured": false,
+        "window_id": null
+      },
+      "go_test": "tracing.TestDecide/confidence_above_threshold_skips",
+      "id": "confidence above threshold skips",
+      "input": {
+        "api_key_id": "key_a",
+        "confidence": 0.91,
+        "now": "2026-07-07T12:00:00Z",
+        "windows": [
+          {
+            "api_key_id": null,
+            "confidence_below": 0.5,
+            "ends_at": "2026-07-07T13:00:00Z",
+            "id": "cw_conf",
+            "starts_at": "2026-07-07T11:00:00Z"
+          }
+        ],
+        "zero_retention": false
+      }
+    },
+    {
+      "expected": {
+        "captured": false,
+        "window_id": null
+      },
+      "go_test": "tracing.TestDecide/window_not_yet_started_skips",
+      "id": "window not yet started skips",
+      "input": {
+        "api_key_id": "key_a",
+        "confidence": 0.1,
+        "now": "2026-07-07T12:00:00Z",
+        "windows": [
+          {
+            "api_key_id": null,
+            "confidence_below": null,
+            "ends_at": "2026-07-07T13:00:00Z",
+            "id": "cw_future",
+            "starts_at": "2026-07-07T12:01:00Z"
+          }
+        ],
+        "zero_retention": false
+      }
+    },
+    {
+      "expected": {
+        "captured": false,
+        "window_id": null
+      },
+      "go_test": "tracing.TestDecide/window_ended_at_exactly_ends_at_skips",
+      "id": "window ended at exactly ends_at skips",
+      "input": {
+        "api_key_id": "key_a",
+        "confidence": 0.1,
+        "now": "2026-07-07T12:00:00Z",
+        "windows": [
+          {
+            "api_key_id": null,
+            "confidence_below": null,
+            "ends_at": "2026-07-07T12:00:00Z",
+            "id": "cw_past",
+            "starts_at": "2026-07-07T11:00:00Z"
+          }
+        ],
+        "zero_retention": false
+      }
+    },
+    {
+      "expected": {
+        "captured": true,
+        "window_id": "cw_match"
+      },
+      "go_test": "tracing.TestDecide/first_matching_of_several_wins",
+      "id": "first matching of several wins",
+      "input": {
+        "api_key_id": "key_a",
+        "confidence": 1,
+        "now": "2026-07-07T12:00:00Z",
+        "windows": [
+          {
+            "api_key_id": "key_b",
+            "confidence_below": null,
+            "ends_at": "2026-07-07T13:00:00Z",
+            "id": "cw_wrong_key",
+            "starts_at": "2026-07-07T11:00:00Z"
+          },
+          {
+            "api_key_id": null,
+            "confidence_below": null,
+            "ends_at": "2026-07-07T13:00:00Z",
+            "id": "cw_match",
+            "starts_at": "2026-07-07T11:00:00Z"
+          }
+        ],
+        "zero_retention": false
+      }
+    },
+    {
+      "expected": {
+        "captured": true,
+        "window_id": "cw_now"
+      },
+      "go_test": "",
+      "id": "extra: window starting exactly now captures",
+      "input": {
+        "api_key_id": "key_a",
+        "confidence": 1,
+        "now": "2026-07-07T12:00:00Z",
+        "windows": [
+          {
+            "api_key_id": null,
+            "confidence_below": null,
+            "ends_at": "2026-07-07T13:00:00Z",
+            "id": "cw_now",
+            "starts_at": "2026-07-07T12:00:00Z"
+          }
+        ],
+        "zero_retention": false
+      }
+    },
+    {
+      "expected": {
+        "captured": false,
+        "window_id": null
+      },
+      "go_test": "",
+      "id": "extra: float32-stored threshold 0.95 vs confidence 0.95 skips",
+      "input": {
+        "api_key_id": "key_a",
+        "confidence": 0.95,
+        "now": "2026-07-07T12:00:00Z",
+        "windows": [
+          {
+            "api_key_id": null,
+            "confidence_below": 0.949999988079071,
+            "ends_at": "2026-07-07T13:00:00Z",
+            "id": "cw_f32",
+            "starts_at": "2026-07-07T11:00:00Z"
+          }
+        ],
+        "zero_retention": false
+      }
+    },
+    {
+      "expected": {
+        "captured": true,
+        "window_id": "cw_f32"
+      },
+      "go_test": "",
+      "id": "extra: float32-stored threshold 0.95 vs confidence 0.9499999 captures (0.9499999 < 0.949999988)",
+      "input": {
+        "api_key_id": "key_a",
+        "confidence": 0.9499999,
+        "now": "2026-07-07T12:00:00Z",
+        "windows": [
+          {
+            "api_key_id": null,
+            "confidence_below": 0.949999988079071,
+            "ends_at": "2026-07-07T13:00:00Z",
+            "id": "cw_f32",
+            "starts_at": "2026-07-07T11:00:00Z"
+          }
+        ],
+        "zero_retention": false
+      }
+    },
+    {
+      "expected": {
+        "captured": true,
+        "window_id": "cw_f32"
+      },
+      "go_test": "",
+      "id": "extra: float32-stored threshold 0.95 vs confidence 0.9499 captures",
+      "input": {
+        "api_key_id": "key_a",
+        "confidence": 0.9499,
+        "now": "2026-07-07T12:00:00Z",
+        "windows": [
+          {
+            "api_key_id": null,
+            "confidence_below": 0.949999988079071,
+            "ends_at": "2026-07-07T13:00:00Z",
+            "id": "cw_f32",
+            "starts_at": "2026-07-07T11:00:00Z"
+          }
+        ],
+        "zero_retention": false
+      }
+    }
+  ]
+}

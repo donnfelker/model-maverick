@@ -1,0 +1,17 @@
+description: schema-invalid document (missing required field) still gets its field checks evaluated
+spec:
+  schema:
+    type: object
+    required: [name, amount]
+    properties:
+      name: { type: string }
+      amount: { type: number }
+  checks:
+    - { path: $.name, equals: "Acme Corp" }
+output: |-
+  ```json
+  { "name": "Acme Corp" }
+  ```
+expect:
+  dimensions: { schema_validity: 0.0, field_accuracy: 1.0 }
+  detail_contains: ['"schema_valid":false', 'required']

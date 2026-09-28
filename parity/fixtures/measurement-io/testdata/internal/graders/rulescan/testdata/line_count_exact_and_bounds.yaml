@@ -1,0 +1,13 @@
+description: integer line_count means exact; the bounded form allows a range
+spec:
+  rules:
+    - { line_count: 3 }
+    - { line_count: { min: 2, max: 4 } }
+    - { line_count: { min: 5 } }
+output: |-
+  first line
+  second line
+  third line
+expect:
+  dimensions: { constraint_compliance: 0.666667 }
+epsilon: 0.000001

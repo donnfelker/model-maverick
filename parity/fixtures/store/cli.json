@@ -1,0 +1,334 @@
+{
+  "description": "cmd/maverick run(args, lookup, stdout, stderr) black-box cases. env null = empty lookup (nothing set). stdout/stderr are exact except JSON log timestamps masked as \"time\":\"<TS>\". Paths under ../../internal/tasks/testdata are relative to cmd/maverick (the tasks area copies that testdata). Unreachable-DB error text comes from pgx and is informative, not a parity target: the parity target is exit code, stream, msg field, and that an error field is present. ids starting with probe- are observed behavior, not Go tests.",
+  "source": "cmd/maverick (Go oracle, captured 2026-09-28)",
+  "cases": [
+    {
+      "id": "no-command",
+      "go_test": "main.TestRunNoCommandPrintsUsage",
+      "args": [],
+      "env": null,
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "Usage: maverick <command> [flags]\n\nCommands:\n  serve       run the HTTP API, MCP server, and workers (--api-only | --worker-only)\n  migrate     run database migrations\n  corpus      load, activate, and inspect corpus versions, and print the tier\n              calibration report (load | activate | status | calibrate)\n  mcp-stdio   stdio MCP transport for local development (--api-key mk_live_...)\n"
+    },
+    {
+      "id": "unknown-command",
+      "go_test": "main.TestRunUnknownCommand",
+      "args": [
+        "bogus"
+      ],
+      "env": null,
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "maverick: unknown command \"bogus\"\n\nUsage: maverick <command> [flags]\n\nCommands:\n  serve       run the HTTP API, MCP server, and workers (--api-only | --worker-only)\n  migrate     run database migrations\n  corpus      load, activate, and inspect corpus versions, and print the tier\n              calibration report (load | activate | status | calibrate)\n  mcp-stdio   stdio MCP transport for local development (--api-key mk_live_...)\n"
+    },
+    {
+      "id": "corpus-no-sub",
+      "go_test": "main.TestRunCorpusWithoutSubcommand",
+      "args": [
+        "corpus"
+      ],
+      "env": null,
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "Usage: maverick corpus <subcommand> [flags]\n\nSubcommands:\n  load      --version <v> --dir <path> [--description <text>] [--strict]\n            validate the task files in <path> and store them under <v>\n            (inactive until activated); --strict also fails on corpus-shape\n            warnings (20-25 tasks and exactly 5 smoke members per capability)\n  activate  --version <v>\n            atomically make <v> the active corpus version\n  status    list corpus versions and the active flag\n  calibrate print the tier calibration report (capability-matrix design 5.3):\n            per-capability, per-column tier pass rates from the latest\n            measured aggregates, with monotonicity inversions and >15-point\n            tier-trend outliers; a report, never a gate\n"
+    },
+    {
+      "id": "corpus-unknown-sub",
+      "go_test": "main.TestRunCorpusUnknownSubcommand",
+      "args": [
+        "corpus",
+        "bogus"
+      ],
+      "env": null,
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "maverick corpus: unknown subcommand \"bogus\"\n\nUsage: maverick corpus <subcommand> [flags]\n\nSubcommands:\n  load      --version <v> --dir <path> [--description <text>] [--strict]\n            validate the task files in <path> and store them under <v>\n            (inactive until activated); --strict also fails on corpus-shape\n            warnings (20-25 tasks and exactly 5 smoke members per capability)\n  activate  --version <v>\n            atomically make <v> the active corpus version\n  status    list corpus versions and the active flag\n  calibrate print the tier calibration report (capability-matrix design 5.3):\n            per-capability, per-column tier pass rates from the latest\n            measured aggregates, with monotonicity inversions and >15-point\n            tier-trend outliers; a report, never a gate\n"
+    },
+    {
+      "id": "corpus-load-missing-dir",
+      "go_test": "main.TestRunCorpusLoadRequiresVersionAndDir",
+      "args": [
+        "corpus",
+        "load",
+        "--version",
+        "v-test"
+      ],
+      "env": null,
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "maverick corpus load: --version and --dir are required\n"
+    },
+    {
+      "id": "corpus-load-invalid-tier-range",
+      "go_test": "main.TestRunCorpusLoadRejectsInvalidCorpusListingEveryViolation",
+      "args": [
+        "corpus",
+        "load",
+        "--version",
+        "v-test",
+        "--dir",
+        "../../internal/tasks/testdata/invalid/tier_range"
+      ],
+      "env": null,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "warning: capability_task_count: capability factual_qa has 2 tasks; spec 5.6 requires 20-25\nwarning: capability_tier_span: capability factual_qa has no tasks at tier(s) [1 2 3 4 5]; tasks must span all five tiers (spec 5.6)\nwarning: smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5\nerror: task_tr_000.yaml: task task_tr_000: tier_out_of_range: difficulty_tier 0 is not in 1..5\nerror: task_tr_006.yaml: task task_tr_006: tier_out_of_range: difficulty_tier 6 is not in 1..5\nmaverick corpus load: rejected ../../internal/tasks/testdata/invalid/tier_range: 2 violation(s)\n"
+    },
+    {
+      "id": "corpus-load-invalid-test-suite",
+      "go_test": "main.TestRunCorpusLoadValidatesBeforeTouchingTheDatabase",
+      "args": [
+        "corpus",
+        "load",
+        "--version",
+        "v-test",
+        "--dir",
+        "../../internal/tasks/testdata/invalid/test_suite"
+      ],
+      "env": null,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "warning: capability_task_count: capability code_generation has 1 tasks; spec 5.6 requires 20-25\nwarning: capability_tier_span: capability code_generation has no tasks at tier(s) [1 2 4 5]; tasks must span all five tiers (spec 5.6)\nwarning: smoke_count: capability code_generation has 0 smoke_member tasks; spec 5.6 requires exactly 5\nerror: task_ts_001.yaml: task task_ts_001: grader_unsupported: grader_specs[0]: graders: envelope: grader_unsupported: type \"test_suite\" is reserved until v1.1\nmaverick corpus load: rejected ../../internal/tasks/testdata/invalid/test_suite: 1 violation(s)\n"
+    },
+    {
+      "id": "corpus-load-valid-unreachable-db",
+      "go_test": "main.TestRunCorpusLoadValidCorpusFailsOnUnreachableDatabase",
+      "args": [
+        "corpus",
+        "load",
+        "--version",
+        "v-test",
+        "--dir",
+        "../../internal/tasks/testdata/valid"
+      ],
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick@127.0.0.1:1/maverick?connect_timeout=1&sslmode=disable",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "exit_code": 1,
+      "stdout": "{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"connecting to database\",\"error\":\"failed to connect to `user=maverick database=maverick`: 127.0.0.1:1 (127.0.0.1): dial error: dial tcp 127.0.0.1:1: connect: connection refused\"}\n",
+      "stderr": "warning: capability_task_count: capability factual_qa has 1 tasks; spec 5.6 requires 20-25\nwarning: capability_tier_span: capability factual_qa has no tasks at tier(s) [2 3 4 5]; tasks must span all five tiers (spec 5.6)\nwarning: smoke_count: capability factual_qa has 0 smoke_member tasks; spec 5.6 requires exactly 5\nwarning: capability_task_count: capability structured_extraction has 3 tasks; spec 5.6 requires 20-25\nwarning: capability_tier_span: capability structured_extraction has no tasks at tier(s) [1 4]; tasks must span all five tiers (spec 5.6)\nwarning: smoke_count: capability structured_extraction has 2 smoke_member tasks; spec 5.6 requires exactly 5\n"
+    },
+    {
+      "id": "corpus-activate-missing-version",
+      "go_test": "main.TestRunCorpusActivateRequiresVersion",
+      "args": [
+        "corpus",
+        "activate"
+      ],
+      "env": null,
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "maverick corpus activate: --version is required\n"
+    },
+    {
+      "id": "corpus-activate-unreachable-db",
+      "go_test": "main.TestRunCorpusActivateFailsOnUnreachableDatabase",
+      "args": [
+        "corpus",
+        "activate",
+        "--version",
+        "v-test"
+      ],
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick@127.0.0.1:1/maverick?connect_timeout=1&sslmode=disable",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "exit_code": 1,
+      "stdout": "{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"connecting to database\",\"error\":\"failed to connect to `user=maverick database=maverick`: 127.0.0.1:1 (127.0.0.1): dial error: dial tcp 127.0.0.1:1: connect: connection refused\"}\n",
+      "stderr": ""
+    },
+    {
+      "id": "corpus-calibrate-unreachable-db",
+      "go_test": "main.TestRunCorpusCalibrateFailsOnUnreachableDatabase",
+      "args": [
+        "corpus",
+        "calibrate"
+      ],
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick@127.0.0.1:1/maverick?connect_timeout=1&sslmode=disable",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "exit_code": 1,
+      "stdout": "{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"connecting to database\",\"error\":\"failed to connect to `user=maverick database=maverick`: 127.0.0.1:1 (127.0.0.1): dial error: dial tcp 127.0.0.1:1: connect: connection refused\"}\n",
+      "stderr": ""
+    },
+    {
+      "id": "mcp-stdio-missing-key",
+      "go_test": "main.TestRunMCPStdioRequiresAPIKey",
+      "args": [
+        "mcp-stdio"
+      ],
+      "env": null,
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"mcp-stdio: --api-key is required (spec §12)\"}\n"
+    },
+    {
+      "id": "mcp-stdio-missing-config",
+      "go_test": "main.TestRunMCPStdioFailsFastNamingMissingVarsOnStderr",
+      "args": [
+        "mcp-stdio",
+        "--api-key",
+        "mk_live_x"
+      ],
+      "env": null,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"invalid configuration\",\"var\":\"MAVERICK_DATABASE_URL\",\"reason\":\"required but not set\"}\n{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"invalid configuration\",\"var\":\"MAVERICK_INTERNAL_TOKENS\",\"reason\":\"required but not set\"}\n{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"invalid configuration\",\"var\":\"MAVERICK_CAPTURE_MASTER_KEY\",\"reason\":\"required but not set\"}\n"
+    },
+    {
+      "id": "mcp-stdio-unreachable-db",
+      "go_test": "main.TestRunMCPStdioFailsOnUnreachableDatabase",
+      "args": [
+        "mcp-stdio",
+        "--api-key",
+        "mk_live_x"
+      ],
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick@127.0.0.1:1/maverick?connect_timeout=1&sslmode=disable",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"mcp-stdio: authenticating --api-key\",\"error\":\"looking up api key: failed to connect to `user=maverick database=maverick`: 127.0.0.1:1 (127.0.0.1): dial error: dial tcp 127.0.0.1:1: connect: connection refused\"}\n"
+    },
+    {
+      "id": "serve-missing-config",
+      "go_test": "main.TestRunServeFailsFastNamingMissingVars",
+      "args": [
+        "serve"
+      ],
+      "env": null,
+      "exit_code": 1,
+      "stdout": "{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"invalid configuration\",\"var\":\"MAVERICK_DATABASE_URL\",\"reason\":\"required but not set\"}\n{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"invalid configuration\",\"var\":\"MAVERICK_INTERNAL_TOKENS\",\"reason\":\"required but not set\"}\n{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"invalid configuration\",\"var\":\"MAVERICK_CAPTURE_MASTER_KEY\",\"reason\":\"required but not set\"}\n",
+      "stderr": ""
+    },
+    {
+      "id": "serve-malformed-var",
+      "go_test": "main.TestRunServeFailsFastNamingMalformedVar",
+      "args": [
+        "serve"
+      ],
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_RATELIMIT_RPM": "many"
+      },
+      "exit_code": 1,
+      "stdout": "{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"invalid configuration\",\"var\":\"MAVERICK_RATELIMIT_RPM\",\"reason\":\"must be a positive integer\"}\n",
+      "stderr": ""
+    },
+    {
+      "id": "serve-logs-json",
+      "go_test": "main.TestRunServeLogsJSON",
+      "args": [
+        "serve"
+      ],
+      "env": null,
+      "exit_code": 1,
+      "stdout": "{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"invalid configuration\",\"var\":\"MAVERICK_DATABASE_URL\",\"reason\":\"required but not set\"}\n{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"invalid configuration\",\"var\":\"MAVERICK_INTERNAL_TOKENS\",\"reason\":\"required but not set\"}\n{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"invalid configuration\",\"var\":\"MAVERICK_CAPTURE_MASTER_KEY\",\"reason\":\"required but not set\"}\n",
+      "stderr": ""
+    },
+    {
+      "id": "serve-conflicting-flags",
+      "go_test": "main.TestRunServeRejectsConflictingFlags",
+      "args": [
+        "serve",
+        "--api-only",
+        "--worker-only"
+      ],
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "exit_code": 2,
+      "stdout": "{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"serve: --api-only and --worker-only are mutually exclusive\"}\n",
+      "stderr": ""
+    },
+    {
+      "id": "migrate-missing-config",
+      "go_test": "main.TestRunMigrateFailsFastOnMissingConfig",
+      "args": [
+        "migrate"
+      ],
+      "env": null,
+      "exit_code": 1,
+      "stdout": "{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"invalid configuration\",\"var\":\"MAVERICK_DATABASE_URL\",\"reason\":\"required but not set\"}\n{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"invalid configuration\",\"var\":\"MAVERICK_INTERNAL_TOKENS\",\"reason\":\"required but not set\"}\n{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"invalid configuration\",\"var\":\"MAVERICK_CAPTURE_MASTER_KEY\",\"reason\":\"required but not set\"}\n",
+      "stderr": ""
+    },
+    {
+      "id": "migrate-unreachable-db",
+      "go_test": "main.TestRunMigrateFailsOnUnreachableDatabase",
+      "args": [
+        "migrate"
+      ],
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick@127.0.0.1:1/maverick?connect_timeout=1&sslmode=disable",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "exit_code": 1,
+      "stdout": "{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"migrate failed\",\"error\":\"goose migrations: failed to initialize: failed to connect to `user=maverick database=maverick`: 127.0.0.1:1 (127.0.0.1): dial error: dial tcp 127.0.0.1:1: connect: connection refused\"}\n",
+      "stderr": ""
+    },
+    {
+      "id": "probe-serve-help",
+      "go_test": "",
+      "args": [
+        "serve",
+        "-h"
+      ],
+      "env": null,
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "Usage of serve:\n  -api-only\n    \tserve only the HTTP API (no background workers)\n  -worker-only\n    \trun only background workers (no public API)\n"
+    },
+    {
+      "id": "probe-serve-unknown-flag",
+      "go_test": "",
+      "args": [
+        "serve",
+        "--nope"
+      ],
+      "env": null,
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "flag provided but not defined: -nope\nUsage of serve:\n  -api-only\n    \tserve only the HTTP API (no background workers)\n  -worker-only\n    \trun only background workers (no public API)\n"
+    },
+    {
+      "id": "probe-corpus-status-unreachable-db",
+      "go_test": "",
+      "args": [
+        "corpus",
+        "status"
+      ],
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick@127.0.0.1:1/maverick?connect_timeout=1&sslmode=disable",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "exit_code": 1,
+      "stdout": "{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"connecting to database\",\"error\":\"failed to connect to `user=maverick database=maverick`: 127.0.0.1:1 (127.0.0.1): dial error: dial tcp 127.0.0.1:1: connect: connection refused\"}\n",
+      "stderr": ""
+    },
+    {
+      "id": "probe-demo-run-missing-config",
+      "go_test": "",
+      "args": [
+        "demo-run"
+      ],
+      "env": null,
+      "exit_code": 1,
+      "stdout": "{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"invalid configuration\",\"var\":\"MAVERICK_DATABASE_URL\",\"reason\":\"required but not set\"}\n{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"invalid configuration\",\"var\":\"MAVERICK_INTERNAL_TOKENS\",\"reason\":\"required but not set\"}\n{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"invalid configuration\",\"var\":\"MAVERICK_CAPTURE_MASTER_KEY\",\"reason\":\"required but not set\"}\n",
+      "stderr": ""
+    }
+  ]
+}

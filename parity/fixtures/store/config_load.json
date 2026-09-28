@@ -1,0 +1,2645 @@
+{
+  "description": "config.Load(lookup) cases. Each case: env map passed as the lookup (a key absent from env = unset). ok=true -> config holds the parsed values (durations in seconds; capture_master_key_hex is the decoded 32 bytes re-encoded lowercase). ok=false -> issues is the exact ordered Issue list and error_text the exact Error() string. Cases with go_test empty are extra probes of observed Go behavior, not Go tests; they are still parity targets. The Go tests themselves only assert substrings (var name in error text) and specific fields; the full values here were captured by running the Go code.",
+  "source": "internal/config (Go oracle, captured 2026-09-28)",
+  "cases": [
+    {
+      "id": "defaults",
+      "go_test": "config.TestLoadDefaults",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "",
+        "alerts_webhook_url": "",
+        "anthropic_api_key": "",
+        "batch_job_timeout_seconds": 21600,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 1440,
+        "capture_retention_hours": 72,
+        "catalog_cold_start_nights": 5,
+        "ceiling_buffer": 0.05,
+        "classifier_column": "claude-haiku-4-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "0 3 * * *",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "",
+        "history_retention_days": 365,
+        "internal_addr": ":8081",
+        "internal_tokens": [
+          {
+            "label": "rails",
+            "secret": "s3cret"
+          }
+        ],
+        "judge_pool": [
+          "gemini-3.1-pro/direct",
+          "gpt-5.5/direct"
+        ],
+        "openai_api_key": "",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": ":8080",
+        "ranking_band_balanced": 1.5,
+        "ranking_band_cost": 5.5,
+        "ranking_band_quality": 0,
+        "ranking_noise_band": 0.75,
+        "ratelimit_rpm": 300,
+        "runner_repeats": 3,
+        "runner_timeout_seconds": 120,
+        "scoring_alpha": 0.3,
+        "scoring_lambda_amb": 0.25,
+        "scoring_lambda_var": 0.5,
+        "scoring_min_nights": 3,
+        "smtp_url": "",
+        "spend_nightly_cap_usd": 100,
+        "spend_weekly_cap_usd": 500,
+        "xai_api_key": ""
+      }
+    },
+    {
+      "id": "overrides",
+      "go_test": "config.TestLoadOverrides",
+      "env": {
+        "MAVERICK_ALERTS_WEBHOOK_SECRET": "whsec",
+        "MAVERICK_ALERTS_WEBHOOK_URL": "https://ops.example.com/hooks/maverick",
+        "MAVERICK_ANTHROPIC_API_KEY": "sk-ant-test",
+        "MAVERICK_BATCH_JOB_TIMEOUT": "8h",
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_CAPTURE_MAX_WINDOW_MINUTES": "120",
+        "MAVERICK_CAPTURE_RETENTION_HOURS": "24",
+        "MAVERICK_CATALOG_COLD_START_NIGHTS": "7",
+        "MAVERICK_CEILING_BUFFER": "0.1",
+        "MAVERICK_CLASSIFIER_COLUMN": "claude-haiku-5/direct",
+        "MAVERICK_CRON_NIGHTLY": "30 3 * * *",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_GOOGLE_API_KEY": "goog-test",
+        "MAVERICK_HISTORY_RETENTION_DAYS": "30",
+        "MAVERICK_INTERNAL_ADDR": ":9091",
+        "MAVERICK_INTERNAL_TOKENS": "rails:one,ops:two",
+        "MAVERICK_JUDGE_POOL": "gpt-6/direct, claude-opus-5/direct",
+        "MAVERICK_OPENAI_API_KEY": "sk-oai-test",
+        "MAVERICK_PROVIDERS_ANTHROPIC_MAX_CONCURRENCY": "4",
+        "MAVERICK_PROVIDERS_ANTHROPIC_RPM_LIMIT": "120",
+        "MAVERICK_PUBLIC_ADDR": "127.0.0.1:9090",
+        "MAVERICK_RANKING_BAND_BALANCED": "2",
+        "MAVERICK_RANKING_BAND_COST": "6",
+        "MAVERICK_RANKING_BAND_QUALITY": "0.1",
+        "MAVERICK_RANKING_NOISE_BAND": "1",
+        "MAVERICK_RATELIMIT_RPM": "600",
+        "MAVERICK_RUNNER_REPEATS": "5",
+        "MAVERICK_RUNNER_TIMEOUT": "90s",
+        "MAVERICK_SCORING_ALPHA": "0.5",
+        "MAVERICK_SCORING_LAMBDA_AMB": "0.3",
+        "MAVERICK_SCORING_LAMBDA_VAR": "0.6",
+        "MAVERICK_SCORING_MIN_NIGHTS": "4",
+        "MAVERICK_SMTP_URL": "smtp://user:pw@mail.example.com:587",
+        "MAVERICK_SPEND_NIGHTLY_CAP_USD": "42.5",
+        "MAVERICK_SPEND_WEEKLY_CAP_USD": "200",
+        "MAVERICK_XAI_API_KEY": "xai-test"
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "whsec",
+        "alerts_webhook_url": "https://ops.example.com/hooks/maverick",
+        "anthropic_api_key": "sk-ant-test",
+        "batch_job_timeout_seconds": 28800,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 120,
+        "capture_retention_hours": 24,
+        "catalog_cold_start_nights": 7,
+        "ceiling_buffer": 0.1,
+        "classifier_column": "claude-haiku-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "30 3 * * *",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "goog-test",
+        "history_retention_days": 30,
+        "internal_addr": ":9091",
+        "internal_tokens": [
+          {
+            "label": "rails",
+            "secret": "one"
+          },
+          {
+            "label": "ops",
+            "secret": "two"
+          }
+        ],
+        "judge_pool": [
+          "gpt-6/direct",
+          "claude-opus-5/direct"
+        ],
+        "openai_api_key": "sk-oai-test",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 4,
+            "rpm_limit": 120
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": "127.0.0.1:9090",
+        "ranking_band_balanced": 2,
+        "ranking_band_cost": 6,
+        "ranking_band_quality": 0.1,
+        "ranking_noise_band": 1,
+        "ratelimit_rpm": 600,
+        "runner_repeats": 5,
+        "runner_timeout_seconds": 90,
+        "scoring_alpha": 0.5,
+        "scoring_lambda_amb": 0.3,
+        "scoring_lambda_var": 0.6,
+        "scoring_min_nights": 4,
+        "smtp_url": "smtp://user:pw@mail.example.com:587",
+        "spend_nightly_cap_usd": 42.5,
+        "spend_weekly_cap_usd": 200,
+        "xai_api_key": "xai-test"
+      }
+    },
+    {
+      "id": "required-missing",
+      "go_test": "config.TestLoadRequiredMissing",
+      "env": {},
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_DATABASE_URL",
+          "reason": "required but not set"
+        },
+        {
+          "var": "MAVERICK_INTERNAL_TOKENS",
+          "reason": "required but not set"
+        },
+        {
+          "var": "MAVERICK_CAPTURE_MASTER_KEY",
+          "reason": "required but not set"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_DATABASE_URL: required but not set; MAVERICK_INTERNAL_TOKENS: required but not set; MAVERICK_CAPTURE_MASTER_KEY: required but not set"
+    },
+    {
+      "id": "empty-required-is-missing",
+      "go_test": "config.TestLoadEmptyRequiredIsMissing",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_DATABASE_URL",
+          "reason": "required but not set"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_DATABASE_URL: required but not set"
+    },
+    {
+      "id": "malformed/public_addr_without_port",
+      "go_test": "config.TestLoadMalformedValues/public_addr_without_port",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_PUBLIC_ADDR": "8080"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_PUBLIC_ADDR",
+          "reason": "must be a listen address like \":8080\" or \"host:port\""
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_PUBLIC_ADDR: must be a listen address like \":8080\" or \"host:port\""
+    },
+    {
+      "id": "malformed/public_addr_non-numeric_port",
+      "go_test": "config.TestLoadMalformedValues/public_addr_non-numeric_port",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_PUBLIC_ADDR": ":http"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_PUBLIC_ADDR",
+          "reason": "port must be a number between 0 and 65535"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_PUBLIC_ADDR: port must be a number between 0 and 65535"
+    },
+    {
+      "id": "malformed/internal_addr_port_out_of_range",
+      "go_test": "config.TestLoadMalformedValues/internal_addr_port_out_of_range",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_ADDR": ":99999",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_INTERNAL_ADDR",
+          "reason": "port must be a number between 0 and 65535"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_INTERNAL_ADDR: port must be a number between 0 and 65535"
+    },
+    {
+      "id": "malformed/tokens_missing_separator",
+      "go_test": "config.TestLoadMalformedValues/tokens_missing_separator",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "railssecret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_INTERNAL_TOKENS",
+          "reason": "must be a comma-separated list of \"label:secret\" pairs"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_INTERNAL_TOKENS: must be a comma-separated list of \"label:secret\" pairs"
+    },
+    {
+      "id": "malformed/tokens_empty_label",
+      "go_test": "config.TestLoadMalformedValues/tokens_empty_label",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": ":secret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_INTERNAL_TOKENS",
+          "reason": "must be a comma-separated list of \"label:secret\" pairs"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_INTERNAL_TOKENS: must be a comma-separated list of \"label:secret\" pairs"
+    },
+    {
+      "id": "malformed/tokens_empty_secret",
+      "go_test": "config.TestLoadMalformedValues/tokens_empty_secret",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_INTERNAL_TOKENS",
+          "reason": "must be a comma-separated list of \"label:secret\" pairs"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_INTERNAL_TOKENS: must be a comma-separated list of \"label:secret\" pairs"
+    },
+    {
+      "id": "malformed/master_key_not_hex",
+      "go_test": "config.TestLoadMalformedValues/master_key_not_hex",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_CAPTURE_MASTER_KEY",
+          "reason": "must be 64 hex characters encoding a 32-byte key"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_CAPTURE_MASTER_KEY: must be 64 hex characters encoding a 32-byte key"
+    },
+    {
+      "id": "malformed/master_key_too_short",
+      "go_test": "config.TestLoadMalformedValues/master_key_too_short",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abcdef",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_CAPTURE_MASTER_KEY",
+          "reason": "must be 64 hex characters encoding a 32-byte key"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_CAPTURE_MASTER_KEY: must be 64 hex characters encoding a 32-byte key"
+    },
+    {
+      "id": "malformed/judge_pool_empty_entry",
+      "go_test": "config.TestLoadMalformedValues/judge_pool_empty_entry",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_JUDGE_POOL": "gpt-6/direct,,claude-opus-5/direct"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_JUDGE_POOL",
+          "reason": "must be a comma-separated list of column identifiers with no empty entries"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_JUDGE_POOL: must be a comma-separated list of column identifiers with no empty entries"
+    },
+    {
+      "id": "malformed/nightly_cap_not_a_number",
+      "go_test": "config.TestLoadMalformedValues/nightly_cap_not_a_number",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_SPEND_NIGHTLY_CAP_USD": "ten"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_SPEND_NIGHTLY_CAP_USD",
+          "reason": "must be a finite number"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_SPEND_NIGHTLY_CAP_USD: must be a finite number"
+    },
+    {
+      "id": "malformed/nightly_cap_negative",
+      "go_test": "config.TestLoadMalformedValues/nightly_cap_negative",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_SPEND_NIGHTLY_CAP_USD": "-1"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_SPEND_NIGHTLY_CAP_USD",
+          "reason": "must not be negative"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_SPEND_NIGHTLY_CAP_USD: must not be negative"
+    },
+    {
+      "id": "malformed/alpha_not_a_number",
+      "go_test": "config.TestLoadMalformedValues/alpha_not_a_number",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_SCORING_ALPHA": "abc"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_SCORING_ALPHA",
+          "reason": "must be a finite number"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_SCORING_ALPHA: must be a finite number"
+    },
+    {
+      "id": "malformed/alpha_above_one",
+      "go_test": "config.TestLoadMalformedValues/alpha_above_one",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_SCORING_ALPHA": "1.5"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_SCORING_ALPHA",
+          "reason": "must be a number in (0, 1]"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_SCORING_ALPHA: must be a number in (0, 1]"
+    },
+    {
+      "id": "malformed/alpha_zero",
+      "go_test": "config.TestLoadMalformedValues/alpha_zero",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_SCORING_ALPHA": "0"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_SCORING_ALPHA",
+          "reason": "must be a number in (0, 1]"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_SCORING_ALPHA: must be a number in (0, 1]"
+    },
+    {
+      "id": "malformed/lambda_var_not_a_number",
+      "go_test": "config.TestLoadMalformedValues/lambda_var_not_a_number",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_SCORING_LAMBDA_VAR": "x"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_SCORING_LAMBDA_VAR",
+          "reason": "must be a finite number"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_SCORING_LAMBDA_VAR: must be a finite number"
+    },
+    {
+      "id": "malformed/noise_band_NaN",
+      "go_test": "config.TestLoadMalformedValues/noise_band_NaN",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_RANKING_NOISE_BAND": "NaN"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_RANKING_NOISE_BAND",
+          "reason": "must be a finite number"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_RANKING_NOISE_BAND: must be a finite number"
+    },
+    {
+      "id": "malformed/rpm_non-numeric",
+      "go_test": "config.TestLoadMalformedValues/rpm_non-numeric",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_RATELIMIT_RPM": "many"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_RATELIMIT_RPM",
+          "reason": "must be a positive integer"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_RATELIMIT_RPM: must be a positive integer"
+    },
+    {
+      "id": "malformed/rpm_zero",
+      "go_test": "config.TestLoadMalformedValues/rpm_zero",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_RATELIMIT_RPM": "0"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_RATELIMIT_RPM",
+          "reason": "must be a positive integer"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_RATELIMIT_RPM: must be a positive integer"
+    },
+    {
+      "id": "malformed/rpm_negative",
+      "go_test": "config.TestLoadMalformedValues/rpm_negative",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_RATELIMIT_RPM": "-10"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_RATELIMIT_RPM",
+          "reason": "must be a positive integer"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_RATELIMIT_RPM: must be a positive integer"
+    },
+    {
+      "id": "malformed/retention_days_float",
+      "go_test": "config.TestLoadMalformedValues/retention_days_float",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_HISTORY_RETENTION_DAYS": "12.5",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_HISTORY_RETENTION_DAYS",
+          "reason": "must be a positive integer"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_HISTORY_RETENTION_DAYS: must be a positive integer"
+    },
+    {
+      "id": "malformed/capture_max_window_zero",
+      "go_test": "config.TestLoadMalformedValues/capture_max_window_zero",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_CAPTURE_MAX_WINDOW_MINUTES": "0",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_CAPTURE_MAX_WINDOW_MINUTES",
+          "reason": "must be a positive integer"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_CAPTURE_MAX_WINDOW_MINUTES: must be a positive integer"
+    },
+    {
+      "id": "malformed/capture_retention_hours_negative",
+      "go_test": "config.TestLoadMalformedValues/capture_retention_hours_negative",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_CAPTURE_RETENTION_HOURS": "-1",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_CAPTURE_RETENTION_HOURS",
+          "reason": "must be a positive integer"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_CAPTURE_RETENTION_HOURS: must be a positive integer"
+    },
+    {
+      "id": "malformed/capture_expiry_cron_free_text",
+      "go_test": "config.TestLoadMalformedValues/capture_expiry_cron_free_text",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_CRON_CAPTURE_EXPIRY": "hourly",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_CRON_CAPTURE_EXPIRY",
+          "reason": "must be a 5-field cron expression like \"0 3 * * *\""
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_CRON_CAPTURE_EXPIRY: must be a 5-field cron expression like \"0 3 * * *\""
+    },
+    {
+      "id": "malformed/history_prune_cron_too_few_fields",
+      "go_test": "config.TestLoadMalformedValues/history_prune_cron_too_few_fields",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_CRON_HISTORY_PRUNE": "5 * *",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_CRON_HISTORY_PRUNE",
+          "reason": "must be a 5-field cron expression like \"0 3 * * *\""
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_CRON_HISTORY_PRUNE: must be a 5-field cron expression like \"0 3 * * *\""
+    },
+    {
+      "id": "malformed/min_nights_non-numeric",
+      "go_test": "config.TestLoadMalformedValues/min_nights_non-numeric",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_SCORING_MIN_NIGHTS": "three"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_SCORING_MIN_NIGHTS",
+          "reason": "must be a positive integer"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_SCORING_MIN_NIGHTS: must be a positive integer"
+    },
+    {
+      "id": "malformed/cold_start_nights_zero",
+      "go_test": "config.TestLoadMalformedValues/cold_start_nights_zero",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_CATALOG_COLD_START_NIGHTS": "0",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_CATALOG_COLD_START_NIGHTS",
+          "reason": "must be a positive integer"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_CATALOG_COLD_START_NIGHTS: must be a positive integer"
+    },
+    {
+      "id": "malformed/cron_too_few_fields",
+      "go_test": "config.TestLoadMalformedValues/cron_too_few_fields",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_CRON_NIGHTLY": "3 * *",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_CRON_NIGHTLY",
+          "reason": "must be a 5-field cron expression like \"0 3 * * *\""
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_CRON_NIGHTLY: must be a 5-field cron expression like \"0 3 * * *\""
+    },
+    {
+      "id": "malformed/cron_free_text",
+      "go_test": "config.TestLoadMalformedValues/cron_free_text",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_CRON_WEEKLY": "every sunday",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_CRON_WEEKLY",
+          "reason": "must be a 5-field cron expression like \"0 3 * * *\""
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_CRON_WEEKLY: must be a 5-field cron expression like \"0 3 * * *\""
+    },
+    {
+      "id": "malformed/runner_repeats_zero",
+      "go_test": "config.TestLoadMalformedValues/runner_repeats_zero",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_RUNNER_REPEATS": "0"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_RUNNER_REPEATS",
+          "reason": "must be a positive integer"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_RUNNER_REPEATS: must be a positive integer"
+    },
+    {
+      "id": "malformed/runner_timeout_not_a_duration",
+      "go_test": "config.TestLoadMalformedValues/runner_timeout_not_a_duration",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_RUNNER_TIMEOUT": "120"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_RUNNER_TIMEOUT",
+          "reason": "must be a positive duration like \"120s\""
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_RUNNER_TIMEOUT: must be a positive duration like \"120s\""
+    },
+    {
+      "id": "malformed/runner_timeout_zero",
+      "go_test": "config.TestLoadMalformedValues/runner_timeout_zero",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_RUNNER_TIMEOUT": "0s"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_RUNNER_TIMEOUT",
+          "reason": "must be a positive duration like \"120s\""
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_RUNNER_TIMEOUT: must be a positive duration like \"120s\""
+    },
+    {
+      "id": "malformed/runner_timeout_above_cap",
+      "go_test": "config.TestLoadMalformedValues/runner_timeout_above_cap",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_RUNNER_TIMEOUT": "601s"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_RUNNER_TIMEOUT",
+          "reason": "must not exceed 10m0s"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_RUNNER_TIMEOUT: must not exceed 10m0s"
+    },
+    {
+      "id": "malformed/batch_job_timeout_not_a_duration",
+      "go_test": "config.TestLoadMalformedValues/batch_job_timeout_not_a_duration",
+      "env": {
+        "MAVERICK_BATCH_JOB_TIMEOUT": "21600",
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_BATCH_JOB_TIMEOUT",
+          "reason": "must be a positive duration like \"120s\""
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_BATCH_JOB_TIMEOUT: must be a positive duration like \"120s\""
+    },
+    {
+      "id": "malformed/batch_job_timeout_zero",
+      "go_test": "config.TestLoadMalformedValues/batch_job_timeout_zero",
+      "env": {
+        "MAVERICK_BATCH_JOB_TIMEOUT": "0h",
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_BATCH_JOB_TIMEOUT",
+          "reason": "must be a positive duration like \"120s\""
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_BATCH_JOB_TIMEOUT: must be a positive duration like \"120s\""
+    },
+    {
+      "id": "malformed/batch_job_timeout_negative",
+      "go_test": "config.TestLoadMalformedValues/batch_job_timeout_negative",
+      "env": {
+        "MAVERICK_BATCH_JOB_TIMEOUT": "-1h",
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_BATCH_JOB_TIMEOUT",
+          "reason": "must be a positive duration like \"120s\""
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_BATCH_JOB_TIMEOUT: must be a positive duration like \"120s\""
+    },
+    {
+      "id": "malformed/batch_job_timeout_above_cap",
+      "go_test": "config.TestLoadMalformedValues/batch_job_timeout_above_cap",
+      "env": {
+        "MAVERICK_BATCH_JOB_TIMEOUT": "25h",
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_BATCH_JOB_TIMEOUT",
+          "reason": "must not exceed 24h0m0s"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_BATCH_JOB_TIMEOUT: must not exceed 24h0m0s"
+    },
+    {
+      "id": "malformed/provider_max_concurrency_zero",
+      "go_test": "config.TestLoadMalformedValues/provider_max_concurrency_zero",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_PROVIDERS_OPENAI_MAX_CONCURRENCY": "0"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_PROVIDERS_OPENAI_MAX_CONCURRENCY",
+          "reason": "must be a positive integer"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_PROVIDERS_OPENAI_MAX_CONCURRENCY: must be a positive integer"
+    },
+    {
+      "id": "malformed/provider_rpm_negative",
+      "go_test": "config.TestLoadMalformedValues/provider_rpm_negative",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_PROVIDERS_GOOGLE_RPM_LIMIT": "-1"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_PROVIDERS_GOOGLE_RPM_LIMIT",
+          "reason": "must be a non-negative integer"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_PROVIDERS_GOOGLE_RPM_LIMIT: must be a non-negative integer"
+    },
+    {
+      "id": "malformed/provider_rpm_non-numeric",
+      "go_test": "config.TestLoadMalformedValues/provider_rpm_non-numeric",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_PROVIDERS_XAI_RPM_LIMIT": "fast"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_PROVIDERS_XAI_RPM_LIMIT",
+          "reason": "must be a non-negative integer"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_PROVIDERS_XAI_RPM_LIMIT: must be a non-negative integer"
+    },
+    {
+      "id": "all-issues-at-once",
+      "go_test": "config.TestLoadReportsAllIssuesAtOnce",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_RATELIMIT_RPM": "many",
+        "MAVERICK_SCORING_ALPHA": "2"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_DATABASE_URL",
+          "reason": "required but not set"
+        },
+        {
+          "var": "MAVERICK_SCORING_ALPHA",
+          "reason": "must be a number in (0, 1]"
+        },
+        {
+          "var": "MAVERICK_RATELIMIT_RPM",
+          "reason": "must be a positive integer"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_DATABASE_URL: required but not set; MAVERICK_SCORING_ALPHA: must be a number in (0, 1]; MAVERICK_RATELIMIT_RPM: must be a positive integer"
+    },
+    {
+      "id": "probe/port-plus-sign",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_PUBLIC_ADDR": ":+80"
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "",
+        "alerts_webhook_url": "",
+        "anthropic_api_key": "",
+        "batch_job_timeout_seconds": 21600,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 1440,
+        "capture_retention_hours": 72,
+        "catalog_cold_start_nights": 5,
+        "ceiling_buffer": 0.05,
+        "classifier_column": "claude-haiku-4-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "0 3 * * *",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "",
+        "history_retention_days": 365,
+        "internal_addr": ":8081",
+        "internal_tokens": [
+          {
+            "label": "rails",
+            "secret": "s3cret"
+          }
+        ],
+        "judge_pool": [
+          "gemini-3.1-pro/direct",
+          "gpt-5.5/direct"
+        ],
+        "openai_api_key": "",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": ":+80",
+        "ranking_band_balanced": 1.5,
+        "ranking_band_cost": 5.5,
+        "ranking_band_quality": 0,
+        "ranking_noise_band": 0.75,
+        "ratelimit_rpm": 300,
+        "runner_repeats": 3,
+        "runner_timeout_seconds": 120,
+        "scoring_alpha": 0.3,
+        "scoring_lambda_amb": 0.25,
+        "scoring_lambda_var": 0.5,
+        "scoring_min_nights": 3,
+        "smtp_url": "",
+        "spend_nightly_cap_usd": 100,
+        "spend_weekly_cap_usd": 500,
+        "xai_api_key": ""
+      },
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/port-empty",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_PUBLIC_ADDR": "localhost:"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_PUBLIC_ADDR",
+          "reason": "port must be a number between 0 and 65535"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_PUBLIC_ADDR: port must be a number between 0 and 65535",
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/ipv6-addr",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_PUBLIC_ADDR": "[::1]:8080"
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "",
+        "alerts_webhook_url": "",
+        "anthropic_api_key": "",
+        "batch_job_timeout_seconds": 21600,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 1440,
+        "capture_retention_hours": 72,
+        "catalog_cold_start_nights": 5,
+        "ceiling_buffer": 0.05,
+        "classifier_column": "claude-haiku-4-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "0 3 * * *",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "",
+        "history_retention_days": 365,
+        "internal_addr": ":8081",
+        "internal_tokens": [
+          {
+            "label": "rails",
+            "secret": "s3cret"
+          }
+        ],
+        "judge_pool": [
+          "gemini-3.1-pro/direct",
+          "gpt-5.5/direct"
+        ],
+        "openai_api_key": "",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": "[::1]:8080",
+        "ranking_band_balanced": 1.5,
+        "ranking_band_cost": 5.5,
+        "ranking_band_quality": 0,
+        "ranking_noise_band": 0.75,
+        "ratelimit_rpm": 300,
+        "runner_repeats": 3,
+        "runner_timeout_seconds": 120,
+        "scoring_alpha": 0.3,
+        "scoring_lambda_amb": 0.25,
+        "scoring_lambda_var": 0.5,
+        "scoring_min_nights": 3,
+        "smtp_url": "",
+        "spend_nightly_cap_usd": 100,
+        "spend_weekly_cap_usd": 500,
+        "xai_api_key": ""
+      },
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/tokens-spaces-and-colon-in-secret",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": " a : b:c , ops:two "
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "",
+        "alerts_webhook_url": "",
+        "anthropic_api_key": "",
+        "batch_job_timeout_seconds": 21600,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 1440,
+        "capture_retention_hours": 72,
+        "catalog_cold_start_nights": 5,
+        "ceiling_buffer": 0.05,
+        "classifier_column": "claude-haiku-4-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "0 3 * * *",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "",
+        "history_retention_days": 365,
+        "internal_addr": ":8081",
+        "internal_tokens": [
+          {
+            "label": "a ",
+            "secret": " b:c"
+          },
+          {
+            "label": "ops",
+            "secret": "two"
+          }
+        ],
+        "judge_pool": [
+          "gemini-3.1-pro/direct",
+          "gpt-5.5/direct"
+        ],
+        "openai_api_key": "",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": ":8080",
+        "ranking_band_balanced": 1.5,
+        "ranking_band_cost": 5.5,
+        "ranking_band_quality": 0,
+        "ranking_noise_band": 0.75,
+        "ratelimit_rpm": 300,
+        "runner_repeats": 3,
+        "runner_timeout_seconds": 120,
+        "scoring_alpha": 0.3,
+        "scoring_lambda_amb": 0.25,
+        "scoring_lambda_var": 0.5,
+        "scoring_min_nights": 3,
+        "smtp_url": "",
+        "spend_nightly_cap_usd": 100,
+        "spend_weekly_cap_usd": 500,
+        "xai_api_key": ""
+      },
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/tokens-trailing-comma",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:x,"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_INTERNAL_TOKENS",
+          "reason": "must be a comma-separated list of \"label:secret\" pairs"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_INTERNAL_TOKENS: must be a comma-separated list of \"label:secret\" pairs",
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/master-key-uppercase-hex",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "",
+        "alerts_webhook_url": "",
+        "anthropic_api_key": "",
+        "batch_job_timeout_seconds": 21600,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 1440,
+        "capture_retention_hours": 72,
+        "catalog_cold_start_nights": 5,
+        "ceiling_buffer": 0.05,
+        "classifier_column": "claude-haiku-4-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "0 3 * * *",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "",
+        "history_retention_days": 365,
+        "internal_addr": ":8081",
+        "internal_tokens": [
+          {
+            "label": "rails",
+            "secret": "s3cret"
+          }
+        ],
+        "judge_pool": [
+          "gemini-3.1-pro/direct",
+          "gpt-5.5/direct"
+        ],
+        "openai_api_key": "",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": ":8080",
+        "ranking_band_balanced": 1.5,
+        "ranking_band_cost": 5.5,
+        "ranking_band_quality": 0,
+        "ranking_noise_band": 0.75,
+        "ratelimit_rpm": 300,
+        "runner_repeats": 3,
+        "runner_timeout_seconds": 120,
+        "scoring_alpha": 0.3,
+        "scoring_lambda_amb": 0.25,
+        "scoring_lambda_var": 0.5,
+        "scoring_min_nights": 3,
+        "smtp_url": "",
+        "spend_nightly_cap_usd": 100,
+        "spend_weekly_cap_usd": 500,
+        "xai_api_key": ""
+      },
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/master-key-odd-length",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_CAPTURE_MASTER_KEY",
+          "reason": "must be 64 hex characters encoding a 32-byte key"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_CAPTURE_MASTER_KEY: must be 64 hex characters encoding a 32-byte key",
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/float-exponent",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_SPEND_NIGHTLY_CAP_USD": "1e2"
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "",
+        "alerts_webhook_url": "",
+        "anthropic_api_key": "",
+        "batch_job_timeout_seconds": 21600,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 1440,
+        "capture_retention_hours": 72,
+        "catalog_cold_start_nights": 5,
+        "ceiling_buffer": 0.05,
+        "classifier_column": "claude-haiku-4-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "0 3 * * *",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "",
+        "history_retention_days": 365,
+        "internal_addr": ":8081",
+        "internal_tokens": [
+          {
+            "label": "rails",
+            "secret": "s3cret"
+          }
+        ],
+        "judge_pool": [
+          "gemini-3.1-pro/direct",
+          "gpt-5.5/direct"
+        ],
+        "openai_api_key": "",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": ":8080",
+        "ranking_band_balanced": 1.5,
+        "ranking_band_cost": 5.5,
+        "ranking_band_quality": 0,
+        "ranking_noise_band": 0.75,
+        "ratelimit_rpm": 300,
+        "runner_repeats": 3,
+        "runner_timeout_seconds": 120,
+        "scoring_alpha": 0.3,
+        "scoring_lambda_amb": 0.25,
+        "scoring_lambda_var": 0.5,
+        "scoring_min_nights": 3,
+        "smtp_url": "",
+        "spend_nightly_cap_usd": 100,
+        "spend_weekly_cap_usd": 500,
+        "xai_api_key": ""
+      },
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/float-hex",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_SPEND_NIGHTLY_CAP_USD": "0x1p4"
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "",
+        "alerts_webhook_url": "",
+        "anthropic_api_key": "",
+        "batch_job_timeout_seconds": 21600,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 1440,
+        "capture_retention_hours": 72,
+        "catalog_cold_start_nights": 5,
+        "ceiling_buffer": 0.05,
+        "classifier_column": "claude-haiku-4-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "0 3 * * *",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "",
+        "history_retention_days": 365,
+        "internal_addr": ":8081",
+        "internal_tokens": [
+          {
+            "label": "rails",
+            "secret": "s3cret"
+          }
+        ],
+        "judge_pool": [
+          "gemini-3.1-pro/direct",
+          "gpt-5.5/direct"
+        ],
+        "openai_api_key": "",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": ":8080",
+        "ranking_band_balanced": 1.5,
+        "ranking_band_cost": 5.5,
+        "ranking_band_quality": 0,
+        "ranking_noise_band": 0.75,
+        "ratelimit_rpm": 300,
+        "runner_repeats": 3,
+        "runner_timeout_seconds": 120,
+        "scoring_alpha": 0.3,
+        "scoring_lambda_amb": 0.25,
+        "scoring_lambda_var": 0.5,
+        "scoring_min_nights": 3,
+        "smtp_url": "",
+        "spend_nightly_cap_usd": 16,
+        "spend_weekly_cap_usd": 500,
+        "xai_api_key": ""
+      },
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/float-inf",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_SPEND_NIGHTLY_CAP_USD": "Inf"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_SPEND_NIGHTLY_CAP_USD",
+          "reason": "must be a finite number"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_SPEND_NIGHTLY_CAP_USD: must be a finite number",
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/float-overflow",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_SPEND_NIGHTLY_CAP_USD": "1e400"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_SPEND_NIGHTLY_CAP_USD",
+          "reason": "must be a finite number"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_SPEND_NIGHTLY_CAP_USD: must be a finite number",
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/float-negative-zero",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_CEILING_BUFFER": "-0",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "",
+        "alerts_webhook_url": "",
+        "anthropic_api_key": "",
+        "batch_job_timeout_seconds": 21600,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 1440,
+        "capture_retention_hours": 72,
+        "catalog_cold_start_nights": 5,
+        "ceiling_buffer": -0,
+        "classifier_column": "claude-haiku-4-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "0 3 * * *",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "",
+        "history_retention_days": 365,
+        "internal_addr": ":8081",
+        "internal_tokens": [
+          {
+            "label": "rails",
+            "secret": "s3cret"
+          }
+        ],
+        "judge_pool": [
+          "gemini-3.1-pro/direct",
+          "gpt-5.5/direct"
+        ],
+        "openai_api_key": "",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": ":8080",
+        "ranking_band_balanced": 1.5,
+        "ranking_band_cost": 5.5,
+        "ranking_band_quality": 0,
+        "ranking_noise_band": 0.75,
+        "ratelimit_rpm": 300,
+        "runner_repeats": 3,
+        "runner_timeout_seconds": 120,
+        "scoring_alpha": 0.3,
+        "scoring_lambda_amb": 0.25,
+        "scoring_lambda_var": 0.5,
+        "scoring_min_nights": 3,
+        "smtp_url": "",
+        "spend_nightly_cap_usd": 100,
+        "spend_weekly_cap_usd": 500,
+        "xai_api_key": ""
+      },
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/float-leading-space",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_CEILING_BUFFER": " 0.1",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_CEILING_BUFFER",
+          "reason": "must be a finite number"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_CEILING_BUFFER: must be a finite number",
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/alpha-one",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_SCORING_ALPHA": "1"
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "",
+        "alerts_webhook_url": "",
+        "anthropic_api_key": "",
+        "batch_job_timeout_seconds": 21600,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 1440,
+        "capture_retention_hours": 72,
+        "catalog_cold_start_nights": 5,
+        "ceiling_buffer": 0.05,
+        "classifier_column": "claude-haiku-4-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "0 3 * * *",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "",
+        "history_retention_days": 365,
+        "internal_addr": ":8081",
+        "internal_tokens": [
+          {
+            "label": "rails",
+            "secret": "s3cret"
+          }
+        ],
+        "judge_pool": [
+          "gemini-3.1-pro/direct",
+          "gpt-5.5/direct"
+        ],
+        "openai_api_key": "",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": ":8080",
+        "ranking_band_balanced": 1.5,
+        "ranking_band_cost": 5.5,
+        "ranking_band_quality": 0,
+        "ranking_noise_band": 0.75,
+        "ratelimit_rpm": 300,
+        "runner_repeats": 3,
+        "runner_timeout_seconds": 120,
+        "scoring_alpha": 1,
+        "scoring_lambda_amb": 0.25,
+        "scoring_lambda_var": 0.5,
+        "scoring_min_nights": 3,
+        "smtp_url": "",
+        "spend_nightly_cap_usd": 100,
+        "spend_weekly_cap_usd": 500,
+        "xai_api_key": ""
+      },
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/int-plus-sign",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_RATELIMIT_RPM": "+5"
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "",
+        "alerts_webhook_url": "",
+        "anthropic_api_key": "",
+        "batch_job_timeout_seconds": 21600,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 1440,
+        "capture_retention_hours": 72,
+        "catalog_cold_start_nights": 5,
+        "ceiling_buffer": 0.05,
+        "classifier_column": "claude-haiku-4-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "0 3 * * *",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "",
+        "history_retention_days": 365,
+        "internal_addr": ":8081",
+        "internal_tokens": [
+          {
+            "label": "rails",
+            "secret": "s3cret"
+          }
+        ],
+        "judge_pool": [
+          "gemini-3.1-pro/direct",
+          "gpt-5.5/direct"
+        ],
+        "openai_api_key": "",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": ":8080",
+        "ranking_band_balanced": 1.5,
+        "ranking_band_cost": 5.5,
+        "ranking_band_quality": 0,
+        "ranking_noise_band": 0.75,
+        "ratelimit_rpm": 5,
+        "runner_repeats": 3,
+        "runner_timeout_seconds": 120,
+        "scoring_alpha": 0.3,
+        "scoring_lambda_amb": 0.25,
+        "scoring_lambda_var": 0.5,
+        "scoring_min_nights": 3,
+        "smtp_url": "",
+        "spend_nightly_cap_usd": 100,
+        "spend_weekly_cap_usd": 500,
+        "xai_api_key": ""
+      },
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/int-leading-zero",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_RATELIMIT_RPM": "007"
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "",
+        "alerts_webhook_url": "",
+        "anthropic_api_key": "",
+        "batch_job_timeout_seconds": 21600,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 1440,
+        "capture_retention_hours": 72,
+        "catalog_cold_start_nights": 5,
+        "ceiling_buffer": 0.05,
+        "classifier_column": "claude-haiku-4-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "0 3 * * *",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "",
+        "history_retention_days": 365,
+        "internal_addr": ":8081",
+        "internal_tokens": [
+          {
+            "label": "rails",
+            "secret": "s3cret"
+          }
+        ],
+        "judge_pool": [
+          "gemini-3.1-pro/direct",
+          "gpt-5.5/direct"
+        ],
+        "openai_api_key": "",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": ":8080",
+        "ranking_band_balanced": 1.5,
+        "ranking_band_cost": 5.5,
+        "ranking_band_quality": 0,
+        "ranking_noise_band": 0.75,
+        "ratelimit_rpm": 7,
+        "runner_repeats": 3,
+        "runner_timeout_seconds": 120,
+        "scoring_alpha": 0.3,
+        "scoring_lambda_amb": 0.25,
+        "scoring_lambda_var": 0.5,
+        "scoring_min_nights": 3,
+        "smtp_url": "",
+        "spend_nightly_cap_usd": 100,
+        "spend_weekly_cap_usd": 500,
+        "xai_api_key": ""
+      },
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/duration-compound",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_RUNNER_TIMEOUT": "1m30s"
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "",
+        "alerts_webhook_url": "",
+        "anthropic_api_key": "",
+        "batch_job_timeout_seconds": 21600,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 1440,
+        "capture_retention_hours": 72,
+        "catalog_cold_start_nights": 5,
+        "ceiling_buffer": 0.05,
+        "classifier_column": "claude-haiku-4-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "0 3 * * *",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "",
+        "history_retention_days": 365,
+        "internal_addr": ":8081",
+        "internal_tokens": [
+          {
+            "label": "rails",
+            "secret": "s3cret"
+          }
+        ],
+        "judge_pool": [
+          "gemini-3.1-pro/direct",
+          "gpt-5.5/direct"
+        ],
+        "openai_api_key": "",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": ":8080",
+        "ranking_band_balanced": 1.5,
+        "ranking_band_cost": 5.5,
+        "ranking_band_quality": 0,
+        "ranking_noise_band": 0.75,
+        "ratelimit_rpm": 300,
+        "runner_repeats": 3,
+        "runner_timeout_seconds": 90,
+        "scoring_alpha": 0.3,
+        "scoring_lambda_amb": 0.25,
+        "scoring_lambda_var": 0.5,
+        "scoring_min_nights": 3,
+        "smtp_url": "",
+        "spend_nightly_cap_usd": 100,
+        "spend_weekly_cap_usd": 500,
+        "xai_api_key": ""
+      },
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/duration-fractional",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_RUNNER_TIMEOUT": "1.5m"
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "",
+        "alerts_webhook_url": "",
+        "anthropic_api_key": "",
+        "batch_job_timeout_seconds": 21600,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 1440,
+        "capture_retention_hours": 72,
+        "catalog_cold_start_nights": 5,
+        "ceiling_buffer": 0.05,
+        "classifier_column": "claude-haiku-4-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "0 3 * * *",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "",
+        "history_retention_days": 365,
+        "internal_addr": ":8081",
+        "internal_tokens": [
+          {
+            "label": "rails",
+            "secret": "s3cret"
+          }
+        ],
+        "judge_pool": [
+          "gemini-3.1-pro/direct",
+          "gpt-5.5/direct"
+        ],
+        "openai_api_key": "",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": ":8080",
+        "ranking_band_balanced": 1.5,
+        "ranking_band_cost": 5.5,
+        "ranking_band_quality": 0,
+        "ranking_noise_band": 0.75,
+        "ratelimit_rpm": 300,
+        "runner_repeats": 3,
+        "runner_timeout_seconds": 90,
+        "scoring_alpha": 0.3,
+        "scoring_lambda_amb": 0.25,
+        "scoring_lambda_var": 0.5,
+        "scoring_min_nights": 3,
+        "smtp_url": "",
+        "spend_nightly_cap_usd": 100,
+        "spend_weekly_cap_usd": 500,
+        "xai_api_key": ""
+      },
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/duration-exact-cap",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_RUNNER_TIMEOUT": "600s"
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "",
+        "alerts_webhook_url": "",
+        "anthropic_api_key": "",
+        "batch_job_timeout_seconds": 21600,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 1440,
+        "capture_retention_hours": 72,
+        "catalog_cold_start_nights": 5,
+        "ceiling_buffer": 0.05,
+        "classifier_column": "claude-haiku-4-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "0 3 * * *",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "",
+        "history_retention_days": 365,
+        "internal_addr": ":8081",
+        "internal_tokens": [
+          {
+            "label": "rails",
+            "secret": "s3cret"
+          }
+        ],
+        "judge_pool": [
+          "gemini-3.1-pro/direct",
+          "gpt-5.5/direct"
+        ],
+        "openai_api_key": "",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": ":8080",
+        "ranking_band_balanced": 1.5,
+        "ranking_band_cost": 5.5,
+        "ranking_band_quality": 0,
+        "ranking_noise_band": 0.75,
+        "ratelimit_rpm": 300,
+        "runner_repeats": 3,
+        "runner_timeout_seconds": 600,
+        "scoring_alpha": 0.3,
+        "scoring_lambda_amb": 0.25,
+        "scoring_lambda_var": 0.5,
+        "scoring_min_nights": 3,
+        "smtp_url": "",
+        "spend_nightly_cap_usd": 100,
+        "spend_weekly_cap_usd": 500,
+        "xai_api_key": ""
+      },
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/duration-exact-batch-cap",
+      "go_test": "",
+      "env": {
+        "MAVERICK_BATCH_JOB_TIMEOUT": "24h",
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "",
+        "alerts_webhook_url": "",
+        "anthropic_api_key": "",
+        "batch_job_timeout_seconds": 86400,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 1440,
+        "capture_retention_hours": 72,
+        "catalog_cold_start_nights": 5,
+        "ceiling_buffer": 0.05,
+        "classifier_column": "claude-haiku-4-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "0 3 * * *",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "",
+        "history_retention_days": 365,
+        "internal_addr": ":8081",
+        "internal_tokens": [
+          {
+            "label": "rails",
+            "secret": "s3cret"
+          }
+        ],
+        "judge_pool": [
+          "gemini-3.1-pro/direct",
+          "gpt-5.5/direct"
+        ],
+        "openai_api_key": "",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": ":8080",
+        "ranking_band_balanced": 1.5,
+        "ranking_band_cost": 5.5,
+        "ranking_band_quality": 0,
+        "ranking_noise_band": 0.75,
+        "ratelimit_rpm": 300,
+        "runner_repeats": 3,
+        "runner_timeout_seconds": 120,
+        "scoring_alpha": 0.3,
+        "scoring_lambda_amb": 0.25,
+        "scoring_lambda_var": 0.5,
+        "scoring_min_nights": 3,
+        "smtp_url": "",
+        "spend_nightly_cap_usd": 100,
+        "spend_weekly_cap_usd": 500,
+        "xai_api_key": ""
+      },
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/cron-six-fields",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_CRON_NIGHTLY": "0 0 3 * * *",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_CRON_NIGHTLY",
+          "reason": "must be a 5-field cron expression like \"0 3 * * *\""
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_CRON_NIGHTLY: must be a 5-field cron expression like \"0 3 * * *\"",
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/cron-garbage-five-fields",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_CRON_NIGHTLY": "a b c d e",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "",
+        "alerts_webhook_url": "",
+        "anthropic_api_key": "",
+        "batch_job_timeout_seconds": 21600,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 1440,
+        "capture_retention_hours": 72,
+        "catalog_cold_start_nights": 5,
+        "ceiling_buffer": 0.05,
+        "classifier_column": "claude-haiku-4-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "a b c d e",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "",
+        "history_retention_days": 365,
+        "internal_addr": ":8081",
+        "internal_tokens": [
+          {
+            "label": "rails",
+            "secret": "s3cret"
+          }
+        ],
+        "judge_pool": [
+          "gemini-3.1-pro/direct",
+          "gpt-5.5/direct"
+        ],
+        "openai_api_key": "",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": ":8080",
+        "ranking_band_balanced": 1.5,
+        "ranking_band_cost": 5.5,
+        "ranking_band_quality": 0,
+        "ranking_noise_band": 0.75,
+        "ratelimit_rpm": 300,
+        "runner_repeats": 3,
+        "runner_timeout_seconds": 120,
+        "scoring_alpha": 0.3,
+        "scoring_lambda_amb": 0.25,
+        "scoring_lambda_var": 0.5,
+        "scoring_min_nights": 3,
+        "smtp_url": "",
+        "spend_nightly_cap_usd": 100,
+        "spend_weekly_cap_usd": 500,
+        "xai_api_key": ""
+      },
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/cron-extra-whitespace",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_CRON_NIGHTLY": "  0\t3  * * *  ",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret"
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "",
+        "alerts_webhook_url": "",
+        "anthropic_api_key": "",
+        "batch_job_timeout_seconds": 21600,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 1440,
+        "capture_retention_hours": 72,
+        "catalog_cold_start_nights": 5,
+        "ceiling_buffer": 0.05,
+        "classifier_column": "claude-haiku-4-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "  0\t3  * * *  ",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "",
+        "history_retention_days": 365,
+        "internal_addr": ":8081",
+        "internal_tokens": [
+          {
+            "label": "rails",
+            "secret": "s3cret"
+          }
+        ],
+        "judge_pool": [
+          "gemini-3.1-pro/direct",
+          "gpt-5.5/direct"
+        ],
+        "openai_api_key": "",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": ":8080",
+        "ranking_band_balanced": 1.5,
+        "ranking_band_cost": 5.5,
+        "ranking_band_quality": 0,
+        "ranking_noise_band": 0.75,
+        "ratelimit_rpm": 300,
+        "runner_repeats": 3,
+        "runner_timeout_seconds": 120,
+        "scoring_alpha": 0.3,
+        "scoring_lambda_amb": 0.25,
+        "scoring_lambda_var": 0.5,
+        "scoring_min_nights": 3,
+        "smtp_url": "",
+        "spend_nightly_cap_usd": 100,
+        "spend_weekly_cap_usd": 500,
+        "xai_api_key": ""
+      },
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/judge-pool-single-space-entry",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_JUDGE_POOL": " "
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_JUDGE_POOL",
+          "reason": "must be a comma-separated list of column identifiers with no empty entries"
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_JUDGE_POOL: must be a comma-separated list of column identifiers with no empty entries",
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/rpm-limit-zero-ok",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_PROVIDERS_OPENAI_RPM_LIMIT": "0"
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "",
+        "alerts_webhook_url": "",
+        "anthropic_api_key": "",
+        "batch_job_timeout_seconds": 21600,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 1440,
+        "capture_retention_hours": 72,
+        "catalog_cold_start_nights": 5,
+        "ceiling_buffer": 0.05,
+        "classifier_column": "claude-haiku-4-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "0 3 * * *",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "",
+        "history_retention_days": 365,
+        "internal_addr": ":8081",
+        "internal_tokens": [
+          {
+            "label": "rails",
+            "secret": "s3cret"
+          }
+        ],
+        "judge_pool": [
+          "gemini-3.1-pro/direct",
+          "gpt-5.5/direct"
+        ],
+        "openai_api_key": "",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": ":8080",
+        "ranking_band_balanced": 1.5,
+        "ranking_band_cost": 5.5,
+        "ranking_band_quality": 0,
+        "ranking_noise_band": 0.75,
+        "ratelimit_rpm": 300,
+        "runner_repeats": 3,
+        "runner_timeout_seconds": 120,
+        "scoring_alpha": 0.3,
+        "scoring_lambda_amb": 0.25,
+        "scoring_lambda_var": 0.5,
+        "scoring_min_nights": 3,
+        "smtp_url": "",
+        "spend_nightly_cap_usd": 100,
+        "spend_weekly_cap_usd": 500,
+        "xai_api_key": ""
+      },
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/lowercase-provider-var-ignored",
+      "go_test": "",
+      "env": {
+        "MAVERICK_CAPTURE_MASTER_KEY": "abababababababababababababababababababababababababababababababab",
+        "MAVERICK_DATABASE_URL": "postgres://maverick:pw@localhost:5432/maverick",
+        "MAVERICK_INTERNAL_TOKENS": "rails:s3cret",
+        "MAVERICK_PROVIDERS_openai_MAX_CONCURRENCY": "0"
+      },
+      "ok": true,
+      "config": {
+        "alerts_webhook_secret": "",
+        "alerts_webhook_url": "",
+        "anthropic_api_key": "",
+        "batch_job_timeout_seconds": 21600,
+        "capture_master_key_hex": "abababababababababababababababababababababababababababababababab",
+        "capture_max_window_minutes": 1440,
+        "capture_retention_hours": 72,
+        "catalog_cold_start_nights": 5,
+        "ceiling_buffer": 0.05,
+        "classifier_column": "claude-haiku-4-5/direct",
+        "cron_capture_expiry": "0 * * * *",
+        "cron_catalog_sync": "10 6 * * *",
+        "cron_history_prune": "0 5 * * *",
+        "cron_latency_probes": "0 * * * *",
+        "cron_nightly": "0 3 * * *",
+        "cron_prediction_lock": "50 2 * * *",
+        "cron_price_sync": "0 6 * * *",
+        "cron_weekly": "0 4 * * 0",
+        "database_url": "postgres://maverick:pw@localhost:5432/maverick",
+        "google_api_key": "",
+        "history_retention_days": 365,
+        "internal_addr": ":8081",
+        "internal_tokens": [
+          {
+            "label": "rails",
+            "secret": "s3cret"
+          }
+        ],
+        "judge_pool": [
+          "gemini-3.1-pro/direct",
+          "gpt-5.5/direct"
+        ],
+        "openai_api_key": "",
+        "provider_limits": {
+          "anthropic": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "google": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "openai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          },
+          "xai": {
+            "max_concurrency": 8,
+            "rpm_limit": 0
+          }
+        },
+        "public_addr": ":8080",
+        "ranking_band_balanced": 1.5,
+        "ranking_band_cost": 5.5,
+        "ranking_band_quality": 0,
+        "ranking_noise_band": 0.75,
+        "ratelimit_rpm": 300,
+        "runner_repeats": 3,
+        "runner_timeout_seconds": 120,
+        "scoring_alpha": 0.3,
+        "scoring_lambda_amb": 0.25,
+        "scoring_lambda_var": 0.5,
+        "scoring_min_nights": 3,
+        "smtp_url": "",
+        "spend_nightly_cap_usd": 100,
+        "spend_weekly_cap_usd": 500,
+        "xai_api_key": ""
+      },
+      "note": "extra probe, not a Go test: observed behavior of the Go oracle"
+    },
+    {
+      "id": "probe/issue-order",
+      "go_test": "",
+      "env": {
+        "MAVERICK_BATCH_JOB_TIMEOUT": "48h",
+        "MAVERICK_CRON_HISTORY_PRUNE": "x",
+        "MAVERICK_INTERNAL_ADDR": "y",
+        "MAVERICK_JUDGE_POOL": ",",
+        "MAVERICK_PROVIDERS_ANTHROPIC_MAX_CONCURRENCY": "0",
+        "MAVERICK_PROVIDERS_XAI_RPM_LIMIT": "-1",
+        "MAVERICK_PUBLIC_ADDR": "x",
+        "MAVERICK_RUNNER_REPEATS": "0",
+        "MAVERICK_RUNNER_TIMEOUT": "700s",
+        "MAVERICK_SCORING_ALPHA": "abc"
+      },
+      "ok": false,
+      "issues": [
+        {
+          "var": "MAVERICK_DATABASE_URL",
+          "reason": "required but not set"
+        },
+        {
+          "var": "MAVERICK_PUBLIC_ADDR",
+          "reason": "must be a listen address like \":8080\" or \"host:port\""
+        },
+        {
+          "var": "MAVERICK_INTERNAL_ADDR",
+          "reason": "must be a listen address like \":8080\" or \"host:port\""
+        },
+        {
+          "var": "MAVERICK_INTERNAL_TOKENS",
+          "reason": "required but not set"
+        },
+        {
+          "var": "MAVERICK_CAPTURE_MASTER_KEY",
+          "reason": "required but not set"
+        },
+        {
+          "var": "MAVERICK_JUDGE_POOL",
+          "reason": "must be a comma-separated list of column identifiers with no empty entries"
+        },
+        {
+          "var": "MAVERICK_RUNNER_REPEATS",
+          "reason": "must be a positive integer"
+        },
+        {
+          "var": "MAVERICK_RUNNER_TIMEOUT",
+          "reason": "must not exceed 10m0s"
+        },
+        {
+          "var": "MAVERICK_PROVIDERS_ANTHROPIC_MAX_CONCURRENCY",
+          "reason": "must be a positive integer"
+        },
+        {
+          "var": "MAVERICK_PROVIDERS_XAI_RPM_LIMIT",
+          "reason": "must be a non-negative integer"
+        },
+        {
+          "var": "MAVERICK_BATCH_JOB_TIMEOUT",
+          "reason": "must not exceed 24h0m0s"
+        },
+        {
+          "var": "MAVERICK_SCORING_ALPHA",
+          "reason": "must be a finite number"
+        },
+        {
+          "var": "MAVERICK_CRON_HISTORY_PRUNE",
+          "reason": "must be a 5-field cron expression like \"0 3 * * *\""
+        }
+      ],
+      "error_text": "invalid configuration: MAVERICK_DATABASE_URL: required but not set; MAVERICK_PUBLIC_ADDR: must be a listen address like \":8080\" or \"host:port\"; MAVERICK_INTERNAL_ADDR: must be a listen address like \":8080\" or \"host:port\"; MAVERICK_INTERNAL_TOKENS: required but not set; MAVERICK_CAPTURE_MASTER_KEY: required but not set; MAVERICK_JUDGE_POOL: must be a comma-separated list of column identifiers with no empty entries; MAVERICK_RUNNER_REPEATS: must be a positive integer; MAVERICK_RUNNER_TIMEOUT: must not exceed 10m0s; MAVERICK_PROVIDERS_ANTHROPIC_MAX_CONCURRENCY: must be a positive integer; MAVERICK_PROVIDERS_XAI_RPM_LIMIT: must be a non-negative integer; MAVERICK_BATCH_JOB_TIMEOUT: must not exceed 24h0m0s; MAVERICK_SCORING_ALPHA: must be a finite number; MAVERICK_CRON_HISTORY_PRUNE: must be a 5-field cron expression like \"0 3 * * *\"",
+      "note": "extra probe, not a Go test: issue order equals evaluation order"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+description: a must_not_include regex rule fails when the forbidden pattern appears
+spec:
+  rules:
+    - { must_not_include: '(?i)\bas an ai\b', regex: true }
+    - { must_include: '\bpython\b', regex: true, case_insensitive: true }
+output: |-
+  As an AI, I suggest the following Python snippet.
+expect:
+  dimensions: { constraint_compliance: 0.5 }
+  detail_contains: ['"kind":"must_not_include"', '"pass":false']

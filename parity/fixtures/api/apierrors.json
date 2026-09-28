@@ -1,0 +1,107 @@
+{
+  "description": "Appendix B error envelope writer (internal/api/apierrors). Every body is JSON + a single trailing \\n (Go json.Encoder). Content-Type header exactly 'application/json'. details is never null: nil/absent details serialize as {}. Key order in the envelope is code, message, details. Keys inside details are emitted in sorted (lexicographic) order because Go marshals map[string]any with sorted keys.",
+  "codes_exact": {
+    "unauthorized": 401,
+    "tenant_suspended": 403,
+    "not_found": 404,
+    "zero_retention_conflict": 409,
+    "capture_expired": 410,
+    "payload_too_large": 413,
+    "invalid_request": 422,
+    "unknown_model": 422,
+    "model_not_in_pool": 422,
+    "unknown_pool": 422,
+    "pool_would_be_empty": 422,
+    "grader_unsupported": 422,
+    "rate_limited": 429,
+    "internal_error": 500
+  },
+  "code_list_order_exact": [
+    "unauthorized",
+    "tenant_suspended",
+    "not_found",
+    "zero_retention_conflict",
+    "capture_expired",
+    "payload_too_large",
+    "invalid_request",
+    "unknown_model",
+    "model_not_in_pool",
+    "unknown_pool",
+    "pool_would_be_empty",
+    "grader_unsupported",
+    "rate_limited",
+    "internal_error"
+  ],
+  "cases": [
+    {
+      "id": "write-envelope-byte-exact",
+      "go_test": "apierrors.TestWriteEnvelopeByteExactAppendixB",
+      "input": {
+        "status": 422,
+        "code": "model_not_in_pool",
+        "message": "allowed_models entry 'gpt-5.5' is not in pool 'vertex-only'",
+        "details": {
+          "entry": "gpt-5.5",
+          "pool": "vertex-only"
+        }
+      },
+      "expected": {
+        "status": 422,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body_exact": "{\"error\":{\"code\":\"model_not_in_pool\",\"message\":\"allowed_models entry 'gpt-5.5' is not in pool 'vertex-only'\",\"details\":{\"entry\":\"gpt-5.5\",\"pool\":\"vertex-only\"}}}\n"
+      }
+    },
+    {
+      "id": "nil-details-empty-object",
+      "go_test": "apierrors.TestWriteNilDetailsMarshalsEmptyObject",
+      "input": {
+        "status": 401,
+        "code": "unauthorized",
+        "message": "missing or invalid API key",
+        "details": null
+      },
+      "expected": {
+        "status": 401,
+        "body_exact": "{\"error\":{\"code\":\"unauthorized\",\"message\":\"missing or invalid API key\",\"details\":{}}}\n"
+      }
+    },
+    {
+      "id": "code-constants",
+      "go_test": "apierrors.TestCodeConstantsMatchAppendixB",
+      "input": null,
+      "expected": {
+        "count": 14,
+        "codes": [
+          "unauthorized",
+          "tenant_suspended",
+          "not_found",
+          "zero_retention_conflict",
+          "capture_expired",
+          "payload_too_large",
+          "invalid_request",
+          "unknown_model",
+          "model_not_in_pool",
+          "unknown_pool",
+          "pool_would_be_empty",
+          "grader_unsupported",
+          "rate_limited",
+          "internal_error"
+        ]
+      }
+    },
+    {
+      "id": "not-found-handler",
+      "go_test": "apierrors.TestNotFoundHandlerWritesEnvelope",
+      "input": {
+        "method": "GET",
+        "path": "/nope"
+      },
+      "expected": {
+        "status": 404,
+        "body_exact": "{\"error\":{\"code\":\"not_found\",\"message\":\"resource not found\",\"details\":{}}}\n"
+      }
+    }
+  ]
+}

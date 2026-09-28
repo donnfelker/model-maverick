@@ -1,0 +1,30 @@
+description: cmd §8.1-style envelope with schema_validity and field_accuracy mapping
+envelope:
+  type: json_schema
+  version: 1
+  weight_dimensions: { schema_validity: 1.0, field_accuracy: 1.0 }
+  spec:
+    schema:
+      type: object
+      required: [parties, effective_date, payment]
+      properties:
+        parties: { type: array, minItems: 2, items: { type: string } }
+        effective_date: { type: string }
+        payment:
+          type: object
+          required: [amount_usd]
+          properties:
+            amount_usd: { type: number }
+    checks:
+      - { path: $.effective_date, equals: "2025-03-01" }
+      - { path: $.payment.amount_usd, numeric: 12500, tolerance: 0 }
+output: |-
+  ```json
+  {
+    "parties": ["Acme Corp", "Beta LLC"],
+    "effective_date": "2025-03-01",
+    "payment": { "amount_usd": 12500 }
+  }
+  ```
+expect:
+  dimensions: { schema_validity: 1.0, field_accuracy: 1.0 }

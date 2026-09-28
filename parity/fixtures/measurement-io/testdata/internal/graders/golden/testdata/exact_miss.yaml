@@ -1,0 +1,8 @@
+description: a wrong answer scores 0, not an error
+spec:
+  answers:
+    - { value: Paris }
+output: London
+expect:
+  dimensions: { answer_correctness: 0.0 }
+  detail_contains: ['"matched":false', '"answer_index":-1']

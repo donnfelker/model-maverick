@@ -1,0 +1,398 @@
+{
+  "cases": [
+    {
+      "expected": [
+        {
+          "provider": "anthropic",
+          "model": "claude-sonnet-4-6",
+          "endpoint": "direct",
+          "column_id": "col_sonnet",
+          "execution_aliases": {
+            "openrouter": "anthropic/claude-sonnet-4.6"
+          },
+          "score": 88,
+          "clears_difficulty": true,
+          "reason": "cheapest column clearing tier 3 structured_extraction at your quality bar in this pool"
+        },
+        {
+          "provider": "anthropic",
+          "model": "claude-opus-4-8",
+          "endpoint": "direct",
+          "column_id": "col_opus",
+          "execution_aliases": {},
+          "score": 91.3,
+          "clears_difficulty": true,
+          "reason": "escalation target"
+        },
+        {
+          "provider": "openai",
+          "model": "gpt-5.5",
+          "endpoint": "direct",
+          "column_id": "col_gpt",
+          "execution_aliases": {},
+          "score": 89,
+          "clears_difficulty": true,
+          "reason": "cross-family alternative"
+        },
+        {
+          "provider": "google",
+          "model": "gemini-3.1-pro",
+          "endpoint": "vertex",
+          "column_id": "col_gemini",
+          "execution_aliases": {},
+          "score": 92,
+          "clears_difficulty": true,
+          "reason": "escalation target"
+        },
+        {
+          "provider": "anthropic",
+          "model": "claude-haiku-4-5",
+          "endpoint": "direct",
+          "column_id": "col_haiku",
+          "execution_aliases": {},
+          "score": 70,
+          "clears_difficulty": false,
+          "reason": "fallback candidate"
+        }
+      ],
+      "function": "recommendations",
+      "go_test": null,
+      "id": "recommendations/pick_clears_balanced",
+      "input": {
+        "capability": "structured_extraction",
+        "columns": [
+          {
+            "endpoint": "direct",
+            "execution_aliases": {
+              "openrouter": "anthropic/claude-sonnet-4.6"
+            },
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "provider": "anthropic"
+          },
+          {
+            "endpoint": "direct",
+            "execution_aliases": {},
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "provider": "anthropic"
+          },
+          {
+            "endpoint": "direct",
+            "execution_aliases": {},
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "provider": "openai"
+          },
+          {
+            "endpoint": "vertex",
+            "execution_aliases": {},
+            "id": "col_gemini",
+            "model_id": "gemini-3.1-pro",
+            "provider": "google"
+          },
+          {
+            "endpoint": "direct",
+            "execution_aliases": {},
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "provider": "anthropic"
+          }
+        ],
+        "difficulty": 3,
+        "mode": "balanced",
+        "ranked": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_sonnet",
+            "family": "anthropic",
+            "quality": 88.04
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_opus",
+            "family": "anthropic",
+            "quality": 91.26
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_gpt",
+            "family": "openai",
+            "quality": 89
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_gemini",
+            "family": "google",
+            "quality": 92
+          },
+          {
+            "clears_difficulty": false,
+            "column_id": "col_haiku",
+            "family": "anthropic",
+            "quality": 70
+          }
+        ]
+      }
+    },
+    {
+      "expected": [
+        {
+          "provider": "anthropic",
+          "model": "claude-haiku-4-5",
+          "endpoint": "direct",
+          "column_id": "col_haiku",
+          "execution_aliases": {},
+          "score": 80,
+          "clears_difficulty": true,
+          "reason": "cheapest in pool"
+        },
+        {
+          "provider": "openai",
+          "model": "gpt-5.5",
+          "endpoint": "direct",
+          "column_id": "col_gpt",
+          "execution_aliases": {},
+          "score": 79,
+          "clears_difficulty": true,
+          "reason": "cross-family alternative"
+        },
+        {
+          "provider": "anthropic",
+          "model": "claude-opus-4-8",
+          "endpoint": "direct",
+          "column_id": "col_opus",
+          "execution_aliases": {},
+          "score": 81,
+          "clears_difficulty": true,
+          "reason": "escalation target"
+        }
+      ],
+      "function": "recommendations",
+      "go_test": null,
+      "id": "recommendations/pick_clears_cost",
+      "input": {
+        "capability": "factual_qa",
+        "columns": [
+          {
+            "endpoint": "direct",
+            "execution_aliases": {},
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "provider": "anthropic"
+          },
+          {
+            "endpoint": "direct",
+            "execution_aliases": {},
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "provider": "openai"
+          },
+          {
+            "endpoint": "direct",
+            "execution_aliases": {},
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "provider": "anthropic"
+          }
+        ],
+        "difficulty": 2,
+        "mode": "cost",
+        "ranked": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_haiku",
+            "family": "anthropic",
+            "quality": 80
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_gpt",
+            "family": "openai",
+            "quality": 79
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_opus",
+            "family": "anthropic",
+            "quality": 81
+          }
+        ]
+      }
+    },
+    {
+      "expected": [
+        {
+          "provider": "anthropic",
+          "model": "claude-haiku-4-5",
+          "endpoint": "direct",
+          "column_id": "col_haiku",
+          "execution_aliases": {},
+          "score": 80,
+          "clears_difficulty": false,
+          "reason": "below difficulty ceiling — best available"
+        },
+        {
+          "provider": "openai",
+          "model": "gpt-5.5",
+          "endpoint": "direct",
+          "column_id": "col_gpt",
+          "execution_aliases": {},
+          "score": null,
+          "clears_difficulty": true,
+          "reason": "cross-family alternative"
+        }
+      ],
+      "function": "recommendations",
+      "go_test": null,
+      "id": "recommendations/pick_below_ceiling_cost",
+      "input": {
+        "capability": "code_generation",
+        "columns": [
+          {
+            "endpoint": "direct",
+            "execution_aliases": {},
+            "id": "col_haiku",
+            "model_id": "claude-haiku-4-5",
+            "provider": "anthropic"
+          },
+          {
+            "endpoint": "direct",
+            "execution_aliases": {},
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "provider": "openai"
+          }
+        ],
+        "difficulty": 5,
+        "mode": "cost",
+        "ranked": [
+          {
+            "clears_difficulty": false,
+            "column_id": "col_haiku",
+            "family": "anthropic",
+            "quality": 80
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_gpt",
+            "family": "openai",
+            "quality": null
+          }
+        ]
+      }
+    },
+    {
+      "expected": [
+        {
+          "provider": "anthropic",
+          "model": "claude-opus-4-8",
+          "endpoint": "direct",
+          "column_id": "col_opus",
+          "execution_aliases": {},
+          "score": null,
+          "clears_difficulty": true,
+          "reason": "cheapest column clearing tier 4 multi_step_reasoning at your quality bar in this pool"
+        },
+        {
+          "provider": "anthropic",
+          "model": "claude-sonnet-4-6",
+          "endpoint": "direct",
+          "column_id": "col_sonnet",
+          "execution_aliases": {
+            "openrouter": "anthropic/claude-sonnet-4.6"
+          },
+          "score": 90,
+          "clears_difficulty": true,
+          "reason": "fallback candidate"
+        },
+        {
+          "provider": "google",
+          "model": "gemini-3.1-pro",
+          "endpoint": "vertex",
+          "column_id": "col_gemini",
+          "execution_aliases": {},
+          "score": 95,
+          "clears_difficulty": true,
+          "reason": "cross-family alternative"
+        },
+        {
+          "provider": "openai",
+          "model": "gpt-5.5",
+          "endpoint": "direct",
+          "column_id": "col_gpt",
+          "execution_aliases": {},
+          "score": 99,
+          "clears_difficulty": true,
+          "reason": "fallback candidate"
+        }
+      ],
+      "function": "recommendations",
+      "go_test": null,
+      "id": "recommendations/pick_quality_mode",
+      "input": {
+        "capability": "multi_step_reasoning",
+        "columns": [
+          {
+            "endpoint": "direct",
+            "execution_aliases": {},
+            "id": "col_opus",
+            "model_id": "claude-opus-4-8",
+            "provider": "anthropic"
+          },
+          {
+            "endpoint": "direct",
+            "execution_aliases": {
+              "openrouter": "anthropic/claude-sonnet-4.6"
+            },
+            "id": "col_sonnet",
+            "model_id": "claude-sonnet-4-6",
+            "provider": "anthropic"
+          },
+          {
+            "endpoint": "vertex",
+            "execution_aliases": {},
+            "id": "col_gemini",
+            "model_id": "gemini-3.1-pro",
+            "provider": "google"
+          },
+          {
+            "endpoint": "direct",
+            "execution_aliases": {},
+            "id": "col_gpt",
+            "model_id": "gpt-5.5",
+            "provider": "openai"
+          }
+        ],
+        "difficulty": 4,
+        "mode": "quality",
+        "ranked": [
+          {
+            "clears_difficulty": true,
+            "column_id": "col_opus",
+            "family": "anthropic",
+            "quality": null
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_sonnet",
+            "family": "anthropic",
+            "quality": 90
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_gemini",
+            "family": "google",
+            "quality": 95
+          },
+          {
+            "clears_difficulty": true,
+            "column_id": "col_gpt",
+            "family": "openai",
+            "quality": 99
+          }
+        ]
+      }
+    }
+  ]
+}

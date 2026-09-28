@@ -1,0 +1,514 @@
+{
+  "about": "providers package: error taxonomy, WrapError classification, retry policy, settings helpers.",
+  "kind_strings": {
+    "0": "unknown",
+    "1": "invalid_request",
+    "2": "rate_limited",
+    "3": "provider_error",
+    "4": "timeout"
+  },
+  "wrap_error_classification": [
+    {
+      "go_test": "providers.TestWrapErrorClassification/429_is_rate_limited",
+      "status": 429,
+      "err": "slow down",
+      "kind": "rate_limited"
+    },
+    {
+      "go_test": "providers.TestWrapErrorClassification/500_is_provider_error",
+      "status": 500,
+      "err": "boom",
+      "kind": "provider_error"
+    },
+    {
+      "go_test": "providers.TestWrapErrorClassification/503_is_provider_error",
+      "status": 503,
+      "err": "unavailable",
+      "kind": "provider_error"
+    },
+    {
+      "go_test": "providers.TestWrapErrorClassification/400_is_invalid_request",
+      "status": 400,
+      "err": "bad",
+      "kind": "invalid_request"
+    },
+    {
+      "go_test": "providers.TestWrapErrorClassification/404_is_invalid_request",
+      "status": 404,
+      "err": "missing",
+      "kind": "invalid_request"
+    },
+    {
+      "go_test": "providers.TestWrapErrorClassification/422_is_invalid_request",
+      "status": 422,
+      "err": "unprocessable",
+      "kind": "invalid_request"
+    },
+    {
+      "go_test": "providers.TestWrapErrorClassification/deadline_exceeded_is_timeout",
+      "status": 0,
+      "err": "<context.DeadlineExceeded>",
+      "kind": "timeout"
+    },
+    {
+      "go_test": "providers.TestWrapErrorClassification/wrapped_deadline_is_timeout",
+      "status": 0,
+      "err": "<join(request failed, DeadlineExceeded)>",
+      "kind": "timeout"
+    },
+    {
+      "go_test": "providers.TestWrapErrorClassification/canceled_is_timeout",
+      "status": 0,
+      "err": "<context.Canceled>",
+      "kind": "timeout"
+    },
+    {
+      "go_test": "providers.TestWrapErrorClassification/transport_failure_is_provider_error",
+      "status": 0,
+      "err": "connection reset",
+      "kind": "provider_error"
+    },
+    {
+      "probe": true,
+      "status": 200,
+      "err": "x",
+      "kind": "provider_error",
+      "note": "any status < 400 other than timeout errors is provider_error"
+    },
+    {
+      "probe": true,
+      "status": 408,
+      "err": "x",
+      "kind": "invalid_request"
+    },
+    {
+      "probe": true,
+      "status": 429,
+      "err": "<context.DeadlineExceeded>",
+      "kind": "timeout",
+      "note": "timeout check precedes status"
+    }
+  ],
+  "kind_of": {
+    "go_test": "providers.TestKindOf",
+    "wrap_429": "rate_limited",
+    "plain_error": "unknown"
+  },
+  "error_message": {
+    "go_test": "providers.TestErrorMessage",
+    "error": {
+      "provider": "anthropic",
+      "kind": "rate_limited",
+      "status": 429,
+      "attempts": 3,
+      "err": "slow down"
+    },
+    "exact": "anthropic: rate_limited (status 429) after 3 attempt(s): slow down",
+    "format": "<provider>: <kind>[ (status <status>) if status != 0][ after <attempts> attempt(s) if attempts > 0][: <inner error> if inner != nil]",
+    "more": {
+      "bare": "fake: invalid_request (status 400)",
+      "full": "anthropic: rate_limited (status 429) after 3 attempt(s): slow down",
+      "no status": "openai: provider_error after 2 attempt(s): x",
+      "retry ctx cancel non-provider error": "plain calls=1",
+      "retry ctx timeout": "test: timeout after 1 attempt(s): context deadline exceeded",
+      "unknown kind": "p: unknown"
+    }
+  },
+  "settings_helpers": {
+    "go_test": "providers.TestSettingHelpers",
+    "settings": {
+      "thinking": true,
+      "reasoning": "high",
+      "budget_int": "int 1024",
+      "budget_float": 2048.0,
+      "budget_i64": "int64 4096"
+    },
+    "cases": [
+      {
+        "fn": "SettingBool",
+        "key": "thinking",
+        "value": true,
+        "ok": true
+      },
+      {
+        "fn": "SettingBool",
+        "key": "reasoning",
+        "ok": false
+      },
+      {
+        "fn": "SettingString",
+        "key": "reasoning",
+        "value": "high",
+        "ok": true
+      },
+      {
+        "fn": "SettingInt",
+        "key": "budget_int",
+        "value": 1024,
+        "ok": true
+      },
+      {
+        "fn": "SettingInt",
+        "key": "budget_float",
+        "value": 2048,
+        "ok": true
+      },
+      {
+        "fn": "SettingInt",
+        "key": "budget_i64",
+        "value": 4096,
+        "ok": true
+      },
+      {
+        "fn": "SettingInt",
+        "key": "missing",
+        "ok": false
+      }
+    ],
+    "note": "SettingInt accepts int,int32,int64,uint64,float32,float64 and truncates floats toward zero (2048.9 -> 2048)."
+  },
+  "retry_policy_defaults": {
+    "max_attempts": 3,
+    "base_delay_ms": 250,
+    "max_delay_ms": 4000,
+    "jitter": "uniform [0,1) from math/rand/v2 Float64"
+  },
+  "retry_delay": [
+    {
+      "go_test": "providers.TestRetryPolicyDelayBounds/attempt_1_lower_bound",
+      "base_ms": 100,
+      "max_ms": 400,
+      "jitter": 0,
+      "attempt": 1,
+      "delay_ns": 50000000
+    },
+    {
+      "go_test": "providers.TestRetryPolicyDelayBounds/attempt_2_lower_bound",
+      "base_ms": 100,
+      "max_ms": 400,
+      "jitter": 0,
+      "attempt": 2,
+      "delay_ns": 100000000
+    },
+    {
+      "go_test": "providers.TestRetryPolicyDelayBounds/attempt_3_capped_lower_bound",
+      "base_ms": 100,
+      "max_ms": 400,
+      "jitter": 0,
+      "attempt": 3,
+      "delay_ns": 200000000
+    },
+    {
+      "go_test": "providers.TestRetryPolicyDelayBounds/attempt_4_stays_capped",
+      "base_ms": 100,
+      "max_ms": 400,
+      "jitter": 0,
+      "attempt": 4,
+      "delay_ns": 200000000
+    },
+    {
+      "go_test": "providers.TestRetryPolicyDelayBounds/attempt_1_mid_jitter",
+      "base_ms": 100,
+      "max_ms": 400,
+      "jitter": 0.5,
+      "attempt": 1,
+      "delay_ns": 75000000
+    },
+    {
+      "go_test": "providers.TestRetryPolicyDelayBounds/attempt_2_mid_jitter",
+      "base_ms": 100,
+      "max_ms": 400,
+      "jitter": 0.5,
+      "attempt": 2,
+      "delay_ns": 150000000
+    },
+    {
+      "go_test": "providers.TestRetryPolicyDelayBounds/attempt_3_capped_mid_jitter",
+      "base_ms": 100,
+      "max_ms": 400,
+      "jitter": 0.5,
+      "attempt": 3,
+      "delay_ns": 300000000
+    },
+    {
+      "go_test": "providers.TestRetryPolicyDelayBounds/huge_attempt_uses_max_delay",
+      "base_ms": 100,
+      "max_ms": 400,
+      "jitter": 0.5,
+      "attempt": 63,
+      "delay_ns": 300000000
+    },
+    {
+      "go_test": "providers.TestRetryPolicyDelayUpperBoundExclusive",
+      "base_ms": 100,
+      "max_ms": 400,
+      "jitter": 0.999999,
+      "attempts": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "expect": "full/2 <= d < full where full = min(100ms<<(a-1), 400ms)"
+    }
+  ],
+  "retry_delay_default_policy_probes": [
+    {
+      "Attempt": 0,
+      "Jitter": 0,
+      "Delay": "2s",
+      "Nanos": 2000000000
+    },
+    {
+      "Attempt": 1,
+      "Jitter": 0,
+      "Delay": "125ms",
+      "Nanos": 125000000
+    },
+    {
+      "Attempt": 2,
+      "Jitter": 0,
+      "Delay": "250ms",
+      "Nanos": 250000000
+    },
+    {
+      "Attempt": 3,
+      "Jitter": 0,
+      "Delay": "500ms",
+      "Nanos": 500000000
+    },
+    {
+      "Attempt": 4,
+      "Jitter": 0,
+      "Delay": "1s",
+      "Nanos": 1000000000
+    },
+    {
+      "Attempt": 5,
+      "Jitter": 0,
+      "Delay": "2s",
+      "Nanos": 2000000000
+    },
+    {
+      "Attempt": 6,
+      "Jitter": 0,
+      "Delay": "2s",
+      "Nanos": 2000000000
+    },
+    {
+      "Attempt": 7,
+      "Jitter": 0,
+      "Delay": "2s",
+      "Nanos": 2000000000
+    },
+    {
+      "Attempt": 0,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": 1,
+      "Jitter": 0.5,
+      "Delay": "187.5ms",
+      "Nanos": 187500000
+    },
+    {
+      "Attempt": 2,
+      "Jitter": 0.5,
+      "Delay": "375ms",
+      "Nanos": 375000000
+    },
+    {
+      "Attempt": 3,
+      "Jitter": 0.5,
+      "Delay": "750ms",
+      "Nanos": 750000000
+    },
+    {
+      "Attempt": 4,
+      "Jitter": 0.5,
+      "Delay": "1.5s",
+      "Nanos": 1500000000
+    },
+    {
+      "Attempt": 5,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": 6,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": 7,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": 0,
+      "Jitter": 0.999999,
+      "Delay": "3.999998s",
+      "Nanos": 3999998000
+    },
+    {
+      "Attempt": 1,
+      "Jitter": 0.999999,
+      "Delay": "249.999875ms",
+      "Nanos": 249999875
+    },
+    {
+      "Attempt": 2,
+      "Jitter": 0.999999,
+      "Delay": "499.99975ms",
+      "Nanos": 499999750
+    },
+    {
+      "Attempt": 3,
+      "Jitter": 0.999999,
+      "Delay": "999.9995ms",
+      "Nanos": 999999500
+    },
+    {
+      "Attempt": 4,
+      "Jitter": 0.999999,
+      "Delay": "1.999999s",
+      "Nanos": 1999999000
+    },
+    {
+      "Attempt": 5,
+      "Jitter": 0.999999,
+      "Delay": "3.999998s",
+      "Nanos": 3999998000
+    },
+    {
+      "Attempt": 6,
+      "Jitter": 0.999999,
+      "Delay": "3.999998s",
+      "Nanos": 3999998000
+    },
+    {
+      "Attempt": 7,
+      "Jitter": 0.999999,
+      "Delay": "3.999998s",
+      "Nanos": 3999998000
+    },
+    {
+      "Attempt": 31,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": 32,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": 33,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": 63,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": 64,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": -1,
+      "Jitter": 0.5,
+      "Delay": "3s",
+      "Nanos": 3000000000
+    },
+    {
+      "Attempt": 1,
+      "Jitter": 0.3333333333333333,
+      "Delay": "base100ms max400ms: 66.666666ms",
+      "Nanos": 66666666
+    }
+  ],
+  "retry_loop": [
+    {
+      "go_test": "providers.TestRetrySucceedsFirstTry",
+      "fn_results": [
+        "nil"
+      ],
+      "calls": 1,
+      "result": "nil"
+    },
+    {
+      "go_test": "providers.TestRetryRecoversFromRetryableErrors",
+      "fn_results": [
+        "wrap(test,429)",
+        "wrap(test,429)",
+        "nil"
+      ],
+      "calls": 3,
+      "result": "nil"
+    },
+    {
+      "go_test": "providers.TestRetryExhaustsAndStampsAttempts",
+      "fn_results": [
+        "wrap(test,503) always"
+      ],
+      "calls": 3,
+      "result": {
+        "kind": "provider_error",
+        "attempts": 3
+      }
+    },
+    {
+      "go_test": "providers.TestRetryStopsOnNonRetryable",
+      "fn_results": [
+        "wrap(test,400)"
+      ],
+      "calls": 1,
+      "result": {
+        "kind": "invalid_request",
+        "attempts": 1
+      }
+    },
+    {
+      "go_test": "providers.TestRetryStopsOnTimeoutKind",
+      "fn_results": [
+        "wrap(test,0,DeadlineExceeded)"
+      ],
+      "calls": 1,
+      "result": {
+        "kind": "timeout"
+      }
+    },
+    {
+      "go_test": "providers.TestRetryHonorsContextMidBackoff",
+      "ctx_timeout_ms": 20,
+      "policy": {
+        "base_ms": 500,
+        "max_ms": 1000
+      },
+      "fn_results": [
+        "wrap(test,429) always"
+      ],
+      "calls": 1,
+      "result": {
+        "kind": "timeout",
+        "provider": "test",
+        "attempts": 1,
+        "unwraps_to": "context.DeadlineExceeded",
+        "message": "test: timeout after 1 attempt(s): context deadline exceeded"
+      }
+    }
+  ]
+}

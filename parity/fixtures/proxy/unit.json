@@ -1,0 +1,801 @@
+{
+  "area": "proxy",
+  "source": "Literal outputs from calling the Go internal/proxy pure functions in a scratch copy. Rows whose name starts with EXTRA have no Go test; they record observed Go behavior and are parity targets.",
+  "notes": {
+    "parse_alias": "error values: not_maverick_alias | malformed_alias. Both surface as the identical HTTP 400 invalid_model_alias. mode is the ENGINE mode (auto -> balanced). pool empty string means no pool field is sent.",
+    "extract_last_user_text": "ok=false means the caller sends the declared fallback workload {capability: multi_step_reasoning, difficulty: 3}. text is only meaningful when ok=true.",
+    "bearer_token": "input is the first Authorization header value (Header.Get); output \"\" means no client credential.",
+    "rewrite_model": "normalizer: none | chat (reasoning_effort) | messages (output_config.effort). output_body is byte-exact. error=true means the attempt is skipped silently (not counted as an attempt).",
+    "build_upstream_headers": "base header set before the per-attempt credential header and (messages surface) anthropic-version default are applied. Header names canonical MIME form.",
+    "load_config": "config shows the parsed Config struct field values; error is the exact error string.",
+    "parse_usage": "null means field omitted from the telemetry item. Non-integer numbers make the whole parse fail (both null)."
+  },
+  "bearer_token": [
+    {
+      "header": "",
+      "token": "",
+      "id": "bearer_token-0"
+    },
+    {
+      "header": "Bearer ",
+      "token": "",
+      "id": "bearer_token-1"
+    },
+    {
+      "header": "Bearer x",
+      "token": "x",
+      "id": "bearer_token-2"
+    },
+    {
+      "header": "bearer x",
+      "token": "x",
+      "id": "bearer_token-3"
+    },
+    {
+      "header": "BEARER x",
+      "token": "x",
+      "id": "bearer_token-4"
+    },
+    {
+      "header": "Bearer  x ",
+      "token": " x ",
+      "id": "bearer_token-5"
+    },
+    {
+      "header": "Basic abc",
+      "token": "",
+      "id": "bearer_token-6"
+    },
+    {
+      "header": "Bearerx",
+      "token": "",
+      "id": "bearer_token-7"
+    },
+    {
+      "header": "Bearer\tx",
+      "token": "",
+      "id": "bearer_token-8"
+    },
+    {
+      "header": "Token x",
+      "token": "",
+      "id": "bearer_token-9"
+    }
+  ],
+  "build_upstream_headers": [
+    {
+      "client_headers": [
+        [
+          "Host",
+          "x"
+        ],
+        [
+          "Content-Length",
+          "10"
+        ],
+        [
+          "Authorization",
+          "Bearer c"
+        ],
+        [
+          "X-Api-Key",
+          "k"
+        ],
+        [
+          "Connection",
+          "keep-alive, X-Dyn"
+        ],
+        [
+          "Keep-Alive",
+          "t"
+        ],
+        [
+          "Proxy-Authenticate",
+          "a"
+        ],
+        [
+          "Proxy-Authorization",
+          "b"
+        ],
+        [
+          "Te",
+          "trailers"
+        ],
+        [
+          "Trailer",
+          "x"
+        ],
+        [
+          "Transfer-Encoding",
+          "chunked"
+        ],
+        [
+          "Upgrade",
+          "h2c"
+        ],
+        [
+          "X-Dyn",
+          "v"
+        ],
+        [
+          "X-Keep",
+          "1"
+        ],
+        [
+          "Anthropic-Beta",
+          "b1"
+        ],
+        [
+          "Anthropic-Beta",
+          "b2"
+        ],
+        [
+          "Content-Type",
+          "text/plain"
+        ]
+      ],
+      "name": "strip list",
+      "upstream_base_headers": {
+        "Anthropic-Beta": [
+          "b1",
+          "b2"
+        ],
+        "Content-Type": [
+          "text/plain"
+        ],
+        "X-Keep": [
+          "1"
+        ]
+      },
+      "id": "build_upstream_headers-0"
+    },
+    {
+      "client_headers": [
+        [
+          "X-Keep",
+          "1"
+        ]
+      ],
+      "name": "content-type default",
+      "upstream_base_headers": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "X-Keep": [
+          "1"
+        ]
+      },
+      "id": "build_upstream_headers-1"
+    },
+    {
+      "client_headers": [
+        [
+          "X-Maverick-Api-Key",
+          "mk_tenant"
+        ]
+      ],
+      "name": "maverick key header is forwarded in Go",
+      "upstream_base_headers": {
+        "Content-Type": [
+          "application/json"
+        ],
+        "X-Maverick-Api-Key": [
+          "mk_tenant"
+        ]
+      },
+      "id": "build_upstream_headers-2"
+    }
+  ],
+  "extract_last_user_text": [
+    {
+      "body": "{\"messages\":[{\"role\":\"system\",\"content\":\"sys\"},{\"role\":\"user\",\"content\":\"first question\"},{\"role\":\"assistant\",\"content\":\"answer\"},{\"role\":\"user\",\"content\":\"second question, the real one\"}]}",
+      "name": "string content, last user message wins",
+      "ok": true,
+      "text": "second question, the real one",
+      "id": "extract_last_user_text-0"
+    },
+    {
+      "body": "{\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"part A \"},{\"type\":\"image_url\",\"image_url\":{\"url\":\"http://example.com/x.png\"}},{\"type\":\"text\",\"text\":\"part B\"}]}]}",
+      "name": "array content, concatenates text parts only",
+      "ok": true,
+      "text": "part A part B",
+      "id": "extract_last_user_text-1"
+    },
+    {
+      "body": "{\"messages\":[{\"role\":\"system\",\"content\":\"sys\"},{\"role\":\"assistant\",\"content\":\"hi\"}]}",
+      "name": "no user message at all",
+      "ok": false,
+      "text": "",
+      "id": "extract_last_user_text-2"
+    },
+    {
+      "body": "{\"model\":\"maverick/auto\"}",
+      "name": "no messages field",
+      "ok": false,
+      "text": "",
+      "id": "extract_last_user_text-3"
+    },
+    {
+      "body": "{\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"image_url\",\"image_url\":{\"url\":\"http://example.com/x.png\"}}]}]}",
+      "name": "last user message has only non-text parts",
+      "ok": false,
+      "text": "",
+      "id": "extract_last_user_text-4"
+    },
+    {
+      "body": "{\"messages\":[{\"role\":\"user\",\"content\":\"\"}]}",
+      "name": "last user message content is empty string",
+      "ok": false,
+      "text": "",
+      "id": "extract_last_user_text-5"
+    },
+    {
+      "body": "not json",
+      "name": "malformed JSON",
+      "ok": false,
+      "text": "",
+      "id": "extract_last_user_text-6"
+    },
+    {
+      "body": "{\"messages\":[{\"role\":\"user\",\"content\":\"earlier\"},{\"role\":\"user\",\"content\":\"\"}]}",
+      "name": "EXTRA last user empty does not fall back to earlier user",
+      "ok": false,
+      "text": "",
+      "id": "extract_last_user_text-7"
+    },
+    {
+      "body": "{\"messages\":[{\"role\":\"user\",\"content\":\"q\"},{\"role\":\"assistant\",\"content\":\"a\"}]}",
+      "name": "EXTRA trailing assistant after user",
+      "ok": true,
+      "text": "q",
+      "id": "extract_last_user_text-8"
+    },
+    {
+      "body": "{\"messages\":[{\"role\":\"User\",\"content\":\"q\"}]}",
+      "name": "EXTRA role match is case-sensitive",
+      "ok": false,
+      "text": "",
+      "id": "extract_last_user_text-9"
+    },
+    {
+      "body": "{\"Messages\":[{\"ROLE\":\"user\",\"Content\":[{\"TYPE\":\"text\",\"Text\":\"k\"}]}]}",
+      "name": "EXTRA JSON keys match case-insensitively",
+      "ok": true,
+      "text": "k",
+      "id": "extract_last_user_text-10"
+    },
+    {
+      "body": "{\"messages\":[{\"role\":\"user\",\"content\":null}]}",
+      "name": "EXTRA null content",
+      "ok": false,
+      "text": "",
+      "id": "extract_last_user_text-11"
+    },
+    {
+      "body": "{\"messages\":[{\"role\":\"user\",\"content\":42}]}",
+      "name": "EXTRA numeric content",
+      "ok": false,
+      "text": "",
+      "id": "extract_last_user_text-12"
+    },
+    {
+      "body": "{\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"Text\",\"text\":\"x\"},{\"type\":\"input_text\",\"text\":\"y\"},{\"type\":\"text\",\"text\":\"z\"}]}]}",
+      "name": "EXTRA type field exact 'text' only",
+      "ok": true,
+      "text": "z",
+      "id": "extract_last_user_text-13"
+    },
+    {
+      "body": "{\"messages\":[{\"role\":\"user\",\"content\":\"ok\"},{\"role\":5}]}",
+      "name": "EXTRA one malformed message element voids the whole parse",
+      "ok": false,
+      "text": "",
+      "id": "extract_last_user_text-14"
+    },
+    {
+      "body": "{\"messages\":\"hi\"}",
+      "name": "EXTRA messages not an array",
+      "ok": false,
+      "text": "",
+      "id": "extract_last_user_text-15"
+    },
+    {
+      "body": "{\"messages\":[{\"role\":\"user\",\"content\":\"   \"}]}",
+      "name": "EXTRA whitespace-only text is kept",
+      "ok": true,
+      "text": "   ",
+      "id": "extract_last_user_text-16"
+    },
+    {
+      "body": "{\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":1}]}]}",
+      "name": "EXTRA part with non-string text voids array",
+      "ok": false,
+      "text": "",
+      "id": "extract_last_user_text-17"
+    },
+    {
+      "body": "{\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t\",\"content\":\"r\"}]}]}",
+      "name": "EXTRA tool_result blocks ignored (anthropic)",
+      "ok": false,
+      "text": "",
+      "id": "extract_last_user_text-18"
+    },
+    {
+      "body": "{\"messages\":[{\"role\":\"user\",\"content\":\"a�b\"}]}",
+      "name": "EXTRA invalid UTF-8 replaced by U+FFFD",
+      "ok": true,
+      "text": "a�b",
+      "id": "extract_last_user_text-19"
+    },
+    {
+      "body": "{\"messages\":[{\"role\":\"user\",\"content\":\"\\u00e9\\ud83d\\ude00\"}]}",
+      "name": "EXTRA escaped unicode decoded",
+      "ok": true,
+      "text": "é😀",
+      "id": "extract_last_user_text-20"
+    },
+    {
+      "body_generator": "content = 'a' repeated 101000 times",
+      "name": "TestExtractLastUserText_Caps: 101000 x 'a' capped",
+      "ok": true,
+      "text_generator": "'a' repeated 100000 times",
+      "text_rune_count": 100000,
+      "id": "extract_last_user_text-21"
+    },
+    {
+      "body_generator": "content = U+00E9 repeated 100005 times",
+      "name": "EXTRA cap counts Unicode scalar values (runes), not bytes",
+      "ok": true,
+      "text_byte_count": 200000,
+      "text_rune_count": 100000,
+      "id": "extract_last_user_text-22"
+    }
+  ],
+  "load_config": [
+    {
+      "env": {},
+      "error": "MAVERICK_API_KEY: required but not set",
+      "id": "load_config-0"
+    },
+    {
+      "env": {
+        "MAVERICK_API_KEY": ""
+      },
+      "error": "MAVERICK_API_KEY: required but not set",
+      "id": "load_config-1"
+    },
+    {
+      "config": {
+        "EngineURL": "http://localhost:8080",
+        "APIKey": "mk",
+        "Addr": ":8090",
+        "Telemetry": true,
+        "OTLPEndpoint": "",
+        "OTLPServiceName": "maverick-proxy",
+        "UpstreamOpenAI": "https://api.openai.com",
+        "UpstreamAnthropic": "https://api.anthropic.com",
+        "UpstreamGoogle": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "UpstreamXAI": "https://api.x.ai",
+        "AnthropicAPIKey": "",
+        "OpenAIAPIKey": "",
+        "GeminiAPIKey": "",
+        "XAIAPIKey": ""
+      },
+      "env": {
+        "MAVERICK_API_KEY": "mk"
+      },
+      "id": "load_config-2"
+    },
+    {
+      "config": {
+        "EngineURL": "http://e:1",
+        "APIKey": "mk",
+        "Addr": ":8090",
+        "Telemetry": false,
+        "OTLPEndpoint": "http://c:4318",
+        "OTLPServiceName": "maverick-proxy",
+        "UpstreamOpenAI": "http://o/",
+        "UpstreamAnthropic": "https://api.anthropic.com",
+        "UpstreamGoogle": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "UpstreamXAI": "https://api.x.ai",
+        "AnthropicAPIKey": "",
+        "OpenAIAPIKey": "",
+        "GeminiAPIKey": "",
+        "XAIAPIKey": ""
+      },
+      "env": {
+        "MAVERICK_API_KEY": "mk",
+        "MAVERICK_ENGINE_URL": "http://e:1/",
+        "MAVERICK_PROXY_ADDR": "",
+        "MAVERICK_PROXY_OTLP_ENDPOINT": "http://c:4318/",
+        "MAVERICK_PROXY_TELEMETRY": "OFF",
+        "MAVERICK_UPSTREAM_OPENAI": "http://o//"
+      },
+      "id": "load_config-3"
+    },
+    {
+      "config": {
+        "EngineURL": "http://localhost:8080",
+        "APIKey": "mk",
+        "Addr": ":8090",
+        "Telemetry": true,
+        "OTLPEndpoint": "",
+        "OTLPServiceName": "maverick-proxy",
+        "UpstreamOpenAI": "https://api.openai.com",
+        "UpstreamAnthropic": "https://api.anthropic.com",
+        "UpstreamGoogle": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "UpstreamXAI": "https://api.x.ai",
+        "AnthropicAPIKey": "",
+        "OpenAIAPIKey": "",
+        "GeminiAPIKey": "",
+        "XAIAPIKey": ""
+      },
+      "env": {
+        "MAVERICK_API_KEY": "mk",
+        "MAVERICK_PROXY_TELEMETRY": "false"
+      },
+      "id": "load_config-4"
+    },
+    {
+      "config": {
+        "EngineURL": "http://localhost:8080",
+        "APIKey": "mk",
+        "Addr": ":8090",
+        "Telemetry": true,
+        "OTLPEndpoint": "",
+        "OTLPServiceName": "maverick-proxy",
+        "UpstreamOpenAI": "https://api.openai.com",
+        "UpstreamAnthropic": "https://api.anthropic.com",
+        "UpstreamGoogle": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "UpstreamXAI": "https://api.x.ai",
+        "AnthropicAPIKey": "",
+        "OpenAIAPIKey": "",
+        "GeminiAPIKey": "",
+        "XAIAPIKey": ""
+      },
+      "env": {
+        "MAVERICK_API_KEY": "mk",
+        "MAVERICK_PROXY_TELEMETRY": " off"
+      },
+      "id": "load_config-5"
+    }
+  ],
+  "parse_alias": [
+    {
+      "mode": "balanced",
+      "model": "maverick/auto",
+      "pool": "",
+      "id": "parse_alias-0"
+    },
+    {
+      "mode": "quality",
+      "model": "maverick/quality",
+      "pool": "",
+      "id": "parse_alias-1"
+    },
+    {
+      "mode": "cost",
+      "model": "maverick/cost",
+      "pool": "",
+      "id": "parse_alias-2"
+    },
+    {
+      "mode": "balanced",
+      "model": "maverick/prod-pool:auto",
+      "pool": "prod-pool",
+      "id": "parse_alias-3"
+    },
+    {
+      "mode": "quality",
+      "model": "maverick/prod-pool:quality",
+      "pool": "prod-pool",
+      "id": "parse_alias-4"
+    },
+    {
+      "mode": "cost",
+      "model": "maverick/prod-pool:cost",
+      "pool": "prod-pool",
+      "id": "parse_alias-5"
+    },
+    {
+      "error": "not_maverick_alias",
+      "model": "gpt-4o",
+      "id": "parse_alias-6"
+    },
+    {
+      "error": "not_maverick_alias",
+      "model": "claude-sonnet-4-6",
+      "id": "parse_alias-7"
+    },
+    {
+      "error": "not_maverick_alias",
+      "model": "",
+      "id": "parse_alias-8"
+    },
+    {
+      "error": "malformed_alias",
+      "model": "maverick/",
+      "id": "parse_alias-9"
+    },
+    {
+      "error": "malformed_alias",
+      "model": "maverick/fast",
+      "id": "parse_alias-10"
+    },
+    {
+      "error": "malformed_alias",
+      "model": "maverick/prod-pool:fast",
+      "id": "parse_alias-11"
+    },
+    {
+      "error": "malformed_alias",
+      "model": "maverick/:auto",
+      "id": "parse_alias-12"
+    },
+    {
+      "error": "malformed_alias",
+      "model": "maverick/prod-pool:",
+      "id": "parse_alias-13"
+    },
+    {
+      "error": "malformed_alias",
+      "model": "maverick/prod:pool:auto",
+      "id": "parse_alias-14"
+    },
+    {
+      "error": "malformed_alias",
+      "model": "maverick/balanced",
+      "id": "parse_alias-15"
+    },
+    {
+      "error": "not_maverick_alias",
+      "model": "Maverick/auto",
+      "id": "parse_alias-16"
+    },
+    {
+      "error": "malformed_alias",
+      "model": "maverick/AUTO",
+      "id": "parse_alias-17"
+    },
+    {
+      "error": "malformed_alias",
+      "model": "maverick/ auto",
+      "id": "parse_alias-18"
+    },
+    {
+      "mode": "cost",
+      "model": "maverick/p p:cost",
+      "pool": "p p",
+      "id": "parse_alias-19"
+    },
+    {
+      "mode": "quality",
+      "model": "maverick/pool/x:quality",
+      "pool": "pool/x",
+      "id": "parse_alias-20"
+    },
+    {
+      "error": "malformed_alias",
+      "model": "maverick/:",
+      "id": "parse_alias-21"
+    },
+    {
+      "mode": "balanced",
+      "model": "maverick/auto:auto",
+      "pool": "auto",
+      "id": "parse_alias-22"
+    }
+  ],
+  "parse_usage": [
+    {
+      "body": "{\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":5}}",
+      "messages_tokens_in": null,
+      "messages_tokens_out": null,
+      "openai_tokens_in": 10,
+      "openai_tokens_out": 5,
+      "id": "parse_usage-0"
+    },
+    {
+      "body": "{\"usage\":{\"prompt_tokens\":10}}",
+      "messages_tokens_in": null,
+      "messages_tokens_out": null,
+      "openai_tokens_in": 10,
+      "openai_tokens_out": null,
+      "id": "parse_usage-1"
+    },
+    {
+      "body": "{\"usage\":{\"input_tokens\":7,\"output_tokens\":3}}",
+      "messages_tokens_in": 7,
+      "messages_tokens_out": 3,
+      "openai_tokens_in": null,
+      "openai_tokens_out": null,
+      "id": "parse_usage-2"
+    },
+    {
+      "body": "{}",
+      "messages_tokens_in": null,
+      "messages_tokens_out": null,
+      "openai_tokens_in": null,
+      "openai_tokens_out": null,
+      "id": "parse_usage-3"
+    },
+    {
+      "body": "not json",
+      "messages_tokens_in": null,
+      "messages_tokens_out": null,
+      "openai_tokens_in": null,
+      "openai_tokens_out": null,
+      "id": "parse_usage-4"
+    },
+    {
+      "body": "{\"usage\":{\"prompt_tokens\":1.5}}",
+      "messages_tokens_in": null,
+      "messages_tokens_out": null,
+      "openai_tokens_in": null,
+      "openai_tokens_out": null,
+      "id": "parse_usage-5"
+    },
+    {
+      "body": "{\"usage\":{\"prompt_tokens\":null,\"completion_tokens\":0}}",
+      "messages_tokens_in": null,
+      "messages_tokens_out": null,
+      "openai_tokens_in": null,
+      "openai_tokens_out": 0,
+      "id": "parse_usage-6"
+    }
+  ],
+  "rewrite_model": [
+    {
+      "input_body": "{\"model\":\"maverick/auto\",\"stream\":true,\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7}",
+      "model": "gpt-5.5-mini",
+      "name": "TestRewriteModel",
+      "normalizer": "none",
+      "output_body": "{\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"model\":\"gpt-5.5-mini\",\"stream\":true,\"temperature\":0.7}",
+      "id": "rewrite_model-0"
+    },
+    {
+      "input_body": "{\"model\":\"maverick/auto\",\"output_config\":{\"effort\":\"high\",\"custom_ratio\":0.50},\"messages\":[]}",
+      "model": "claude-y",
+      "name": "TestEffortNormalization_LeavesEverythingElseAlone/messages:_effort_high_untouched",
+      "normalizer": "messages",
+      "output_body": "{\"messages\":[],\"model\":\"claude-y\",\"output_config\":{\"effort\":\"high\",\"custom_ratio\":0.50}}",
+      "id": "rewrite_model-1"
+    },
+    {
+      "input_body": "{\"model\":\"maverick/auto\",\"messages\":[]}",
+      "model": "claude-y",
+      "name": "TestEffortNormalization_LeavesEverythingElseAlone/messages:_absent_output_config_stays_absent",
+      "normalizer": "messages",
+      "output_body": "{\"messages\":[],\"model\":\"claude-y\"}",
+      "id": "rewrite_model-2"
+    },
+    {
+      "input_body": "{\"model\":\"maverick/auto\",\"reasoning_effort\":\"medium\",\"messages\":[]}",
+      "model": "gpt-a",
+      "name": "TestEffortNormalization_LeavesEverythingElseAlone/chat:_reasoning_effort_medium_untouched",
+      "normalizer": "chat",
+      "output_body": "{\"messages\":[],\"model\":\"gpt-a\",\"reasoning_effort\":\"medium\"}",
+      "id": "rewrite_model-3"
+    },
+    {
+      "input_body": "{\"model\":\"maverick/auto\",\"messages\":[]}",
+      "model": "gpt-a",
+      "name": "TestEffortNormalization_LeavesEverythingElseAlone/chat:_absent_reasoning_effort_stays_absent",
+      "normalizer": "chat",
+      "output_body": "{\"messages\":[],\"model\":\"gpt-a\"}",
+      "id": "rewrite_model-4"
+    },
+    {
+      "input_body": "{\"model\":\"maverick/auto\",\"output_config\":{\"effort\":\"xhigh\",\"custom_ratio\":0.50, \"b\" : 1},\"temperature\":1e2}",
+      "model": "claude-y",
+      "name": "messages xhigh -> max (output_config keys re-sorted, compacted)",
+      "normalizer": "messages",
+      "output_body": "{\"model\":\"claude-y\",\"output_config\":{\"b\":1,\"custom_ratio\":0.50,\"effort\":\"max\"},\"temperature\":1e2}",
+      "id": "rewrite_model-5"
+    },
+    {
+      "input_body": "{\"model\":\"maverick/auto\",\"reasoning_effort\":\"xhigh\"}",
+      "model": "gpt-a",
+      "name": "chat xhigh -> high",
+      "normalizer": "chat",
+      "output_body": "{\"model\":\"gpt-a\",\"reasoning_effort\":\"high\"}",
+      "id": "rewrite_model-6"
+    },
+    {
+      "input_body": "{\"model\":\"maverick/auto\",\"output_config\":{\"effort\":\"xhigh\"}}",
+      "model": "gpt-a",
+      "name": "EXTRA chat normalizer ignores output_config",
+      "normalizer": "chat",
+      "output_body": "{\"model\":\"gpt-a\",\"output_config\":{\"effort\":\"xhigh\"}}",
+      "id": "rewrite_model-7"
+    },
+    {
+      "input_body": "{\"model\":\"maverick/auto\",\"reasoning_effort\":\"xhigh\"}",
+      "model": "claude-y",
+      "name": "EXTRA messages normalizer ignores reasoning_effort",
+      "normalizer": "messages",
+      "output_body": "{\"model\":\"claude-y\",\"reasoning_effort\":\"xhigh\"}",
+      "id": "rewrite_model-8"
+    },
+    {
+      "input_body": "{\"model\":\"maverick/auto\",\"reasoning_effort\":\"XHIGH\"}",
+      "model": "gpt-a",
+      "name": "EXTRA effort match is exact-case",
+      "normalizer": "chat",
+      "output_body": "{\"model\":\"gpt-a\",\"reasoning_effort\":\"XHIGH\"}",
+      "id": "rewrite_model-9"
+    },
+    {
+      "input_body": "{\"model\":\"maverick/auto\",\"output_config\":null}",
+      "model": "claude-y",
+      "name": "EXTRA output_config null",
+      "normalizer": "messages",
+      "output_body": "{\"model\":\"claude-y\",\"output_config\":null}",
+      "id": "rewrite_model-10"
+    },
+    {
+      "input_body": "{\"model\":\"maverick/auto\",\"output_config\":{\"effort\":null}}",
+      "model": "claude-y",
+      "name": "EXTRA output_config.effort null",
+      "normalizer": "messages",
+      "output_body": "{\"model\":\"claude-y\",\"output_config\":{\"effort\":null}}",
+      "id": "rewrite_model-11"
+    },
+    {
+      "input_body": "{\"model\" : \"maverick/auto\" , \"x\" : { \"a\" : \"<&>\" , \"b\" : [ 1 , 2 ] } }",
+      "model": "gpt-a",
+      "name": "EXTRA nested whitespace compacted and HTML escaped",
+      "normalizer": "none",
+      "output_body": "{\"model\":\"gpt-a\",\"x\":{\"a\":\"\\u003c\\u0026\\u003e\",\"b\":[1,2]}}",
+      "id": "rewrite_model-12"
+    },
+    {
+      "input_body": "{\"model\":\"maverick/auto\"}",
+      "model": "a<b>&c",
+      "name": "EXTRA model with HTML chars escaped",
+      "normalizer": "none",
+      "output_body": "{\"model\":\"a\\u003cb\\u003e\\u0026c\"}",
+      "id": "rewrite_model-13"
+    },
+    {
+      "input_body": "{\"MODEL\":\"maverick/auto\"}",
+      "model": "gpt-a",
+      "name": "EXTRA model key case variant kept alongside new model",
+      "normalizer": "none",
+      "output_body": "{\"MODEL\":\"maverick/auto\",\"model\":\"gpt-a\"}",
+      "id": "rewrite_model-14"
+    },
+    {
+      "input_body": "{\"model\":\"maverick/auto\",\"t\":1,\"t\":2}",
+      "model": "gpt-a",
+      "name": "EXTRA duplicate keys last wins",
+      "normalizer": "none",
+      "output_body": "{\"model\":\"gpt-a\",\"t\":2}",
+      "id": "rewrite_model-15"
+    },
+    {
+      "error": true,
+      "input_body": "[1,2]",
+      "model": "gpt-a",
+      "name": "EXTRA non-object body fails rewrite",
+      "normalizer": "none",
+      "id": "rewrite_model-16"
+    },
+    {
+      "input_body": "{\"model\":\"maverick/auto\",\"s\":\"a b c\"}",
+      "model": "gpt-a",
+      "name": "EXTRA unicode line separators escaped",
+      "normalizer": "none",
+      "output_body": "{\"model\":\"gpt-a\",\"s\":\"a\\u2028b\\u2029c\"}",
+      "id": "rewrite_model-17"
+    },
+    {
+      "input_body": "{\"model\":\"maverick/auto\",\"s\":\"\\u00e9\\u00e9\"}",
+      "model": "gpt-a",
+      "name": "EXTRA non-ASCII kept as UTF-8",
+      "normalizer": "none",
+      "output_body": "{\"model\":\"gpt-a\",\"s\":\"\\u00e9\\u00e9\"}",
+      "id": "rewrite_model-18"
+    }
+  ]
+}

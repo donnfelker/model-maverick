@@ -1,0 +1,499 @@
+{
+  "about": "graders framework: envelope parsing, dimension mapping, registry. Envelope 'parsed' shows the decoded fields; spec is the raw JSON sub-document.",
+  "spec_example_envelope_raw": "{\n  \"type\": \"rule_scan\",\n  \"version\": 1,\n  \"weight_dimensions\": { \"constraint_compliance\": 1.0 },\n  \"spec\": { \"rules\": [ { \"must_include\": \"\\\\bWHERE\\\\b\", \"regex\": true, \"weight\": 2, \"critical\": false } ] }\n}",
+  "parse_envelope": [
+    {
+      "case": "spec example",
+      "input": "{\n  \"type\": \"rule_scan\",\n  \"version\": 1,\n  \"weight_dimensions\": { \"constraint_compliance\": 1.0 },\n  \"spec\": { \"rules\": [ { \"must_include\": \"\\\\bWHERE\\\\b\", \"regex\": true, \"weight\": 2, \"critical\": false } ] }\n}",
+      "parsed": {
+        "type": "rule_scan",
+        "version": 1,
+        "weight_dimensions": {
+          "constraint_compliance": 1
+        },
+        "spec": {
+          "rules": [
+            {
+              "must_include": "\\bWHERE\\b",
+              "regex": true,
+              "weight": 2,
+              "critical": false
+            }
+          ]
+        }
+      },
+      "go_test": "graders.TestParseEnvelopeValid"
+    },
+    {
+      "case": "unknown type",
+      "input": "{\"type\":\"vibes\",\"version\":1,\"weight_dimensions\":{\"a\":1},\"spec\":{}}",
+      "error": "graders: envelope: unknown type \"vibes\"",
+      "go_test": "graders.TestParseEnvelopeUnknownType"
+    },
+    {
+      "case": "test_suite",
+      "input": "{\"type\":\"test_suite\",\"version\":1,\"weight_dimensions\":{\"a\":1},\"spec\":{\"files\":[]}}",
+      "error": "graders: envelope: grader_unsupported: type \"test_suite\" is reserved until v1.1",
+      "go_test": "graders.TestParseEnvelopeTestSuiteRejected"
+    },
+    {
+      "case": "missing type",
+      "input": "{\"version\":1,\"weight_dimensions\":{\"a\":1},\"spec\":{}}",
+      "error": "graders: envelope: missing type",
+      "go_test": "graders.TestParseEnvelopeMissingFields/missing_type"
+    },
+    {
+      "case": "missing version",
+      "input": "{\"type\":\"rule_scan\",\"weight_dimensions\":{\"a\":1},\"spec\":{}}",
+      "error": "graders: envelope: missing version",
+      "go_test": "graders.TestParseEnvelopeMissingFields/missing_version"
+    },
+    {
+      "case": "missing weight_dimensions",
+      "input": "{\"type\":\"rule_scan\",\"version\":1,\"spec\":{}}",
+      "error": "graders: envelope: weight_dimensions must be a non-empty map",
+      "go_test": "graders.TestParseEnvelopeMissingFields/missing_weight_dimensions"
+    },
+    {
+      "case": "missing spec",
+      "input": "{\"type\":\"rule_scan\",\"version\":1,\"weight_dimensions\":{\"a\":1}}",
+      "error": "graders: envelope: missing spec",
+      "go_test": "graders.TestParseEnvelopeMissingFields/missing_spec"
+    },
+    {
+      "case": "null spec",
+      "input": "{\"type\":\"rule_scan\",\"version\":1,\"weight_dimensions\":{\"a\":1},\"spec\":null}",
+      "error": "graders: envelope: missing spec",
+      "go_test": "graders.TestParseEnvelopeMissingFields/null_spec"
+    },
+    {
+      "case": "empty document",
+      "input": "{}",
+      "error": "graders: envelope: missing type",
+      "go_test": "graders.TestParseEnvelopeMissingFields/empty_document"
+    },
+    {
+      "case": "empty map",
+      "input": "{\"type\":\"rule_scan\",\"version\":1,\"weight_dimensions\":{},\"spec\":{}}",
+      "error": "graders: envelope: weight_dimensions must be a non-empty map",
+      "go_test": "graders.TestParseEnvelopeBadWeights/empty_map"
+    },
+    {
+      "case": "zero weight",
+      "input": "{\"type\":\"rule_scan\",\"version\":1,\"weight_dimensions\":{\"a\":0},\"spec\":{}}",
+      "error": "graders: envelope: weight_dimensions[\"a\"] = 0: multiplier must be a positive finite number",
+      "go_test": "graders.TestParseEnvelopeBadWeights/zero_weight"
+    },
+    {
+      "case": "negative weight",
+      "input": "{\"type\":\"rule_scan\",\"version\":1,\"weight_dimensions\":{\"a\":-1},\"spec\":{}}",
+      "error": "graders: envelope: weight_dimensions[\"a\"] = -1: multiplier must be a positive finite number",
+      "go_test": "graders.TestParseEnvelopeBadWeights/negative_weight"
+    },
+    {
+      "case": "string weight",
+      "input": "{\"type\":\"rule_scan\",\"version\":1,\"weight_dimensions\":{\"a\":\"heavy\"},\"spec\":{}}",
+      "error": "graders: envelope: json: cannot unmarshal string into Go struct field Envelope.weight_dimensions of type float64",
+      "go_test": "graders.TestParseEnvelopeBadWeights/string_weight"
+    },
+    {
+      "case": "empty dimension",
+      "input": "{\"type\":\"rule_scan\",\"version\":1,\"weight_dimensions\":{\"\":1},\"spec\":{}}",
+      "error": "graders: envelope: weight_dimensions has an empty dimension name",
+      "go_test": "graders.TestParseEnvelopeBadWeights/empty_dimension"
+    },
+    {
+      "case": "version zero",
+      "input": "{\"type\":\"rule_scan\",\"version\":0,\"weight_dimensions\":{\"a\":1},\"spec\":{}}",
+      "error": "graders: envelope: missing version",
+      "go_test": "graders.TestParseEnvelopeBadVersion/zero"
+    },
+    {
+      "case": "version 2",
+      "input": "{\"type\":\"rule_scan\",\"version\":2,\"weight_dimensions\":{\"a\":1},\"spec\":{}}",
+      "error": "graders: envelope: unsupported version 2 for type \"rule_scan\" (v1 registers version 1)",
+      "go_test": "graders.TestParseEnvelopeBadVersion/unregistered"
+    },
+    {
+      "case": "version 1.5",
+      "input": "{\"type\":\"rule_scan\",\"version\":1.5,\"weight_dimensions\":{\"a\":1},\"spec\":{}}",
+      "error": "graders: envelope: json: cannot unmarshal number 1.5 into Go struct field Envelope.version of type int",
+      "go_test": "graders.TestParseEnvelopeBadVersion/fractional"
+    },
+    {
+      "case": "unknown field",
+      "input": "{\"type\":\"rule_scan\",\"version\":1,\"weight_dimensions\":{\"a\":1},\"spec\":{},\"wieght_dimensions\":{}}",
+      "error": "graders: envelope: json: unknown field \"wieght_dimensions\"",
+      "go_test": "graders.TestParseEnvelopeUnknownField"
+    },
+    {
+      "case": "trailing data",
+      "input": "{\"type\":\"rule_scan\",\"version\":1,\"weight_dimensions\":{\"a\":1},\"spec\":{}} {}",
+      "error": "graders: envelope: trailing data after envelope",
+      "probe": true
+    },
+    {
+      "case": "case-insensitive field names",
+      "input": "{\"TYPE\":\"rule_scan\",\"Version\":1,\"Weight_Dimensions\":{\"a\":1},\"SPEC\":{}}",
+      "parsed": {
+        "type": "rule_scan",
+        "version": 1,
+        "weight_dimensions": {
+          "a": 1
+        },
+        "spec": {}
+      },
+      "probe": true
+    },
+    {
+      "case": "spec empty string",
+      "input": "{\"type\":\"rule_scan\",\"version\":1,\"weight_dimensions\":{\"a\":1},\"spec\":\"\"}",
+      "parsed": {
+        "type": "rule_scan",
+        "version": 1,
+        "weight_dimensions": {
+          "a": 1
+        },
+        "spec": ""
+      },
+      "probe": true
+    },
+    {
+      "case": "spec empty array",
+      "input": "{\"type\":\"rule_scan\",\"version\":1,\"weight_dimensions\":{\"a\":1},\"spec\":[]}",
+      "parsed": {
+        "type": "rule_scan",
+        "version": 1,
+        "weight_dimensions": {
+          "a": 1
+        },
+        "spec": []
+      },
+      "probe": true
+    },
+    {
+      "case": "weight 1e308*10",
+      "input": "{\"type\":\"rule_scan\",\"version\":1,\"weight_dimensions\":{\"a\":1e309},\"spec\":{}}",
+      "error": "graders: envelope: json: cannot unmarshal number 1e309 into Go struct field Envelope.weight_dimensions of type float64",
+      "probe": true
+    },
+    {
+      "case": "version 1.0",
+      "input": "{\"type\":\"rule_scan\",\"version\":1.0,\"weight_dimensions\":{\"a\":1},\"spec\":{}}",
+      "error": "graders: envelope: json: cannot unmarshal number 1.0 into Go struct field Envelope.version of type int",
+      "probe": true
+    },
+    {
+      "case": "type empty string",
+      "input": "{\"type\":\"\",\"version\":1,\"weight_dimensions\":{\"a\":1},\"spec\":{}}",
+      "error": "graders: envelope: missing type",
+      "probe": true
+    },
+    {
+      "case": "not json",
+      "input": "{",
+      "error": "graders: envelope: unexpected EOF",
+      "probe": true
+    },
+    {
+      "case": "array",
+      "input": "[]",
+      "error": "graders: envelope: json: cannot unmarshal array into Go value of type graders.Envelope",
+      "probe": true
+    }
+  ],
+  "map_dimensions": [
+    {
+      "name": "name match with unit multiplier",
+      "weight_dimensions": {
+        "schema_validity": 1
+      },
+      "emitted": {
+        "schema_validity": 1
+      },
+      "mapped": {
+        "schema_validity": 1
+      },
+      "go_test": "graders.TestMapDimensions/name_match_with_unit_multiplier"
+    },
+    {
+      "name": "multiplier applies",
+      "weight_dimensions": {
+        "accuracy": 0.5
+      },
+      "emitted": {
+        "accuracy": 0.8
+      },
+      "mapped": {
+        "accuracy": 0.4
+      },
+      "go_test": "graders.TestMapDimensions/multiplier_applies"
+    },
+    {
+      "name": "single leftover renames (fact_coverage → completeness)",
+      "weight_dimensions": {
+        "completeness": 1,
+        "hallucination_free": 1
+      },
+      "emitted": {
+        "fact_coverage": 0.75,
+        "hallucination_free": 1
+      },
+      "mapped": {
+        "completeness": 0.75,
+        "hallucination_free": 1
+      },
+      "go_test": "graders.TestMapDimensions/single_leftover_renames_(fact_coverage_→_completeness)"
+    },
+    {
+      "name": "unemitted task dimension stays absent",
+      "weight_dimensions": {
+        "a": 1,
+        "b": 1
+      },
+      "emitted": {
+        "a": 0.5
+      },
+      "mapped": {
+        "a": 0.5
+      },
+      "go_test": "graders.TestMapDimensions/unemitted_task_dimension_stays_absent"
+    },
+    {
+      "name": "unclaimed emitted dimension is dropped",
+      "weight_dimensions": {
+        "a": 1
+      },
+      "emitted": {
+        "a": 0.5,
+        "extra": 0.9
+      },
+      "mapped": {
+        "a": 0.5
+      },
+      "go_test": "graders.TestMapDimensions/unclaimed_emitted_dimension_is_dropped"
+    },
+    {
+      "name": "ambiguous mapping errors",
+      "weight_dimensions": {
+        "x": 1,
+        "y": 1
+      },
+      "emitted": {
+        "p": 0.1,
+        "q": 0.2
+      },
+      "error": "graders: envelope: ambiguous weight_dimensions mapping for type \"key_facts\": task dimensions [x y] vs emitted [p q] — align the names",
+      "go_test": "graders.TestMapDimensions/ambiguous_mapping_errors"
+    },
+    {
+      "name": "product clamps to [0,1]",
+      "weight_dimensions": {
+        "a": 2
+      },
+      "emitted": {
+        "a": 0.9
+      },
+      "mapped": {
+        "a": 1
+      },
+      "go_test": "graders.TestMapDimensions/product_clamps_to_[0,1]"
+    },
+    {
+      "name": "single leftover with multiplier",
+      "weight_dimensions": {
+        "completeness": 0.5
+      },
+      "emitted": {
+        "fact_coverage": 0.8
+      },
+      "mapped": {
+        "completeness": 0.4
+      },
+      "probe": true
+    },
+    {
+      "name": "two open keys one leftover is ambiguous",
+      "weight_dimensions": {
+        "x": 1,
+        "y": 1
+      },
+      "emitted": {
+        "p": 0.5
+      },
+      "error": "graders: envelope: ambiguous weight_dimensions mapping for type \"key_facts\": task dimensions [x y] vs emitted [p] — align the names",
+      "probe": true
+    },
+    {
+      "name": "one open key two leftovers is ambiguous",
+      "weight_dimensions": {
+        "x": 1
+      },
+      "emitted": {
+        "p": 0.5,
+        "q": 0.1
+      },
+      "error": "graders: envelope: ambiguous weight_dimensions mapping for type \"key_facts\": task dimensions [x] vs emitted [p q] — align the names",
+      "probe": true
+    },
+    {
+      "name": "negative emitted clamps to 0",
+      "weight_dimensions": {
+        "a": 1
+      },
+      "emitted": {
+        "a": -0.5
+      },
+      "mapped": {
+        "a": 0
+      },
+      "probe": true
+    },
+    {
+      "name": "nil emitted",
+      "weight_dimensions": {
+        "a": 1
+      },
+      "emitted": null,
+      "probe": true,
+      "mapped": {}
+    }
+  ],
+  "json_from_yaml_value_example": {
+    "yaml": "type: key_facts\nversion: 1\nweight_dimensions: { completeness: 1.0 }\nspec: { facts: [ { id: a, any_of: [x] } ] }\n",
+    "json": "{\"spec\":{\"facts\":[{\"any_of\":[\"x\"],\"id\":\"a\"}]},\"type\":\"key_facts\",\"version\":1,\"weight_dimensions\":{\"completeness\":1}}"
+  },
+  "errors": {
+    "grader_error_format": "grader rule_scan: bad regex",
+    "non_string_key": "graders: envelope: non-string map key 1",
+    "register_duplicate": "graders: register: duplicate kind \"rule_scan\"",
+    "register_empty": "graders: register: empty kind",
+    "validate_spec_rejected": "graders: envelope: rule_scan spec: bad rule grammar",
+    "validate_spec_unregistered": "graders: envelope: no grader registered for type \"rule_scan\""
+  },
+  "registry_cases": [
+    {
+      "go_test": "graders.TestRegistryRegisterAndLookup",
+      "register": [
+        "rule_scan"
+      ],
+      "lookup": {
+        "rule_scan": true,
+        "nope": false
+      }
+    },
+    {
+      "go_test": "graders.TestRegistryRegisterDuplicate",
+      "register": [
+        "key_facts",
+        "key_facts"
+      ],
+      "expect_error_on": 2,
+      "error": "graders: register: duplicate kind \"key_facts\""
+    },
+    {
+      "go_test": "graders.TestRegistryRegisterEmptyKind",
+      "register": [
+        ""
+      ],
+      "expect_error_on": 1,
+      "error": "graders: register: empty kind"
+    },
+    {
+      "go_test": "graders.TestRegistryMustRegisterDuplicatePanics",
+      "register_must": [
+        "golden_answer",
+        "golden_answer"
+      ],
+      "expect": "panic on the second"
+    },
+    {
+      "go_test": "graders.TestRegistryKindsSorted",
+      "register": [
+        "rule_scan",
+        "golden_answer",
+        "key_facts"
+      ],
+      "kinds": [
+        "golden_answer",
+        "key_facts",
+        "rule_scan"
+      ]
+    },
+    {
+      "go_test": "graders.TestRegistryGradeUnknownKind",
+      "grade_kind": "rule_scan",
+      "registered": [],
+      "error": "graders: grade: no grader registered for kind \"rule_scan\"",
+      "failure_counter": 0
+    },
+    {
+      "go_test": "graders.TestRegistryGradeSuccess",
+      "grader_returns": {
+        "dims": {
+          "fact_coverage": 0.75,
+          "hallucination_free": 1
+        },
+        "detail": "{\"facts_found\":3}"
+      },
+      "result": {
+        "dims": {
+          "fact_coverage": 0.75,
+          "hallucination_free": 1
+        },
+        "detail": "{\"facts_found\":3}"
+      },
+      "failure_counter": 0
+    },
+    {
+      "go_test": "graders.TestRegistryGradeErrorMarksDimensionsAbsent",
+      "grader_kind": "judge_rubric",
+      "grader_returns": {
+        "dims": {
+          "idiom": 0.4
+        },
+        "error": "judge upstream 500"
+      },
+      "result": {
+        "dims": null,
+        "error": "grader judge_rubric: judge upstream 500",
+        "error_type": "GraderError{Kind: judge_rubric}",
+        "unwraps_to_inner": true
+      },
+      "failure_counter": 1
+    },
+    {
+      "go_test": "graders.TestRegistryGradePreservesGraderError",
+      "grader_kind": "rule_scan",
+      "grader_returns": {
+        "error": "GraderError{Kind: rule_scan, Err: bad regex}"
+      },
+      "result": {
+        "error": "grader rule_scan: bad regex",
+        "same_instance": true
+      },
+      "failure_counter": 1
+    }
+  ],
+  "validate_spec_delegation": {
+    "go_test": "graders.TestEnvelopeValidateSpecDelegates",
+    "unregistered kind": "graders: envelope: no grader registered for type \"rule_scan\"",
+    "delegates payload": "the registered grader's ValidateSpec receives exactly the envelope's raw spec bytes (contains 'must_include')",
+    "propagates grader rejection": "graders: envelope: rule_scan spec: bad rule grammar"
+  },
+  "parse_envelope_value_yaml": {
+    "go_test": "graders.TestParseEnvelopeValueYAML",
+    "yaml": "\ntype: key_facts\nversion: 1\nweight_dimensions: { completeness: 1.0, hallucination_free: 1.0 }\nspec:\n  facts:\n    - { id: party_acme, any_of: [\"Acme Corp\", \"Acme Corporation\"], weight: 1 }\n    - { id: term_24mo, any_of: [\"24 month\", \"two-year\", \"24-month\"], weight: 1 }\n  forbidden_facts:\n    - { id: distractor_2019_date, any_of: [\"2019-06-15\"], weight: 1 }\n",
+    "expect": {
+      "type": "key_facts",
+      "version": 1,
+      "weight_dimension_count": 2,
+      "spec_contains": "party_acme"
+    }
+  },
+  "parse_envelope_value_non_string_keys": {
+    "go_test": "graders.TestParseEnvelopeValueNonStringKeys",
+    "value": "map with spec = {1: \"x\"} (integer key)",
+    "error": "graders: envelope: non-string map key 1"
+  }
+}

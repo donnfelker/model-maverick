@@ -1,0 +1,157 @@
+{
+  "decode": [
+    {
+      "field_count": 3,
+      "fields": [
+        "2026-07-01",
+        "structured_extraction",
+        "3"
+      ],
+      "id": "round_trip_series",
+      "kind": "agg",
+      "ok": true,
+      "token": "djF8YWdnfDIwMjYtMDctMDF8c3RydWN0dXJlZF9leHRyYWN0aW9ufDM"
+    },
+    {
+      "error_message": "cursor is not a valid pagination token",
+      "field_count": 1,
+      "fields": null,
+      "id": "not_base64",
+      "kind": "rec",
+      "ok": false,
+      "token": "!!!not-base64!!!"
+    },
+    {
+      "error_message": "cursor is not a valid pagination token",
+      "field_count": 1,
+      "fields": null,
+      "id": "empty",
+      "kind": "rec",
+      "ok": false,
+      "token": ""
+    },
+    {
+      "error_message": "cursor is not a valid pagination token",
+      "field_count": 1,
+      "fields": null,
+      "id": "random_base64",
+      "kind": "rec",
+      "ok": false,
+      "token": "aGVsbG8gd29ybGQ"
+    },
+    {
+      "error_message": "cursor is not a valid pagination token",
+      "field_count": 1,
+      "fields": null,
+      "id": "wrong_version",
+      "kind": "rec",
+      "ok": false,
+      "token": "djB8cmVjfHJlY18wMUFCQw"
+    },
+    {
+      "error_message": "cursor is not a valid pagination token",
+      "field_count": 1,
+      "fields": null,
+      "id": "empty_field",
+      "kind": "rec",
+      "ok": false,
+      "token": "djF8cmVjfA"
+    },
+    {
+      "error_message": "cursor is not a valid pagination token",
+      "field_count": 1,
+      "fields": null,
+      "id": "missing_fields",
+      "kind": "rec",
+      "ok": false,
+      "token": "djF8cmVj"
+    },
+    {
+      "error_message": "cursor is not a valid pagination token",
+      "field_count": 1,
+      "fields": null,
+      "id": "extra_fields",
+      "kind": "rec",
+      "ok": false,
+      "token": "djF8cmVjfGF8Yg"
+    },
+    {
+      "error_message": "cursor is not a valid pagination token",
+      "field_count": 1,
+      "fields": null,
+      "id": "foreign_kind",
+      "kind": "rec",
+      "ok": false,
+      "token": "djF8b3V0fG91dF8wMUFCQw"
+    },
+    {
+      "error_message": "cursor is not a valid pagination token",
+      "field_count": 1,
+      "fields": null,
+      "id": "padded_base64_rejected",
+      "kind": "rec",
+      "ok": false,
+      "token": "djF8cmVjfHJlY18wMUFCQ0Q="
+    },
+    {
+      "field_count": 1,
+      "fields": [
+        "?>"
+      ],
+      "id": "url_alphabet_dash_and_question",
+      "kind": "rec",
+      "ok": true,
+      "token": "djF8cmVjfD8-"
+    }
+  ],
+  "encode": [
+    {
+      "expected_token": "djF8cmVjfHJlY18wMUFCQw",
+      "fields": [
+        "rec_01ABC"
+      ],
+      "kind": "rec"
+    },
+    {
+      "expected_token": "djF8b3V0fG91dF8wMUFCQw",
+      "fields": [
+        "out_01ABC"
+      ],
+      "kind": "out"
+    },
+    {
+      "expected_token": "djF8YWdnfDIwMjYtMDctMDF8c3RydWN0dXJlZF9leHRyYWN0aW9ufDM",
+      "fields": [
+        "2026-07-01",
+        "structured_extraction",
+        "3"
+      ],
+      "kind": "agg"
+    },
+    {
+      "expected_token": "djF8Y2FsfGJhdF8wMUpafGZhY3R1YWxfcWE",
+      "fields": [
+        "bat_01JZ",
+        "factual_qa"
+      ],
+      "kind": "cal"
+    },
+    {
+      "expected_token": "djF8cmVjfHJlY18wMUpaWDhROVYzTjRNNUs2UDdSOFM5VDBVVg",
+      "fields": [
+        "rec_01JZX8Q9V3N4M5K6P7R8S9T0UV"
+      ],
+      "kind": "rec"
+    }
+  ],
+  "invalid_cursor_error": {
+    "details": {
+      "parameter": "cursor"
+    },
+    "message": "cursor is not a valid pagination token"
+  },
+  "invalid_dimension_example": "dimension \"bogus\" is not one of [quality pass_rate ambiguity latency_p50_ms latency_p95_ms cost_per_run_usd]",
+  "invalid_enum_example": "outcome \"bogus\" is not one of [success parse_failure quality_insufficient latency_exceeded provider_error other]",
+  "separator": "|",
+  "version": "v1"
+}

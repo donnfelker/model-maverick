@@ -1,0 +1,380 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "classification": {
+          "capability": "structured_extraction",
+          "difficulty": 3,
+          "domain_tags": [
+            "legal"
+          ],
+          "confidence": 0.91
+        },
+        "ok": true
+      },
+      "id": "valid",
+      "input": "{\"capability\":\"structured_extraction\",\"difficulty\":3,\"domain_tags\":[\"legal\"],\"confidence\":0.91}",
+      "strip_code_fence": "{\"capability\":\"structured_extraction\",\"difficulty\":3,\"domain_tags\":[\"legal\"],\"confidence\":0.91}"
+    },
+    {
+      "expected": {
+        "go_error": "parsing structured output: invalid character 'h' in literal true (expecting 'r')",
+        "ok": false
+      },
+      "id": "not_json",
+      "input": "the workload looks like extraction",
+      "strip_code_fence": "the workload looks like extraction"
+    },
+    {
+      "expected": {
+        "go_error": "parsing structured output: invalid character 'o' in literal null (expecting 'u')",
+        "ok": false
+      },
+      "id": "not_json_short",
+      "input": "not json",
+      "strip_code_fence": "not json"
+    },
+    {
+      "expected": {
+        "go_error": "capability \"vibes\" is not a v1 capability",
+        "ok": false
+      },
+      "id": "unknown_capability",
+      "input": "{\"capability\":\"vibes\",\"difficulty\":3,\"domain_tags\":[],\"confidence\":0.9}",
+      "strip_code_fence": "{\"capability\":\"vibes\",\"difficulty\":3,\"domain_tags\":[],\"confidence\":0.9}"
+    },
+    {
+      "expected": {
+        "go_error": "difficulty 0 is out of range 1-5",
+        "ok": false
+      },
+      "id": "difficulty_too_low",
+      "input": "{\"capability\":\"factual_qa\",\"difficulty\":0,\"domain_tags\":[],\"confidence\":0.9}",
+      "strip_code_fence": "{\"capability\":\"factual_qa\",\"difficulty\":0,\"domain_tags\":[],\"confidence\":0.9}"
+    },
+    {
+      "expected": {
+        "go_error": "difficulty 6 is out of range 1-5",
+        "ok": false
+      },
+      "id": "difficulty_too_high",
+      "input": "{\"capability\":\"factual_qa\",\"difficulty\":6,\"domain_tags\":[],\"confidence\":0.9}",
+      "strip_code_fence": "{\"capability\":\"factual_qa\",\"difficulty\":6,\"domain_tags\":[],\"confidence\":0.9}"
+    },
+    {
+      "expected": {
+        "go_error": "confidence 1.2 is out of range 0-1",
+        "ok": false
+      },
+      "id": "confidence_above_one",
+      "input": "{\"capability\":\"factual_qa\",\"difficulty\":2,\"domain_tags\":[],\"confidence\":1.2}",
+      "strip_code_fence": "{\"capability\":\"factual_qa\",\"difficulty\":2,\"domain_tags\":[],\"confidence\":1.2}"
+    },
+    {
+      "expected": {
+        "go_error": "confidence -0.1 is out of range 0-1",
+        "ok": false
+      },
+      "id": "confidence_negative",
+      "input": "{\"capability\":\"factual_qa\",\"difficulty\":2,\"domain_tags\":[],\"confidence\":-0.1}",
+      "strip_code_fence": "{\"capability\":\"factual_qa\",\"difficulty\":2,\"domain_tags\":[],\"confidence\":-0.1}"
+    },
+    {
+      "expected": {
+        "go_error": "structured output missing capability",
+        "ok": false
+      },
+      "id": "missing_capability",
+      "input": "{\"difficulty\":2,\"domain_tags\":[],\"confidence\":0.9}",
+      "strip_code_fence": "{\"difficulty\":2,\"domain_tags\":[],\"confidence\":0.9}"
+    },
+    {
+      "expected": {
+        "go_error": "structured output missing difficulty",
+        "ok": false
+      },
+      "id": "missing_difficulty",
+      "input": "{\"capability\":\"factual_qa\",\"domain_tags\":[],\"confidence\":0.9}",
+      "strip_code_fence": "{\"capability\":\"factual_qa\",\"domain_tags\":[],\"confidence\":0.9}"
+    },
+    {
+      "expected": {
+        "go_error": "structured output missing confidence",
+        "ok": false
+      },
+      "id": "missing_confidence",
+      "input": "{\"capability\":\"factual_qa\",\"difficulty\":2,\"domain_tags\":[]}",
+      "strip_code_fence": "{\"capability\":\"factual_qa\",\"difficulty\":2,\"domain_tags\":[]}"
+    },
+    {
+      "expected": {
+        "go_error": "parsing structured output: json: unknown field \"notes\"",
+        "ok": false
+      },
+      "id": "unknown_field",
+      "input": "{\"capability\":\"factual_qa\",\"difficulty\":2,\"domain_tags\":[],\"confidence\":0.9,\"notes\":\"hi\"}",
+      "strip_code_fence": "{\"capability\":\"factual_qa\",\"difficulty\":2,\"domain_tags\":[],\"confidence\":0.9,\"notes\":\"hi\"}"
+    },
+    {
+      "expected": {
+        "go_error": "parsing structured output: trailing data after JSON object",
+        "ok": false
+      },
+      "id": "trailing_data",
+      "input": "{\"capability\":\"structured_extraction\",\"difficulty\":3,\"domain_tags\":[\"legal\"],\"confidence\":0.91}{\"more\":true}",
+      "strip_code_fence": "{\"capability\":\"structured_extraction\",\"difficulty\":3,\"domain_tags\":[\"legal\"],\"confidence\":0.91}{\"more\":true}"
+    },
+    {
+      "expected": {
+        "go_error": "capability \"vibes\" is not a v1 capability",
+        "ok": false
+      },
+      "id": "schema_violating_multi",
+      "input": "{\"capability\":\"vibes\",\"difficulty\":9,\"domain_tags\":[],\"confidence\":2}",
+      "strip_code_fence": "{\"capability\":\"vibes\",\"difficulty\":9,\"domain_tags\":[],\"confidence\":2}"
+    },
+    {
+      "expected": {
+        "classification": {
+          "capability": "factual_qa",
+          "difficulty": 1,
+          "domain_tags": [],
+          "confidence": 0
+        },
+        "ok": true
+      },
+      "id": "confidence_zero_empty_tags",
+      "input": "{\"capability\":\"factual_qa\",\"difficulty\":1,\"domain_tags\":[],\"confidence\":0}",
+      "strip_code_fence": "{\"capability\":\"factual_qa\",\"difficulty\":1,\"domain_tags\":[],\"confidence\":0}"
+    },
+    {
+      "expected": {
+        "classification": {
+          "capability": "code_generation",
+          "difficulty": 5,
+          "domain_tags": [],
+          "confidence": 1
+        },
+        "ok": true
+      },
+      "id": "confidence_one",
+      "input": "{\"capability\":\"code_generation\",\"difficulty\":5,\"domain_tags\":[],\"confidence\":1}",
+      "strip_code_fence": "{\"capability\":\"code_generation\",\"difficulty\":5,\"domain_tags\":[],\"confidence\":1}"
+    },
+    {
+      "expected": {
+        "classification": {
+          "capability": "factual_qa",
+          "difficulty": 2,
+          "domain_tags": [],
+          "confidence": 0.5
+        },
+        "ok": true
+      },
+      "id": "missing_domain_tags",
+      "input": "{\"capability\":\"factual_qa\",\"difficulty\":2,\"confidence\":0.5}",
+      "strip_code_fence": "{\"capability\":\"factual_qa\",\"difficulty\":2,\"confidence\":0.5}"
+    },
+    {
+      "expected": {
+        "classification": {
+          "capability": "factual_qa",
+          "difficulty": 2,
+          "domain_tags": [],
+          "confidence": 0.5
+        },
+        "ok": true
+      },
+      "id": "null_domain_tags",
+      "input": "{\"capability\":\"factual_qa\",\"difficulty\":2,\"domain_tags\":null,\"confidence\":0.5}",
+      "strip_code_fence": "{\"capability\":\"factual_qa\",\"difficulty\":2,\"domain_tags\":null,\"confidence\":0.5}"
+    },
+    {
+      "expected": {
+        "classification": {
+          "capability": "structured_extraction",
+          "difficulty": 3,
+          "domain_tags": [
+            "legal"
+          ],
+          "confidence": 0.91
+        },
+        "ok": true
+      },
+      "id": "fenced_json",
+      "input": "```json\n{\"capability\":\"structured_extraction\",\"difficulty\":3,\"domain_tags\":[\"legal\"],\"confidence\":0.91}\n```",
+      "strip_code_fence": "{\"capability\":\"structured_extraction\",\"difficulty\":3,\"domain_tags\":[\"legal\"],\"confidence\":0.91}"
+    },
+    {
+      "expected": {
+        "classification": {
+          "capability": "structured_extraction",
+          "difficulty": 3,
+          "domain_tags": [
+            "legal"
+          ],
+          "confidence": 0.91
+        },
+        "ok": true
+      },
+      "id": "fenced_bare",
+      "input": "```\n{\"capability\":\"structured_extraction\",\"difficulty\":3,\"domain_tags\":[\"legal\"],\"confidence\":0.91}\n```",
+      "strip_code_fence": "{\"capability\":\"structured_extraction\",\"difficulty\":3,\"domain_tags\":[\"legal\"],\"confidence\":0.91}"
+    },
+    {
+      "expected": {
+        "classification": {
+          "capability": "structured_extraction",
+          "difficulty": 3,
+          "domain_tags": [
+            "legal"
+          ],
+          "confidence": 0.91
+        },
+        "ok": true
+      },
+      "id": "fenced_with_ws",
+      "input": "  \n```json\n{\"capability\":\"structured_extraction\",\"difficulty\":3,\"domain_tags\":[\"legal\"],\"confidence\":0.91}\n```  \n",
+      "strip_code_fence": "{\"capability\":\"structured_extraction\",\"difficulty\":3,\"domain_tags\":[\"legal\"],\"confidence\":0.91}"
+    },
+    {
+      "expected": {
+        "go_error": "parsing structured output: invalid character '`' looking for beginning of value",
+        "ok": false
+      },
+      "id": "fence_no_newline",
+      "input": "```{\"capability\":\"structured_extraction\",\"difficulty\":3,\"domain_tags\":[\"legal\"],\"confidence\":0.91}```",
+      "strip_code_fence": "```{\"capability\":\"structured_extraction\",\"difficulty\":3,\"domain_tags\":[\"legal\"],\"confidence\":0.91}```"
+    },
+    {
+      "expected": {
+        "classification": {
+          "capability": "structured_extraction",
+          "difficulty": 3,
+          "domain_tags": [
+            "legal"
+          ],
+          "confidence": 0.91
+        },
+        "ok": true
+      },
+      "id": "fence_no_close",
+      "input": "```json\n{\"capability\":\"structured_extraction\",\"difficulty\":3,\"domain_tags\":[\"legal\"],\"confidence\":0.91}",
+      "strip_code_fence": "{\"capability\":\"structured_extraction\",\"difficulty\":3,\"domain_tags\":[\"legal\"],\"confidence\":0.91}"
+    },
+    {
+      "expected": {
+        "classification": {
+          "capability": "structured_extraction",
+          "difficulty": 3,
+          "domain_tags": [
+            "legal"
+          ],
+          "confidence": 0.91
+        },
+        "ok": true
+      },
+      "id": "leading_ws_json",
+      "input": "  \n{\"capability\":\"structured_extraction\",\"difficulty\":3,\"domain_tags\":[\"legal\"],\"confidence\":0.91}\n ",
+      "strip_code_fence": "  \n{\"capability\":\"structured_extraction\",\"difficulty\":3,\"domain_tags\":[\"legal\"],\"confidence\":0.91}\n "
+    },
+    {
+      "expected": {
+        "classification": {
+          "capability": "structured_extraction",
+          "difficulty": 3,
+          "domain_tags": [
+            "legal"
+          ],
+          "confidence": 0.91
+        },
+        "ok": true
+      },
+      "id": "trailing_ws_after_obj",
+      "input": "{\"capability\":\"structured_extraction\",\"difficulty\":3,\"domain_tags\":[\"legal\"],\"confidence\":0.91}   \n",
+      "strip_code_fence": "{\"capability\":\"structured_extraction\",\"difficulty\":3,\"domain_tags\":[\"legal\"],\"confidence\":0.91}   \n"
+    },
+    {
+      "expected": {
+        "go_error": "parsing structured output: json: cannot unmarshal number 2.0 into Go struct field .difficulty of type int",
+        "ok": false
+      },
+      "id": "difficulty_float",
+      "input": "{\"capability\":\"factual_qa\",\"difficulty\":2.0,\"domain_tags\":[],\"confidence\":0.5}",
+      "strip_code_fence": "{\"capability\":\"factual_qa\",\"difficulty\":2.0,\"domain_tags\":[],\"confidence\":0.5}"
+    },
+    {
+      "expected": {
+        "go_error": "parsing structured output: json: cannot unmarshal string into Go struct field .difficulty of type int",
+        "ok": false
+      },
+      "id": "difficulty_string",
+      "input": "{\"capability\":\"factual_qa\",\"difficulty\":\"2\",\"domain_tags\":[],\"confidence\":0.5}",
+      "strip_code_fence": "{\"capability\":\"factual_qa\",\"difficulty\":\"2\",\"domain_tags\":[],\"confidence\":0.5}"
+    },
+    {
+      "expected": {
+        "go_error": "structured output missing capability",
+        "ok": false
+      },
+      "id": "null_capability",
+      "input": "{\"capability\":null,\"difficulty\":2,\"domain_tags\":[],\"confidence\":0.5}",
+      "strip_code_fence": "{\"capability\":null,\"difficulty\":2,\"domain_tags\":[],\"confidence\":0.5}"
+    },
+    {
+      "expected": {
+        "classification": {
+          "capability": "factual_qa",
+          "difficulty": 2,
+          "domain_tags": [],
+          "confidence": 0.5
+        },
+        "ok": true
+      },
+      "id": "case_insensitive_key",
+      "input": "{\"Capability\":\"factual_qa\",\"difficulty\":2,\"domain_tags\":[],\"confidence\":0.5}",
+      "strip_code_fence": "{\"Capability\":\"factual_qa\",\"difficulty\":2,\"domain_tags\":[],\"confidence\":0.5}"
+    },
+    {
+      "expected": {
+        "classification": {
+          "capability": "code_generation",
+          "difficulty": 2,
+          "domain_tags": [],
+          "confidence": 0.5
+        },
+        "ok": true
+      },
+      "id": "duplicate_key_last_wins",
+      "input": "{\"capability\":\"factual_qa\",\"capability\":\"code_generation\",\"difficulty\":2,\"domain_tags\":[],\"confidence\":0.5}",
+      "strip_code_fence": "{\"capability\":\"factual_qa\",\"capability\":\"code_generation\",\"difficulty\":2,\"domain_tags\":[],\"confidence\":0.5}"
+    },
+    {
+      "expected": {
+        "go_error": "parsing structured output: json: unknown field \"truncated\"",
+        "ok": false
+      },
+      "id": "truncated_field_ignored_unknown",
+      "input": "{\"capability\":\"factual_qa\",\"difficulty\":2,\"domain_tags\":[],\"confidence\":0.5,\"truncated\":true}",
+      "strip_code_fence": "{\"capability\":\"factual_qa\",\"difficulty\":2,\"domain_tags\":[],\"confidence\":0.5,\"truncated\":true}"
+    },
+    {
+      "expected": {
+        "go_error": "parsing structured output: json: cannot unmarshal array into Go value of type struct { Capability *string \"json:\\\"capability\\\"\"; Difficulty *int \"json:\\\"difficulty\\\"\"; DomainTags []string \"json:\\\"domain_tags\\\"\"; Confidence *float64 \"json:\\\"confidence\\\"\" }",
+        "ok": false
+      },
+      "id": "array_top",
+      "input": "[1,2]",
+      "strip_code_fence": "[1,2]"
+    },
+    {
+      "expected": {
+        "go_error": "parsing structured output: EOF",
+        "ok": false
+      },
+      "id": "empty",
+      "input": "",
+      "strip_code_fence": ""
+    }
+  ]
+}

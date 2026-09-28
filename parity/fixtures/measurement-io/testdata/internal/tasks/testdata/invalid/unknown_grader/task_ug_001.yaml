@@ -1,0 +1,14 @@
+id: task_ug_001
+capability: factual_qa
+difficulty_tier: 2
+prompt: |
+  What is the capital of France? Answer with the city name only.
+max_tokens: 16
+dimension_weights: { answer_correctness: 1.0 }
+grader_specs:
+  - type: quantum_score
+    version: 1
+    weight_dimensions: { answer_correctness: 1.0 }
+    spec:
+      answers:
+        - { value: "Paris" }
