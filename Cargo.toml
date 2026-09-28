@@ -16,6 +16,7 @@ members = [
     "crates/maverick-testdb",
     "crates/parity-support",
     "crates/sdk-conformance",
+    "crates/test-support",
 ]
 
 # Shared package metadata. Each crate sets `[package] ... .workspace = true` to inherit.
