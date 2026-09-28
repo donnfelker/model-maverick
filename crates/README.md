@@ -58,6 +58,11 @@ database, and clones one database per test. Set `MAVERICK_TEST_DATABASE_URL` to 
 existing server instead. Without Docker the tests skip, except when `CI` or
 `MAVERICK_TEST_REQUIRE_DB` is set.
 
+`instrument-lint` is dev tooling for the G5 telemetry redaction control (D19). It rejects
+any `#[instrument]` that lacks `skip_all`, or that uses `ret` or `err`. CI runs it through
+`scripts/check-instrumentation.sh`. Write every instrument as
+`#[instrument(skip_all, fields(...))]` and name each recorded field.
+
 ## Stack choices worth noting
 
 - TLS is rustls only. `reqwest`, `sqlx`, and `graphile_worker` are pinned with

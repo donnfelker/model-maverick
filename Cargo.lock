@@ -1989,6 +1989,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "instrument-lint"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
