@@ -19,7 +19,7 @@ maverick-runner = { workspace = true }
 maverick-alerts = { workspace = true }
 maverick-config = { workspace = true }
 axum = { workspace = true }
-tower = { workspace = true }
+tower = { workspace = true, features = ["util"] }
 tower-http = { workspace = true }
 rmcp = { workspace = true }
 tokio = { workspace = true }
@@ -27,3 +27,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+futures-util = "0.3"
+http-body-util = "0.1"
+ulid = { workspace = true }
