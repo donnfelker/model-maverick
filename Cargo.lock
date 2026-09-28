@@ -2300,6 +2300,8 @@ name = "maverick-api"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "futures-util",
+ "http-body-util",
  "maverick-alerts",
  "maverick-config",
  "maverick-domain",
@@ -2313,6 +2315,7 @@ dependencies = [
  "tower",
  "tower-http 0.7.1",
  "tracing",
+ "ulid",
 ]
 
 [[package]]
