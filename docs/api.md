@@ -854,24 +854,24 @@ Component health, behind the same internal bearer auth:
   "status": "ok",
   "components": {
     "db": { "status": "ok" },
-    "provider_client_config": { "status": "ok", "detail": "configured: anthropic, openai" },
-    "river_queues": { "status": "ok", "detail": "queues: default" }
+    "job_queue": { "status": "ok", "detail": "graphile_worker queues: default" },
+    "provider_client_config": { "status": "ok", "detail": "configured: anthropic, openai" }
   },
   "active_matrix_version": "2026-07-07",
   "last_batch_times": { "nightly_smoke": "2026-07-08T03:41:12Z" }
 }
 ```
 
-`503` with `status: "degraded"` when Postgres is unreachable — `db` reports
-`error` with the failure detail, and `river_queues` reports `unknown`
-(reading River's own state needs the same connection).
+`503` with `status: "degraded"` when Postgres is unreachable: `db` reports
+`error` with the failure detail, and `job_queue` reports `unknown`
+(reading the queue state needs the same connection).
 `provider_client_config` reports `none_configured` when no provider API key
-is set. `river_queues` reflects live state read straight from River's own
-Postgres tables — an `--api-only` node reports the workers running in a
-separate `--worker-only` node: `no_workers` when no queue has ever
-registered, `paused` when any queue is paused (naming it), `stale` when
-every queue's heartbeat is older than 60s (naming the queues), `ok`
-otherwise. `active_matrix_version` is the corpus version active right now
+is set. `job_queue` reflects live graphile_worker state read from Postgres, so
+an `--api-only` node reports the workers running in a separate
+`--worker-only` node: `no_workers` when no worker is registered, `stale` when
+no worker heartbeat is newer than 60s, `ok` otherwise. (The Go engine named
+this component `river_queues` and also had `paused`; see
+`parity/DIVERGENCES.md` D35.) `active_matrix_version` is the corpus version active right now
 (`null` on a cold stack, matching `matrix_version` elsewhere).
-`last_batch_times` maps job kind to its most recent completed run (absent
-entries mean that kind has never completed).
+`last_batch_times` maps job kind to its most recent completed batch
+(`batches.completed_at`; absent entries mean that kind has never completed).
