@@ -563,6 +563,19 @@ mod tests {
     }
 
     #[test]
+    fn key_ring_seal_uses_fresh_nonce_and_round_trips() {
+        let ring = KeyRing::new(5, [0x44u8; MASTER_KEY_SIZE], None);
+        let (v1, n1, c1) = ring.seal("cap_r", b"hello").unwrap();
+        let (v2, n2, c2) = ring.seal("cap_r", b"hello").unwrap();
+        assert_eq!(v1, 5, "seal reports the current version");
+        assert_eq!(v2, 5);
+        assert_ne!(n1, n2, "each seal draws a fresh nonce");
+        assert_ne!(c1, c2);
+        assert_eq!(ring.open(v1, "cap_r", &n1, &c1).unwrap(), b"hello");
+        assert_eq!(ring.open(v2, "cap_r", &n2, &c2).unwrap(), b"hello");
+    }
+
+    #[test]
     fn key_ring_without_previous_rejects_old_versions() {
         let ring = KeyRing::new(3, [0x33u8; MASTER_KEY_SIZE], None);
         assert_eq!(
