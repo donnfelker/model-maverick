@@ -2350,6 +2350,8 @@ name = "maverick-providers"
 version = "0.1.0"
 dependencies = [
  "maverick-domain",
+ "parity-support",
+ "rand 0.10.3",
  "reqwest",
  "serde",
  "serde_json",
