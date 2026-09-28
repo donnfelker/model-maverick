@@ -12,6 +12,7 @@ members = [
     "crates/maverick-proxy",
     "crates/maverick-runner",
     "crates/maverick-store",
+    "crates/maverick-testdb",
     "crates/parity-support",
     "crates/sdk-conformance",
 ]
@@ -125,6 +126,8 @@ maverick-jobs = { path = "crates/maverick-jobs" }
 maverick-alerts = { path = "crates/maverick-alerts" }
 maverick-api = { path = "crates/maverick-api" }
 maverick-core = { path = "crates/maverick-core" }
+# Dev-only: real Postgres for store and job tests (testcontainers, template per schema).
+maverick-testdb = { path = "crates/maverick-testdb" }
 
 # Lints inherited by every crate via `[lints] workspace = true`.
 # unsafe is forbidden by default; a crate that truly needs it overrides this locally.

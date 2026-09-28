@@ -52,6 +52,12 @@ Rules that the split enforces:
 `parity-support` is the dev-only fixture-loading crate. The skeleton exists now. The
 helpers are a separate bead (pkg1.4).
 
+`maverick-testdb` is the dev-only Postgres helper for store and job tests. Each test
+binary starts one `postgres:16-alpine` container, applies a `Schema` once to a template
+database, and clones one database per test. Set `MAVERICK_TEST_DATABASE_URL` to use an
+existing server instead. Without Docker the tests skip, except when `CI` or
+`MAVERICK_TEST_REQUIRE_DB` is set.
+
 ## Stack choices worth noting
 
 - TLS is rustls only. `reqwest`, `sqlx`, and `graphile_worker` are pinned with
