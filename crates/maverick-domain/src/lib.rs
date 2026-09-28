@@ -9,5 +9,9 @@
 //! Package 2a fills this in, one module per work package.
 
 pub mod capture;
+pub mod gofmt;
+pub mod gojson;
+pub mod graders;
 pub mod ids;
 pub mod keys;
+pub mod tasks;
