@@ -355,6 +355,13 @@ mod tests {
             .with_timezone(&Utc)
     }
 
+    // parity: tracing.TestFingerprintGoldenVector
+    // parity: tracing.TestFingerprintFormat
+    // parity: tracing.TestFingerprintRFC4231Vector
+    // parity: tracing.TestFingerprintOneCharEditDiverges
+    // parity: tracing.TestFingerprintCrossTenantDiverges
+    // parity: tracing.TestFingerprintEmptyPrompt
+    // parity: tracing.TestFingerprintNoUnicodeNormalization
     #[test]
     fn fingerprint_matches_fixture_rows() {
         let fixture: Value = serde_json::from_str(FINGERPRINT_FIXTURE).unwrap();
@@ -368,6 +375,7 @@ mod tests {
         }
     }
 
+    // parity: tracing.TestSealOpenRoundTrip
     #[test]
     fn capture_crypto_matches_fixture_rows() {
         let fixture: Value = serde_json::from_str(CRYPTO_FIXTURE).unwrap();
@@ -414,6 +422,7 @@ mod tests {
         }
     }
 
+    // parity: tracing.TestOpenRejectsWrongCaptureID
     #[test]
     fn open_rejects_tampered_ciphertext() {
         let fixture: Value = serde_json::from_str(CRYPTO_FIXTURE).unwrap();
@@ -447,6 +456,7 @@ mod tests {
         );
     }
 
+    // parity: tracing.TestSealNoncesAndCiphertextsDiffer
     #[test]
     fn seal_uses_a_fresh_nonce_each_time() {
         let master_key = [0x11u8; MASTER_KEY_SIZE];
@@ -491,6 +501,7 @@ mod tests {
         );
     }
 
+    // parity: tracing.TestSealRejectsShortMasterKey
     #[test]
     fn master_key_size_is_checked_at_use() {
         let short = [0u8; 31];
@@ -519,6 +530,7 @@ mod tests {
         );
     }
 
+    // parity: tracing.TestOpenRejectsWrongMasterKey
     #[test]
     fn key_ring_seals_with_current_and_opens_by_version() {
         let v1 = [0x11u8; MASTER_KEY_SIZE];
@@ -583,6 +595,7 @@ mod tests {
         )); // later
     }
 
+    // parity: tracing.TestDecide
     #[test]
     fn decide_matches_fixture_rows() {
         let fixture: Value = serde_json::from_str(DECIDE_FIXTURE).unwrap();
