@@ -109,7 +109,7 @@ Standard library first. Approved third-party (about a dozen, per plan):
 
 ## 3. Data model
 
-Postgres 16+. All DDL below is normative; migrations live in `internal/store/migrations` and are managed by goose. River manages its own tables via its migrations.
+Postgres 16+. All DDL below is normative. Migrations live in `crates/maverick-store/migrations` and are managed by sqlx. They are up only (D37). `0001_baseline.sql` equals the Go goose head (`parity/schema/schema.sql`, D21). Each later file is additive and names its spec section and D-row. graphile_worker manages its own schema (D22). (changed 2026-09-28 for the Rust port; the Go engine used goose, and River managed its own tables)
 
 Conventions: primary keys are prefixed ULIDs stored as `text` (`ten_`, `key_`, `col_`, `pool_`, `task_` (authored slug, see below), `run_`, `rec_`, `out_`, `cw_`, `cap_`, `alr_`, `bat_`). Timestamps are `timestamptz` UTC. Money is `numeric` USD. All tables get `created_at timestamptz not null default now()`; mutable tables also get `updated_at`.
 
@@ -160,6 +160,12 @@ create table model_columns (
   retention_verified_at     timestamptz,        -- when the evidence was last checked
   retention_valid_until     timestamptz,        -- ≤ retention_verified_at + 90 days; past it reads as 'unknown'
   retention_source          text,               -- link to the provider evidence
+  execution_aliases         jsonb not null default '{}',  -- {"openrouter": "<slug>"}; openrouter spec §2.1
+  execution_alias_retention jsonb not null default '{}',  -- per alias: the four retention fields (§4.5)
+  param_constraints         jsonb not null default '{}',
+  -- per-model parameter constraints (D29, §8.1):
+  -- {"<field>": {"allowed": [...], "order": [...]}}, keyed by a surface-neutral
+  -- field name such as "reasoning_effort"; {} = no constraints (Go mappings apply)
   created_at                timestamptz not null default now(),
   updated_at                timestamptz not null default now()
 );
@@ -269,6 +275,7 @@ create table tenant_constraints (
   max_cost_per_run numeric(12,6),               -- null = unconstrained
   max_latency_ms   int,
   zero_retention   boolean not null default false,
+  telemetry_opt_out boolean not null default false,  -- D39, §9.10
   updated_at       timestamptz not null default now()
 );
 
@@ -297,6 +304,7 @@ create table outcomes (
                                         'completed_unchecked','other')),  -- §9.10
   escalated_to       text,
   details            jsonb,
+  endpoint_used      text not null default 'direct',  -- execution backend that served the model; openrouter spec §2.4
   created_at         timestamptz not null default now()
 );
 create index on outcomes (recommendation_id);
@@ -340,10 +348,15 @@ create table debug_captures (
   ciphertext         bytea not null,            -- AES-256-GCM(prompt)
   nonce              bytea not null,            -- 96-bit, fresh from a CSPRNG per capture
   capture_key_version int not null,             -- master-key ring version used to encrypt (§10.4)
+  window_id          text references capture_windows(id) on delete set null,
+  -- the window that captured the row; the only FK that is not NO ACTION, because
+  -- ending a window early hard-deletes it while its captures live on
   captured_at        timestamptz not null default now(),
   expires_at         timestamptz not null
 );
 create index on debug_captures (expires_at);
+create index on debug_captures (window_id);
+create index on debug_captures (tenant_id);
 
 create table capture_access_log (
   id          text primary key,
@@ -376,6 +389,20 @@ create table classification_cache (
   primary key (tenant_id, prompt_hash, classifier_version)
 );
 
+-- Classifier budget counters (§8.3, D4), shared by every API replica. Before a
+-- cache-miss classifier call, an upsert increments calls only while calls is
+-- below the tenant's quota; no returned row means the quota is used up. The
+-- global spend cap compares the sum of spend_usd for the UTC day. New
+-- 2026-09-28 for the Rust port.
+create table classifier_usage (
+  usage_date  date not null,                    -- UTC day
+  tenant_id   text not null references tenants(id),
+  calls       int not null default 0,           -- classifier calls counted against the quota
+  spend_usd   numeric(12,6) not null default 0, -- provider cost of those calls
+  updated_at  timestamptz not null default now(),
+  primary key (usage_date, tenant_id)
+);
+
 -- One row per job kind × schedule window: the engine-owned uniqueness and
 -- lease record for every job (§11.2). New 2026-09-28 for the Rust port.
 create table batches (
@@ -396,7 +423,7 @@ create table batches (
 );
 ```
 
-The engine has 21 tables, including `batches` (added 2026-09-28 for the Rust port; the Go engine relies on River unique jobs and has the other twenty). The window column is named `batch_window` because `window` is a reserved word in Postgres.
+The engine has 22 tables. The Go engine has twenty. The Rust port adds `batches` (the Go engine relies on River unique jobs) and `classifier_usage` (the Go engine has no classifier budget), both on 2026-09-28. The window column is named `batch_window` because `window` is a reserved word in Postgres.
 
 Raw values live in `scores` and `aggregates`. Normalized scores are computed per query and never stored (plan §Data model). The `recommendations.response` jsonb is the exception by design: it snapshots what the caller actually saw.
 
