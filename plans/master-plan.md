@@ -390,8 +390,8 @@ Consolidated from every plan. Decided items are kept for the record with their d
 | Proxy surfaces | OpenAI-only vs also Anthropic Messages | both | Decided 2026-07-15 |
 | Shell auth and frontend | Devise + Hotwire (plan) vs Rails 8 auth + Vite React (framework) | framework wins | Decided 2026-07-13 |
 | Trial proxy keys | BYOK pass-through vs MM-owned capped trial keys | caller credentials only; hosted mode reads no provider env keys (§3.5) | Decided in this plan |
-| Trial proxy hosting | MM-operated instance plus binary vs binary only | hosted plus binary | Open |
-| Trial proxy execution | OpenRouter-backed (one BYOK key) vs per-provider direct | per-provider direct by default; OpenRouter as one opt-in backend among several (Vercel AI Gateway, Bedrock). OpenRouter is being acquired by Stripe and runs a free Auto Router that overlaps MM, so defaulting evaluators through it sends them to a competitor and adds a single-vendor dependency | Open, decide at N5 |
+| Trial proxy hosting | MM-operated instance plus binary vs binary only | hosted plus binary | Decided 2026-09-28 (owner): hosted plus binary |
+| Trial proxy execution | OpenRouter-backed (one BYOK key) vs per-provider direct | per-provider direct by default; OpenRouter as one opt-in backend among several (Vercel AI Gateway, Bedrock). OpenRouter is being acquired by Stripe and runs a free Auto Router that overlaps MM, so defaulting evaluators through it sends them to a competitor and adds a single-vendor dependency | Decided 2026-09-28 (owner): per-provider direct by default; OpenRouter is opt-in |
 | Scope label | standalone v1.2 vs fold into v1.1 | standalone | Open |
 | Telemetry naming | `/v1/telemetry` vs `/v1/observations`; rename history/outcomes? | keep `/v1/telemetry`, history unchanged | Open |
 | SDK repo layout | one repo per language vs monorepo | per language | Open |
@@ -403,7 +403,7 @@ Consolidated from every plan. Decided items are kept for the record with their d
 | SDK version floors | Node 20 / Ruby 3.2 / Go 1.22 / Python 3.10 | confirm against client fleets | Open |
 | Alias shape | generic `execution_aliases` map vs single `openrouter_slug` column | generic map | Open |
 | Alias population | operator-only vs a sync job against OpenRouter's list | operator-only at v0 | Open |
-| Price source for `price_sync` | none (operator edits via the column PUT) vs a models.dev-backed source | build the source | Open |
+| Price source for `price_sync` | none (operator edits via the column PUT) vs a models.dev-backed source | build the source | Decided 2026-09-28 (owner): build the models.dev source |
 | Proposed spec changes from this plan | workload projection and declared-workload header, three-valued `check_pass` and `completed_unchecked`, `retention_valid_until`, per-tenant classification quota field on tenant limits, (model, settings) chain entries, per-alias `retention_mode`, zero-retention codes and G1/G14 exceptions, `retention_mode`, classifier budget and 1.5 s deadline, availability aggregate and error-scoring fix, hosted-proxy key and tenant-header rules, `batches` table; v1.1 spec shell section aligned to the framework | adopt into `specs/` as §7.0 step 0, a hard gate before port work packages are assigned | Adopted 2026-09-28 |
 | Classifier hosting | provider column vs a trained classifier from the corpus | provider column until volume justifies training | Open |
 
