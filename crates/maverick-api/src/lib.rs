@@ -6,9 +6,11 @@
 pub mod audit;
 mod health;
 pub mod observe;
+mod recommend;
 mod telemetry;
 
 pub use health::HealthState;
+pub use recommend::{RecommendConfig, RecommendError, Recommended, recommend};
 
 /// What the endpoint handlers read: the engine pool and the health inputs. Handlers that
 /// need the database answer `500 internal_error` on a detached state (router tests).
@@ -16,19 +18,22 @@ pub use health::HealthState;
 pub struct ApiState {
     pool: Option<PgPool>,
     health: HealthState,
+    recommend: RecommendConfig,
 }
 
 impl ApiState {
     /// The production state.
     pub fn new(pool: PgPool, config: &Config) -> Self {
         Self::with_health(pool.clone(), HealthState::new(pool, config))
+            .with_recommend_config(RecommendConfig::from_config(config))
     }
 
-    /// A state with an explicit health configuration.
+    /// A state with an explicit health configuration and the default recommend knobs.
     pub fn with_health(pool: PgPool, health: HealthState) -> Self {
         Self {
             pool: Some(pool),
             health,
+            recommend: RecommendConfig::default(),
         }
     }
 
@@ -37,12 +42,24 @@ impl ApiState {
         Self {
             pool: None,
             health: HealthState::detached(),
+            recommend: RecommendConfig::default(),
         }
+    }
+
+    /// Replaces the recommend knobs (ranking, ceiling buffer, alert notifier).
+    pub fn with_recommend_config(mut self, recommend: RecommendConfig) -> Self {
+        self.recommend = recommend;
+        self
     }
 
     /// The engine pool, when there is one.
     pub fn pool(&self) -> Option<&PgPool> {
         self.pool.as_ref()
+    }
+
+    /// The recommend knobs.
+    pub fn recommend(&self) -> &RecommendConfig {
+        &self.recommend
     }
 }
 
@@ -838,8 +855,11 @@ fn public_v1_router(state: AuthState, api: ApiState) -> Router {
         .route("/config/weights", any(route_stub))
         .route("/config/constraints", any(route_stub))
         .route("/policies", any(route_stub))
-        .route("/recommend", any(route_stub))
-        .route("/checks/{*path}", any(route_stub))
+        .route(
+            "/recommend",
+            any(recommend::recommend_handler).with_state(api.clone()),
+        )
+        .route("/checks/{*path}", any(recommend::checks_handler))
         .route("/models", any(route_stub))
         .route("/telemetry", any(telemetry::telemetry).with_state(api))
         .route("/history/models/{column_id}", any(route_stub))
