@@ -1,92 +1,128 @@
-# The trial proxy (`cmd/maverick-proxy`)
+# Trial Proxy
 
-*Zero-code-change routing: point an existing OpenAI or Anthropic client's base
-URL at the proxy instead of the provider, and it gets automatic model
-selection, execution, and telemetry.*
+The trial proxy is a demo path for existing OpenAI and Anthropic clients. A
+caller points its base URL at the proxy, uses a `maverick/*` model alias, and
+keeps the provider wire format it already sends. The proxy asks the engine for a
+ranked chain, tries the entries in order, and reports the attempts through
+`/v1/telemetry`.
 
-## The problem it solves
+The engine still does not execute inference. The proxy is the only component
+that calls providers, and it uses the caller credential or the self-hosted
+operator keys.
 
-The production integration path is an SDK that a team deliberately adopts
-(v1.1 Track 1) — but before anyone adopts anything, they need to *see the
-product work* against code they already have, without writing an integration
-first. A base-URL swap is the lowest-friction demonstration available: no new
-package, no new client code, just a different host and a `maverick/*` model
-name. That demonstration has to behave like a real integration, not a toy —
-real fallback on transient failure, real streaming, real telemetry — or it
-proves nothing about the product it's demonstrating.
+## Modes
 
-## How it works
+`MAVERICK_PROXY_MODE=self-hosted` is the local and single-tenant mode. The proxy
+uses one `MAVERICK_API_KEY` for engine calls. It may also read provider keys
+from its own environment as fallback credentials.
 
-- **Two surfaces, one behavior.** The proxy speaks OpenAI chat-completions
-  (`POST /v1/chat/completions`) and the Anthropic Messages schema
-  (`POST /v1/messages`) — the latter a deliberate extension past the original
-  OpenAI-only trial-proxy design so Anthropic-native tooling (e.g. Claude
-  Code via `ANTHROPIC_BASE_URL`) works unmodified. Both surfaces resolve the
-  same `maverick/auto | quality | cost | <pool>:<mode>` alias grammar used
-  everywhere else in the [SDK integration conventions](../api.md), asking the
-  engine for a recommendation and walking its fallback chain.
-- **A real chain executor, not a single call.** Each chain entry is tried in
-  order; a transport failure or an upstream `429`/`5xx` advances to the next
-  entry, a semantic `4xx` is relayed verbatim (the request was bad on every
-  model, not just this one), and a `2xx` — streaming or not — is relayed the
-  moment it's seen, so fallback only ever happens before the caller sees a
-  byte. A chain that never produces an executable attempt fails closed
-  (`502 no_executable_candidates`) rather than guessing.
-- **BYOK where it's safe, the proxy's own key otherwise.** When a chain entry
-  lands on the surface's native provider (Anthropic for Messages, OpenAI for
-  chat-completions) and the caller sent its own credential, that credential
-  is forwarded as-is and never inspected or stored. Every other entry — a
-  cross-provider pick, or the native provider when the caller sent no
-  credential — falls back to the proxy's own configured provider key; an
-  entry with no resolvable credential anywhere is skipped without counting as
-  an attempt.
-- **Headers and query strings pass through by default.** Real client tooling
-  sends headers the proxy can't enumerate in advance (Claude Code's
-  `anthropic-beta` authorizing beta body fields, for one) — an allowlist
-  would silently break them. Everything flows through except hop-by-hop
-  headers and the two credential headers, which the resolved key replaces.
-  The client's query string travels verbatim for the same reason.
-- **Narrow, honest parameter normalization.** A client configured for one
-  model chooses parameter values for *that* model, not whatever the engine
-  routes to — a live finding was Claude Code sending an Opus-tier reasoning
-  effort that a routed Sonnet-tier model rejected outright. v0 ships exactly
-  one normalization per surface for exactly that failure; a catalog-driven,
-  per-model version of the fix is future work, not solved generally here.
-- **Zero-ceremony telemetry and optional observability.** Every dispatched
-  attempt reports to `POST /v1/telemetry` automatically, same as any
-  MM-authored component (G13) — the demonstration closes its own feedback
-  loop without anyone wiring it up. Separately, and only when an operator
-  points it at a collector, the proxy emits its own OTel logs and metrics
-  (cold-cell rate, classifier-fallback rate) — fail-open, so a dead collector
-  never touches request latency.
-- **Deliberately narrow (v0).** No OpenAI↔Anthropic schema translation, so
-  the Messages surface only ever executes Anthropic chain entries. Direct
-  execution only — the catalog's `execution_aliases` (see
-  [Model catalog](model-catalog.md)) are never read here. No production SLA,
-  rate limiting, or request-size cap beyond the stdlib's defaults. This is a
-  trial demonstration; production traffic graduates to a client SDK or a
-  gateway plugin.
+`MAVERICK_PROXY_MODE=hosted` is the shared trial mode. Each request must carry a
+tenant key in `X-Maverick-API-Key`. Hosted mode does not read provider keys from
+the proxy process. The caller must send its provider credential on the request.
 
-## Nice to have (not planned)
+## Claude Code
 
-- A "graduation link" response header that points trial users to the
-  production integration path (a client SDK or a gateway plugin). Removed
-  from the v1 requirements by the owner on 2026-09-28 as premature: the SDKs
-  and a public docs page do not exist yet. Revisit when they do.
+Claude Code uses the Anthropic Messages surface. The launcher is:
 
-## Dependencies
+```bash
+./scripts/claude-via-maverick.sh --dry-run
+./scripts/claude-via-maverick.sh
+```
 
-- A separate binary and a separate deployable from `maverick` — no database,
-  no migrations, no shared runtime with the engine.
-- Drives [Recommendation](recommendation.md) exactly like any external caller
-  (tenant API key auth — see [Tenancy & auth](tenancy-auth.md)) and closes the
-  loop through the same automatic-telemetry path described in
-  [History & audit](history-audit.md).
-- Shares the alias grammar and the correlation-header convention with every
-  other MM-authored component: [API reference — SDK integration
-  conventions](../api.md).
-- Full environment reference, surfaces, header/key-resolution rules, and the
-  OTel event/metric shapes: [`cmd/maverick-proxy/README.md`](../../cmd/maverick-proxy/README.md).
-- Normative contract: `plans/model-maverick-integration-surfaces-plan.md` §4
-  (Track 3); the alias grammar and telemetry contract originate in the same
-  plan's §1.
+For hosted mode, put this in `.env.maverick.local`:
+
+```bash
+MAVERICK_PROXY_MODE=hosted
+MAVERICK_PROXY_URL=https://proxy.example.test
+MAVERICK_TENANT_KEY=mk_live_...
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+The script sets `ANTHROPIC_BASE_URL` to the proxy and adds
+`X-Maverick-API-Key` through `ANTHROPIC_CUSTOM_HEADERS`. It never prints key
+values. The `ANTHROPIC_API_KEY` value remains the caller's Anthropic credential
+for direct Anthropic attempts.
+
+For self-hosted mode, set:
+
+```bash
+MAVERICK_PROXY_MODE=self-hosted
+MAVERICK_PROXY_URL=http://localhost:8090
+MAVERICK_ENGINE_URL=http://localhost:8080
+```
+
+You may set `ANTHROPIC_API_KEY` to send a caller Anthropic key, or rely on
+provider keys loaded by the self-hosted proxy.
+
+Claude Code reads `ANTHROPIC_BASE_URL`, `ANTHROPIC_API_KEY`, and
+`ANTHROPIC_CUSTOM_HEADERS`; see the Claude Code environment variable reference.
+
+## Manual Check
+
+Use dry-run first:
+
+```bash
+./scripts/claude-via-maverick.sh --dry-run -p "."
+```
+
+For a local self-hosted check, start the engine and proxy with the fake provider
+path from `docs/onboarding.md`. Then run:
+
+```bash
+./scripts/claude-via-maverick.sh -p "."
+```
+
+The script should print the proxy URL, mode, and aliases. It must not print the
+tenant key or provider key.
+
+## Execution
+
+Direct execution is the default. The chat-completions surface can run OpenAI and
+OpenAI-compatible entries. The Messages surface executes Anthropic entries only.
+The proxy does not translate schemas between providers.
+
+OpenRouter is opt-in on the chat-completions surface. In hosted mode, a caller
+Bearer key that starts with `sk-or-` selects OpenRouter execution. The proxy uses
+the catalog entry's OpenRouter alias as the upstream model. For a zero-retention
+tenant, the alias must have valid zero-retention evidence, or the proxy returns
+`409 no_compliant_columns`.
+
+Claude Code uses the Messages surface, so the launcher refuses `sk-or-` keys.
+Use an OpenAI-compatible client for OpenRouter trials.
+
+## Fences
+
+- No schema translation. Send OpenAI chat payloads to
+  `/v1/chat/completions`, and Anthropic Messages payloads to `/v1/messages`.
+- The Messages surface executes Anthropic entries only.
+- Hosted mode never falls back to provider keys owned by Model Maverick.
+- `X-Maverick-API-Key` is stripped before any upstream provider call.
+- The default hosted rate limit is 60 requests per minute per tenant key.
+- The default body cap is 32 MiB.
+- This path has no production SLA. Production traffic should use an SDK or a
+  gateway plugin once those exist.
+
+## Telemetry
+
+Each attempt reports through `/v1/telemetry`, unless telemetry is disabled.
+When a tenant has `telemetry_opt_out`, the engine returns `telemetry: false`,
+and the proxy sends no telemetry for that tenant. Operators can also set
+`MAVERICK_PROXY_TELEMETRY=off` to send no proxy telemetry at all.
+
+OTel logs and metrics are separate operator observability. They are enabled only
+when the proxy has `MAVERICK_PROXY_OTLP_ENDPOINT`.
+
+## Nice To Have (Not Planned)
+
+A graduation-link response header could point trial users to the production
+integration path. The owner removed it from v1 on 2026-09-28 as premature
+because SDKs and public docs do not exist yet. Revisit when they do.
+
+## References
+
+- [API conventions](../api.md)
+- [Model catalog](model-catalog.md)
+- [Tenancy and auth](tenancy-auth.md)
+- [History and audit](history-audit.md)
+- Normative proxy contract: `specs/model-maverick-v1-spec.md` §8.1
+- Claude Code environment variables: <https://code.claude.com/docs/en/env-vars>
