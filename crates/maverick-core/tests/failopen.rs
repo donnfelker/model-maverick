@@ -29,6 +29,7 @@ fn recommendation(zero_retention: bool, chain: Vec<ChainEntry>) -> Recommendatio
         classification_method: "declared".to_owned(),
         zero_retention,
         classification_quota_exceeded: false,
+        telemetry_opt_out: false,
     }
 }
 

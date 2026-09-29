@@ -8,8 +8,9 @@
 //! - The body is written as the Go proxy wrote it: compact JSON, members in lexicographic
 //!   order, HTML-escaped strings, `pool` omitted when empty.
 //! - The response is decoded with Go's `encoding/json` rules, and it carries the Rust
-//!   fields: entry `settings` (D14), `retention_mode` and `zero_retention` (D9), and
-//!   execution aliases with their retention (D15).
+//!   fields: entry `settings` (D14), `retention_mode` and `zero_retention` (D9),
+//!   execution aliases with their retention (D15), and the tenant's `telemetry` flag
+//!   (D39).
 //! - `422 zero_retention_requires_declared` and `409 no_compliant_columns` are terminal
 //!   privacy errors, typed apart from every other failure. They never trigger fail-open
 //!   (D17). Every other failure is an engine error.
@@ -266,6 +267,9 @@ pub struct Recommendation {
     pub zero_retention: bool,
     /// `classification_quota_exceeded`.
     pub classification_quota_exceeded: bool,
+    /// `telemetry: false` (D39): the tenant opted out, so no MM component sends telemetry
+    /// for this request. An absent or `null` member (a Go-era engine) leaves it `false`.
+    pub telemetry_opt_out: bool,
 }
 
 /// Why a recommend call produced no recommendation.

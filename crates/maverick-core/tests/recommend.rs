@@ -432,6 +432,7 @@ async fn rust_response_fields_decode() {
             classification_method: "classified".to_owned(),
             zero_retention: true,
             classification_quota_exceeded: true,
+            telemetry_opt_out: false,
         }
     );
 }
@@ -511,6 +512,33 @@ async fn go_decoding_rules() {
             "{body:?}: {outcome:?}"
         );
     }
+}
+
+/// DIVERGENCE: D39. `telemetry: false` marks an opted-out tenant. `true`, an absent member
+/// (a Go-era engine), and `null` all mean telemetry is on. A wrong type fails the decode
+/// like any known field.
+#[tokio::test]
+async fn the_tenant_telemetry_flag_decodes() {
+    let d39 = parity_support::divergence!("D39");
+    assert_eq!(d39.id(), "D39");
+    for (body, opted_out) in [
+        (r#"{"telemetry":false}"#, true),
+        (r#"{"TELEMETRY":false}"#, true),
+        (r#"{"telemetry":true}"#, false),
+        (r#"{"telemetry":null}"#, false),
+        ("{}", false),
+    ] {
+        let decoded = call_with(200, body).await.expect(body);
+        assert_eq!(decoded.telemetry_opt_out, opted_out, "{body}");
+    }
+    let outcome = call_with(200, r#"{"telemetry":"false"}"#).await;
+    assert!(
+        matches!(
+            outcome,
+            Err(RecommendError::Engine(EngineFailure::Decode(_)))
+        ),
+        "{outcome:?}"
+    );
 }
 
 // ---------------------------------------------------------------------------------------
