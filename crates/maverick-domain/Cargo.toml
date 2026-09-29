@@ -18,6 +18,8 @@ serde_json = { workspace = true }
 serde_norway = { workspace = true }
 jsonschema = { workspace = true }
 regex = { workspace = true }
+unicode-general-category = { workspace = true }
+unicode-script = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 ulid = { workspace = true }

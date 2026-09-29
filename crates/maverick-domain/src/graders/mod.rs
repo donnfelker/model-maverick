@@ -6,6 +6,7 @@ pub mod golden;
 pub mod goregex;
 pub mod keyfacts;
 pub mod registry;
+pub mod rulescan;
 pub mod spec;
 
 pub use envelope::{
@@ -18,4 +19,5 @@ pub use registry::{
     BoxError, BoxFuture, FailureCounter, GradeError, GradeInput, GradeResult, Grader, GraderError,
     RegisterError, Registry, RunMeta,
 };
+pub use rulescan::RuleScan;
 pub use spec::{SpecValidator, ValidationRegistry, check_schema};
