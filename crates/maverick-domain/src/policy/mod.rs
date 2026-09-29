@@ -10,7 +10,9 @@ mod simulate;
 mod validate;
 
 pub use evaluate::{evaluate, resolve_pool};
-pub use simulate::{CellEwma, ColumnRetention, SimCell, SimulationState, simulate};
+pub use simulate::{
+    CellEwma, ColumnRetention, PoolFloor, SimCell, SimulationState, pool_floor, simulate,
+};
 pub use validate::{
     ConfigError, ConfigErrorCode, WeightRow, validate_constraint_values, validate_pool_shapes,
     validate_weights,

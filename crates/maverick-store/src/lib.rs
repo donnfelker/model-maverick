@@ -23,6 +23,7 @@ pub mod decisions;
 pub mod health;
 pub mod measurement;
 pub mod migrate;
+pub mod simulation;
 pub mod tenancy;
 
 pub use rust_decimal::Decimal;
