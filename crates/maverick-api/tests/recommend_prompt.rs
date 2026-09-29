@@ -648,7 +648,9 @@ async fn a_spent_quota_is_flagged_on_the_response() {
     let (status, text) = env.recommend(&prompt_body(CONTRACT)).await;
     assert_eq!(status, StatusCode::OK);
     assert!(
-        text.ends_with("\"zero_retention\":false,\"classification_quota_exceeded\":true}\n"),
+        text.ends_with(
+            "\"zero_retention\":false,\"telemetry\":true,\"classification_quota_exceeded\":true}\n"
+        ),
         "{text}"
     );
     assert_eq!(parse(&text)["classification"]["method"], "fallback_default");

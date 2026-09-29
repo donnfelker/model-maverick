@@ -48,6 +48,14 @@ impl Resource {
     }
 }
 
+/// A constraints payload: the standing constraints (policy filters) and the tenant's
+/// telemetry opt-out (D39), which filters no column.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct ConstraintsInput {
+    pub standing: StandingConstraints,
+    pub telemetry_opt_out: bool,
+}
+
 /// A stored configuration after a successful replace.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Replaced {
@@ -349,12 +357,12 @@ fn weight_input(value: &JsonValue) -> Result<WeightInput, String> {
 }
 
 /// The constraints of a `{"constraints":{...}}` body. Missing keys are null or false, so
-/// `{"constraints":{}}` clears everything.
-pub fn decode_constraints(body: &[u8]) -> Result<StandingConstraints, ApiError> {
+/// `{"constraints":{}}` clears everything, `telemetry_opt_out` (D39) included.
+pub fn decode_constraints(body: &[u8]) -> Result<ConstraintsInput, ApiError> {
     const STRUCT: &str = "ConstraintsRequest";
     const INNER: &str = "ConstraintsInput";
     let value = strict::body_value(body)?;
-    let constraints = (|| -> Result<Option<StandingConstraints>, String> {
+    let constraints = (|| -> Result<Option<ConstraintsInput>, String> {
         let mut out = None;
         let Some(members) = strict::members(&value, STRUCT, "")? else {
             return Ok(None);
@@ -367,11 +375,17 @@ pub fn decode_constraints(body: &[u8]) -> Result<StandingConstraints, ApiError> 
                 out = None;
                 continue;
             };
-            let mut constraints: StandingConstraints = out.unwrap_or_default();
+            let mut input: ConstraintsInput = out.unwrap_or_default();
+            let constraints = &mut input.standing;
             for (key, value) in fields {
                 match match_field(
                     key,
-                    &["max_cost_per_run", "max_latency_ms", "zero_retention"],
+                    &[
+                        "max_cost_per_run",
+                        "max_latency_ms",
+                        "zero_retention",
+                        "telemetry_opt_out",
+                    ],
                 ) {
                     Some("max_cost_per_run") => {
                         constraints.max_cost_per_run =
@@ -388,16 +402,23 @@ pub fn decode_constraints(body: &[u8]) -> Result<StandingConstraints, ApiError> 
                         )?
                         .map(|ms| i32::try_from(ms).expect("range checked"));
                     }
-                    Some(_) => strict::boolean(
+                    Some("zero_retention") => strict::boolean(
                         value,
                         INNER,
                         "constraints.zero_retention",
                         &mut constraints.zero_retention,
                     )?,
+                    // D39.
+                    Some(_) => strict::boolean(
+                        value,
+                        INNER,
+                        "constraints.telemetry_opt_out",
+                        &mut input.telemetry_opt_out,
+                    )?,
                     None => return Err(strict::unknown(key)),
                 }
             }
-            out = Some(constraints);
+            out = Some(input);
         }
         Ok(out)
     })()
@@ -503,13 +524,13 @@ pub async fn replace_weights(
 }
 
 /// Validates constraints against the stored pools (G4, including D1 zero retention) and
-/// upserts them. The stored `telemetry_opt_out` (D39) is kept: this payload has no such
-/// field.
+/// upserts them with the payload's `telemetry_opt_out` (D39), which G4 ignores.
 pub async fn replace_constraints(
     db: &PgPool,
     tenant_id: &str,
-    constraints: &StandingConstraints,
+    input: &ConstraintsInput,
 ) -> Result<Replaced, ConfigFailure> {
+    let constraints = &input.standing;
     if let Some(first) = policy::validate_constraint_values(constraints)
         .into_iter()
         .next()
@@ -533,9 +554,6 @@ pub async fn replace_constraints(
     {
         return Err(config_error(first).into());
     }
-    let telemetry_opt_out = stored_constraints(&mut tx, tenant_id)
-        .await?
-        .is_some_and(|row| row.telemetry_opt_out);
     let max_cost = constraints
         .max_cost_per_run
         .map(|cost| {
@@ -551,7 +569,7 @@ pub async fn replace_constraints(
         max_cost,
         constraints.max_latency_ms,
         constraints.zero_retention,
-        telemetry_opt_out,
+        input.telemetry_opt_out,
     )
     .await?;
     tx.commit().await?;
@@ -666,8 +684,8 @@ fn weights_body(rows: &[TenantWeight]) -> Result<String, ConfigFailure> {
     Ok(document(Resource::Weights.name(), JsonValue::Array(items)))
 }
 
-/// `{"constraints":{"max_cost_per_run","max_latency_ms","zero_retention"}}`; no row is
-/// all null and false.
+/// `{"constraints":{"max_cost_per_run","max_latency_ms","zero_retention",
+/// "telemetry_opt_out"}}` (Go's three keys, then D39); no row is all null and false.
 fn constraints_body(row: Option<&TenantConstraint>) -> Result<String, ConfigFailure> {
     let max_cost = match row.and_then(|row| row.max_cost_per_run) {
         Some(cost) => JsonValue::Number(
@@ -685,6 +703,11 @@ fn constraints_body(row: Option<&TenantConstraint>) -> Result<String, ConfigFail
             ("max_cost_per_run", max_cost),
             ("max_latency_ms", max_latency),
             ("zero_retention", JsonValue::Bool(zero_retention)),
+            // D39.
+            (
+                "telemetry_opt_out",
+                JsonValue::Bool(row.is_some_and(|row| row.telemetry_opt_out)),
+            ),
         ]),
     ))
 }
@@ -784,18 +807,39 @@ mod tests {
         assert_eq!(m, "constraints is required");
         assert_eq!(
             decode_constraints(br#"{"constraints":{}}"#).unwrap(),
-            StandingConstraints::default()
+            ConstraintsInput::default()
         );
         assert_eq!(
             decode_constraints(
                 br#"{"constraints":{"max_cost_per_run":0.25,"max_latency_ms":4000,"zero_retention":true}}"#
             )
             .unwrap(),
-            StandingConstraints {
-                max_cost_per_run: Some(0.25),
-                max_latency_ms: Some(4000),
-                zero_retention: true,
+            ConstraintsInput {
+                standing: StandingConstraints {
+                    max_cost_per_run: Some(0.25),
+                    max_latency_ms: Some(4000),
+                    zero_retention: true,
+                },
+                telemetry_opt_out: false,
             }
+        );
+        // D39: Go-style field matching; null leaves false.
+        assert!(
+            decode_constraints(br#"{"constraints":{"Telemetry_Opt_Out":true}}"#)
+                .unwrap()
+                .telemetry_opt_out
+        );
+        assert!(
+            !decode_constraints(br#"{"constraints":{"telemetry_opt_out":null}}"#)
+                .unwrap()
+                .telemetry_opt_out
+        );
+        let (m, _) = message(decode_constraints(
+            br#"{"constraints":{"telemetry_opt_out":"yes"}}"#,
+        ));
+        assert!(
+            m.starts_with("malformed request body: json: cannot unmarshal string into Go struct field ConstraintsInput.constraints.telemetry_opt_out of type bool"),
+            "{m}"
         );
         let (m, _) = message(decode_constraints(br#"{"constraints":{"max_tokens":5}}"#));
         assert_eq!(
@@ -831,7 +875,7 @@ mod tests {
         assert_eq!(
             constraints_body(None).unwrap(),
             "{\"constraints\":{\"max_cost_per_run\":null,\"max_latency_ms\":null,\
-             \"zero_retention\":false}}\n"
+             \"zero_retention\":false,\"telemetry_opt_out\":false}}\n"
         );
         assert_eq!(
             referenced_ids(&[

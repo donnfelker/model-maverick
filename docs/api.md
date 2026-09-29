@@ -322,6 +322,11 @@ counted**, never surfaced as a per-item error, never failing the batch.
 `200 {"accepted": N, "dropped": M}`. An empty `items` array is a valid
 no-op: `{"accepted": 0, "dropped": 0}`.
 
+**Tenant opt-out (D39):** when the tenant's `telemetry_opt_out` constraint is
+set, every item is dropped and counted, and no outcome row is written. The
+response has the same shape. Recommend responses carry `"telemetry": false`
+for such a tenant, so MM components send nothing for it in the first place.
+
 **Outcome derivation** (server-side; first matching rule wins):
 
 1. `error_class == "timeout"` → `latency_exceeded`
@@ -504,14 +509,21 @@ Standing tenant constraints — hard filters on every request:
   "constraints": {
     "max_cost_per_run": 0.01,
     "max_latency_ms": 5000,
-    "zero_retention": false
+    "zero_retention": false,
+    "telemetry_opt_out": false
   }
 }
 ```
 
 `null` disables a limit. A write that would leave any pool without usable
 columns is refused `422 pool_would_be_empty`. `zero_retention: true` also
-forbids debug capture windows (G5).
+forbids debug capture windows (G5). The PUT is a full replace: a missing key
+is `null` or `false`.
+
+`telemetry_opt_out: true` (D39) turns off outcome telemetry for the tenant.
+Recommend responses then carry `"telemetry": false`, MM components send no
+telemetry, and the engine drops any telemetry items it still receives. It
+filters no model column, so it never causes `pool_would_be_empty`.
 
 ## Debug capture
 
@@ -712,7 +724,8 @@ tenant can call `/v1/recommend`.
               "created_at": "...", "updated_at": "..." },
   "pools": [ { "name": "default", "model_column_ids": ["col_01K..."], "is_default": true } ],
   "weights": [],
-  "constraints": { "max_cost_per_run": null, "max_latency_ms": null, "zero_retention": false },
+  "constraints": { "max_cost_per_run": null, "max_latency_ms": null, "zero_retention": false,
+                   "telemetry_opt_out": false },
   "api_keys": []
 }
 ```

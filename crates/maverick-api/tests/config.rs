@@ -174,7 +174,8 @@ fn day(text: &str) -> NaiveDate {
 const POOLS: &str = "/v1/config/pools";
 const WEIGHTS: &str = "/v1/config/weights";
 const CONSTRAINTS: &str = "/v1/config/constraints";
-const NO_CONSTRAINTS: &str = "{\"constraints\":{\"max_cost_per_run\":null,\"max_latency_ms\":null,\"zero_retention\":false}}\n";
+/// Go's three keys, then D39's `telemetry_opt_out`.
+const NO_CONSTRAINTS: &str = "{\"constraints\":{\"max_cost_per_run\":null,\"max_latency_ms\":null,\"zero_retention\":false,\"telemetry_opt_out\":false}}\n";
 
 // parity: api.TestConfigPoolsRoundTrip
 #[tokio::test]
@@ -369,7 +370,7 @@ async fn constraints_round_trip() {
         (StatusCode::OK, NO_CONSTRAINTS.to_owned())
     );
     let full = "{\"constraints\":{\"max_cost_per_run\":0.25,\"max_latency_ms\":4000,\
-                \"zero_retention\":true}}\n";
+                \"zero_retention\":true,\"telemetry_opt_out\":false}}\n";
     assert_eq!(
         put(
             &pool,
@@ -568,7 +569,7 @@ async fn unmeasured_columns_survive_and_only_the_latest_aggregate_counts() {
         (
             StatusCode::OK,
             "{\"constraints\":{\"max_cost_per_run\":0.000001,\"max_latency_ms\":null,\
-             \"zero_retention\":false}}\n"
+             \"zero_retention\":false,\"telemetry_opt_out\":false}}\n"
                 .to_owned()
         )
     );
@@ -618,10 +619,10 @@ async fn unmeasured_columns_survive_and_only_the_latest_aggregate_counts() {
 }
 
 /// D1: zero retention is simulated with the constraints, so a pool without valid
-/// zero-retention evidence refuses the change. D39: the stored `telemetry_opt_out` is
-/// kept, since this payload has no such field.
+/// zero-retention evidence refuses the change. D39: the PUT is a full replace (spec
+/// §9.7), so a payload without `telemetry_opt_out` stores `false`.
 #[tokio::test]
-async fn zero_retention_is_simulated_and_telemetry_opt_out_is_kept() {
+async fn zero_retention_is_simulated_and_telemetry_opt_out_is_replaced() {
     let Some((db, pool)) = database().await else {
         return;
     };
@@ -668,8 +669,84 @@ async fn zero_retention_is_simulated_and_telemetry_opt_out_is_kept() {
         .unwrap();
     assert!(row.zero_retention);
     assert!(
-        row.telemetry_opt_out,
-        "D39 opt-out survives a constraints PUT"
+        !row.telemetry_opt_out,
+        "D39: a full-replace PUT without the key clears the opt-out"
+    );
+    db.close().await;
+}
+
+/// DIVERGENCE: D39. `telemetry_opt_out` is written and read through the constraints
+/// payload as the last key. It filters no column, so it never trips G4: an opt-out PUT
+/// succeeds for a pool that the other constraints leave intact.
+#[tokio::test]
+async fn telemetry_opt_out_round_trips() {
+    let d39 = parity_support::divergence!("D39");
+    assert_eq!(d39.id(), "D39");
+    let Some((db, pool)) = database().await else {
+        return;
+    };
+    column(&pool, "col_std", "active").await;
+    tenancy::create_pool(
+        &pool,
+        "pool_1",
+        TENANT,
+        "default",
+        &["col_std".to_owned()],
+        true,
+    )
+    .await
+    .unwrap();
+    let opted_out = "{\"constraints\":{\"max_cost_per_run\":null,\"max_latency_ms\":null,\
+                     \"zero_retention\":false,\"telemetry_opt_out\":true}}\n";
+    assert_eq!(
+        put(
+            &pool,
+            CONSTRAINTS,
+            r#"{"constraints":{"telemetry_opt_out":true}}"#
+        )
+        .await,
+        (StatusCode::OK, opted_out.to_owned())
+    );
+    assert_eq!(
+        get(&pool, CONSTRAINTS).await,
+        (StatusCode::OK, opted_out.to_owned())
+    );
+    let row = tenancy::get_tenant_constraints(&pool, TENANT)
+        .await
+        .unwrap();
+    assert!(row.telemetry_opt_out && !row.zero_retention);
+
+    // Another tenant is unaffected.
+    assert_eq!(
+        get_as(&pool, "tenant_other", CONSTRAINTS).await,
+        (StatusCode::OK, NO_CONSTRAINTS.to_owned())
+    );
+
+    // A wrongly typed value is the Go-strict decode error, and nothing is written.
+    let (status, text) = put(
+        &pool,
+        CONSTRAINTS,
+        r#"{"constraints":{"telemetry_opt_out":"no"}}"#,
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(parse(&text)["error"]["code"], "invalid_request");
+    assert_eq!(
+        parse(&text)["error"]["message"],
+        "malformed request body: json: cannot unmarshal string into Go struct field \
+         ConstraintsInput.constraints.telemetry_opt_out of type bool"
+    );
+    assert_eq!(get(&pool, CONSTRAINTS).await.1, opted_out);
+
+    // Opting back in.
+    assert_eq!(
+        put(
+            &pool,
+            CONSTRAINTS,
+            r#"{"constraints":{"telemetry_opt_out":false}}"#
+        )
+        .await,
+        (StatusCode::OK, NO_CONSTRAINTS.to_owned())
     );
     db.close().await;
 }
