@@ -52,9 +52,12 @@ pub const ZERO_RETENTION_REQUIRES_DECLARED: &str = "zero_retention_requires_decl
 /// `no_compliant_columns`, relayed from the engine (D17).
 pub const NO_COMPLIANT_COLUMNS: &str = "no_compliant_columns";
 
-/// The correlation header on `no_executable_candidates` responses.
+/// The correlation header on relayed and `no_executable_candidates` responses.
 pub const RECOMMENDATION_ID_HEADER: HeaderName =
     HeaderName::from_static("x-maverick-recommendation-id");
+
+/// The correlation header naming the executed model on relayed responses.
+pub const MODEL_USED_HEADER: HeaderName = HeaderName::from_static("x-maverick-model-used");
 
 /// The exact envelope bytes: `{"error":{"code":..,"message":..}}` and one newline.
 #[must_use]

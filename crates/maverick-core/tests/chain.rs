@@ -38,8 +38,11 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// Sleep 1 ms of real time. The paused clock does not move.
+/// Sleep 1 ms of real time. The paused clock does not move. Each pause also rebuilds the
+/// tracing interest cache, which another test thread may have set before this test's
+/// subscriber existed.
 async fn real_pause() {
+    tracing::callsite::rebuild_interest_cache();
     tokio::task::spawn_blocking(|| std::thread::sleep(Duration::from_millis(1)))
         .await
         .expect("real pause");
@@ -367,10 +370,14 @@ impl Rig {
             .with_target(false)
             .with_writer(move || writer.clone())
             .finish();
+        let subscriber = tracing::subscriber::set_default(subscriber);
+        // A callsite first hit on a thread with no subscriber can cache "never"; rebuild so
+        // this thread's subscriber sees the executor's lines.
+        tracing::callsite::rebuild_interest_cache();
         let (events_tx, events) = mpsc::unbounded_channel();
         Self {
             log,
-            _subscriber: tracing::subscriber::set_default(subscriber),
+            _subscriber: subscriber,
             _manual_clock: release,
             http: reqwest::Client::builder()
                 .no_proxy()

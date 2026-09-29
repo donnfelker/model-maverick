@@ -1,8 +1,9 @@
 //! The chain-walk seam (pipeline step 6).
 //!
-//! The shell hands every recommended chain to a [`ChainRunner`]. The chain executor
-//! (bead 6.2) and the chat and messages surfaces (bead 6.7) provide the real runner. Until
-//! they land, [`NoExecutor`] answers as Go did when no chain entry could be executed.
+//! The shell hands every recommended chain to a [`ChainRunner`]. The real runner is
+//! [`crate::surface::ExecutorRunner`]: the chat and messages surfaces on the
+//! `maverick-core` chain executor. [`NoExecutor`] answers as Go did when no chain entry
+//! could be executed; tests use it.
 
 use std::fmt;
 use std::future::Future;
@@ -58,6 +59,9 @@ pub struct ChainRequest {
     pub headers: HeaderMap,
     /// The inbound body, exactly as received.
     pub body: Bytes,
+    /// The inbound raw query (without `?`), appended verbatim to every upstream URL when
+    /// it is not empty.
+    pub raw_query: String,
     /// The parsed alias; `settings_mode` says whether entry settings apply (D14).
     pub alias: Alias,
     /// The engine's recommendation.
@@ -80,6 +84,10 @@ impl fmt::Debug for ChainRequest {
             .field("env_keys", &self.env_keys)
             .field("headers", &self.headers.keys().collect::<Vec<_>>())
             .field("body", &format_args!("<{} bytes>", self.body.len()))
+            .field(
+                "raw_query",
+                &format_args!("<{} bytes>", self.raw_query.len()),
+            )
             .field("alias", &self.alias)
             .field("recommendation_id", &self.recommendation.recommendation_id)
             .field("chain_len", &self.recommendation.chain.len())
@@ -94,8 +102,7 @@ pub trait ChainRunner: Send + Sync + 'static {
     fn run(&self, request: ChainRequest) -> BoxFuture<'_, Response>;
 }
 
-/// The placeholder runner: every chain is treated as exhausted. Replaced by beads 6.2 and
-/// 6.7.
+/// A runner that attempts nothing: every chain is treated as exhausted.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NoExecutor;
 
