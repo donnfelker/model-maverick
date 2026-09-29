@@ -2346,6 +2346,7 @@ dependencies = [
 name = "maverick-core"
 version = "0.1.0"
 dependencies = [
+ "httpdate",
  "insta",
  "parity-support",
  "reqwest",
@@ -2354,6 +2355,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
