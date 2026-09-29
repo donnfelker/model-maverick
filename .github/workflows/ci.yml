@@ -5,10 +5,28 @@ on:
   push:
     branches:
       - main
+  # The full mutation run (sharded) runs nightly and on demand; pushes run it on the
+  # changed lines only. See the mutants jobs below.
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+# Many agents push to main. A newer push supersedes an older run on the same ref, so the
+# newest commit always gets the full gate set without a queue of stale runs. The event
+# name keeps a push from cancelling the nightly run.
+concurrency:
+  group: ci-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
   SQLX_OFFLINE: "true"
+  # The full debug build of the workspace (plus the restored cache) filled the runner
+  # disk: "No space left on device" at link time. Line tables keep file:line backtraces
+  # at a fraction of the size, and incremental artifacts are useless on a fresh runner.
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_TEST_DEBUG: line-tables-only
 
 jobs:
   tiers:
@@ -23,6 +41,13 @@ jobs:
           - parity
           - e2e
     steps:
+      - name: Free runner disk space
+        # ubuntu-latest ships about 30 GB of SDKs this project never uses.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h /
+
       - uses: actions/checkout@v4
 
       - name: Show toolchain
@@ -36,10 +61,12 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-${{ matrix.tier }}
+          # v2: artifacts built with the line-tables-only profile. Older full-debug
+          # targets are not restored.
+          key: cargo-v2-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-${{ matrix.tier }}
           restore-keys: |
-            cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-
-            cargo-${{ runner.os }}-
+            cargo-v2-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-
+            cargo-v2-${{ runner.os }}-
 
       - name: Install fast-tier cargo tools
         if: matrix.tier == 'fast'
@@ -57,6 +84,10 @@ jobs:
       - name: Run tier
         run: scripts/ci.sh "${{ matrix.tier }}"
 
+      - name: Disk usage
+        if: always()
+        run: df -h / && (du -sh target 2>/dev/null || true)
+
       - name: Upload CI logs
         if: failure()
         uses: actions/upload-artifact@v4
@@ -64,10 +95,88 @@ jobs:
           name: ci-${{ matrix.tier }}-logs
           path: target/ci/${{ matrix.tier }}
 
-  mutants:
-    name: mutants
+  # cargo-mutants on maverick-domain is about 1,900 mutants, several hours on one runner
+  # (past the 6-hour job limit), and pushes arrive every few minutes. So each push and
+  # pull request tests the mutants on its changed lines, and the full run is split into
+  # shards nightly and on demand.
+  mutants-diff:
+    name: mutants (changed lines)
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
+      - name: Free runner disk space
+        # cargo-mutants builds a second copy of the workspace, so disk matters here too.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h /
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Show toolchain
+        run: rustup show
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-v2-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-mutants
+          restore-keys: |
+            cargo-v2-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-
+            cargo-v2-${{ runner.os }}-
+
+      - name: Install cargo-mutants
+        # See the fast-tier install step: skip when the cached binary is already pinned.
+        run: |
+          if ! cargo mutants --version 2>/dev/null | grep -qxF 'cargo-mutants 27.1.0'; then
+            cargo install cargo-mutants --version 27.1.0 --locked --force
+          fi
+
+      - name: Run mutants on changed lines
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base="${PR_BASE:-$PUSH_BEFORE}"
+          # A new branch has no "before" commit; fall back to the parent.
+          if [[ -z "$base" || "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            base="HEAD~1"
+          fi
+          scripts/ci.sh mutants-diff "$base"
+
+      - name: Disk usage
+        if: always()
+        run: df -h / && (du -sh target 2>/dev/null || true)
+
+      - name: Upload mutant logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-mutants-diff-logs
+          path: target/ci/mutants
+
+  mutants-full:
+    name: mutants (shard ${{ matrix.shard }}/8)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h /
+
       - uses: actions/checkout@v4
 
       - name: Show toolchain
@@ -81,24 +190,27 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-mutants
+          key: cargo-v2-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-mutants
           restore-keys: |
-            cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-
-            cargo-${{ runner.os }}-
+            cargo-v2-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-
+            cargo-v2-${{ runner.os }}-
 
       - name: Install cargo-mutants
-        # See the fast-tier install step: skip when the cached binary is already pinned.
         run: |
           if ! cargo mutants --version 2>/dev/null | grep -qxF 'cargo-mutants 27.1.0'; then
             cargo install cargo-mutants --version 27.1.0 --locked --force
           fi
 
-      - name: Run mutants
-        run: scripts/ci.sh mutants
+      - name: Run mutants shard
+        run: scripts/ci.sh mutants "${{ matrix.shard }}/8"
+
+      - name: Disk usage
+        if: always()
+        run: df -h / && (du -sh target 2>/dev/null || true)
 
       - name: Upload mutant logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ci-mutants-logs
+          name: ci-mutants-shard-${{ matrix.shard }}-logs
           path: target/ci/mutants
