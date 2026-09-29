@@ -16,14 +16,13 @@
 //! ([`super::keyfacts`]), rule_scan ([`super::rulescan`]), and judge_rubric (duplicate
 //! dimension, blank criterion).
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 use std::sync::LazyLock;
-
-use serde::Deserialize;
 
 use super::envelope::{Envelope, EnvelopeError, EnvelopeErrorKind, GraderKind};
 use super::golden::GoldenAnswer;
 use super::json_schema::JsonSchema;
+use super::judge_rubric::JudgeRubric;
 use super::keyfacts::KeyFacts;
 use super::rulescan::RuleScan;
 use crate::gofmt;
@@ -76,7 +75,7 @@ impl ValidationRegistry {
         registry.register(Box::new(GoldenAnswer));
         registry.register(Box::new(KeyFacts));
         registry.register(Box::new(RuleScan));
-        registry.register(Box::new(JudgeRubricValidator));
+        registry.register(Box::new(JudgeRubric::validator()));
         registry
     }
 
@@ -161,55 +160,6 @@ pub fn check_schema(kind: GraderKind, spec: &JsonValue) -> Result<serde_json::Va
             "{prefix}jsonschema validation failed\n{}",
             failures.join("\n")
         ))
-    }
-}
-
-/// The judge_rubric spec (reference Part 2 §11).
-#[derive(Debug, Clone, Deserialize)]
-pub struct JudgeRubricSpec {
-    pub rubric: Vec<RubricItem>,
-    #[serde(default)]
-    pub judge_prompt: String,
-    #[serde(default)]
-    pub reference: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct RubricItem {
-    pub dimension: String,
-    pub criterion: String,
-}
-
-/// `judgerubric.NewValidator()`: schema, then in rubric order a duplicate dimension
-/// (reported at the second occurrence) or a whitespace-only criterion.
-pub struct JudgeRubricValidator;
-
-impl SpecValidator for JudgeRubricValidator {
-    fn kind(&self) -> &str {
-        GraderKind::JudgeRubric.as_str()
-    }
-
-    fn validate_spec(&self, spec: &JsonValue) -> Result<(), String> {
-        let value = check_schema(GraderKind::JudgeRubric, spec)?;
-        let spec: JudgeRubricSpec =
-            serde_json::from_value(value).map_err(|e| format!("judge_rubric spec: {e}"))?;
-        let mut seen = HashSet::new();
-        for (i, item) in spec.rubric.iter().enumerate() {
-            if !seen.insert(item.dimension.as_str()) {
-                return Err(format!(
-                    "judge_rubric spec: rubric[{i}]: duplicate dimension {}",
-                    gofmt::quote(&item.dimension)
-                ));
-            }
-            // Rust's `trim` uses the same whitespace set as Go's `strings.TrimSpace`.
-            if item.criterion.trim().is_empty() {
-                return Err(format!(
-                    "judge_rubric spec: rubric[{i}] ({}): criterion is blank",
-                    item.dimension
-                ));
-            }
-        }
-        Ok(())
     }
 }
 
@@ -327,7 +277,7 @@ mod tests {
 
     #[test]
     fn judge_rubric_extra_rules() {
-        let validator = JudgeRubricValidator;
+        let validator = JudgeRubric::validator();
         assert_eq!(
             validator
                 .validate_spec(&spec(

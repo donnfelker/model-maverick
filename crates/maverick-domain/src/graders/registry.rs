@@ -14,7 +14,6 @@ use std::sync::Arc;
 use super::spec::SpecValidator;
 use crate::gofmt;
 use crate::gojson::JsonValue;
-use crate::tasks::Task;
 
 /// A boxed, sendable future. The judge grader awaits provider calls, so grading is
 /// async; the deterministic graders return a ready future.
@@ -34,11 +33,22 @@ pub struct RunMeta {
     pub latency_ms: i64,
 }
 
+/// The task fields a grader can read (a `tasks` row). The judge grader rebuilds the
+/// benchmarked model's prompt from `prompt` and the raw `attachments_json`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct GradeTask {
+    pub id: String,
+    pub capability: String,
+    pub prompt: String,
+    /// The `attachments` column as JSON text (empty means none).
+    pub attachments_json: String,
+}
+
 /// What a grader sees: the task (for reference-anchored graders), the model output,
 /// and the run.
 #[derive(Debug, Clone, Copy)]
 pub struct GradeInput<'a> {
-    pub task: Option<&'a Task>,
+    pub task: Option<&'a GradeTask>,
     pub output: &'a str,
     pub run: Option<&'a RunMeta>,
 }

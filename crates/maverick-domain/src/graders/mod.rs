@@ -5,6 +5,7 @@ pub mod envelope;
 pub mod golden;
 pub mod goregex;
 pub mod json_schema;
+pub mod judge_rubric;
 pub mod keyfacts;
 pub mod registry;
 pub mod rulescan;
@@ -16,10 +17,11 @@ pub use envelope::{
 };
 pub use golden::GoldenAnswer;
 pub use json_schema::JsonSchema;
+pub use judge_rubric::JudgeRubric;
 pub use keyfacts::KeyFacts;
 pub use registry::{
-    BoxError, BoxFuture, FailureCounter, GradeError, GradeInput, GradeResult, Grader, GraderError,
-    RegisterError, Registry, RunMeta,
+    BoxError, BoxFuture, FailureCounter, GradeError, GradeInput, GradeResult, GradeTask, Grader,
+    GraderError, RegisterError, Registry, RunMeta,
 };
 pub use rulescan::RuleScan;
 pub use spec::{SpecValidator, ValidationRegistry, check_schema};
