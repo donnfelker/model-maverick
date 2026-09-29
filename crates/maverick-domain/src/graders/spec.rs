@@ -12,9 +12,10 @@
 //! (D24, D36).
 //!
 //! Extra rules: golden_answer ([`super::golden`]), key_facts ([`super::keyfacts`]),
-//! and judge_rubric (duplicate dimension, blank criterion) are ported. The json_schema
-//! and rule_scan extra rules (path parsing, regex compilation) arrive with their grader
-//! beads, which register a validator that runs [`check_schema`] first.
+//! rule_scan ([`super::rulescan`]), and judge_rubric (duplicate dimension, blank
+//! criterion) are ported. The json_schema extra rules (embedded-schema compilation,
+//! path parsing) arrive with its grader bead, which registers a validator that runs
+//! [`check_schema`] first.
 
 use std::collections::{BTreeMap, HashSet};
 use std::sync::LazyLock;
@@ -24,6 +25,7 @@ use serde::Deserialize;
 use super::envelope::{Envelope, EnvelopeError, EnvelopeErrorKind, GraderKind};
 use super::golden::GoldenAnswer;
 use super::keyfacts::KeyFacts;
+use super::rulescan::RuleScan;
 use crate::gofmt;
 use crate::gojson::{self, JsonValue};
 
@@ -70,11 +72,10 @@ impl ValidationRegistry {
     /// judge validator.
     pub fn v1() -> Self {
         let mut registry = Self::new();
-        for kind in [GraderKind::JsonSchema, GraderKind::RuleScan] {
-            registry.register(Box::new(SchemaOnly(kind)));
-        }
+        registry.register(Box::new(SchemaOnly(GraderKind::JsonSchema)));
         registry.register(Box::new(GoldenAnswer));
         registry.register(Box::new(KeyFacts));
+        registry.register(Box::new(RuleScan));
         registry.register(Box::new(JudgeRubricValidator));
         registry
     }
@@ -253,21 +254,17 @@ mod tests {
     #[test]
     fn schema_only_validators_reject_schema_failures() {
         let registry = ValidationRegistry::v1();
-        for (kind, bad) in [
-            ("json_schema", r#"{"schema":1}"#),
-            ("rule_scan", r#"{"rules":[]}"#),
-        ] {
-            let validator = registry.get(kind).expect("registered");
-            let error = validator.validate_spec(&spec(bad)).unwrap_err();
-            assert!(
-                error.starts_with(&format!("{kind} spec: jsonschema validation failed")),
-                "{kind}: {error}"
-            );
-        }
-        let validator = registry.get("rule_scan").expect("registered");
+        let validator = registry.get("json_schema").expect("registered");
+        let error = validator
+            .validate_spec(&spec(r#"{"schema":1}"#))
+            .unwrap_err();
+        assert!(
+            error.starts_with("json_schema spec: jsonschema validation failed"),
+            "{error}"
+        );
         assert!(
             validator
-                .validate_spec(&spec(r#"{"rules":[{"max_length_words":3}]}"#))
+                .validate_spec(&spec(r#"{"schema":{"type":"object"}}"#))
                 .is_ok()
         );
     }
