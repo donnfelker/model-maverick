@@ -1,0 +1,246 @@
+{
+  "id": "S02",
+  "name": "provider_429_retry_after_advances",
+  "group": 2,
+  "source": "sdk-v0 plan §2.3 scenario 2; D26",
+  "summary": "A 429 with Retry-After: 1 makes the core wait at least one second, then call the next entry.",
+  "engine": {
+    "recommend": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "recommendation_id": "rec_s02",
+          "recommendations": [
+            {
+              "provider": "openai",
+              "model": "gpt-a",
+              "endpoint": "direct",
+              "column_id": "col_gpt_a",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "standard",
+              "execution_aliases": {},
+              "execution_alias_retention": {}
+            },
+            {
+              "provider": "openai",
+              "model": "gpt-b",
+              "endpoint": "direct",
+              "column_id": "col_gpt_b",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "standard",
+              "execution_aliases": {},
+              "execution_alias_retention": {}
+            }
+          ],
+          "classification": {
+            "method": "declared"
+          },
+          "measured": true,
+          "zero_retention": false,
+          "telemetry": true
+        }
+      }
+    ]
+  },
+  "provider": {
+    "responses": [
+      {
+        "kind": "respond",
+        "status": 429,
+        "body": {
+          "error": {
+            "message": "Rate limit reached",
+            "type": "rate_limit_error"
+          }
+        },
+        "headers": {
+          "Retry-After": "1"
+        }
+      },
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s02",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s02"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    ]
+  },
+  "steps": [
+    {
+      "call": {
+        "surface": "chat_completions",
+        "model": "maverick/auto",
+        "workload": "structured_extraction:3",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a billing assistant."
+            },
+            {
+              "role": "user",
+              "content": "Extract the invoice total from: Total due $42.10"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": "response",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s02",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s02"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        },
+        "min_elapsed_ms": 1000
+      }
+    }
+  ],
+  "recorded": {
+    "provider": {
+      "count": 2,
+      "requests": [
+        {
+          "headers": {
+            "authorization": "Bearer sk-caller-openai"
+          },
+          "checks": [
+            {
+              "pointer": "/model",
+              "equals": "gpt-a"
+            },
+            {
+              "pointer": "/messages",
+              "equals": [
+                {
+                  "role": "system",
+                  "content": "You are a billing assistant."
+                },
+                {
+                  "role": "user",
+                  "content": "Extract the invoice total from: Total due $42.10"
+                }
+              ]
+            }
+          ],
+          "not_containing": [
+            "mk_test_conformance"
+          ]
+        },
+        {
+          "headers": {
+            "authorization": "Bearer sk-caller-openai"
+          },
+          "checks": [
+            {
+              "pointer": "/model",
+              "equals": "gpt-b"
+            },
+            {
+              "pointer": "/messages",
+              "equals": [
+                {
+                  "role": "system",
+                  "content": "You are a billing assistant."
+                },
+                {
+                  "role": "user",
+                  "content": "Extract the invoice total from: Total due $42.10"
+                }
+              ]
+            }
+          ],
+          "not_containing": [
+            "mk_test_conformance"
+          ]
+        }
+      ]
+    },
+    "telemetry": {
+      "count": 1,
+      "requests": [
+        {
+          "headers": {
+            "authorization": "Bearer mk_test_conformance"
+          },
+          "checks": [
+            {
+              "pointer": "/items",
+              "length": 2
+            },
+            {
+              "pointer": "/items/0/recommendation_id",
+              "equals": "rec_s02"
+            },
+            {
+              "pointer": "/items/0/model_used",
+              "equals": "gpt-a"
+            },
+            {
+              "pointer": "/items/0/status",
+              "equals": 429
+            },
+            {
+              "pointer": "/items/0/error_class",
+              "absent": true
+            },
+            {
+              "pointer": "/items/0/tokens_in",
+              "absent": true
+            },
+            {
+              "pointer": "/items/1/recommendation_id",
+              "equals": "rec_s02"
+            },
+            {
+              "pointer": "/items/1/model_used",
+              "equals": "gpt-b"
+            },
+            {
+              "pointer": "/items/1/status",
+              "equals": 200
+            }
+          ],
+          "not_containing": [
+            "Total due $42.10",
+            "You are a billing assistant.",
+            "sk-caller-openai",
+            "sk-or-caller"
+          ]
+        }
+      ]
+    }
+  }
+}

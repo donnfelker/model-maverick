@@ -1,0 +1,115 @@
+{
+  "id": "S10c",
+  "name": "openrouter_zero_retention_none_compliant",
+  "group": 10,
+  "source": "openrouter execution spec §6 scenario 10 (zero-retention case); D15",
+  "summary": "No alias is verified zero: no_compliant_columns, no upstream request, and no direct-key fallback.",
+  "config": {
+    "execution": "openrouter"
+  },
+  "engine": {
+    "recommend": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "recommendation_id": "rec_s10c",
+          "recommendations": [
+            {
+              "provider": "openai",
+              "model": "gpt-a",
+              "endpoint": "direct",
+              "column_id": "col_gpt_a",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "standard",
+              "execution_aliases": {
+                "openrouter": "openai/gpt-a"
+              },
+              "execution_alias_retention": {
+                "openrouter": "standard"
+              }
+            },
+            {
+              "provider": "openai",
+              "model": "claude-b",
+              "endpoint": "direct",
+              "column_id": "col_claude_b",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "standard",
+              "execution_aliases": {
+                "openrouter": "anthropic/claude-b"
+              },
+              "execution_alias_retention": {
+                "openrouter": "unknown"
+              }
+            }
+          ],
+          "classification": {
+            "method": "declared"
+          },
+          "measured": true,
+          "zero_retention": true,
+          "telemetry": true
+        }
+      }
+    ]
+  },
+  "provider": {
+    "responses": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s10c",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s10c"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    ]
+  },
+  "steps": [
+    {
+      "call": {
+        "surface": "chat_completions",
+        "model": "maverick/auto",
+        "workload": "structured_extraction:3",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a billing assistant."
+            },
+            {
+              "role": "user",
+              "content": "Extract the invoice total from: Total due $42.10"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": "error",
+        "code": "no_compliant_columns"
+      }
+    }
+  ],
+  "recorded": {
+    "provider": {
+      "count": 0
+    }
+  }
+}

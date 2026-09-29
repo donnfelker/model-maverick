@@ -1,0 +1,319 @@
+{
+  "vector_set": "alias",
+  "version": "v1",
+  "source": "master plan §3.5 'The alias grammar'; sdk-v0 plan §2.1; reference Part 6 §5 (Go ParseAlias, rows go-*: parity/fixtures/proxy/unit.json#parse_alias); D14 (rows d14-*); crates/maverick-core/src/alias.rs. Hand-checked.",
+  "rule": [
+    "If the model string ends with exactly ?settings=caller, remove that suffix once; settings is then caller, else apply (D14).",
+    "The rest must start with exactly maverick/ (case sensitive), else the kind is not_maverick_alias.",
+    "After the prefix: with a ':', split at the FIRST ':' into pool and mode word; an empty pool or mode word is malformed_alias. Without a ':', there is no pool (null) and the whole rest is the mode word.",
+    "The mode word is exact: auto is the engine mode balanced, quality is quality, cost is cost. Anything else is malformed_alias. Nothing is trimmed."
+  ],
+  "actions": {
+    "alias": {
+      "sdk": "Route: POST /v1/recommend with mode and pool (pool omitted when null); apply each entry's settings unless settings is caller.",
+      "proxy": "Route, as the SDK does."
+    },
+    "not_maverick_alias": {
+      "sdk": "Pass the original model string through unchanged; MM is not contacted (master plan §3.5).",
+      "proxy": "400 invalid_model_alias."
+    },
+    "malformed_alias": {
+      "sdk": "Pass the original model string through unchanged; MM is not contacted (sdk-v0 plan §2.1: anything else passes through untouched).",
+      "proxy": "400 invalid_model_alias."
+    }
+  },
+  "how_to_run": "For each case, parse model. kind alias must match pool, mode, and settings exactly; the other kinds carry no fields.",
+  "cases": [
+    {
+      "id": "go-0",
+      "model": "maverick/auto",
+      "expect": {
+        "kind": "alias",
+        "pool": null,
+        "mode": "balanced",
+        "settings": "apply"
+      }
+    },
+    {
+      "id": "go-1",
+      "model": "maverick/quality",
+      "expect": {
+        "kind": "alias",
+        "pool": null,
+        "mode": "quality",
+        "settings": "apply"
+      }
+    },
+    {
+      "id": "go-2",
+      "model": "maverick/cost",
+      "expect": {
+        "kind": "alias",
+        "pool": null,
+        "mode": "cost",
+        "settings": "apply"
+      }
+    },
+    {
+      "id": "go-3",
+      "model": "maverick/prod-pool:auto",
+      "expect": {
+        "kind": "alias",
+        "pool": "prod-pool",
+        "mode": "balanced",
+        "settings": "apply"
+      }
+    },
+    {
+      "id": "go-4",
+      "model": "maverick/prod-pool:quality",
+      "expect": {
+        "kind": "alias",
+        "pool": "prod-pool",
+        "mode": "quality",
+        "settings": "apply"
+      }
+    },
+    {
+      "id": "go-5",
+      "model": "maverick/prod-pool:cost",
+      "expect": {
+        "kind": "alias",
+        "pool": "prod-pool",
+        "mode": "cost",
+        "settings": "apply"
+      }
+    },
+    {
+      "id": "go-6",
+      "model": "gpt-4o",
+      "expect": {
+        "kind": "not_maverick_alias"
+      }
+    },
+    {
+      "id": "go-7",
+      "model": "claude-sonnet-4-6",
+      "expect": {
+        "kind": "not_maverick_alias"
+      }
+    },
+    {
+      "id": "go-8",
+      "model": "",
+      "expect": {
+        "kind": "not_maverick_alias"
+      }
+    },
+    {
+      "id": "go-9",
+      "model": "maverick/",
+      "expect": {
+        "kind": "malformed_alias"
+      }
+    },
+    {
+      "id": "go-10",
+      "model": "maverick/fast",
+      "expect": {
+        "kind": "malformed_alias"
+      }
+    },
+    {
+      "id": "go-11",
+      "model": "maverick/prod-pool:fast",
+      "expect": {
+        "kind": "malformed_alias"
+      }
+    },
+    {
+      "id": "go-12",
+      "model": "maverick/:auto",
+      "expect": {
+        "kind": "malformed_alias"
+      }
+    },
+    {
+      "id": "go-13",
+      "model": "maverick/prod-pool:",
+      "expect": {
+        "kind": "malformed_alias"
+      }
+    },
+    {
+      "id": "go-14",
+      "model": "maverick/prod:pool:auto",
+      "expect": {
+        "kind": "malformed_alias"
+      }
+    },
+    {
+      "id": "go-15",
+      "model": "maverick/balanced",
+      "expect": {
+        "kind": "malformed_alias"
+      }
+    },
+    {
+      "id": "go-16",
+      "model": "Maverick/auto",
+      "expect": {
+        "kind": "not_maverick_alias"
+      }
+    },
+    {
+      "id": "go-17",
+      "model": "maverick/AUTO",
+      "expect": {
+        "kind": "malformed_alias"
+      }
+    },
+    {
+      "id": "go-18",
+      "model": "maverick/ auto",
+      "expect": {
+        "kind": "malformed_alias"
+      }
+    },
+    {
+      "id": "go-19",
+      "model": "maverick/p p:cost",
+      "expect": {
+        "kind": "alias",
+        "pool": "p p",
+        "mode": "cost",
+        "settings": "apply"
+      }
+    },
+    {
+      "id": "go-20",
+      "model": "maverick/pool/x:quality",
+      "expect": {
+        "kind": "alias",
+        "pool": "pool/x",
+        "mode": "quality",
+        "settings": "apply"
+      }
+    },
+    {
+      "id": "go-21",
+      "model": "maverick/:",
+      "expect": {
+        "kind": "malformed_alias"
+      }
+    },
+    {
+      "id": "go-22",
+      "model": "maverick/auto:auto",
+      "expect": {
+        "kind": "alias",
+        "pool": "auto",
+        "mode": "balanced",
+        "settings": "apply"
+      }
+    },
+    {
+      "id": "d14-0",
+      "model": "maverick/auto?settings=caller",
+      "expect": {
+        "kind": "alias",
+        "pool": null,
+        "mode": "balanced",
+        "settings": "caller"
+      }
+    },
+    {
+      "id": "d14-1",
+      "model": "maverick/quality?settings=caller",
+      "expect": {
+        "kind": "alias",
+        "pool": null,
+        "mode": "quality",
+        "settings": "caller"
+      }
+    },
+    {
+      "id": "d14-2",
+      "model": "maverick/prod-pool:cost?settings=caller",
+      "expect": {
+        "kind": "alias",
+        "pool": "prod-pool",
+        "mode": "cost",
+        "settings": "caller"
+      }
+    },
+    {
+      "id": "d14-3",
+      "model": "maverick/auto?settings=apply",
+      "expect": {
+        "kind": "malformed_alias"
+      }
+    },
+    {
+      "id": "d14-4",
+      "model": "maverick/auto?settings=CALLER",
+      "expect": {
+        "kind": "malformed_alias"
+      }
+    },
+    {
+      "id": "d14-5",
+      "model": "maverick/auto?settings=caller?settings=caller",
+      "expect": {
+        "kind": "malformed_alias"
+      }
+    },
+    {
+      "id": "d14-6",
+      "model": "maverick/auto ?settings=caller",
+      "expect": {
+        "kind": "malformed_alias"
+      }
+    },
+    {
+      "id": "d14-7",
+      "model": "maverick/?settings=caller",
+      "expect": {
+        "kind": "malformed_alias"
+      }
+    },
+    {
+      "id": "d14-8",
+      "model": "maverick/prod-pool:?settings=caller",
+      "expect": {
+        "kind": "malformed_alias"
+      }
+    },
+    {
+      "id": "d14-9",
+      "model": "gpt-4o?settings=caller",
+      "expect": {
+        "kind": "not_maverick_alias"
+      }
+    },
+    {
+      "id": "d14-10",
+      "model": "Maverick/auto?settings=caller",
+      "expect": {
+        "kind": "not_maverick_alias"
+      }
+    },
+    {
+      "id": "d14-11",
+      "model": "?settings=caller",
+      "expect": {
+        "kind": "not_maverick_alias"
+      }
+    },
+    {
+      "id": "d14-12",
+      "model": "maverick/p?settings=caller:auto",
+      "expect": {
+        "kind": "alias",
+        "pool": "p?settings=caller",
+        "mode": "balanced",
+        "settings": "apply"
+      }
+    }
+  ]
+}

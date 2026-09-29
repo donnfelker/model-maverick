@@ -1,0 +1,312 @@
+{
+  "contract": "sdk-conformance",
+  "readme": "README.md",
+  "scenarios": [
+    {
+      "file": "scenarios/S01a.json",
+      "group": 1,
+      "id": "S01a",
+      "name": "declared_happy_path",
+      "sha256": "3e3c13cffc3bee1fed24fba9e0562f974cbe2331b789b5bc0021093dd07cfc29"
+    },
+    {
+      "file": "scenarios/S01b.json",
+      "group": 1,
+      "id": "S01b",
+      "name": "prompt_happy_path",
+      "sha256": "17a2020b313880cae3e3ed483cfef5ea08becb9499bc57253366e924b1db7065"
+    },
+    {
+      "file": "scenarios/S02.json",
+      "group": 2,
+      "id": "S02",
+      "name": "provider_429_retry_after_advances",
+      "sha256": "d73647d120a6712afda09d1506d314b1478acfe0d3a7cda29838348bfd6411ab"
+    },
+    {
+      "file": "scenarios/S03a.json",
+      "group": 3,
+      "id": "S03a",
+      "name": "provider_500_advances",
+      "sha256": "64255e305ec8a0d9035be93f0f63183ab86b52fd7d7a67ef1005b703ce3f49e4"
+    },
+    {
+      "file": "scenarios/S03b.json",
+      "group": 3,
+      "id": "S03b",
+      "name": "provider_timeout_advances",
+      "sha256": "2bb30dcfe9d9de17b172034c4cfa9e8da4f1ad2ef49191bdd7fe652ac75e4ca7"
+    },
+    {
+      "file": "scenarios/S03c.json",
+      "group": 3,
+      "id": "S03c",
+      "name": "connection_refused_advances",
+      "sha256": "927f19fd407cba51db556bfe03583ec1a8cd3fa7a99adf3e45c7355513160b3c"
+    },
+    {
+      "file": "scenarios/S04a.json",
+      "group": 4,
+      "id": "S04a",
+      "name": "provider_400_no_advance",
+      "sha256": "8d4a3f4eef53674c451818b1e9761f6c9c91bf86b2464db353bcbcac4c4edf6d"
+    },
+    {
+      "file": "scenarios/S04b.json",
+      "group": 4,
+      "id": "S04b",
+      "name": "provider_422_no_advance",
+      "sha256": "c5b3cecc828298f5e79d45d4cbf0fb2ba3d39929316a2bf455ff325f08966108"
+    },
+    {
+      "file": "scenarios/S05.json",
+      "group": 5,
+      "id": "S05",
+      "name": "chain_exhausted_surfaces_last_error",
+      "sha256": "d263deaa8e8b0279aa7c937af7dffa319fca728dd418cd818609fae2873c377d"
+    },
+    {
+      "file": "scenarios/S06a.json",
+      "group": 6,
+      "id": "S06a",
+      "name": "mm_down_uses_cached_chain",
+      "sha256": "45c8822d59110323178e278ab0d953573a9936d17abce65187ffaaa1fa4e9af2"
+    },
+    {
+      "file": "scenarios/S06b.json",
+      "group": 6,
+      "id": "S06b",
+      "name": "mm_down_cold_cache_uses_default_model",
+      "sha256": "e3b3cfe3ca270022e8e129f8005790e5d5e1a89b095d7bd1899cfca14e4437e5"
+    },
+    {
+      "file": "scenarios/S06c.json",
+      "group": 6,
+      "id": "S06c",
+      "name": "mm_down_no_default_uses_original_model",
+      "sha256": "d3d8dc0ba1316feda5c7f0a91ed1ac1597521a8a9c2ffd56f6569f4e82618967"
+    },
+    {
+      "file": "scenarios/S06d.json",
+      "group": 6,
+      "id": "S06d",
+      "name": "privacy_off_never_contacts_mm",
+      "sha256": "be8e160fbb379497dd00f1aa925b4e1f00e972c4462972334733af63db74d10a"
+    },
+    {
+      "file": "scenarios/S06e.json",
+      "group": 6,
+      "id": "S06e",
+      "name": "zero_retention_422_is_terminal_and_purges",
+      "sha256": "db9e6c4a023b789e975dd4d7d637bde61415e55da5ae7ff0ea96b70f801eabe7"
+    },
+    {
+      "file": "scenarios/S06f.json",
+      "group": 6,
+      "id": "S06f",
+      "name": "zero_retention_409_is_terminal",
+      "sha256": "961e01ff199cad040f75e0bc96d5637d9f9014c5394a13d4df0ce90526ca72bb"
+    },
+    {
+      "file": "scenarios/S06g.json",
+      "group": 6,
+      "id": "S06g",
+      "name": "zero_retention_warm_outage_uses_zero_entries_only",
+      "sha256": "0999f08817078ce8a610ad5e16159afdbcea0719b01cb5c184aae46083005698"
+    },
+    {
+      "file": "scenarios/S06h.json",
+      "group": 6,
+      "id": "S06h",
+      "name": "zero_retention_cold_outage_fails_closed",
+      "sha256": "064d4e876eee7eecf8e659a94f38fcd593a9ccb312a370885d7cd16dd78d290c"
+    },
+    {
+      "file": "scenarios/S06i.json",
+      "group": 6,
+      "id": "S06i",
+      "name": "zero_retention_cold_outage_uses_verified_default",
+      "sha256": "bb202c0fb9c269add95217002c88ef7a0cf20d291bbaf0596708c3057b404e19"
+    },
+    {
+      "file": "scenarios/S06j.json",
+      "group": 6,
+      "id": "S06j",
+      "name": "zero_retention_switches_to_declared",
+      "sha256": "5f75274ab924562a78bdc8c638f50d9fef74991fe22cc76abaf050de3a2f7837"
+    },
+    {
+      "file": "scenarios/S07a.json",
+      "group": 7,
+      "id": "S07a",
+      "name": "telemetry_batch_shape_and_exit_flush",
+      "sha256": "fce78b401abbedf75e44fe71627caa9d0f76d82a1c34d849eae00b1d04791974"
+    },
+    {
+      "file": "scenarios/S07b.json",
+      "group": 7,
+      "id": "S07b",
+      "name": "telemetry_interval_flush",
+      "sha256": "5e1570de34da37f7f3997ad0a94a0664f9ba2d16132b97771c47ad8866572f94"
+    },
+    {
+      "file": "scenarios/S07c.json",
+      "group": 7,
+      "id": "S07c",
+      "name": "telemetry_size_flush",
+      "sha256": "9089128349324034f37df2e05294bc0daeeff01e99a8bcf37412cbc73be4ba35"
+    },
+    {
+      "file": "scenarios/S07d.json",
+      "group": 7,
+      "id": "S07d",
+      "name": "telemetry_failure_is_dropped_silently",
+      "sha256": "b70c6212e86083a54c7e0a0c7feb3cd67abcfd1e224e2d366fdfa0f3c4b57e39"
+    },
+    {
+      "file": "scenarios/S07e.json",
+      "group": 7,
+      "id": "S07e",
+      "name": "telemetry_one_item_per_attempt",
+      "sha256": "e2b12b2bcf48ee64f168be2e6fb2fe90a5dd213656294ea37c725be55a0a7790"
+    },
+    {
+      "file": "scenarios/S07f.json",
+      "group": 7,
+      "id": "S07f",
+      "name": "telemetry_settings_applied",
+      "sha256": "a30e32b9e44edbf6839e302a981734194828ae311fd20f3cdae140cc9eeb94dc"
+    },
+    {
+      "file": "scenarios/S07g.json",
+      "group": 7,
+      "id": "S07g",
+      "name": "telemetry_tenant_opt_out",
+      "sha256": "4ce3994a51152c3020aab067302f98a951c74a759778f3bccc87341e39ffdc5a"
+    },
+    {
+      "file": "scenarios/S08.json",
+      "group": 8,
+      "id": "S08",
+      "name": "telemetry_off_sends_zero_bytes",
+      "sha256": "f7d0c3be045931fa068a531398daa1cd2078b84e917d961edbc4fc046262d371"
+    },
+    {
+      "file": "scenarios/S09a.json",
+      "group": 9,
+      "id": "S09a",
+      "name": "concrete_model_passes_through",
+      "sha256": "29afdb01ed5292a0c316d5aed3306048d4fe9dc6558fff527e8a15f7e895445e"
+    },
+    {
+      "file": "scenarios/S09b.json",
+      "group": 9,
+      "id": "S09b",
+      "name": "entry_settings_override_caller_values",
+      "sha256": "301fa1da36aa732b312a0b57af5eb71b5773a495c0e6929dd5008ce1cc0a8f36"
+    },
+    {
+      "file": "scenarios/S09c.json",
+      "group": 9,
+      "id": "S09c",
+      "name": "settings_caller_suffix_keeps_caller_values",
+      "sha256": "7da7b19423bf2354afddd9dca153f13b0927dd74ab6e10e15d6a41a11522da8d"
+    },
+    {
+      "file": "scenarios/S09d.json",
+      "group": 9,
+      "id": "S09d",
+      "name": "workload_override_sends_declared_form",
+      "sha256": "606eb7c317737f73ae3364e8ddba81ed5306695965f9f8a45d82be3f33f4e14f"
+    },
+    {
+      "file": "scenarios/S09e.json",
+      "group": 9,
+      "id": "S09e",
+      "name": "pool_and_mode_alias",
+      "sha256": "3145d57f2bbd09d63cd8af0b33cf4a543771f34ec273f28664fb5a74619c22c8"
+    },
+    {
+      "file": "scenarios/S09f.json",
+      "group": 9,
+      "id": "S09f",
+      "name": "workload_without_tier",
+      "sha256": "187b65a3faecc4f0e3050456ba3721d533f6dedf79aeeb9725570377b9b0b38f"
+    },
+    {
+      "file": "scenarios/S10a.json",
+      "group": 10,
+      "id": "S10a",
+      "name": "openrouter_chain_advances_on_one_upstream",
+      "sha256": "c74ab15a990f80c69f189c1dd57996aeba969be16f69fff0eb8620ee3dde37f2"
+    },
+    {
+      "file": "scenarios/S10b.json",
+      "group": 10,
+      "id": "S10b",
+      "name": "openrouter_zero_retention_skips_unverified_aliases",
+      "sha256": "7238e9dd1279d4ffdcd2ca30dd133d1aedcaf6c0c6effdc596aa631854c42db9"
+    },
+    {
+      "file": "scenarios/S10c.json",
+      "group": 10,
+      "id": "S10c",
+      "name": "openrouter_zero_retention_none_compliant",
+      "sha256": "bea5f304db800f8df96b85e663e143ceb38317cb35a0b02b357a10240c1437dc"
+    },
+    {
+      "file": "scenarios/S11a.json",
+      "group": 11,
+      "id": "S11a",
+      "name": "openrouter_aliasless_entry_skipped",
+      "sha256": "0a23cd6fd79580288915296dc03832a58c9fed1ab15459cb1f8e29718122e273"
+    },
+    {
+      "file": "scenarios/S11b.json",
+      "group": 11,
+      "id": "S11b",
+      "name": "openrouter_aliasless_chain",
+      "sha256": "e4647a877c1be402a7fbf39c6a79465b36fc42d5808a5af5e6a2373f937b6c94"
+    },
+    {
+      "file": "scenarios/S12.json",
+      "group": 12,
+      "id": "S12",
+      "name": "openrouter_telemetry_off_sends_zero_bytes",
+      "sha256": "077266183a88e7f6304a5b1c2c04321720e86d1ee58ae1fb25d88bdfe410da82"
+    }
+  ],
+  "vectors": [
+    {
+      "file": "vectors/alias.v1.json",
+      "sha256": "a999aaf2503fda547abea384a3c708d6dcafc6b9e0aa87d81f94d526d1ffa6cb",
+      "vector_set": "alias",
+      "version": "v1"
+    },
+    {
+      "file": "vectors/normalize.d29.json",
+      "sha256": "4542809a1ccf90be8524676ff9accceae9de2a0e422811dc9cb59d3c6825918c",
+      "vector_set": "normalize",
+      "version": "d29"
+    },
+    {
+      "file": "vectors/projection.p1.json",
+      "sha256": "7cc0656f3075a87f77ddb2b4535b07491a57a4b870478c00608bb5c3e1e306ca",
+      "vector_set": "projection",
+      "version": "p1"
+    },
+    {
+      "file": "vectors/retention.v1.json",
+      "sha256": "59b931223babc83e7b1a117659c5ae2b14d61d76c93608678f1f9e53bf65987a",
+      "vector_set": "retention",
+      "version": "v1"
+    },
+    {
+      "file": "vectors/telemetry.v1.json",
+      "sha256": "cbf76a46e555c7baa111ff8e1133ab2366c610449c4966e842f5e51bf8794b75",
+      "vector_set": "telemetry",
+      "version": "v1"
+    }
+  ],
+  "version": "1"
+}

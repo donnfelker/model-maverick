@@ -1,0 +1,177 @@
+{
+  "id": "S06j",
+  "name": "zero_retention_switches_to_declared",
+  "group": 6,
+  "source": "sdk-v0 plan §2.3 scenario 6; sdk-v0 plan §2.1 zero-retention tenants",
+  "summary": "After a response with zero_retention: true, the core sends only the declared form for that tenant, even in prompt mode. Without a per-call workload that is the declared fallback.",
+  "engine": {
+    "recommend": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "recommendation_id": "rec_s06j",
+          "recommendations": [
+            {
+              "provider": "openai",
+              "model": "gpt-z",
+              "endpoint": "direct",
+              "column_id": "col_gpt_z",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "zero",
+              "execution_aliases": {},
+              "execution_alias_retention": {}
+            }
+          ],
+          "classification": {
+            "method": "classifier"
+          },
+          "measured": true,
+          "zero_retention": true,
+          "telemetry": true
+        }
+      }
+    ]
+  },
+  "provider": {
+    "responses": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s06j",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s06j"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    ]
+  },
+  "steps": [
+    {
+      "call": {
+        "surface": "chat_completions",
+        "model": "maverick/auto",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a billing assistant."
+            },
+            {
+              "role": "user",
+              "content": "Extract the invoice total from: Total due $42.10"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": "response",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s06j",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s06j"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    },
+    {
+      "call": {
+        "surface": "chat_completions",
+        "model": "maverick/auto",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a billing assistant."
+            },
+            {
+              "role": "user",
+              "content": "Extract the invoice total from: Total due $42.10"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": "response",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s06j",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s06j"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    }
+  ],
+  "recorded": {
+    "recommend": {
+      "count": 2,
+      "requests": [
+        {
+          "checks": [
+            {
+              "pointer": "/workload/projection_version",
+              "equals": "p1"
+            }
+          ]
+        },
+        {
+          "headers": {
+            "authorization": "Bearer mk_test_conformance"
+          },
+          "body": {
+            "mode": "balanced",
+            "workload": {
+              "capability": "multi_step_reasoning",
+              "difficulty": 3
+            }
+          },
+          "not_containing": [
+            "Total due $42.10",
+            "You are a billing assistant.",
+            "sk-caller-openai"
+          ]
+        }
+      ]
+    }
+  }
+}

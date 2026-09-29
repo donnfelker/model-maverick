@@ -1,0 +1,150 @@
+{
+  "vector_set": "retention",
+  "version": "v1",
+  "source": "spec v1 §4.5; openrouter execution spec §2.3; D9, D15, D17; crates/maverick-domain/src/policy/mod.rs (RetentionMode::effective), crates/maverick-core/src/recommend.rs (RetentionMode::parse). Hand-checked.",
+  "rules": {
+    "expiry": [
+      "A mode is effective only while now < valid_until (strictly). At or after valid_until it reads as unknown.",
+      "zero without a valid_until reads as unknown: stale or missing evidence never yields compliance. standard or unknown without a valid_until keeps its value.",
+      "Times are RFC 3339 and compare as instants, whatever their offset."
+    ],
+    "parse": [
+      "A retention_mode value from a response is zero or standard only when it is exactly that string. Anything else, a missing member, or null reads as unknown, which is never zero."
+    ],
+    "use": "Recommend entries and execution_alias_retention already carry the effective mode, so a core compares with zero and does not evaluate expiry. A component that reads the raw fields (retention_mode with retention_valid_until, as GET /v1/models shows them) applies the expiry rule."
+  },
+  "how_to_run": "expiry_cases: the effective mode of mode with valid_until (null means none) at now. parse_cases: the mode a response value reads as (null means the member is null or absent).",
+  "expiry_cases": [
+    {
+      "id": "zero_before_expiry",
+      "mode": "zero",
+      "valid_until": "2026-10-01T00:00:00Z",
+      "now": "2026-09-30T23:59:59Z",
+      "expect": "zero"
+    },
+    {
+      "id": "zero_at_expiry",
+      "mode": "zero",
+      "valid_until": "2026-10-01T00:00:00Z",
+      "now": "2026-10-01T00:00:00Z",
+      "expect": "unknown"
+    },
+    {
+      "id": "zero_after_expiry",
+      "mode": "zero",
+      "valid_until": "2026-10-01T00:00:00Z",
+      "now": "2026-10-01T00:00:01Z",
+      "expect": "unknown"
+    },
+    {
+      "id": "zero_without_valid_until",
+      "mode": "zero",
+      "valid_until": null,
+      "now": "2026-10-01T00:00:00Z",
+      "expect": "unknown"
+    },
+    {
+      "id": "zero_one_millisecond_left",
+      "mode": "zero",
+      "valid_until": "2026-10-01T00:00:00.001Z",
+      "now": "2026-10-01T00:00:00Z",
+      "expect": "zero"
+    },
+    {
+      "id": "zero_offset_before_expiry",
+      "mode": "zero",
+      "valid_until": "2026-10-01T02:00:00+02:00",
+      "now": "2026-09-30T23:59:59Z",
+      "expect": "zero"
+    },
+    {
+      "id": "zero_offset_at_expiry",
+      "mode": "zero",
+      "valid_until": "2026-10-01T02:00:00+02:00",
+      "now": "2026-10-01T00:00:00Z",
+      "expect": "unknown"
+    },
+    {
+      "id": "standard_without_valid_until",
+      "mode": "standard",
+      "valid_until": null,
+      "now": "2026-10-01T00:00:00Z",
+      "expect": "standard"
+    },
+    {
+      "id": "standard_before_expiry",
+      "mode": "standard",
+      "valid_until": "2026-10-01T00:00:00Z",
+      "now": "2026-09-30T00:00:00Z",
+      "expect": "standard"
+    },
+    {
+      "id": "standard_after_expiry",
+      "mode": "standard",
+      "valid_until": "2026-10-01T00:00:00Z",
+      "now": "2026-10-02T00:00:00Z",
+      "expect": "unknown"
+    },
+    {
+      "id": "unknown_before_expiry",
+      "mode": "unknown",
+      "valid_until": "2026-10-01T00:00:00Z",
+      "now": "2026-09-30T00:00:00Z",
+      "expect": "unknown"
+    },
+    {
+      "id": "unknown_without_valid_until",
+      "mode": "unknown",
+      "valid_until": null,
+      "now": "2026-10-01T00:00:00Z",
+      "expect": "unknown"
+    }
+  ],
+  "parse_cases": [
+    {
+      "id": "zero",
+      "value": "zero",
+      "expect": "zero"
+    },
+    {
+      "id": "standard",
+      "value": "standard",
+      "expect": "standard"
+    },
+    {
+      "id": "unknown",
+      "value": "unknown",
+      "expect": "unknown"
+    },
+    {
+      "id": "upper_case",
+      "value": "ZERO",
+      "expect": "unknown"
+    },
+    {
+      "id": "title_case",
+      "value": "Zero",
+      "expect": "unknown"
+    },
+    {
+      "id": "padded",
+      "value": " zero",
+      "expect": "unknown"
+    },
+    {
+      "id": "empty",
+      "value": "",
+      "expect": "unknown"
+    },
+    {
+      "id": "other_word",
+      "value": "none",
+      "expect": "unknown"
+    },
+    {
+      "id": "null",
+      "value": null,
+      "expect": "unknown"
+    }
+  ]
+}

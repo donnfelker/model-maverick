@@ -1,0 +1,107 @@
+{
+  "id": "S11b",
+  "name": "openrouter_aliasless_chain",
+  "group": 11,
+  "source": "openrouter execution spec §6 scenario 11",
+  "summary": "No entry has an OpenRouter alias: no_executable_candidates, and no upstream request.",
+  "config": {
+    "execution": "openrouter"
+  },
+  "engine": {
+    "recommend": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "recommendation_id": "rec_s11b",
+          "recommendations": [
+            {
+              "provider": "openai",
+              "model": "local-a",
+              "endpoint": "direct",
+              "column_id": "col_local_a",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "standard",
+              "execution_aliases": {},
+              "execution_alias_retention": {}
+            },
+            {
+              "provider": "openai",
+              "model": "local-b",
+              "endpoint": "direct",
+              "column_id": "col_local_b",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "standard",
+              "execution_aliases": {},
+              "execution_alias_retention": {}
+            }
+          ],
+          "classification": {
+            "method": "declared"
+          },
+          "measured": true,
+          "zero_retention": false,
+          "telemetry": true
+        }
+      }
+    ]
+  },
+  "provider": {
+    "responses": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s11b",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s11b"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    ]
+  },
+  "steps": [
+    {
+      "call": {
+        "surface": "chat_completions",
+        "model": "maverick/auto",
+        "workload": "structured_extraction:3",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a billing assistant."
+            },
+            {
+              "role": "user",
+              "content": "Extract the invoice total from: Total due $42.10"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": "error",
+        "code": "no_executable_candidates"
+      }
+    }
+  ],
+  "recorded": {
+    "provider": {
+      "count": 0
+    }
+  }
+}

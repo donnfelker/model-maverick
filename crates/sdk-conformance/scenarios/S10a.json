@@ -1,0 +1,262 @@
+{
+  "id": "S10a",
+  "name": "openrouter_chain_advances_on_one_upstream",
+  "group": 10,
+  "source": "openrouter execution spec §6 scenario 10",
+  "summary": "OpenRouter mode: every entry goes to the one OpenRouter upstream with its slug as the model; a 500 advances; each item names the entry's catalog model and endpoint_used openrouter.",
+  "config": {
+    "execution": "openrouter"
+  },
+  "engine": {
+    "recommend": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "recommendation_id": "rec_s10a",
+          "recommendations": [
+            {
+              "provider": "openai",
+              "model": "gpt-a",
+              "endpoint": "direct",
+              "column_id": "col_gpt_a",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "standard",
+              "execution_aliases": {
+                "openrouter": "openai/gpt-a"
+              },
+              "execution_alias_retention": {
+                "openrouter": "standard"
+              }
+            },
+            {
+              "provider": "openai",
+              "model": "claude-b",
+              "endpoint": "direct",
+              "column_id": "col_claude_b",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "standard",
+              "execution_aliases": {
+                "openrouter": "anthropic/claude-b"
+              },
+              "execution_alias_retention": {
+                "openrouter": "standard"
+              }
+            },
+            {
+              "provider": "openai",
+              "model": "gemini-c",
+              "endpoint": "direct",
+              "column_id": "col_gemini_c",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "standard",
+              "execution_aliases": {
+                "openrouter": "google/gemini-c"
+              },
+              "execution_alias_retention": {
+                "openrouter": "standard"
+              }
+            }
+          ],
+          "classification": {
+            "method": "declared"
+          },
+          "measured": true,
+          "zero_retention": false,
+          "telemetry": true
+        }
+      }
+    ]
+  },
+  "provider": {
+    "responses": [
+      {
+        "kind": "respond",
+        "status": 500,
+        "body": {
+          "error": {
+            "message": "upstream error",
+            "type": "server_error"
+          }
+        }
+      },
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s10a",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s10a"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    ]
+  },
+  "steps": [
+    {
+      "call": {
+        "surface": "chat_completions",
+        "model": "maverick/auto",
+        "workload": "structured_extraction:3",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a billing assistant."
+            },
+            {
+              "role": "user",
+              "content": "Extract the invoice total from: Total due $42.10"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": "response",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s10a",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s10a"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    }
+  ],
+  "recorded": {
+    "provider": {
+      "count": 2,
+      "requests": [
+        {
+          "headers": {
+            "authorization": "Bearer sk-or-caller"
+          },
+          "checks": [
+            {
+              "pointer": "/model",
+              "equals": "openai/gpt-a"
+            },
+            {
+              "pointer": "/messages",
+              "equals": [
+                {
+                  "role": "system",
+                  "content": "You are a billing assistant."
+                },
+                {
+                  "role": "user",
+                  "content": "Extract the invoice total from: Total due $42.10"
+                }
+              ]
+            }
+          ],
+          "not_containing": [
+            "mk_test_conformance",
+            "sk-caller-openai"
+          ]
+        },
+        {
+          "headers": {
+            "authorization": "Bearer sk-or-caller"
+          },
+          "checks": [
+            {
+              "pointer": "/model",
+              "equals": "anthropic/claude-b"
+            },
+            {
+              "pointer": "/messages",
+              "equals": [
+                {
+                  "role": "system",
+                  "content": "You are a billing assistant."
+                },
+                {
+                  "role": "user",
+                  "content": "Extract the invoice total from: Total due $42.10"
+                }
+              ]
+            }
+          ],
+          "not_containing": [
+            "mk_test_conformance",
+            "sk-caller-openai"
+          ]
+        }
+      ]
+    },
+    "telemetry": {
+      "count": 1,
+      "requests": [
+        {
+          "headers": {
+            "authorization": "Bearer mk_test_conformance"
+          },
+          "checks": [
+            {
+              "pointer": "/items",
+              "length": 2
+            },
+            {
+              "pointer": "/items/0/model_used",
+              "equals": "gpt-a"
+            },
+            {
+              "pointer": "/items/0/status",
+              "equals": 500
+            },
+            {
+              "pointer": "/items/0/endpoint_used",
+              "equals": "openrouter"
+            },
+            {
+              "pointer": "/items/1/model_used",
+              "equals": "claude-b"
+            },
+            {
+              "pointer": "/items/1/status",
+              "equals": 200
+            },
+            {
+              "pointer": "/items/1/endpoint_used",
+              "equals": "openrouter"
+            }
+          ],
+          "not_containing": [
+            "Total due $42.10",
+            "You are a billing assistant.",
+            "sk-caller-openai",
+            "sk-or-caller"
+          ]
+        }
+      ]
+    }
+  }
+}

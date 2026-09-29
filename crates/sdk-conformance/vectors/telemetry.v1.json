@@ -1,0 +1,761 @@
+{
+  "vector_set": "telemetry",
+  "version": "v1",
+  "source": "spec v1 §9.10; master plan §3.5 'Telemetry'; sdk-v0 plan §2.1 'Telemetry batcher'; D14, D16, D39; reference Part 6 §11 (Go parseUsage, rows go-*: parity/fixtures/proxy/unit.json#parse_usage); crates/maverick-core/src/telemetry.rs, crates/maverick-core/src/chain.rs, crates/maverick-domain/src/telemetry.rs. Hand-checked.",
+  "rules": {
+    "item": [
+      "One item per dispatched attempt. A skipped entry (no request sent) has no item.",
+      "recommendation_id is the recommend response's id; model_used is the entry's catalog model (in OpenRouter mode too, not the slug).",
+      "status is the HTTP status, or 0 when the transport failed; then error_class is timeout (no response headers within the attempt timeout) or connect_error (any other transport failure). error_class is absent when a status arrived.",
+      "latency_ms is the whole milliseconds until the response headers arrived or the transport failed.",
+      "tokens_in and tokens_out are present only for a 2xx whose body was buffered (not streamed), read by the usage rules for the surface.",
+      "endpoint_used is direct or openrouter. A component may omit it when it is direct: the engine reads absent as direct.",
+      "check_pass is present only when a check ran (D16); it is never defaulted.",
+      "settings_applied is always present: true when at least one entry setting was written to the request (D14).",
+      "No prompt, completion, request body, or credential is ever part of an item."
+    ],
+    "usage": [
+      "The body must be a JSON object. usage absent or null means no counts. usage of any other non-object type means no counts.",
+      "chat_completions reads usage.prompt_tokens and usage.completion_tokens; messages reads usage.input_tokens and usage.output_tokens.",
+      "Each count must be a JSON integer; null is absent and 0 is kept. If either field of the surface is present with another type (a string, or a number with a fraction), both counts are absent."
+    ],
+    "outcome": [
+      "The engine decodes each item alone and drops (and counts) a malformed one: recommendation_id and model_used must be non-empty strings, status an integer >= 0; latency_ms, tokens_in, tokens_out integers >= 0 when present; error_class one of timeout, connect_error, provider_error, other; endpoint_used one of direct, vertex, bedrock, azure, openrouter (absent is direct); check_pass and settings_applied booleans when present.",
+      "First matching rule: error_class timeout is latency_exceeded; error_class connect_error or provider_error, status 0, 429, or 5xx is provider_error; a 2xx is parse_failure (check_pass false), success (check_pass true), or completed_unchecked (no check_pass); anything else is other."
+    ]
+  },
+  "how_to_run": "usage_cases: read the body with each surface's rule; null means absent. attempt_cases: derive the item from the attempt and compare as JSON objects (an item without endpoint_used equals one with endpoint_used direct). outcome_cases: these are the engine's rules, for reference; a core does not run them.",
+  "usage_cases": [
+    {
+      "id": "go-0",
+      "body": "{\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":5}}",
+      "chat_completions": {
+        "tokens_in": 10,
+        "tokens_out": 5
+      },
+      "messages": {
+        "tokens_in": null,
+        "tokens_out": null
+      }
+    },
+    {
+      "id": "go-1",
+      "body": "{\"usage\":{\"prompt_tokens\":10}}",
+      "chat_completions": {
+        "tokens_in": 10,
+        "tokens_out": null
+      },
+      "messages": {
+        "tokens_in": null,
+        "tokens_out": null
+      }
+    },
+    {
+      "id": "go-2",
+      "body": "{\"usage\":{\"input_tokens\":7,\"output_tokens\":3}}",
+      "chat_completions": {
+        "tokens_in": null,
+        "tokens_out": null
+      },
+      "messages": {
+        "tokens_in": 7,
+        "tokens_out": 3
+      }
+    },
+    {
+      "id": "go-3",
+      "body": "{}",
+      "chat_completions": {
+        "tokens_in": null,
+        "tokens_out": null
+      },
+      "messages": {
+        "tokens_in": null,
+        "tokens_out": null
+      }
+    },
+    {
+      "id": "go-4",
+      "body": "not json",
+      "chat_completions": {
+        "tokens_in": null,
+        "tokens_out": null
+      },
+      "messages": {
+        "tokens_in": null,
+        "tokens_out": null
+      }
+    },
+    {
+      "id": "go-5",
+      "body": "{\"usage\":{\"prompt_tokens\":1.5}}",
+      "chat_completions": {
+        "tokens_in": null,
+        "tokens_out": null
+      },
+      "messages": {
+        "tokens_in": null,
+        "tokens_out": null
+      }
+    },
+    {
+      "id": "go-6",
+      "body": "{\"usage\":{\"prompt_tokens\":null,\"completion_tokens\":0}}",
+      "chat_completions": {
+        "tokens_in": null,
+        "tokens_out": 0
+      },
+      "messages": {
+        "tokens_in": null,
+        "tokens_out": null
+      }
+    },
+    {
+      "id": "rs-0",
+      "body": "{\"usage\":null}",
+      "chat_completions": {
+        "tokens_in": null,
+        "tokens_out": null
+      },
+      "messages": {
+        "tokens_in": null,
+        "tokens_out": null
+      }
+    },
+    {
+      "id": "rs-1",
+      "body": "{\"usage\":\"none\"}",
+      "chat_completions": {
+        "tokens_in": null,
+        "tokens_out": null
+      },
+      "messages": {
+        "tokens_in": null,
+        "tokens_out": null
+      }
+    },
+    {
+      "id": "rs-2",
+      "body": "[{\"usage\":{\"prompt_tokens\":1}}]",
+      "chat_completions": {
+        "tokens_in": null,
+        "tokens_out": null
+      },
+      "messages": {
+        "tokens_in": null,
+        "tokens_out": null
+      }
+    },
+    {
+      "id": "rs-3",
+      "body": "{\"usage\":{\"prompt_tokens\":\"10\",\"completion_tokens\":5}}",
+      "chat_completions": {
+        "tokens_in": null,
+        "tokens_out": null
+      },
+      "messages": {
+        "tokens_in": null,
+        "tokens_out": null
+      }
+    },
+    {
+      "id": "rs-4",
+      "body": "{\"usage\":{\"input_tokens\":0,\"output_tokens\":0}}",
+      "chat_completions": {
+        "tokens_in": null,
+        "tokens_out": null
+      },
+      "messages": {
+        "tokens_in": 0,
+        "tokens_out": 0
+      }
+    },
+    {
+      "id": "rs-5",
+      "body": "{\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":2,\"input_tokens\":9}}",
+      "chat_completions": {
+        "tokens_in": 5,
+        "tokens_out": 2
+      },
+      "messages": {
+        "tokens_in": 9,
+        "tokens_out": null
+      }
+    },
+    {
+      "id": "rs-6",
+      "body": "{\"id\":\"x\",\"usage\":{\"completion_tokens\":4}}",
+      "chat_completions": {
+        "tokens_in": null,
+        "tokens_out": 4
+      },
+      "messages": {
+        "tokens_in": null,
+        "tokens_out": null
+      }
+    }
+  ],
+  "attempt_cases": [
+    {
+      "id": "chat_2xx_buffered",
+      "attempt": {
+        "recommendation_id": "rec_t",
+        "model": "gpt-a",
+        "surface": "chat_completions",
+        "endpoint_used": "direct",
+        "status": 200,
+        "error_class": null,
+        "latency_ms": 120,
+        "settings_applied": false,
+        "buffered_body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"hi\"}}],\"usage\":{\"prompt_tokens\":21,\"completion_tokens\":3}}",
+        "check_pass": null
+      },
+      "item": {
+        "recommendation_id": "rec_t",
+        "model_used": "gpt-a",
+        "status": 200,
+        "latency_ms": 120,
+        "tokens_in": 21,
+        "tokens_out": 3,
+        "endpoint_used": "direct",
+        "settings_applied": false
+      }
+    },
+    {
+      "id": "messages_2xx_buffered",
+      "attempt": {
+        "recommendation_id": "rec_t",
+        "model": "claude-b",
+        "surface": "messages",
+        "endpoint_used": "direct",
+        "status": 200,
+        "error_class": null,
+        "latency_ms": 120,
+        "settings_applied": true,
+        "buffered_body": "{\"id\":\"msg_1\",\"type\":\"message\",\"content\":[{\"type\":\"text\",\"text\":\"hi\"}],\"usage\":{\"input_tokens\":7,\"output_tokens\":3}}",
+        "check_pass": null
+      },
+      "item": {
+        "recommendation_id": "rec_t",
+        "model_used": "claude-b",
+        "status": 200,
+        "latency_ms": 120,
+        "tokens_in": 7,
+        "tokens_out": 3,
+        "endpoint_used": "direct",
+        "settings_applied": true
+      }
+    },
+    {
+      "id": "chat_2xx_streamed",
+      "attempt": {
+        "recommendation_id": "rec_t",
+        "model": "gpt-a",
+        "surface": "chat_completions",
+        "endpoint_used": "direct",
+        "status": 200,
+        "error_class": null,
+        "latency_ms": 120,
+        "settings_applied": false,
+        "buffered_body": null,
+        "check_pass": null
+      },
+      "item": {
+        "recommendation_id": "rec_t",
+        "model_used": "gpt-a",
+        "status": 200,
+        "latency_ms": 120,
+        "endpoint_used": "direct",
+        "settings_applied": false
+      }
+    },
+    {
+      "id": "429_body_with_usage_ignored",
+      "attempt": {
+        "recommendation_id": "rec_t",
+        "model": "gpt-a",
+        "surface": "chat_completions",
+        "endpoint_used": "direct",
+        "status": 429,
+        "error_class": null,
+        "latency_ms": 40,
+        "settings_applied": false,
+        "buffered_body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"hi\"}}],\"usage\":{\"prompt_tokens\":21,\"completion_tokens\":3}}",
+        "check_pass": null
+      },
+      "item": {
+        "recommendation_id": "rec_t",
+        "model_used": "gpt-a",
+        "status": 429,
+        "latency_ms": 40,
+        "endpoint_used": "direct",
+        "settings_applied": false
+      }
+    },
+    {
+      "id": "503",
+      "attempt": {
+        "recommendation_id": "rec_t",
+        "model": "gpt-a",
+        "surface": "chat_completions",
+        "endpoint_used": "direct",
+        "status": 503,
+        "error_class": null,
+        "latency_ms": 55,
+        "settings_applied": false,
+        "buffered_body": "{\"error\":{\"message\":\"overloaded\"}}",
+        "check_pass": null
+      },
+      "item": {
+        "recommendation_id": "rec_t",
+        "model_used": "gpt-a",
+        "status": 503,
+        "latency_ms": 55,
+        "endpoint_used": "direct",
+        "settings_applied": false
+      }
+    },
+    {
+      "id": "400",
+      "attempt": {
+        "recommendation_id": "rec_t",
+        "model": "gpt-a",
+        "surface": "chat_completions",
+        "endpoint_used": "direct",
+        "status": 400,
+        "error_class": null,
+        "latency_ms": 12,
+        "settings_applied": false,
+        "buffered_body": "{\"error\":{\"message\":\"bad\"}}",
+        "check_pass": null
+      },
+      "item": {
+        "recommendation_id": "rec_t",
+        "model_used": "gpt-a",
+        "status": 400,
+        "latency_ms": 12,
+        "endpoint_used": "direct",
+        "settings_applied": false
+      }
+    },
+    {
+      "id": "timeout",
+      "attempt": {
+        "recommendation_id": "rec_t",
+        "model": "gpt-a",
+        "surface": "chat_completions",
+        "endpoint_used": "direct",
+        "status": 0,
+        "error_class": "timeout",
+        "latency_ms": 30000,
+        "settings_applied": false,
+        "buffered_body": null,
+        "check_pass": null
+      },
+      "item": {
+        "recommendation_id": "rec_t",
+        "model_used": "gpt-a",
+        "status": 0,
+        "latency_ms": 30000,
+        "error_class": "timeout",
+        "endpoint_used": "direct",
+        "settings_applied": false
+      }
+    },
+    {
+      "id": "connect_error",
+      "attempt": {
+        "recommendation_id": "rec_t",
+        "model": "gpt-a",
+        "surface": "chat_completions",
+        "endpoint_used": "direct",
+        "status": 0,
+        "error_class": "connect_error",
+        "latency_ms": 3,
+        "settings_applied": false,
+        "buffered_body": null,
+        "check_pass": null
+      },
+      "item": {
+        "recommendation_id": "rec_t",
+        "model_used": "gpt-a",
+        "status": 0,
+        "latency_ms": 3,
+        "error_class": "connect_error",
+        "endpoint_used": "direct",
+        "settings_applied": false
+      }
+    },
+    {
+      "id": "check_passed",
+      "attempt": {
+        "recommendation_id": "rec_t",
+        "model": "gpt-a",
+        "surface": "chat_completions",
+        "endpoint_used": "direct",
+        "status": 200,
+        "error_class": null,
+        "latency_ms": 120,
+        "settings_applied": false,
+        "buffered_body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"hi\"}}],\"usage\":{\"prompt_tokens\":21,\"completion_tokens\":3}}",
+        "check_pass": true
+      },
+      "item": {
+        "recommendation_id": "rec_t",
+        "model_used": "gpt-a",
+        "status": 200,
+        "latency_ms": 120,
+        "tokens_in": 21,
+        "tokens_out": 3,
+        "endpoint_used": "direct",
+        "check_pass": true,
+        "settings_applied": false
+      }
+    },
+    {
+      "id": "check_failed",
+      "attempt": {
+        "recommendation_id": "rec_t",
+        "model": "gpt-a",
+        "surface": "chat_completions",
+        "endpoint_used": "direct",
+        "status": 200,
+        "error_class": null,
+        "latency_ms": 120,
+        "settings_applied": false,
+        "buffered_body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"hi\"}}],\"usage\":{\"prompt_tokens\":21,\"completion_tokens\":3}}",
+        "check_pass": false
+      },
+      "item": {
+        "recommendation_id": "rec_t",
+        "model_used": "gpt-a",
+        "status": 200,
+        "latency_ms": 120,
+        "tokens_in": 21,
+        "tokens_out": 3,
+        "endpoint_used": "direct",
+        "check_pass": false,
+        "settings_applied": false
+      }
+    },
+    {
+      "id": "openrouter",
+      "attempt": {
+        "recommendation_id": "rec_t",
+        "model": "claude-b",
+        "surface": "chat_completions",
+        "endpoint_used": "openrouter",
+        "status": 200,
+        "error_class": null,
+        "latency_ms": 120,
+        "settings_applied": false,
+        "buffered_body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"hi\"}}],\"usage\":{\"prompt_tokens\":21,\"completion_tokens\":3}}",
+        "check_pass": null
+      },
+      "item": {
+        "recommendation_id": "rec_t",
+        "model_used": "claude-b",
+        "status": 200,
+        "latency_ms": 120,
+        "tokens_in": 21,
+        "tokens_out": 3,
+        "endpoint_used": "openrouter",
+        "settings_applied": false
+      }
+    },
+    {
+      "id": "zero_and_null_tokens",
+      "attempt": {
+        "recommendation_id": "rec_t",
+        "model": "gpt-a",
+        "surface": "chat_completions",
+        "endpoint_used": "direct",
+        "status": 200,
+        "error_class": null,
+        "latency_ms": 120,
+        "settings_applied": false,
+        "buffered_body": "{\"usage\":{\"prompt_tokens\":0,\"completion_tokens\":null}}",
+        "check_pass": null
+      },
+      "item": {
+        "recommendation_id": "rec_t",
+        "model_used": "gpt-a",
+        "status": 200,
+        "latency_ms": 120,
+        "tokens_in": 0,
+        "endpoint_used": "direct",
+        "settings_applied": false
+      }
+    },
+    {
+      "id": "usage_not_integers",
+      "attempt": {
+        "recommendation_id": "rec_t",
+        "model": "gpt-a",
+        "surface": "chat_completions",
+        "endpoint_used": "direct",
+        "status": 200,
+        "error_class": null,
+        "latency_ms": 120,
+        "settings_applied": false,
+        "buffered_body": "{\"usage\":{\"prompt_tokens\":1.5,\"completion_tokens\":2}}",
+        "check_pass": null
+      },
+      "item": {
+        "recommendation_id": "rec_t",
+        "model_used": "gpt-a",
+        "status": 200,
+        "latency_ms": 120,
+        "endpoint_used": "direct",
+        "settings_applied": false
+      }
+    }
+  ],
+  "outcome_cases": [
+    {
+      "id": "2xx_no_check",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 200
+      },
+      "expect": "completed_unchecked",
+      "endpoint_used": "direct"
+    },
+    {
+      "id": "2xx_check_true",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 200,
+        "check_pass": true
+      },
+      "expect": "success",
+      "endpoint_used": "direct"
+    },
+    {
+      "id": "2xx_check_false",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 200,
+        "check_pass": false
+      },
+      "expect": "parse_failure",
+      "endpoint_used": "direct"
+    },
+    {
+      "id": "299_no_check",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 299
+      },
+      "expect": "completed_unchecked",
+      "endpoint_used": "direct"
+    },
+    {
+      "id": "timeout",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 0,
+        "error_class": "timeout"
+      },
+      "expect": "latency_exceeded",
+      "endpoint_used": "direct"
+    },
+    {
+      "id": "timeout_class_on_2xx",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 200,
+        "error_class": "timeout"
+      },
+      "expect": "latency_exceeded",
+      "endpoint_used": "direct"
+    },
+    {
+      "id": "connect_error",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 0,
+        "error_class": "connect_error"
+      },
+      "expect": "provider_error",
+      "endpoint_used": "direct"
+    },
+    {
+      "id": "status_0_no_class",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 0
+      },
+      "expect": "provider_error",
+      "endpoint_used": "direct"
+    },
+    {
+      "id": "provider_error_class_on_2xx",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 200,
+        "error_class": "provider_error",
+        "check_pass": true
+      },
+      "expect": "provider_error",
+      "endpoint_used": "direct"
+    },
+    {
+      "id": "429",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 429
+      },
+      "expect": "provider_error",
+      "endpoint_used": "direct"
+    },
+    {
+      "id": "500",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 500
+      },
+      "expect": "provider_error",
+      "endpoint_used": "direct"
+    },
+    {
+      "id": "400",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 400
+      },
+      "expect": "other",
+      "endpoint_used": "direct"
+    },
+    {
+      "id": "300",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 300
+      },
+      "expect": "other",
+      "endpoint_used": "direct"
+    },
+    {
+      "id": "other_class_on_2xx",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 200,
+        "error_class": "other"
+      },
+      "expect": "completed_unchecked",
+      "endpoint_used": "direct"
+    },
+    {
+      "id": "openrouter_success",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 200,
+        "check_pass": true,
+        "endpoint_used": "openrouter"
+      },
+      "expect": "success",
+      "endpoint_used": "openrouter"
+    },
+    {
+      "id": "settings_applied_kept",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 200,
+        "settings_applied": true
+      },
+      "expect": "completed_unchecked",
+      "endpoint_used": "direct"
+    },
+    {
+      "id": "missing_recommendation_id",
+      "item": {
+        "model_used": "gpt-a",
+        "status": 200
+      },
+      "expect": "dropped"
+    },
+    {
+      "id": "empty_model_used",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "",
+        "status": 200
+      },
+      "expect": "dropped"
+    },
+    {
+      "id": "missing_status",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a"
+      },
+      "expect": "dropped"
+    },
+    {
+      "id": "negative_status",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": -1
+      },
+      "expect": "dropped"
+    },
+    {
+      "id": "negative_latency",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 200,
+        "latency_ms": -5
+      },
+      "expect": "dropped"
+    },
+    {
+      "id": "unknown_error_class",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 0,
+        "error_class": "rate_limited"
+      },
+      "expect": "dropped"
+    },
+    {
+      "id": "unknown_endpoint",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 200,
+        "endpoint_used": "gateway"
+      },
+      "expect": "dropped"
+    },
+    {
+      "id": "check_pass_not_boolean",
+      "item": {
+        "recommendation_id": "rec_1",
+        "model_used": "gpt-a",
+        "status": 200,
+        "check_pass": "true"
+      },
+      "expect": "dropped"
+    }
+  ]
+}

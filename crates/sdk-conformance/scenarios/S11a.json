@@ -1,0 +1,159 @@
+{
+  "id": "S11a",
+  "name": "openrouter_aliasless_entry_skipped",
+  "group": 11,
+  "source": "openrouter execution spec §6 scenario 11",
+  "summary": "An entry without an OpenRouter alias cannot run there and is skipped.",
+  "config": {
+    "execution": "openrouter"
+  },
+  "engine": {
+    "recommend": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "recommendation_id": "rec_s11a",
+          "recommendations": [
+            {
+              "provider": "openai",
+              "model": "local-a",
+              "endpoint": "direct",
+              "column_id": "col_local_a",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "standard",
+              "execution_aliases": {},
+              "execution_alias_retention": {}
+            },
+            {
+              "provider": "openai",
+              "model": "claude-b",
+              "endpoint": "direct",
+              "column_id": "col_claude_b",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "standard",
+              "execution_aliases": {
+                "openrouter": "anthropic/claude-b"
+              },
+              "execution_alias_retention": {
+                "openrouter": "standard"
+              }
+            }
+          ],
+          "classification": {
+            "method": "declared"
+          },
+          "measured": true,
+          "zero_retention": false,
+          "telemetry": true
+        }
+      }
+    ]
+  },
+  "provider": {
+    "responses": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s11a",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s11a"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    ]
+  },
+  "steps": [
+    {
+      "call": {
+        "surface": "chat_completions",
+        "model": "maverick/auto",
+        "workload": "structured_extraction:3",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a billing assistant."
+            },
+            {
+              "role": "user",
+              "content": "Extract the invoice total from: Total due $42.10"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": "response",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s11a",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s11a"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    }
+  ],
+  "recorded": {
+    "provider": {
+      "count": 1,
+      "requests": [
+        {
+          "headers": {
+            "authorization": "Bearer sk-or-caller"
+          },
+          "checks": [
+            {
+              "pointer": "/model",
+              "equals": "anthropic/claude-b"
+            },
+            {
+              "pointer": "/messages",
+              "equals": [
+                {
+                  "role": "system",
+                  "content": "You are a billing assistant."
+                },
+                {
+                  "role": "user",
+                  "content": "Extract the invoice total from: Total due $42.10"
+                }
+              ]
+            }
+          ],
+          "not_containing": [
+            "mk_test_conformance",
+            "sk-caller-openai"
+          ]
+        }
+      ]
+    }
+  }
+}

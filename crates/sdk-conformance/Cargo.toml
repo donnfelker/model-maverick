@@ -1,6 +1,6 @@
 [package]
 name = "sdk-conformance"
-description = "The SDK conformance harness: a mock engine plus a mock provider and twelve frozen scenarios. A lib for the shared vectors and a bin to run them."
+description = "The SDK conformance harness: a mock engine and a mock provider, plus the frozen cross-language scenarios (twelve groups) and test vectors."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -29,5 +29,10 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 maverick-core = { path = "../maverick-core" }
+# The retention expiry and telemetry outcome vectors replay against the engine's rules.
+maverick-domain = { workspace = true }
+chrono = { workspace = true }
+# conformance.json pins each frozen file by its sha256.
+sha2 = { workspace = true }
 reqwest = { workspace = true }
 serde_json = { workspace = true }
