@@ -6,7 +6,9 @@ cd "$ROOT_DIR"
 
 usage() {
     cat <<'USAGE'
-Usage: scripts/ci.sh [all|fast|db|parity|e2e|mutants]
+Usage: scripts/ci.sh [all|fast|db|parity|e2e]
+       scripts/ci.sh mutants [k/n]          full run, or shard k of n (0-based)
+       scripts/ci.sh mutants-diff <base>    only mutants on lines changed since <base>
 
 No argument runs all tiers except mutants.
 USAGE
@@ -85,22 +87,52 @@ run_fast() {
 
 run_db() {
     log_dir db
-    echo "no db suites registered yet" | tee "target/ci/db/placeholder.log"
+    # Placeholder: the store and job tests on Postgres run today inside the fast tier's `cargo test --workspace`.
+    # This tier gets its own suite when one exists (API/proxy replay, e2e script).
+    echo "no separate db suite yet; its tests run in the fast tier (cargo test --workspace)" \
+        | tee "target/ci/db/placeholder.log"
 }
 
 run_parity() {
     log_dir parity
-    echo "no parity suites registered yet" | tee "target/ci/parity/placeholder.log"
+    # Placeholder: the parity fixture tests run today inside the fast tier's `cargo test --workspace`.
+    # This tier gets its own suite when one exists (API/proxy replay, e2e script).
+    echo "no separate parity suite yet; its tests run in the fast tier (cargo test --workspace)" \
+        | tee "target/ci/parity/placeholder.log"
 }
 
 run_e2e() {
     log_dir e2e
-    echo "no e2e suites registered yet" | tee "target/ci/e2e/placeholder.log"
+    # Placeholder: the end-to-end script (bead 9.10) run today inside the fast tier's `cargo test --workspace`.
+    # This tier gets its own suite when one exists (API/proxy replay, e2e script).
+    echo "no separate e2e suite yet; its tests run in the fast tier (cargo test --workspace)" \
+        | tee "target/ci/e2e/placeholder.log"
 }
 
+# The full maverick-domain run is about 1,900 mutants: hours on a CI runner, so CI
+# splits it into shards (`--shard k/n`) on a schedule, and checks each push with
+# `mutants-diff` (only the mutants on changed lines).
 run_mutants() {
+    local shard="$1"
     require_cargo_command mutants cargo-mutants 27.1.0 ""
-    run_logged mutants maverick-domain cargo mutants --package maverick-domain --output target/ci/mutants
+    local args=(--package maverick-domain --output target/ci/mutants)
+    if [[ -n "$shard" ]]; then
+        args+=(--shard "$shard")
+    fi
+    run_logged mutants maverick-domain cargo mutants "${args[@]}"
+}
+
+run_mutants_diff() {
+    local base="$1"
+    require_cargo_command mutants cargo-mutants 27.1.0 ""
+    log_dir mutants
+    git diff "$base" HEAD -- crates/maverick-domain >target/ci/mutants/diff.patch
+    if [[ ! -s target/ci/mutants/diff.patch ]]; then
+        echo "no maverick-domain changes since $base" | tee target/ci/mutants/maverick-domain.log
+        return
+    fi
+    run_logged mutants maverick-domain cargo mutants --package maverick-domain \
+        --in-diff target/ci/mutants/diff.patch --output target/ci/mutants
 }
 
 case "$TIER" in
@@ -123,7 +155,10 @@ case "$TIER" in
         run_e2e
         ;;
     mutants)
-        run_mutants
+        run_mutants "${2:-}"
+        ;;
+    mutants-diff)
+        run_mutants_diff "${2:?usage: scripts/ci.sh mutants-diff <base>}"
         ;;
     -h | --help | help)
         usage
