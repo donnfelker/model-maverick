@@ -18,6 +18,8 @@ maverick-store = { workspace = true }
 maverick-runner = { workspace = true }
 maverick-alerts = { workspace = true }
 maverick-config = { workspace = true }
+# The prompt path's classifier is a provider call (spec §8.3).
+maverick-providers = { workspace = true }
 axum = { workspace = true }
 tower = { workspace = true, features = ["util"] }
 tower-http = { workspace = true }
@@ -38,6 +40,7 @@ chrono = { workspace = true }
 
 [dev-dependencies]
 maverick-testdb = { workspace = true }
+parity-support = { path = "../parity-support" }
 tracing-subscriber = { workspace = true }
 # The in-memory span exporter for the request-span tests.
 opentelemetry_sdk = { workspace = true, features = ["testing"] }

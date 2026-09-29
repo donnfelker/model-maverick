@@ -4,6 +4,8 @@
 //! deliberately small: business rules belong to the service crates.
 
 pub mod audit;
+pub mod capture;
+pub mod classify;
 pub mod config;
 mod health;
 pub mod observe;
