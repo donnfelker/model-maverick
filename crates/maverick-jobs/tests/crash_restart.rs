@@ -23,17 +23,17 @@ use std::time::{Duration, Instant};
 use graphile_worker::{WorkerOptions, WorkerRecoveryConfig, WorkerUtils};
 use maverick_domain::graders::{GoldenAnswer, Registry};
 use maverick_domain::spend::SpendCaps;
-use maverick_jobs::batch::{BatchConfig, NightlySmokeJob};
+use maverick_jobs::batch::{BatchConfig, BatchOutcome, NightlySmokeJob, run_batch};
 use maverick_jobs::predictions::{CalibrationConfig, CalibrationScoreJob};
 use maverick_jobs::rebuild::{AggregateRebuildJob, RebuildConfig};
 use maverick_jobs::regression_scan::{RegressionScanConfig, RegressionScanJob};
 use maverick_jobs::{
-    BatchLeaseManager, BatchLeaseOutcome, JobClientConfig, JobKind, NightlySmokeArgs,
+    BatchLeaseManager, BatchLeaseOutcome, JobArgs, JobClientConfig, JobKind, NightlySmokeArgs,
     deterministic_batch_id,
 };
 use maverick_providers::fake::{FakeProvider, FixtureSpec};
 use maverick_providers::{CompletionRequest, ProviderClient, ProviderFuture};
-use maverick_runner::{Clients, ProviderLimits, RunnerConfig};
+use maverick_runner::{Cancellation, Clients, ProviderLimits, RunnerConfig};
 use maverick_store::catalog::{self, NewModelColumn};
 use maverick_store::corpus::{self, TaskUpsert};
 use maverick_store::health::GRAPHILE_WORKER_SCHEMA;
@@ -706,6 +706,111 @@ async fn enqueue_while_running() {
     );
     s.assert_clean_end(false).await;
     s.finish().await;
+}
+
+/// 4b. The m000019 orphan cleanup (spec 11.2, model-maverick-5bt). A duplicate enqueue on a
+/// locked batch key clears the running job's key and sets its attempts to `max_attempts`
+/// before adding the duplicate. If that worker then dies, recovery unlocks the row, but with
+/// `key IS NULL` and `attempts = max_attempts` it can never run again, and graphile does not
+/// remove it on a plain unlock: a permanently failed orphan. The duplicate that rescued the
+/// window deletes it in its completion transaction. This reproduces the orphan directly (so
+/// it does not depend on the recovery sweep, which would also clear it), then runs the batch
+/// to completion in process. Without the delete in `run_batch`, the orphan would remain.
+#[tokio::test(flavor = "multi_thread")]
+async fn run_batch_completion_removes_the_m000019_orphan() {
+    let Some(s) = Scenario::start("orphan-cleanup").await else {
+        return;
+    };
+    let _ = parity_support::divergence!("D10");
+    const ORPHANS: &str = "select count(*) from graphile_worker._private_jobs \
+         where key is null and attempts >= max_attempts and locked_at is null";
+
+    // Build the orphan the way m000019 does: lock the running keyed job, enqueue a duplicate on
+    // the same key (which clears the first job's key and exhausts its attempts), then unlock as
+    // the recovery sweep would after the worker died.
+    s.enqueue().await;
+    let key = JobKind::NightlySmoke.job_key(NIGHT);
+    sqlx::query(
+        "update graphile_worker._private_jobs set locked_at = now(), locked_by = 'dead' \
+         where key = $1",
+    )
+    .bind(&key)
+    .execute(&s.pool)
+    .await
+    .expect("lock the running job");
+    s.enqueue().await;
+    sqlx::query(
+        "update graphile_worker._private_jobs set locked_at = null, locked_by = null \
+         where locked_by = 'dead'",
+    )
+    .execute(&s.pool)
+    .await
+    .expect("recovery unlocks the dead worker's row");
+    assert_eq!(
+        s.count(ORPHANS).await,
+        1,
+        "the duplicate on the locked key leaves one permanently failed orphan"
+    );
+
+    // The duplicate rescues the window: run the batch to completion in process, which reaches
+    // the completion transaction that removes the orphan.
+    let outcome = run_batch(
+        &s.pool,
+        &JobArgs::NightlySmoke(NightlySmokeArgs {
+            night: NIGHT.to_owned(),
+        }),
+        &orphan_test_config(),
+        "w2",
+        &Cancellation::new(),
+    )
+    .await
+    .expect("run the batch");
+    assert!(
+        matches!(outcome, BatchOutcome::Ran(_)),
+        "the batch runs to completion"
+    );
+    assert_eq!(
+        s.count(ORPHANS).await,
+        0,
+        "the completion transaction removed the orphan"
+    );
+    assert_eq!(
+        s.batch_status().await,
+        ("completed".to_owned(), 1),
+        "the batch completed"
+    );
+}
+
+/// A batch config on the fake provider for the in-process orphan-cleanup test.
+fn orphan_test_config() -> BatchConfig {
+    let lease = BatchLeaseManager::from_job_client_config(&JobClientConfig::default());
+    let provider: Arc<dyn ProviderClient> = fake();
+    let mut registry = Registry::new();
+    registry.must_register(Arc::new(GoldenAnswer));
+    let one = || ProviderLimits {
+        max_concurrency: 1,
+        rpm_limit: 0,
+    };
+    BatchConfig {
+        repeats: 3,
+        caps: SpendCaps::default(),
+        lease,
+        runner: RunnerConfig {
+            timeout: Duration::from_secs(300),
+            limits: [
+                ("anthropic".to_owned(), one()),
+                ("openai".to_owned(), one()),
+            ]
+            .into_iter()
+            .collect(),
+            ..RunnerConfig::default()
+        },
+        clients: Clients::new()
+            .with("anthropic", Arc::clone(&provider))
+            .with("openai", provider),
+        graders: Arc::new(registry),
+        notifier: None,
+    }
 }
 
 /// 5. An enqueue of the same (kind, window) after it completed. graphile_worker has
