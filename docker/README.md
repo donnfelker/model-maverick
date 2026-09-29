@@ -1,7 +1,8 @@
 # Deploy images, Kamal, and backups
 
 Bead `model-maverick-rust-port-3hk.9.4`. Master plan §4 "Deployment" and spec §14.2 are the
-authority. The go-live runbook (bead 9.5) uses these files on the real host.
+authority. The go-live runbook, `docs/runbook-go-live.md` (bead 9.5), uses these files on the
+real host.
 
 ## The images
 
@@ -68,8 +69,11 @@ forwards `127.0.0.1:8081` on your machine to it. Run it again after each deploy.
 `scripts/backup.sh` (POSIX sh) dumps the database with `pg_dump --format=custom`. Next to
 each dump it writes the exact row count of every public table, counted in the dump's own
 snapshot.
-- The `backup` accessory runs it with `--daemon` every night at 02:30 UTC, into the
-  `maverick-backups` volume. It keeps 7 dumps.
+- The `backup` accessory runs it with `--daemon` every night at 02:30 UTC. It writes into
+  the host directory `~/maverick-backup/maverick-backups` (mounted at `/backups`), and it
+  keeps 7 dumps. Kamal mounts an accessory's `directories` from
+  `$PWD/<service>-<accessory>/` in the SSH user's home. They are not named volumes.
+  Postgres keeps its data the same way, in `~/maverick-postgres/postgres-data`.
 - **Off the box:** set `MAVERICK_BACKUP_TARGET` to an rclone remote path (for example
   `offsite:maverick`) and the `RCLONE_CONFIG_OFFSITE_*` secrets. Unset, every run logs a
   warning, because the dump then exists on the host only.
@@ -79,12 +83,7 @@ snapshot.
 `scripts/restore-test.sh` restores a dump into a scratch database and runs two checks. Every
 table's row count must equal the `.counts` file, and `maverick migrate` must succeed on the
 result. It drops the scratch database afterwards. Run it with client tools of the server's
-major version, for example on the host:
-
-```sh
-docker cp "$(docker create <REGISTRY_USERNAME>/maverick:<version>)":/usr/local/bin/maverick ./maverick
-docker run --rm --network kamal \
-  -v maverick-backups:/backups -v "$PWD/scripts:/scripts:ro" -v "$PWD/maverick:/usr/local/bin/maverick:ro" \
-  -e MAVERICK_BACKUP_DIR=/backups -e MAVERICK_DATABASE_URL -e MAVERICK_INTERNAL_TOKENS \
-  -e MAVERICK_CAPTURE_MASTER_KEY postgres:16-alpine sh /scripts/restore-test.sh
-```
+major version. `docs/runbook-go-live.md` section 4 has the exact commands for the host.
+They copy `maverick` out of the deployed image, and they take the secrets from the web
+role's Kamal env file. Then they run the script in `postgres:16-alpine` on the `kamal`
+network, with the backup directory mounted at `/backups`.

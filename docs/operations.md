@@ -432,9 +432,10 @@ Production is one server deployed with Kamal 2. `config/deploy.yml` (the engine)
   host. Open a tunnel with `scripts/internal-tunnel.sh <user>@<host>` and call
   `http://127.0.0.1:8081/internal/v1/...` through it. The script finds the running web
   container's address on the `kamal` network, so run it again after each deploy.
-- Postgres 16 is the `postgres` accessory on the same host, with its data on the named
-  volume `postgres-data` and its port on the host loopback only. `kamal deploy` does not
-  touch accessories. `kamal accessory remove postgres` deletes the data.
+- Postgres 16 is the `postgres` accessory on the same host. Its data is in the host
+  directory `~/maverick-postgres/postgres-data` (a Kamal accessory directory, not a named
+  volume), and its port is on the host loopback only. `kamal deploy` does not touch
+  accessories. `kamal accessory remove postgres` deletes the data.
 - **Migrations:** the `.kamal/hooks/pre-app-boot` hook runs `maverick migrate` from the
   version being deployed before traffic moves. `serve` never migrates, so any path that
   skips the hook (a plain `docker run`, a manual restart) must run `maverick migrate` first.
@@ -445,13 +446,14 @@ Production is one server deployed with Kamal 2. `config/deploy.yml` (the engine)
   **no values**. Export the values in the deploying shell, or fetch them with
   `kamal secrets fetch` from a password manager.
 
-The first deploy: replace the placeholders in both Kamal files, point DNS at the host,
-export the secrets, then `kamal setup` and `kamal setup -c config/deploy-proxy.yml`.
-Releases: `kamal deploy` (and `kamal deploy -c config/deploy-proxy.yml` for the proxy).
+The first deploy follows `docs/runbook-go-live.md` step by step. It boots Postgres on its
+own before `kamal setup`, because the first start of the image restarts once, and a
+migration during that window fails. Releases: `kamal deploy` (and
+`kamal deploy -c config/deploy-proxy.yml` for the proxy).
 After each deploy:
 - check that `https://<host>/up` answers 200 through kamal-proxy;
 - check that port 8081 cannot be reached from outside;
 - watch the first production `nightly_smoke` complete under the spend caps (`kamal app
   logs` and the alerts feed).
 
-Bead 9.5 (the go-live runbook) runs these steps on the real host.
+Bead 9.5 runs `docs/runbook-go-live.md` on the real host with the owner.
