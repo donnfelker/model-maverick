@@ -26,7 +26,7 @@ logged, but it never blocks or fails the write that created the row.
 | `job_failure` | warning or critical | batch and rebuild jobs | A batch completed below 90% (warning), failed mid-batch, or an aggregate rebuild failed (critical). |
 | `regression` | warning or critical | `regression_scan` | A cell regressed per spec §6.5: a smoothed drop of more than 3.0 points against the trailing 7-day maximum, or a raw shock. It is critical when the cell falls below a quality bar that it cleared before. One alert per cell per 7 days, re-armed when the drop deepens by 2 points or more. |
 | `parse_failure_rate` | warning | `regression_scan` | A column's batch parse-failure rate is above 5% **and** above twice its trailing 7-day rate: the early sign of silent escalation on the caller side. |
-| `classifier_degraded` | critical | the classifier resolver | More than 5% of classifier calls failed over 15 minutes (at least 20 samples). One alert per episode, re-armed on recovery. Prompt-form requests get the fallback classification meanwhile. |
+| `classifier_degraded` | critical (info for a D41 resolution) | the classifier resolver and its re-resolution | More than 5% of classifier calls failed over 15 minutes (at least 20 samples). One alert per episode, re-armed on recovery. Or the classifier column stayed unresolved for 5 minutes (subject `reason: "unresolved"`, D41), and its later resolution writes an `info` alert (`reason: "resolved"`). Prompt-form requests get the fallback classification meanwhile. |
 | `pool_would_be_empty` | critical | retirement guard, drift check, recommend | A retirement was blocked (spec §4.1), the nightly drift check found a pool with no usable column for some cell, or a request found that drift. The subject names the tenants and pools. |
 | `retention_expiring` | warning | `catalog_sync` | A column's or an execution alias's zero-retention evidence expires within 14 days (spec §4.5). Renew it before it expires: expired evidence reads as `unknown`, and zero-retention tenants then lose that column (D1, D15). |
 
@@ -165,14 +165,24 @@ from the judged column's, so no output is judged by its own family.
 tenants, `MAVERICK_CLASSIFIER_ZERO_RETENTION_COLUMN` (D2) resolve the same way. The provider
 keys (`MAVERICK_*_API_KEY`) are operator keys, used only for benchmarks and classification.
 
-Today both resolve once, when `serve` starts, so a change needs a restart of `serve` (or of
-the `--worker-only` process for the judge pool). Bead `model-maverick-yl6` makes them retry
-after startup. A failure degrades and never stops the process:
+They resolve when `serve` starts, and again in the background (D41;
+`crates/maverick/src/rewatch.rs`). The classifier resolves in the API processes (`serve` and
+`serve --api-only`). The judge pool resolves in the worker process (`serve` and
+`serve --worker-only`). An unresolved reference is retried every 30 s. A resolved one is
+refreshed every 5 min, so a catalog change takes effect without a restart. A failure
+degrades and never stops the process:
 - The judge pool logs `judge pool unavailable; judge_rubric gradings will fail until it
   resolves`. The deterministic graders still run, and `judge_rubric` gradings fail until the
-  pool is fixed (their dimensions are absent and the batch raises `job_failure`).
+  pool resolves (their dimensions are absent and the batch raises `job_failure`). Resolution
+  logs `judge pool resolved; judge_rubric gradings resume`.
 - The classifier logs `classifier column unavailable; prompt-path requests will receive the
-  fallback classification`, and sustained failure raises `classifier_degraded`.
+  fallback classification`. Its requests get `fallback_default` (G1), and a zero-retention
+  tenant's prompt-form request still fails closed. Resolution logs `classifier column
+  resolved; prompt-path requests use the classifier`.
+- `classifier_degraded` fires on a sustained failure rate of the classifier calls. It also
+  fires when the classifier stays unresolved for 5 min: critical, with subject
+  `reason: "unresolved"`. A later resolution writes an `info` `classifier_degraded` with
+  `reason: "resolved"`.
 
 ## Column lifecycle and the retirement guard
 
