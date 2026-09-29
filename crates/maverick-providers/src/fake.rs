@@ -247,6 +247,10 @@ impl FakeProvider {
 }
 
 impl ProviderClient for FakeProvider {
+    fn name(&self) -> &str {
+        "fake"
+    }
+
     fn complete<'a>(&'a self, request: CompletionRequest) -> ProviderFuture<'a> {
         Box::pin(async move {
             let hash = hash_prompt(&request.prompt);

@@ -77,6 +77,14 @@ impl fmt::Debug for CompletionResponse {
 
 pub trait ProviderClient: Send + Sync {
     fn complete<'a>(&'a self, request: CompletionRequest) -> ProviderFuture<'a>;
+
+    /// The provider name this client's errors carry (`anthropic`, `openai`, `google`,
+    /// `xai`, `fake`). The trait has no cancellation context, so a caller that enforces a
+    /// deadline reports the timeout under this name, the way Go's client wrapped its
+    /// context error: `<name>: timeout: context deadline exceeded`.
+    fn name(&self) -> &str {
+        "provider"
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]

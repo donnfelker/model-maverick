@@ -23,3 +23,9 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 parity-support = { path = "../parity-support" }
+# Paused tokio time keeps the pacing and concurrency tests exact and fast.
+tokio = { workspace = true, features = ["test-util"] }
+# The two batch persistence tests write through the real store to real Postgres.
+maverick-store = { workspace = true }
+maverick-testdb = { workspace = true }
+sqlx = { workspace = true }
