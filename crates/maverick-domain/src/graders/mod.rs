@@ -4,6 +4,7 @@
 pub mod envelope;
 pub mod golden;
 pub mod goregex;
+pub mod keyfacts;
 pub mod registry;
 pub mod spec;
 
@@ -12,6 +13,7 @@ pub use envelope::{
     parse_envelope, parse_envelope_value, raw_type,
 };
 pub use golden::GoldenAnswer;
+pub use keyfacts::KeyFacts;
 pub use registry::{
     BoxError, BoxFuture, FailureCounter, GradeError, GradeInput, GradeResult, Grader, GraderError,
     RegisterError, Registry, RunMeta,
