@@ -72,7 +72,8 @@ For each package:
 - The API replay and the proxy replay have zero unexplained diffs.
   - **Done.** The API replay has 617 exchanges: 507 are byte-exact, 110 are explained by DIVERGENCES rows, and none is unexplained (`parity/closeout-package-2d-api.md`). The proxy replay passes all 54 scenarios in `parity/fixtures/proxy/scenarios.json` (bead 3hk.6.13).
 - The CI gates pass: fmt, clippy with `-D warnings`, tests, `cargo deny`, and `cargo-mutants` on the domain crates.
-  - **Done on push.** Every job passes on `main` (for example run 36619009044 on 2026-09-29). On a push, the mutants job checks only the changed lines. The full `maverick-domain` run is a nightly job with 8 shards. Its first scheduled run is 2026-09-30 at 02:17 UTC.
+  - **Done on push.** Every job passes on `main` (for example run 36619009044 on 2026-09-29). On a push, the mutants job checks the lines changed since the newest `main` run whose mutants passed (bead model-maverick-hhum). The full `maverick-domain` run is a nightly job with 8 shards. Its first scheduled run is 2026-09-30 at 02:17 UTC.
+  - **Checked before the first nightly (bead model-maverick-f827).** A timeout fails a shard just as a missed mutant does, because cargo-mutants exits 3. Local runs covered every file with no recorded seal (1,050 mutants) and the lines that no mutants run had checked: 0 missed and 0 timeouts. The loops in `gojson`, `gostrconv`, `goregex`, and `json_schema` now end on their own, because a mutated `i += 1` hung them.
 - The first live nightly on Rust completes below the spend cap. This step needs the owner (section 6).
   - **Not done.** It needs the provider keys (beads 3hk.10.2 and 3hk.9.6).
 

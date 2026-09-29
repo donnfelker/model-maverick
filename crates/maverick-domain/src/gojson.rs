@@ -164,11 +164,18 @@ struct Parser<'a> {
     depth: usize,
 }
 
+// Every loop here ends on its own: a scan moves `pos` with `seek`, and each parse loop
+// runs at most once per input byte. A loop that only exits once `pos` moves would hang
+// under a mutated increment (`pos *= 1`), and a cargo-mutants timeout fails CI.
 impl Parser<'_> {
+    /// Moves `pos` to the start of `rest`, which must be a suffix of `text[pos..]`.
+    fn seek(&mut self, rest: &str) {
+        self.pos = self.text.len() - rest.len();
+    }
+
     fn skip_ws(&mut self) {
-        while let Some(b' ' | b'\t' | b'\n' | b'\r') = self.bytes.get(self.pos) {
-            self.pos += 1;
-        }
+        let rest = self.text[self.pos..].trim_start_matches([' ', '\t', '\n', '\r']);
+        self.seek(rest);
     }
 
     fn peek(&self) -> Option<u8> {
@@ -224,7 +231,8 @@ impl Parser<'_> {
             self.depth -= 1;
             return Ok(JsonValue::Object(members));
         }
-        loop {
+        // Each pass consumes a member and its separator.
+        for _ in 0..self.bytes.len() {
             self.skip_ws();
             match self.peek() {
                 None => return Err(Self::eof()),
@@ -253,6 +261,7 @@ impl Parser<'_> {
                 Some(_) => return Err(self.invalid("after object key:value pair")),
             }
         }
+        Err(Self::eof())
     }
 
     fn array(&mut self) -> Result<JsonValue, SyntaxError> {
@@ -265,7 +274,8 @@ impl Parser<'_> {
             self.depth -= 1;
             return Ok(JsonValue::Array(items));
         }
-        loop {
+        // Each pass consumes an element and its separator.
+        for _ in 0..self.bytes.len() {
             self.skip_ws();
             items.push(self.value()?);
             self.skip_ws();
@@ -280,6 +290,7 @@ impl Parser<'_> {
                 Some(_) => return Err(self.invalid("after array element")),
             }
         }
+        Err(Self::eof())
     }
 
     fn literal(&mut self, word: &str, value: JsonValue) -> Result<JsonValue, SyntaxError> {
@@ -336,15 +347,15 @@ impl Parser<'_> {
     }
 
     fn digits(&mut self) {
-        while let Some(b'0'..=b'9') = self.peek() {
-            self.pos += 1;
-        }
+        let rest = self.text[self.pos..].trim_start_matches(|c: char| c.is_ascii_digit());
+        self.seek(rest);
     }
 
     fn string(&mut self) -> Result<String, SyntaxError> {
         self.pos += 1; // opening quote
         let mut out = String::new();
-        loop {
+        // Each pass consumes at least one byte or returns.
+        for _ in 0..self.bytes.len() {
             let Some(c) = self.current_char() else {
                 return Err(Self::eof());
             };
@@ -384,6 +395,7 @@ impl Parser<'_> {
                 }
             }
         }
+        Err(Self::eof())
     }
 
     /// Reads `XXXX` after `\u`, joining a surrogate pair. A lone surrogate becomes

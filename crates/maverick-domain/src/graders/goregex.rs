@@ -57,8 +57,13 @@ pub fn translate(pattern: &str) -> Result<String, String> {
     let mut i = 0;
     // Position of the current class's `[` content start, when inside `[...]`.
     let mut class_start: Option<usize> = None;
-    while i < chars.len() {
-        let c = chars[i];
+    // Each pass consumes at least one char, so the pattern length bounds the loop. A
+    // `while i < len` loop would hang under a mutated `i *= 1`, and a cargo-mutants
+    // timeout fails CI.
+    for _ in 0..chars.len() {
+        let Some(&c) = chars.get(i) else {
+            break;
+        };
         match (c, class_start) {
             ('\\', _) => {
                 let Some(&next) = chars.get(i + 1) else {
