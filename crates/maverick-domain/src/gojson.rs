@@ -106,6 +106,50 @@ pub fn decode_one(input: &str) -> Result<(JsonValue, &str), SyntaxError> {
     Ok((value, &input[parser.pos..]))
 }
 
+/// Parses a whole document like `json.Unmarshal`: one value and nothing but whitespace
+/// after it. Truncated or empty input is `unexpected end of JSON input`.
+pub fn unmarshal(input: &str) -> Result<JsonValue, SyntaxError> {
+    let (value, rest) = decode_one(input).map_err(|e| match e.0.as_str() {
+        "EOF" | "unexpected EOF" => SyntaxError("unexpected end of JSON input".to_owned()),
+        _ => e,
+    })?;
+    match rest
+        .trim_start_matches([' ', '\t', '\n', '\r'])
+        .chars()
+        .next()
+    {
+        None => Ok(value),
+        Some(c) => Err(SyntaxError(format!(
+            "invalid character {} after top-level value",
+            quote_char(c)
+        ))),
+    }
+}
+
+/// Go's struct field matching for a JSON key: an exact field name first, then a
+/// case-insensitive match that folds each rune to its simple case-fold class (so
+/// `NAME`, `Name`, and `ſpec` for `spec` match).
+pub fn match_field(key: &str, fields: &[&'static str]) -> Option<&'static str> {
+    fields
+        .iter()
+        .find(|f| **f == key)
+        .or_else(|| fields.iter().find(|f| fold_eq(f, key)))
+        .copied()
+}
+
+fn fold_eq(a: &str, b: &str) -> bool {
+    let fold = |c: char| -> String { c.to_uppercase().collect::<String>().to_lowercase() };
+    let mut a = a.chars();
+    let mut b = b.chars();
+    loop {
+        match (a.next(), b.next()) {
+            (None, None) => return true,
+            (Some(x), Some(y)) if fold(x) == fold(y) => {}
+            _ => return false,
+        }
+    }
+}
+
 /// True if `rest` holds only JSON whitespace.
 pub fn is_blank(rest: &str) -> bool {
     rest.bytes()
@@ -629,6 +673,40 @@ mod tests {
         ] {
             assert_eq!(decode_one(input).unwrap_err().0, want, "{input:?}");
         }
+    }
+
+    #[test]
+    fn unmarshal_uses_go_whole_document_errors() {
+        assert_eq!(
+            unmarshal(" [1] ").unwrap(),
+            JsonValue::Array(vec![num("1")])
+        );
+        for (input, want) in [
+            ("", "unexpected end of JSON input"),
+            ("  ", "unexpected end of JSON input"),
+            ("[1", "unexpected end of JSON input"),
+            ("[1] x", "invalid character 'x' after top-level value"),
+            ("{} {}", "invalid character '{' after top-level value"),
+            (
+                "{b",
+                "invalid character 'b' looking for beginning of object key string",
+            ),
+        ] {
+            assert_eq!(unmarshal(input).unwrap_err().0, want, "{input:?}");
+        }
+    }
+
+    #[test]
+    fn match_field_prefers_exact_then_folds() {
+        const FIELDS: [&str; 2] = ["name", "content"];
+        assert_eq!(match_field("name", &FIELDS), Some("name"));
+        assert_eq!(match_field("NAME", &FIELDS), Some("name"));
+        assert_eq!(match_field("Content", &FIELDS), Some("content"));
+        assert_eq!(match_field("names", &FIELDS), None);
+        assert_eq!(match_field("nam", &FIELDS), None);
+        assert_eq!(match_field("", &FIELDS), None);
+        assert_eq!(match_field("ſpec", &["spec"]), Some("spec"));
+        assert_eq!(match_field("K", &["k"]), Some("k"));
     }
 
     #[test]

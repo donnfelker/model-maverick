@@ -9,6 +9,7 @@
 //! Fixture tasks are synthetic. The private corpus never enters this repository (G7).
 
 mod load;
+mod prompt;
 mod validate;
 
 use std::collections::BTreeMap;
@@ -16,6 +17,7 @@ use std::collections::BTreeMap;
 use crate::gojson::{self, JsonValue};
 
 pub use load::{LoadError, load, load_documents};
+pub use prompt::{parse_attachments, prompt_text};
 pub use validate::{Report, Rule, Violation, validate};
 
 /// The ten v1 capabilities, in the order the `unknown_capability` message lists them.
