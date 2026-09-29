@@ -1,0 +1,92 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select batch_id, capability, brier_score, overconfidence, n, scored_at\n         from calibration\n         where ($1::text = '' or capability = $1)\n           and ($2::timestamptz is null or scored_at >= $2)\n           and ($3::text = ''\n                or batch_id < $3\n                or (batch_id = $3 and capability > $4::text))\n         order by batch_id desc, capability\n         limit $5",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "batch_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "calibration",
+            "name": "batch_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "capability",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "calibration",
+            "name": "capability"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "brier_score",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "calibration",
+            "name": "brier_score"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "overconfidence",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "calibration",
+            "name": "overconfidence"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "n",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "calibration",
+            "name": "n"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "scored_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "calibration",
+            "name": "scored_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Timestamptz",
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ec566d9f6ad8fb6f5f3a8db544c07cbf7a1df72e9f04db48ac575e04bc7c8f4a"
+}

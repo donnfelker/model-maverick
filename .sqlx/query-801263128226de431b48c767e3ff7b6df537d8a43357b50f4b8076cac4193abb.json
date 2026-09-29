@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select scores.run_id, scores.grader_idx, scores.dimension, scores.value,\n                  scores.detail as \"detail: _\"\n           from scores\n           join runs on runs.id = scores.run_id\n           where runs.batch_id = $1\n           order by scores.run_id, scores.grader_idx, scores.dimension",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "run_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "scores",
+            "name": "run_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "grader_idx",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "scores",
+            "name": "grader_idx"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "dimension",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "scores",
+            "name": "dimension"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "value",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "scores",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "detail: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "scores",
+            "name": "detail"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "801263128226de431b48c767e3ff7b6df537d8a43357b50f4b8076cac4193abb"
+}

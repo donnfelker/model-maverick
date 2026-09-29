@@ -14,8 +14,10 @@
 
 use sqlx::migrate::Migrator;
 
+pub mod batches;
 pub mod catalog;
 pub mod corpus;
+pub mod measurement;
 pub mod tenancy;
 
 pub use rust_decimal::Decimal;

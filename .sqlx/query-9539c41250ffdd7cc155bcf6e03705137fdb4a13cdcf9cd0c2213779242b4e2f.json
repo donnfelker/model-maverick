@@ -1,0 +1,138 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select distinct on (model_column_id, difficulty_tier, dimension)\n                  model_column_id as \"model_column_id!\", capability as \"capability!\",\n                  difficulty_tier as \"difficulty_tier!\", dimension as \"dimension!\",\n                  ewma as \"ewma!\", variance as \"variance!\", n as \"n!\",\n                  measured as \"measured!\", matrix_version as \"matrix_version!\",\n                  as_of as \"as_of!\"\n           from aggregates\n           where model_column_id = any($1::text[])\n             and capability = $2\n             and dimension = any($3::text[])\n           order by model_column_id, difficulty_tier, dimension, as_of desc",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "model_column_id!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "aggregates",
+            "name": "model_column_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "capability!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "aggregates",
+            "name": "capability"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "difficulty_tier!",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "aggregates",
+            "name": "difficulty_tier"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "dimension!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "aggregates",
+            "name": "dimension"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "ewma!",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "aggregates",
+            "name": "ewma"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "variance!",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "aggregates",
+            "name": "variance"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "n!",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "aggregates",
+            "name": "n"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "measured!",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "aggregates",
+            "name": "measured"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "matrix_version!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "aggregates",
+            "name": "matrix_version"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "as_of!",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "aggregates",
+            "name": "as_of"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "Text",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "9539c41250ffdd7cc155bcf6e03705137fdb4a13cdcf9cd0c2213779242b4e2f"
+}

@@ -1,0 +1,112 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select batch_id, model_column_id, capability, difficulty_tier, predicted_pass_prob,\n                source, matrix_version, locked_at\n         from predictions\n         where batch_id = $1\n         order by model_column_id, capability, difficulty_tier",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "batch_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "predictions",
+            "name": "batch_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "model_column_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "predictions",
+            "name": "model_column_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "capability",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "predictions",
+            "name": "capability"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "difficulty_tier",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "predictions",
+            "name": "difficulty_tier"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "predicted_pass_prob",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "predictions",
+            "name": "predicted_pass_prob"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "source",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "predictions",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "matrix_version",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "predictions",
+            "name": "matrix_version"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "locked_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "predictions",
+            "name": "locked_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "632c47fa3def295594a33fb0b0b6a23350edb4a98a7a47cb9b9e79de0b67b703"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select distinct model_column_id from aggregates\n         where measured\n         order by model_column_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "model_column_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "aggregates",
+            "name": "model_column_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "751870ab23f6ac886d7a8fb4142c24e07126025e976cc1147e68c33c696ef0fb"
+}

@@ -1,0 +1,43 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select model_column_id,\n                  count(*) as \"total!\",\n                  count(*) filter (where status = 'parse_failure') as \"parse_failures!\"\n           from runs\n           where ran_at >= $1 and ran_at < $2\n           group by model_column_id\n           order by model_column_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "model_column_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "model_column_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "total!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "parse_failures!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "d6ee9d2b31b30f39c994d92890f79eb00ec4aae9fbfb129c700dea9e60fbbfe0"
+}

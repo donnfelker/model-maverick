@@ -1,0 +1,209 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "insert into runs (\n           id, batch_id, task_id, model_column_id, repeat_index, output, tokens_in,\n           tokens_out, latency_ms, cost, temperature, status, error, matrix_version\n         )\n         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)\n         on conflict (batch_id, task_id, model_column_id, repeat_index) do nothing\n         returning id, batch_id, task_id, model_column_id, repeat_index, output, tokens_in,\n                   tokens_out, latency_ms, cost, temperature, status, error,\n                   matrix_version, ran_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "batch_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "batch_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "task_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "task_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "model_column_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "model_column_id"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "repeat_index",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "repeat_index"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "output",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "output"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "tokens_in",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "tokens_in"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "tokens_out",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "tokens_out"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "latency_ms",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "latency_ms"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "cost",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "cost"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "temperature",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "temperature"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "error",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "error"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "matrix_version",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "matrix_version"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "ran_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "ran_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Int2",
+        "Text",
+        "Int4",
+        "Int4",
+        "Int4",
+        "Numeric",
+        "Float4",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "ee4b8fd8c11a55f1edc2aecf176dfb2cf32623464aa3f1eb67b7c3cbb199f4e0"
+}

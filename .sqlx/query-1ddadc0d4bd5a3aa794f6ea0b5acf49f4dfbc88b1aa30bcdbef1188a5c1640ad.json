@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select task_id, model_column_id, repeat_index\n         from runs\n         where batch_id = $1\n         order by task_id, model_column_id, repeat_index",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "task_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "task_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "model_column_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "model_column_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "repeat_index",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "repeat_index"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "1ddadc0d4bd5a3aa794f6ea0b5acf49f4dfbc88b1aa30bcdbef1188a5c1640ad"
+}
