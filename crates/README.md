@@ -26,8 +26,10 @@ Rules that the split enforces:
   (EWMA and Welford), ranking, policy, ceilings, bands, checks, reasons, prediction and
   spend math, catalog lifecycle, capture crypto, fingerprints, key format, pure
   classifier logic, and telemetry derivation.
-- `maverick-store` is the only crate with SQL. Everything reaches Postgres through it
-  (spec §2.2).
+- `maverick-store` holds every engine query. Everything reaches Postgres through it
+  (spec §2.2). Two statements outside test code are elsewhere: the health check's
+  `select 1` ping (`maverick-api/src/health.rs`) and the graphile_worker `add_job`
+  enqueue (`maverick-jobs/src/rebuild.rs`).
 - `maverick-api` has no business logic. It calls services, which call domain and store.
 - `maverick-core` is the shared SDK core. `maverick-proxy` links it directly and has no
   database.
@@ -46,11 +48,19 @@ Rules that the split enforces:
 | `maverick-api` | lib | axum listeners, endpoints, and MCP (rmcp). No business logic. |
 | `maverick-core` | lib | The shared SDK core (recommend client, chain executor, fail-open ladder). Required name (AGENTS.md). |
 | `maverick-proxy` | bin | The trial proxy. No database. Required name (AGENTS.md). |
-| `sdk-conformance` | lib + bin | Mock engine, mock provider, twelve frozen scenarios. Required name (AGENTS.md). |
+| `sdk-conformance` | lib + bin | Mock engine, mock provider, the frozen scenarios (twelve groups, S01 to S12, in 39 files), and the test vectors. Required name (AGENTS.md). |
 | `maverick` | bin | Engine binary and CLI: serve, migrate, corpus, mcp-stdio, demo-run. |
 
-`parity-support` is the dev-only fixture-loading crate. The skeleton exists now. The
-helpers are a separate bead (pkg1.4).
+The workspace has 18 crates. The other six are for tests and tooling:
+
+| Crate (directory) | Role |
+|---|---|
+| `parity-support` | Loads `parity/` fixtures byte for byte, compares floats, and checks `divergence!("Dn")` markers against `DIVERGENCES.md`. Its `parity_coverage` binary is the manifest audit that CI runs with `--strict`. |
+| `test-support` | Per-test tracing capture with a G5 secret-leak guard, step logging, and readable parity diffs. |
+| `maverick-testdb` | The Postgres helper for store and job tests (below). |
+| `maverick-acceptance` (`crates/acceptance`) | Cross-cutting acceptance suites: the real engine and the real trial proxy in one process, on Postgres, with recording fakes for every provider. |
+| `maverick-e2e` (`crates/e2e`) | The full-stack harness: the real `maverick` and `maverick-proxy` binaries as processes against an HTTP fake provider. `scripts/e2e.sh` and `scripts/latency.sh` run it. |
+| `instrument-lint` | The G5 `#[instrument]` lint (below). |
 
 `maverick-testdb` is the dev-only Postgres helper for store and job tests. Each test
 binary starts one `postgres:16-alpine` container, applies a `Schema` once to a template
