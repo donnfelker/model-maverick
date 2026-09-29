@@ -461,7 +461,7 @@ fn render_report(aggregates: &[Aggregate], columns: &[ColumnInfo]) -> String {
 /// A minimal Go `text/tabwriter` (minwidth 2, padding 2, space pad, no flags): each column is
 /// `max(2, longest_cell + 2)` wide, cells are left-aligned, and the last cell of a row is not
 /// padded. `indent` prefixes every line.
-fn tabwrite(rows: &[Vec<String>], indent: &str) -> String {
+pub(crate) fn tabwrite(rows: &[Vec<String>], indent: &str) -> String {
     let columns = rows.iter().map(Vec::len).max().unwrap_or(0);
     let mut widths = vec![0usize; columns];
     for row in rows {

@@ -248,13 +248,12 @@ fn flag_errors_exit_two_before_any_logging() {
     }
 }
 
+/// A valid config reaches `demo-run`'s body (bead 3.13), which migrates first: an
+/// unreachable database fails there, loudly, on one JSON line.
 #[test]
-fn valid_config_reaches_the_pending_body_and_fails_loudly() {
+fn valid_config_reaches_the_demo_body_and_fails_loudly() {
     let env = [
-        (
-            "MAVERICK_DATABASE_URL",
-            "postgres://localhost:5432/maverick",
-        ),
+        ("MAVERICK_DATABASE_URL", "postgres://127.0.0.1:1/maverick"),
         ("MAVERICK_INTERNAL_TOKENS", "rails:s3cret"),
         (
             "MAVERICK_CAPTURE_MASTER_KEY",
@@ -266,8 +265,7 @@ fn valid_config_reaches_the_pending_body_and_fails_loudly() {
     assert_eq!(code, 1);
     assert_eq!(stderr, "");
     assert_eq!(
-        mask_times(&stdout),
-        "{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"demo-run: not implemented yet\",\
-         \"bead\":\"model-maverick-rust-port-3hk.3.13\"}\n"
+        mask_error(&mask_times(&stdout)),
+        "{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"migrate failed\",\"error\":\"<ERR>\"}\n"
     );
 }
