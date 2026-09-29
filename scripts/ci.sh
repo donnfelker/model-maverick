@@ -115,6 +115,12 @@ run_parity() {
         echo "Step failed: parity/proxy-replay reported ${replayed} of 54 scenarios"
         exit 1
     fi
+
+    # The frozen SDK conformance scenarios (bead 8.3) through the real proxy on
+    # maverick-core: groups 1 to 4 and 7 to 9. The fail-open, exhaustion, and OpenRouter
+    # groups run in the core-direct runner (bead model-maverick-5fs).
+    run_logged parity conformance-proxy \
+        cargo test -p sdk-conformance --test conformance -- --nocapture
 }
 
 run_e2e() {

@@ -3652,6 +3652,7 @@ dependencies = [
  "chrono",
  "maverick-core",
  "maverick-domain",
+ "maverick-proxy",
  "reqwest",
  "serde",
  "serde_json",

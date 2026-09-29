@@ -29,6 +29,8 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 maverick-core = { path = "../maverick-core" }
+# Bead 8.3 drives the real proxy (maverick-proxy on maverick-core) through each scenario.
+maverick-proxy = { path = "../maverick-proxy" }
 # The retention expiry and telemetry outcome vectors replay against the engine's rules.
 maverick-domain = { workspace = true }
 chrono = { workspace = true }
