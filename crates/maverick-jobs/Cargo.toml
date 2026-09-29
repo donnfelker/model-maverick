@@ -35,3 +35,7 @@ maverick-testdb = { workspace = true }
 parity-support = { path = "../parity-support" }
 # The fake provider answers the latency probes in tests.
 maverick-providers = { workspace = true }
+# Log capture with the secret-leak guard for the corpus gates (G7).
+test-support = { path = "../test-support" }
+# Builds sample strings from grader regexes for the corpus gates' autofail traps.
+regex-syntax = "0.8"
