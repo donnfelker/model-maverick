@@ -136,4 +136,5 @@ On 2026-09-29, most open beads need the owner. Run `bv --robot-triage` for the c
 - **The owner's inputs:** the provider keys (3hk.10.2), the deploy host and Kamal access (3hk.10.3), and the D2 and D4 replay rules (3hk.10.12).
 - **Go-live (3hk.9.5):** `docs/runbook-go-live.md` is written (bead 3hk.9.12). Running it needs 3hk.10.2 and 3hk.10.3, and each outward-facing step needs the owner.
 - **Live runs:** the first live nightly under the spend cap (3hk.9.6), the classifier quota retune from its cost (3hk.9.8), and one live smoke with the owner's keys (3hk.9.9).
-- **Performance:** the declared `/v1/recommend` path misses its p95 target of 50 ms on the dev host (bead model-maverick-e3x). `scripts/latency.sh` measures it.
+- **The M6 latency gate (model-maverick-j3tt):** e3x cut the declared recommend path from 10 to 6 database transactions (`c4e8bf4`). The p95 < 50 ms assert (`MAVERICK_LATENCY_ASSERT=1 scripts/latency.sh`) needs a quiet host, so it runs on the deploy host.
+- **Conversation affinity (model-maverick-gcd2, proposed D44):** the plan is `plans/conversation-affinity-plan.md`. Its work waits on the owner's answers (gcd2.1).
