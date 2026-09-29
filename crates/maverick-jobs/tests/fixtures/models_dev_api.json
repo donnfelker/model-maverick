@@ -1,0 +1,58 @@
+{
+  "anthropic": {
+    "id": "anthropic",
+    "name": "Anthropic",
+    "models": {
+      "claude-sonnet-4-5": {
+        "id": "claude-sonnet-4-5",
+        "name": "Claude Sonnet 4.5",
+        "cost": {
+          "input": 3,
+          "output": 15,
+          "cache_read": 0.3
+        },
+        "limit": {
+          "context": 200000,
+          "output": 64000
+        }
+      },
+      "negative-price": {
+        "id": "negative-price",
+        "cost": {
+          "input": -1,
+          "output": 2
+        }
+      }
+    }
+  },
+  "openai": {
+    "id": "openai",
+    "name": "OpenAI",
+    "models": {
+      "gpt-4.1": {
+        "id": "gpt-4.1",
+        "name": "GPT-4.1",
+        "last_updated": "2031-07-01",
+        "cost": {
+          "input": 2,
+          "output": 8,
+          "cache_read": 0.5
+        }
+      }
+    }
+  },
+  "openrouter": {
+    "id": "openrouter",
+    "name": "OpenRouter",
+    "models": {
+      "anthropic/claude-sonnet-4.5": {
+        "id": "anthropic/claude-sonnet-4.5",
+        "name": "Claude Sonnet 4.5 via OpenRouter",
+        "cost": {
+          "input": 3.4,
+          "output": 17
+        }
+      }
+    }
+  }
+}
