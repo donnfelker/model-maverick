@@ -1,0 +1,84 @@
+# sdk-conformance
+
+The SDK conformance harness. It is a mock Model Maverick engine plus a mock provider that run
+scripted scenarios. Every SDK (TypeScript, Ruby, Go, Python) runs it in CI, and the Rust
+trial proxy runs the same scenarios, so all of them behave identically on chain advancement,
+fail-open, zero retention, telemetry, and alias parsing.
+
+The servers are dumb and deterministic. A scenario names the exact HTTP reply for each call,
+and the servers record what they received. The provider wire shapes live in the scenario
+JSON, not in translation code here. There is no provider schema translation and no real
+network.
+
+## Run it
+
+```
+sdk-conformance serve [--engine-port N] [--provider-port N] [--scenario FILE]
+```
+
+It binds `127.0.0.1` (ephemeral ports by default) and prints one JSON line:
+
+```json
+{"engine":"http://127.0.0.1:54321","provider":"http://127.0.0.1:54322"}
+```
+
+A CI script in any language reads that line, drives scenarios through the control API, and
+reads the recorded requests back.
+
+## Servers
+
+- Engine: `POST /v1/recommend` and `POST /v1/telemetry`, plus the control endpoints.
+- Provider: any path. The scenario supplies the OpenAI, Anthropic, or OpenRouter-shaped
+  response body.
+
+## Control API (HTTP + JSON, on the engine server)
+
+- `POST /control/scenario`: load a scenario (the JSON body) and clear the recorders.
+- `GET /control/recorded`: read the recorded requests as JSON: `{recommend, telemetry,
+  provider}`, each an array of `{method, path, query, headers, body, body_len}`.
+- `POST /control/reset`: clear the recorders and the reply cursors.
+
+## Scenario format
+
+```json
+{
+  "name": "declared_happy_path",
+  "engine": {
+    "recommend": [ <reply>, ... ],
+    "telemetry_status": 200
+  },
+  "provider": {
+    "responses": [ <reply>, ... ]
+  }
+}
+```
+
+`recommend` and `responses` are lists of replies. The server sends the reply at the call
+index; the last reply repeats past the end; an empty list sends `200` with `{}`.
+
+A reply is one of:
+
+- `{"kind":"respond","status":200,"headers":{...},"body":{...}}`. A string `body` is sent as
+  its own bytes; any other JSON `body` is sent as `application/json`. A `headers` entry
+  overrides the content type. Use it for 2xx, `429` with `Retry-After`, `500`, and semantic
+  `400`/`422`.
+- `{"kind":"sse","status":200,"headers":{...},"events":["...","..."]}`. Each event becomes a
+  `data: <event>\n\n` frame. The bytes are exact, so a scenario can assert byte-identical
+  pass-through.
+- `{"kind":"delay","delay_ms":2500,"then":<reply>}`. Waits, then answers. A delay past the
+  client's deadline drives a timeout or slow headers.
+
+Connection refused: point the client at a port with no listener. The harness serves only the
+two printed addresses, so any other `127.0.0.1` port refuses.
+
+## Assertions
+
+`GET /control/recorded` returns every request each server saw, in order. `body_len` gives the
+exact byte count, so a telemetry-off scenario asserts an empty `telemetry` array (zero bytes),
+and a happy-path scenario asserts the tenant key on `recommend` and the caller key on the
+provider call.
+
+## Drive it from Rust
+
+`Harness::start()` runs both servers on ephemeral ports; `load`, `engine_base_url`,
+`provider_base_url`, and `recorded` drive one scenario in a test. See `tests/smoke.rs`.
