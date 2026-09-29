@@ -23,6 +23,7 @@ use tokio::sync::{Mutex, oneshot};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
+pub mod anthropic;
 pub mod fake;
 
 pub type ProviderResult<T> = Result<T, ProviderError>;
@@ -675,8 +676,21 @@ impl ScriptedResponse {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RecordedRequest {
     pub method: String,
+    /// The request target: the path plus any query string.
     pub path: String,
+    /// Header names as sent (in order); values trimmed.
+    pub headers: Vec<(String, String)>,
     pub body: Vec<u8>,
+}
+
+impl RecordedRequest {
+    /// The first header with this name, compared case-insensitively.
+    pub fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(n, _)| n.eq_ignore_ascii_case(name))
+            .map(|(_, v)| v.as_str())
+    }
 }
 
 #[derive(Debug)]
@@ -811,10 +825,14 @@ async fn read_http_request(stream: &mut TcpStream) -> io::Result<RecordedRequest
     let mut request_parts = request_line.split_whitespace();
     let method = request_parts.next().unwrap_or_default().to_string();
     let path = request_parts.next().unwrap_or_default().to_string();
-    let content_length = lines
+    let headers: Vec<(String, String)> = lines
         .filter_map(|line| line.split_once(':'))
+        .map(|(name, value)| (name.to_string(), value.trim().to_string()))
+        .collect();
+    let content_length = headers
+        .iter()
         .find(|(name, _)| name.eq_ignore_ascii_case("content-length"))
-        .and_then(|(_, value)| value.trim().parse::<usize>().ok())
+        .and_then(|(_, value)| value.parse::<usize>().ok())
         .unwrap_or(0);
 
     let body_start = header_end + 4;
@@ -834,6 +852,7 @@ async fn read_http_request(stream: &mut TcpStream) -> io::Result<RecordedRequest
     Ok(RecordedRequest {
         method,
         path,
+        headers,
         body: buffer[body_start..body_end].to_vec(),
     })
 }
