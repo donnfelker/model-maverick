@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select k.id as \"key_id!\", k.status as \"key_status!\", k.tenant_id as \"tenant_id!\",\n                  t.status as \"tenant_status?\"\n           from api_keys k\n           left join tenants t on t.id = k.tenant_id\n           where k.key_hash = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "key_id!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "api_keys",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "key_status!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "api_keys",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "tenant_id!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "api_keys",
+            "name": "tenant_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "tenant_status?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tenants",
+            "name": "status"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "87d8dfba2adfb83e0aa195c6b3712cff7a479ce39ddcabac1627380cdb1a0090"
+}

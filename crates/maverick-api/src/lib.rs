@@ -398,34 +398,25 @@ impl PublicAuthBackend for PgAuthBackend {
     ) -> BoxFuture<'a, Result<PublicAuthDecision, AuthBackendError>> {
         Box::pin(async move {
             let hash = keys::key_hash(token);
-            let key = match tenancy::get_api_key_by_hash(&self.pool, &hash).await {
-                Ok(key) => key,
-                Err(error) if maverick_store::is_not_found(&error) => {
-                    return Ok(PublicAuthDecision::Missing);
-                }
-                Err(error) => return Err(AuthBackendError::Store(error)),
+            // The key and its tenant in one round trip (e3x); the decisions are Go's: an
+            // unknown or inactive key, or a missing tenant, is 401; a suspended tenant 403.
+            let Some(auth) = tenancy::get_key_auth_by_hash(&self.pool, &hash)
+                .await
+                .map_err(AuthBackendError::Store)?
+            else {
+                return Ok(PublicAuthDecision::Missing);
             };
-
-            if key.status != "active" {
+            if auth.key_status != "active" {
                 return Ok(PublicAuthDecision::Missing);
             }
-
-            let tenant = match tenancy::get_tenant(&self.pool, &key.tenant_id).await {
-                Ok(tenant) => tenant,
-                Err(error) if maverick_store::is_not_found(&error) => {
-                    return Ok(PublicAuthDecision::Missing);
-                }
-                Err(error) => return Err(AuthBackendError::Store(error)),
-            };
-
-            if tenant.status == "suspended" {
-                return Ok(PublicAuthDecision::Suspended);
+            match auth.tenant_status.as_deref() {
+                None => Ok(PublicAuthDecision::Missing),
+                Some("suspended") => Ok(PublicAuthDecision::Suspended),
+                Some(_) => Ok(PublicAuthDecision::Authenticated(Identity {
+                    tenant_id: auth.tenant_id,
+                    api_key_id: auth.key_id,
+                })),
             }
-
-            Ok(PublicAuthDecision::Authenticated(Identity {
-                tenant_id: tenant.id,
-                api_key_id: key.id,
-            }))
         })
     }
 }
