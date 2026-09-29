@@ -14,7 +14,7 @@ use serde_json::value::RawValue;
 use crate::anthropic::go_compact;
 use crate::{
     CompletionRequest, CompletionResponse, ProviderClient, ProviderError, ProviderErrorKind,
-    ProviderFuture, RetryPolicy, retry_provider, setting_string, wrap_error,
+    ProviderFuture, RetryPolicy, retry_provider_observed, setting_string, wrap_error,
 };
 
 /// The OpenAI default API base.
@@ -165,7 +165,7 @@ impl ProviderClient for OpenAiClient {
                 ProviderError::new(self.provider, ProviderErrorKind::Unknown)
                     .with_source(format!("{}: encoding request: {e}", self.provider))
             })?;
-            retry_provider(self.retry.clone(), || self.attempt(&body)).await
+            retry_provider_observed(self.provider, self.retry.clone(), || self.attempt(&body)).await
         })
     }
 }

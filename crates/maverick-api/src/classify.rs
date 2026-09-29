@@ -469,6 +469,7 @@ impl Resolver {
         {
             Ok(row) => match decode_cached(row.classification.get()) {
                 Some(classification) => {
+                    crate::metrics::classifier_cache(true);
                     return Ok(resolution(classification, Method::Cached, false));
                 }
                 None => {
@@ -481,10 +482,22 @@ impl Resolver {
             }
         }
 
-        match self
+        crate::metrics::classifier_cache(false);
+        let started = std::time::Instant::now();
+        let called = self
             .call(pool, input, column, classifier, &base_version)
-            .await
-        {
+            .await;
+        crate::metrics::classifier_call(
+            started.elapsed(),
+            match &called {
+                Called::Classified(_) => None,
+                Called::Fallback {
+                    quota_exceeded: true,
+                } => Some("quota"),
+                Called::Fallback { .. } => Some("failure"),
+            },
+        );
+        match called {
             Called::Classified(classification) => {
                 let cached = JsonRawValue::from_string(classification.cache_json())
                     .map_err(|error| error.to_string());

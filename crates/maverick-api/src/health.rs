@@ -193,6 +193,10 @@ pub(crate) async fn detail(State(state): State<HealthState>, request: Request) -
                     None
                 }
             };
+            match maverick_store::health::queue_stats(pool, &state.queue_schema).await {
+                Ok(stats) => crate::metrics::job_queue(stats.depth, stats.oldest_age_seconds),
+                Err(err) => tracing::debug!(error = %err, "health: queue stats unavailable"),
+            }
             let queue = async {
                 let workers = list_worker_heartbeats(pool, &state.queue_schema).await?;
                 let last = batches::list_last_completed_batches(pool).await?;

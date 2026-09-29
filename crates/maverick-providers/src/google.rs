@@ -14,7 +14,7 @@ use serde_json::value::RawValue;
 use crate::anthropic::go_compact;
 use crate::{
     CompletionRequest, CompletionResponse, ProviderClient, ProviderError, ProviderErrorKind,
-    ProviderFuture, RetryPolicy, retry_provider, setting_int, wrap_error,
+    ProviderFuture, RetryPolicy, retry_provider_observed, setting_int, wrap_error,
 };
 
 /// The provider name errors carry.
@@ -104,7 +104,8 @@ impl ProviderClient for GoogleClient {
                 ProviderError::new(PROVIDER, ProviderErrorKind::Unknown).with_source(e)
             })?;
             let url = self.generate_url(&request.model);
-            retry_provider(self.retry.clone(), || self.attempt(&url, &bytes)).await
+            retry_provider_observed(PROVIDER, self.retry.clone(), || self.attempt(&url, &bytes))
+                .await
         })
     }
 }

@@ -15,7 +15,7 @@ use serde_json::{Map, Value};
 
 use crate::{
     CompletionRequest, CompletionResponse, ProviderClient, ProviderError, ProviderErrorKind,
-    ProviderFuture, RetryPolicy, SETTING_RESPONSE_SCHEMA, retry_provider, setting_bool,
+    ProviderFuture, RetryPolicy, SETTING_RESPONSE_SCHEMA, retry_provider_observed, setting_bool,
     setting_int, wrap_error,
 };
 
@@ -127,7 +127,10 @@ impl ProviderClient for AnthropicClient {
                 ProviderError::new(PROVIDER, ProviderErrorKind::Unknown)
                     .with_source(format!("anthropic: encoding request: {e}"))
             })?;
-            retry_provider(self.retry.clone(), || self.attempt(&bytes, forced)).await
+            retry_provider_observed(PROVIDER, self.retry.clone(), || {
+                self.attempt(&bytes, forced)
+            })
+            .await
         })
     }
 }

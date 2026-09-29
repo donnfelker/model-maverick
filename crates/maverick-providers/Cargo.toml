@@ -21,9 +21,11 @@ serde = { workspace = true }
 serde_json = { workspace = true, features = ["raw_value"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+opentelemetry = { workspace = true }
 rand = { workspace = true }
 sha2 = { workspace = true }
 
 [dev-dependencies]
+opentelemetry_sdk = { workspace = true, features = ["testing"] }
 parity-support = { path = "../parity-support" }
 tokio = { workspace = true }

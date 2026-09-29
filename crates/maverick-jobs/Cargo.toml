@@ -20,6 +20,7 @@ maverick-runner = { workspace = true }
 maverick-alerts = { workspace = true }
 chrono = { workspace = true }
 graphile_worker = { workspace = true }
+opentelemetry = { workspace = true }
 reqwest = { workspace = true }
 sqlx = { workspace = true }
 tokio = { workspace = true }
@@ -31,6 +32,7 @@ tracing = { workspace = true }
 ulid = { workspace = true }
 
 [dev-dependencies]
+opentelemetry_sdk = { workspace = true, features = ["testing"] }
 maverick-testdb = { workspace = true }
 parity-support = { path = "../parity-support" }
 # The fake provider answers the latency probes in tests.

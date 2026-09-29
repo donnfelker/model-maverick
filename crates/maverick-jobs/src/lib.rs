@@ -6,6 +6,7 @@
 pub mod batch;
 pub mod catalog;
 pub mod fold;
+mod metrics;
 pub mod predictions;
 pub mod probes;
 pub mod rebuild;
@@ -285,7 +286,15 @@ pub async fn run_with_timeout<E: fmt::Display>(
     limit: Duration,
     work: impl Future<Output = Result<(), E>>,
 ) -> Result<(), String> {
-    match tokio::time::timeout(limit, work).await {
+    let started = std::time::Instant::now();
+    let outcome = tokio::time::timeout(limit, work).await;
+    let label = match &outcome {
+        Ok(Ok(())) => "ok",
+        Ok(Err(_)) => "error",
+        Err(_) => "timeout",
+    };
+    metrics::job_finished(kind, label, started.elapsed());
+    match outcome {
         Ok(result) => result.map_err(|e| e.to_string()),
         Err(_) => {
             tracing::warn!(
@@ -549,13 +558,17 @@ impl BatchLeaseManager {
                 .is_some_and(|workers| batch_owner_is_gone(batch, workers, stale_after))
         })
         .await?;
-        Ok(BatchLeaseOutcome::from_store(
+        let outcome = BatchLeaseOutcome::from_store(
             outcome,
             kind,
             worker_id,
             self.config.lease_ttl_secs(),
             live,
-        ))
+        );
+        if matches!(outcome, BatchLeaseOutcome::TookOver(_)) {
+            metrics::lease_recovered(kind);
+        }
+        Ok(outcome)
     }
 }
 
