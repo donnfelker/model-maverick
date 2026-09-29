@@ -61,7 +61,7 @@ const DIMENSIONS: [&str; 6] = [
 ];
 
 /// The outcome filter's values: Go's six, with D16's `completed_unchecked` in its schema
-/// position.
+/// position (D40).
 const OUTCOMES: [&str; 7] = [
     outcome::SUCCESS,
     outcome::PARSE_FAILURE,

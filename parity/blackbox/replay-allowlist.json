@@ -197,9 +197,9 @@
     },
     {
       "divergences": [
-        "D16"
+        "D40"
       ],
-      "reason": "The outcome filter accepts completed_unchecked, so its error lists it among the outcomes.",
+      "reason": "The outcome filter accepts completed_unchecked (the D16 outcome of an unchecked 2xx), so its 422 message lists it among the outcomes.",
       "match": [
         {
           "method": "GET",
