@@ -16,4 +16,5 @@ pub mod gostrings;
 pub mod graders;
 pub mod ids;
 pub mod keys;
+pub mod scoring;
 pub mod tasks;
