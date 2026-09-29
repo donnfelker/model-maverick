@@ -11,11 +11,10 @@
 //! from Go's santhosh-tekuri library. Parity is the prefix and the pass/fail decision
 //! (D24, D36).
 //!
-//! Extra rules: golden_answer ([`super::golden`]), key_facts ([`super::keyfacts`]),
-//! rule_scan ([`super::rulescan`]), and judge_rubric (duplicate dimension, blank
-//! criterion) are ported. The json_schema extra rules (embedded-schema compilation,
-//! path parsing) arrive with its grader bead, which registers a validator that runs
-//! [`check_schema`] first.
+//! Each kind's validator runs [`check_schema`] first, then its extra rules:
+//! golden_answer ([`super::golden`]), json_schema ([`super::json_schema`]), key_facts
+//! ([`super::keyfacts`]), rule_scan ([`super::rulescan`]), and judge_rubric (duplicate
+//! dimension, blank criterion).
 
 use std::collections::{BTreeMap, HashSet};
 use std::sync::LazyLock;
@@ -24,6 +23,7 @@ use serde::Deserialize;
 
 use super::envelope::{Envelope, EnvelopeError, EnvelopeErrorKind, GraderKind};
 use super::golden::GoldenAnswer;
+use super::json_schema::JsonSchema;
 use super::keyfacts::KeyFacts;
 use super::rulescan::RuleScan;
 use crate::gofmt;
@@ -72,7 +72,7 @@ impl ValidationRegistry {
     /// judge validator.
     pub fn v1() -> Self {
         let mut registry = Self::new();
-        registry.register(Box::new(SchemaOnly(GraderKind::JsonSchema)));
+        registry.register(Box::new(JsonSchema));
         registry.register(Box::new(GoldenAnswer));
         registry.register(Box::new(KeyFacts));
         registry.register(Box::new(RuleScan));
@@ -164,19 +164,6 @@ pub fn check_schema(kind: GraderKind, spec: &JsonValue) -> Result<serde_json::Va
     }
 }
 
-/// Schema validation only. Used for kinds whose extra rules are not ported yet.
-struct SchemaOnly(GraderKind);
-
-impl SpecValidator for SchemaOnly {
-    fn kind(&self) -> &str {
-        self.0.as_str()
-    }
-
-    fn validate_spec(&self, spec: &JsonValue) -> Result<(), String> {
-        check_schema(self.0, spec).map(|_| ())
-    }
-}
-
 /// The judge_rubric spec (reference Part 2 §11).
 #[derive(Debug, Clone, Deserialize)]
 pub struct JudgeRubricSpec {
@@ -252,7 +239,7 @@ mod tests {
     }
 
     #[test]
-    fn schema_only_validators_reject_schema_failures() {
+    fn json_schema_validator_checks_the_spec_schema() {
         let registry = ValidationRegistry::v1();
         let validator = registry.get("json_schema").expect("registered");
         let error = validator
