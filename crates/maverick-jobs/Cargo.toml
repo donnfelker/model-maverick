@@ -14,9 +14,11 @@ workspace = true
 
 [dependencies]
 maverick-domain = { workspace = true }
+maverick-config = { workspace = true }
 maverick-store = { workspace = true }
 maverick-runner = { workspace = true }
 maverick-alerts = { workspace = true }
+chrono = { workspace = true }
 graphile_worker = { workspace = true }
 sqlx = { workspace = true }
 tokio = { workspace = true }
@@ -24,3 +26,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+
+[dev-dependencies]
+maverick-testdb = { workspace = true }

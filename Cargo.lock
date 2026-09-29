@@ -2372,11 +2372,14 @@ dependencies = [
 name = "maverick-jobs"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "graphile_worker",
  "maverick-alerts",
+ "maverick-config",
  "maverick-domain",
  "maverick-runner",
  "maverick-store",
+ "maverick-testdb",
  "serde",
  "serde_json",
  "sqlx",
