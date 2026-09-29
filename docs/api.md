@@ -1,6 +1,8 @@
-# Model Maverick — API Reference
+# Model Maverick: API Reference
 
-This document describes the HTTP surface the binary actually serves. Two
+This document describes the HTTP surface that the Rust engine serves (spec §9;
+reference Part 5). Where the Rust engine differs from the Go engine it
+replaces, the text names the row in `parity/DIVERGENCES.md` (`D<n>`). Two
 listeners (spec §2.1):
 
 | Listener | Default address | Serves |
@@ -9,12 +11,14 @@ listeners (spec §2.1):
 | Internal | `:8081` (`MAVERICK_INTERNAL_ADDR`) | `/health/detail`, `/internal/v1/*` |
 
 All request and response bodies are JSON (`Content-Type: application/json`).
-Request bodies are capped at 2 MB (`413 payload_too_large`). Request bodies
-and query strings are decoded strictly: unknown JSON fields, trailing
-content, and unknown query parameters are `422 invalid_request`.
+Request bodies are capped at 2 MiB (2,097,152 bytes; `413 payload_too_large`).
+Request bodies and query strings are decoded strictly: unknown JSON fields,
+trailing content, and unknown query parameters are `422 invalid_request`.
+Timestamps in responses are RFC 3339 in UTC.
 
-Every `/v1` response carries `matrix_version` — the active corpus version, or
-`""` when no corpus has been activated yet.
+`POST /v1/recommend`, `GET /v1/policies`, `GET /v1/models`, and the history
+lists carry `matrix_version`: the active corpus version, or `""` when no corpus
+is active.
 
 ---
 
@@ -35,7 +39,7 @@ Every `/v1` response carries `matrix_version` — the active corpus version, or
   ```
 
   Exceeding the window yields `429 rate_limited` with a `Retry-After` header
-  (seconds). The limiter is in-memory and per-process by design for v1.
+  (seconds). The limiter is in memory and per process by design for v1.
 
 ## Error envelope and codes
 
@@ -52,21 +56,23 @@ Every error on both listeners uses one envelope; `details` is always present
 }
 ```
 
-The code list is closed — no response carries a code outside this table:
+The code list is closed. No response carries a code outside this table:
 
 | HTTP | `code` | Meaning |
 |---|---|---|
-| 401 | `unauthorized` | Missing/invalid/revoked key (or internal token) |
+| 401 | `unauthorized` | Missing, invalid, or revoked key (or internal token) |
 | 403 | `tenant_suspended` | Valid key, suspended tenant |
 | 404 | `not_found` | Resource absent **or** owned by another tenant (no existence oracle) |
 | 409 | `zero_retention_conflict` | Capture window requested by a zero-retention tenant |
-| 410 | `capture_expired` | Replay of a hard-deleted capture |
-| 413 | `payload_too_large` | Body > 2 MB |
-| 422 | `invalid_request` | Malformed body, unknown fields/params, bad enums, bad values |
+| 409 | `no_compliant_columns` | Zero-retention tenant, and no pool column has valid zero-retention evidence (D1, D17) |
+| 410 | `capture_expired` | Replay or read of an expired or hard-deleted capture |
+| 413 | `payload_too_large` | Body over 2 MiB |
+| 422 | `invalid_request` | Malformed body, unknown fields or params, bad enums, bad values |
 | 422 | `unknown_model` | `allowed_models` entry not in the system catalog (names the entry) |
 | 422 | `model_not_in_pool` | `allowed_models` entry outside the caller's pool (names the entry) |
 | 422 | `unknown_pool` | Pool name not configured for the tenant |
 | 422 | `pool_would_be_empty` | Config write or retirement would empty a pool (names the pool) |
+| 422 | `zero_retention_requires_declared` | Zero-retention tenant sent the prompt form, and no zero-retention classifier column is configured (D2) |
 | 422 | `grader_unsupported` | Corpus load: reserved grader type in v1 |
 | 429 | `rate_limited` | Per-key limit; `Retry-After` set |
 | 500 | `internal_error` | Bug; logged with the request id |
@@ -75,18 +81,22 @@ There is no 405 entry: a wrong method on a known path answers exactly like an
 unknown path (`404 not_found`).
 
 The four 422 policy codes (`unknown_model`, `model_not_in_pool`,
-`unknown_pool`, `pool_would_be_empty`) are contractual (G3) — callers are
-expected to branch on them.
+`unknown_pool`, `pool_would_be_empty`) are contractual (G3): callers are
+expected to branch on them. So are the two zero-retention codes
+(`no_compliant_columns`, `zero_retention_requires_declared`): they are
+terminal, and SDK cores never fail open past them (D17).
 
 ## Pagination contract
 
 All `GET /v1/history/*` list endpoints paginate identically:
 
-- `?limit=` — default 50, maximum 200; out-of-range is `422 invalid_request`.
-- `?cursor=` — opaque token (ULID-based) from a previous page.
+- `?limit=`: default 50, maximum 200; out of range is `422 invalid_request`.
+- `?cursor=`: an opaque token from a previous page. A cursor from another
+  endpoint is refused.
 - Responses carry `next_cursor`: the token for the next page, or `null` on
   the last page.
-- `?since=` filters accept RFC 3339 timestamps or bare `YYYY-MM-DD` dates.
+- `?since=` filters accept RFC 3339 timestamps or bare `YYYY-MM-DD` dates
+  (midnight UTC).
 
 ---
 
@@ -95,14 +105,24 @@ All `GET /v1/history/*` list endpoints paginate identically:
 Recommends model columns for a workload. `workload` is required and carries
 **exactly one** of two forms:
 
-- **Declared form** — `{"capability": "...", "difficulty": 1-5, "domain_tags": [...]}`.
+- **Declared form**: `{"capability": "...", "difficulty": 1-5, "domain_tags": [...]}`.
   `capability` is one of the ten v1 capabilities (see `GET /v1/policies`);
   `difficulty` defaults to 3 (the response then carries
-  `classification.difficulty_source: "default"`); `domain_tags` optional.
-  Nothing leaves the engine — no classifier call.
-- **Prompt form** — `{"prompt": "..."}` only (no `difficulty`/`domain_tags`
-  alongside). The prompt is classified (§8.3), fingerprinted (`prompt_hash`),
-  and never stored in plaintext. Non-empty, at most 500,000 characters.
+  `classification.difficulty_source: "default"`); `domain_tags` is optional.
+  Nothing leaves the engine: no classifier call.
+- **Prompt form**: `{"prompt": "...", "projection_version": "p1"}`. No
+  `difficulty` or `domain_tags` alongside. `prompt` is non-empty and at most
+  500,000 characters. `projection_version` is optional; an MM component that
+  built the prompt from a chat request names its projection version, which is
+  part of the classification cache key (D5). The prompt is classified (spec
+  §8.3), fingerprinted (`prompt_hash`), and never stored.
+
+The classifier has one 1.5 s deadline that covers the call, one retry, and the
+backoff (D3). Each tenant has a daily classification quota, and a global daily
+classifier spend cap applies (D4). A zero-retention tenant's prompt goes only
+to the zero-retention classifier column (`MAVERICK_CLASSIFIER_ZERO_RETENTION_COLUMN`);
+when none is configured, the prompt form answers
+`422 zero_retention_requires_declared` (D2).
 
 Full request (all fields except `workload` optional):
 
@@ -120,8 +140,8 @@ Full request (all fields except `workload` optional):
 - `mode` ∈ `quality | balanced | cost`, default `balanced`.
 - `allowed_models` entries are **model names** (request-time ergonomics;
   stored pool config references `column_id`s).
-- `constraints` are per-request preferences; standing tenant constraints
-  (`/v1/config/constraints`) filter candidates hard, per-request preferences
+- `constraints` are per-request preferences. Standing tenant constraints
+  (`/v1/config/constraints`) filter candidates hard; per-request preferences
   only reorder and flag.
 
 Response `200` (measured stack):
@@ -132,12 +152,20 @@ Response `200` (measured stack):
     "domain_tags": ["legal"], "high_stakes": true, "confidence": 0.91, "method": "classified" },
   "recommendations": [
     { "provider": "anthropic", "model": "claude-sonnet-4-6", "endpoint": "direct",
-      "column_id": "col_01J...", "execution_aliases": { "openrouter": "anthropic/claude-sonnet-4-6" },
-      "score": 94.1, "clears_difficulty": true,
+      "column_id": "col_01J...",
+      "execution_aliases": { "openrouter": "anthropic/claude-sonnet-4-6" },
+      "execution_alias_retention": { "openrouter": "zero" },
+      "settings": { "thinking": true },
+      "param_constraints": { "reasoning_effort": { "allowed": ["low", "high"],
+                                                   "order": ["low", "medium", "high"] } },
+      "retention_mode": "zero",
+      "score": 94.1, "clears_difficulty": true, "low_availability": false,
       "reason": "cheapest column clearing tier 3 structured_extraction at your quality bar in this pool" },
     { "provider": "google", "model": "gemini-3.1-pro", "endpoint": "direct",
-      "column_id": "col_01J...", "execution_aliases": {},
-      "score": 92.8, "clears_difficulty": true, "reason": "cross-family alternative" }
+      "column_id": "col_01J...", "execution_aliases": {}, "execution_alias_retention": {},
+      "settings": {}, "param_constraints": {}, "retention_mode": "standard",
+      "score": 92.8, "clears_difficulty": true, "low_availability": false,
+      "reason": "cross-family alternative" }
   ],
   "pool": "default",
   "mode": "balanced",
@@ -147,49 +175,78 @@ Response `200` (measured stack):
   "prompt_hash": "hmac_sha256:9f2c...",
   "recommendation_id": "rec_01J...",
   "matrix_version": "2026-07-07",
-  "measured": true
+  "measured": true,
+  "zero_retention": false,
+  "telemetry": true
 }
 ```
 
-Field notes (all verified against the implementation):
+Field notes (checked against the implementation):
 
 - `classification.method` ∈ `declared | classified | cached |
-  fallback_default`. When the classifier is unavailable (no provider key, or
-  the classifier column is missing from the catalog), prompt-form requests
-  still answer `200` with the fallback classification:
+  fallback_default`. When the classifier is unavailable (no provider key, the
+  classifier column is not in the catalog, the deadline passed, or the budget
+  is spent), prompt-form requests still answer `200` with the fallback
+  classification:
   `{"capability": "multi_step_reasoning", "difficulty": 3, "domain_tags": [],
   "high_stakes": false, "confidence": 0, "method": "fallback_default"}` (G1).
+  A classifier column that is missing at boot is resolved again in the
+  background, so the engine recovers without a restart (D41).
 - `classification.difficulty_source: "default"` appears only when a declared
   request omitted `difficulty`; `classification.truncated: true` appears only
-  when an oversize prompt was classified on head+tail.
-- `score` is the absolute displayed quality (0–100, one decimal). It is
-  `null` when the workload cell has no quality EWMA yet (cold start), and
-  `measured` is then `false`. Every recommendation is still produced (G1);
-  see `docs/onboarding.md` for what a fully cold response looks like.
+  when an oversize prompt was classified on its head and tail.
 - `recommendations` is the whole pool-constrained fallback chain, best first
   (G2). `reason` strings are informative, not contractual; the flags are.
-- `execution_aliases` is the recommended column's execution-backend alias map
-  (`GET /v1/models` documents the shape) — empty object when the column
-  carries none. It rides along on every entry so an SDK configured for an
-  alternate execution backend (e.g. OpenRouter) needs zero extra calls to
-  dispatch the pick.
+  Each entry's keys, in order:
+  - `provider`, `model`, `endpoint`, `column_id`.
+  - `execution_aliases`: the column's execution-backend alias map (for
+    example `{"openrouter": "<slug>"}`), `{}` when it has none. It rides along
+    so an SDK configured for an alternate backend needs no extra call.
+  - `execution_alias_retention`: each alias key with its effective retention
+    mode (`zero`, `standard`, or `unknown`; expired evidence reads as
+    `unknown`) (D15). OpenRouter execution for a zero-retention tenant uses
+    only aliases whose mode is `zero`.
+  - `settings`: the column's settings (reasoning effort, thinking mode). MM
+    components apply them unless the caller opts out (D9, D14).
+  - `param_constraints`: the model's parameter constraints from the catalog,
+    `{}` when none. MM components normalize caller values with them (D29).
+  - `retention_mode`: the column's effective retention mode (D1, D9).
+  - `score`: the absolute displayed quality (0 to 100, one decimal). It is
+    `null` when the workload cell has no quality EWMA yet (cold start), and
+    `measured` is then `false`. Every recommendation is still produced (G1);
+    see `docs/onboarding.md` for a fully cold response.
+  - `clears_difficulty`, and `low_availability`: `true` when the column's
+    availability over the trailing 7 nights is below the floor
+    (`MAVERICK_RANKING_AVAILABILITY_FLOOR`, default 0.9). Such columns rank
+    after all others (D8).
+  - `reason`.
 - `prompt_hash` is present only on prompt-form requests:
-  `"hmac_sha256:" + hex(HMAC-SHA256(tenant key, prompt bytes))` — exact
-  bytes, per-tenant key, exact-match only.
+  `"hmac_sha256:" + hex(HMAC-SHA256(tenant key, prompt bytes))`: exact
+  bytes, per-tenant key, exact match only.
 - `violations` entries: `{"constraint": "max_latency_ms", "limit": 2000,
   "estimated": 3400}`; `constraints_met` is `false` when the pick violates a
   per-request preference.
+- `zero_retention` is always present: `true` when the tenant has the
+  zero-retention constraint. SDK cores then switch to the declared form and
+  treat the tenant as zero-retention (D9, G14). For such a tenant only columns
+  with valid zero-retention evidence are candidates; when none remain, the
+  request answers `409 no_compliant_columns` and nothing is recommended (D1).
+- `telemetry` is always present: `false` when the tenant opted out of
+  telemetry, so MM components send none (D39).
+- `classification_quota_exceeded: true` appears only when the classifier
+  budget stopped the classifier, as the last key (D4).
 - Every call (REST or MCP) persists a full decision trace readable at
   `GET /v1/history/recommendations/{id}`.
 
-Errors: `422 invalid_request | unknown_model | model_not_in_pool |
-unknown_pool`, `413`, `429`.
+Errors: `409 no_compliant_columns`, `422 invalid_request | unknown_model |
+model_not_in_pool | unknown_pool | zero_retention_requires_declared`, `413`,
+`429`.
 
 ## GET /v1/policies
 
-`GET /v1/policies?capability=structured_extraction&pool=default` — both
-parameters optional; absent `capability` returns all ten, absent `pool` uses
-the tenant default.
+`GET /v1/policies?capability=structured_extraction&pool=default`: both
+parameters are optional. An absent `capability` returns all ten; an absent
+`pool` uses the tenant default.
 
 ```json
 {
@@ -215,17 +272,25 @@ the tenant default.
 
 On a cold stack every band still resolves a column but carries `ceiling: 0`,
 `pass_rate: null`, `clears_band: false`. `quality_bar` reflects the tenant's
-weights row for the requested capability (default 0.80); `buffer` is the
-§6.6 ceiling buffer (`MAVERICK_CEILING_BUFFER`).
+weights row when one capability is asked for (default 0.80); for the full
+table it is 0.80, though each capability's ceilings use that capability's bar.
+`buffer` is the §6.6 ceiling buffer (`MAVERICK_CEILING_BUFFER`).
+
+The candidates are the pool's known, non-retired columns; no allowlist,
+standing cost or latency constraint, or preference applies. For a
+zero-retention tenant, only columns with valid zero-retention evidence are
+candidates, as on `/v1/recommend`; a band with none has `"column": null` and
+`"clears_band": false` (D42).
 
 Errors: `422 invalid_request` (unknown capability or query param),
 `422 unknown_pool`.
 
 ## GET /v1/models
 
-The column catalog visible to the tenant — all non-retired columns
-(`cold_start`, `active`, `deprecated`). No scores here; scores are per-cell
-and live in policies/history.
+The column catalog visible to the tenant: every non-retired column
+(`cold_start`, `active`, `deprecated`), by column id. Query parameters are
+ignored. There are no scores here; scores are per cell and live in the
+policies and history endpoints.
 
 ```json
 {
@@ -236,21 +301,35 @@ and live in policies/history.
       "status": "active",
       "pricing": { "input_per_mtok": 3.0, "output_per_mtok": 15.0 },
       "deprecation_date": null, "measured": false,
-      "quality_source_column_id": null }
+      "quality_source_column_id": null,
+      "retention_mode": "zero",
+      "retention_verified_at": "2026-09-01T10:00:00Z",
+      "retention_valid_until": "2026-11-30T10:00:00Z",
+      "retention_source": "https://example.com/zdr-terms",
+      "execution_alias_retention": { "openrouter": "zero" },
+      "param_constraints": {} }
   ],
   "matrix_version": "2026-07-07"
 }
 ```
 
-`measured` is true once the column has any measured aggregate cells.
-`quality_source_column_id` names the column this one inherits quality cells
-from (§4.2 — e.g. a Vertex column sourcing quality from its direct sibling).
-`execution_aliases` is a flat string→string map of execution-backend model
-slugs, empty object when unset. This spec defines one key, `"openrouter"`
-(the OpenRouter model slug); unknown keys are preserved and ignored.
-Operator-populated only (`POST`/`PUT /internal/v1/columns`) — no tenant-facing
-write surface. `endpoint` also accepts `"openrouter"` as a legal catalog
-value (comment + validation only; no such columns are created by this spec).
+- The first eleven keys are the Go engine's, in its order. The retention
+  fields, `execution_alias_retention`, and `param_constraints` follow.
+- `measured` is true once the column has any measured aggregate cell.
+- `quality_source_column_id` names the column this one inherits quality cells
+  from (§4.2; for example a Vertex column that uses its direct sibling's
+  quality).
+- `execution_aliases` is a flat string-to-string map of execution-backend
+  model slugs, `{}` when unset. One key is defined, `"openrouter"` (the
+  OpenRouter model slug); unknown keys are kept and ignored. The catalog is
+  operator-populated only (`POST`/`PUT /internal/v1/columns`).
+- `retention_mode` is the effective mode: `zero` or `standard` only while
+  `retention_valid_until` is in the future, else `unknown`. The three evidence
+  fields are shown as stored (D1).
+- `execution_alias_retention` gives each `execution_aliases` key its effective
+  mode under the same rule; a key without evidence reads `unknown` (D15).
+- `param_constraints` is the model's stored parameter constraints, `{}` when
+  none (D29).
 
 ## GET /v1/checks/{ref}
 
@@ -271,27 +350,26 @@ GET /v1/checks/extraction/v1
 }
 ```
 
-The registry is static, embedded in the binary, one spec per capability
+The registry is static, embedded in the binary, with one spec per capability
 (the same `check_spec.ref` values `/v1/recommend` returns). Unknown refs are
 `404 not_found`.
 
 ## POST /v1/telemetry
 
-**This is SDK/plugin plumbing, not a customer obligation (G13).**
-MM-authored components — the client SDKs, gateway plugins, and the trial
-proxy — call this automatically as an invisible side effect of routing a
-request; no public surface ever asks a caller to report what happened by
-hand. A component with telemetry disabled simply never calls it (zero calls,
-no fallback phoning home) — the documented consequence is that tenant's own
-outcome blending (v1.1 §7) has no data and its rankings stay
-benchmark-driven, never a punished caller. `POST /v1/outcomes`, the v1
-caller-reported-outcome ceremony this endpoint replaces, is retired.
+**This is SDK and plugin plumbing, not a customer obligation (G13).**
+MM-authored components (the client SDKs, gateway plugins, and the trial
+proxy) call it automatically as a side effect of routing a request. No public
+surface asks a caller to report what happened by hand. A component with
+telemetry disabled never calls it: zero calls, no fallback. The consequence is
+that the tenant's own outcome blending (v1.1 §7) has no data, and its rankings
+stay benchmark-driven. `POST /v1/outcomes`, the retired caller-reported
+outcome endpoint, does not exist.
 
-Body: `{"items": [...]}` — `items` required, an array, at most 500 entries.
-These are the *only* 4xx cases this endpoint has: malformed JSON, a
-non-object body, missing or non-array `items`, or more than 500 entries all
-answer `422 invalid_request`. Everything about individual items is
-best-effort and never fails the batch (see below).
+Body: `{"items": [...]}`. `items` is required: an array of at most 500
+entries. These are the *only* 4xx cases of this endpoint: an empty body,
+malformed JSON, a non-object body, trailing content, missing or null `items`,
+a non-array `items`, or more than 500 entries all answer `422 invalid_request`.
+Everything about individual items is best effort and never fails the batch.
 
 Item shape:
 
@@ -299,25 +377,30 @@ Item shape:
 { "recommendation_id": "rec_01J...", "model_used": "claude-sonnet-4-6",
   "status": 200, "latency_ms": 812, "tokens_in": 340, "tokens_out": 120,
   "finish_reason": "stop", "error_class": null, "check_pass": true,
-  "endpoint_used": "direct" }
+  "endpoint_used": "direct", "settings_applied": true }
 ```
 
-- `recommendation_id`, `model_used`, `status` required. `status` is the
-  provider's HTTP status; `0` means a transport-level failure (connect error
-  or timeout before any response arrived).
-- `latency_ms`, `tokens_in`, `tokens_out` — optional non-negative integers.
-- `finish_reason` — optional string.
-- `error_class` — optional, ∈ `timeout | connect_error | provider_error |
+- `recommendation_id`, `model_used`, and `status` are required. `status` is
+  the provider's HTTP status; `0` means a transport failure (a connect error or
+  a timeout before any response arrived).
+- `latency_ms`, `tokens_in`, `tokens_out`: optional non-negative integers.
+- `finish_reason`: optional string.
+- `error_class`: optional, ∈ `timeout | connect_error | provider_error |
   other`.
-- `check_pass` — optional boolean.
-- `endpoint_used` — optional, ∈ `direct | vertex | bedrock | azure |
+- `check_pass`: optional boolean, and three-valued: `true`, `false`, or absent
+  when no check ran. Only `true` or `false` is quality evidence (D16).
+- `endpoint_used`: optional, ∈ `direct | vertex | bedrock | azure |
   openrouter`; absent means `direct`.
+- `settings_applied`: optional boolean, whether the component applied the
+  entry's `settings` (D14).
+- Unknown fields are ignored.
 
-**Per item, best-effort:** an item that's missing or mistypes a required
-field, fails an optional field's constraint, names a `recommendation_id`
-that doesn't exist, or belongs to another tenant (no cross-tenant existence
-oracle — dropping is indistinguishable from unknown) is **dropped and
-counted**, never surfaced as a per-item error, never failing the batch.
+**Per item, best effort:** an item that is missing or mistypes a required
+field, fails an optional field's constraint, names a `recommendation_id` that
+does not exist, or names another tenant's recommendation is **dropped and
+counted**. Dropping is indistinguishable from unknown, so there is no
+cross-tenant existence oracle. It is never a per-item error and never fails
+the batch.
 
 `200 {"accepted": N, "dropped": M}`. An empty `items` array is a valid
 no-op: `{"accepted": 0, "dropped": 0}`.
@@ -327,40 +410,47 @@ set, every item is dropped and counted, and no outcome row is written. The
 response has the same shape. Recommend responses carry `"telemetry": false`
 for such a tenant, so MM components send nothing for it in the first place.
 
-**Outcome derivation** (server-side; first matching rule wins):
+**Outcome derivation** (server side; the first matching rule wins):
 
 1. `error_class == "timeout"` → `latency_exceeded`
 2. `error_class ∈ {"connect_error","provider_error"}`, or `status == 0`, or
    `status == 429`, or `status >= 500` → `provider_error`
 3. 2xx `status` and `check_pass == false` → `parse_failure`
-4. 2xx `status` → `success`
-5. anything else (e.g. a semantic 4xx) → `other`
+4. 2xx `status` and `check_pass == true` → `success`
+5. 2xx `status` and no `check_pass` → `completed_unchecked`
+6. anything else (for example a semantic 4xx) → `other`
 
-`quality_insufficient` remains a legal value in the `outcomes` table (it
-still appears on historic rows, and survives the check constraint), but no
-telemetry item can ever produce it going forward.
+`completed_unchecked` counts toward availability only and never enters outcome
+blending. The Go engine derived `success` for any 2xx without
+`check_pass: false` (D16). `quality_insufficient` remains a legal value in the
+`outcomes` table (historic rows keep it), but no telemetry item produces it.
 
-Stored row — the same `outcomes` table as before, one new column:
-`id` `out_<ulid>`, `recommendation_id`, `model_used`, the derived `outcome`,
-`endpoint_used`, `escalated_to: null` (no telemetry equivalent), and
-`details` — a jsonb object holding exactly the facts the item supplied:
-`status` always, plus `latency_ms`/`tokens_in`/`tokens_out`/`finish_reason`/
-`error_class`/`check_pass` only when present on the item. Multiple items per
-recommendation are allowed and appended (retries, chain escalations) —
-unchanged from the retired `POST /v1/outcomes`.
+Stored row (`outcomes`): `id` `out_<ulid>`, `recommendation_id`,
+`model_used`, the derived `outcome`, `endpoint_used`, `escalated_to: null` (no
+telemetry equivalent), and `details`: a jsonb object with exactly the facts the
+item supplied: `status` always, plus `latency_ms`, `tokens_in`, `tokens_out`,
+`finish_reason`, `error_class`, `check_pass`, and `settings_applied` only when
+present on the item. Several items per recommendation are allowed and
+appended (retries, chain escalations).
 
 ## History
 
 Five read endpoints, all paginated (see the pagination contract above).
+Parameters are checked in this order: an unknown name, `limit`, `difficulty`
+(series only), `since`, then the endpoint's own values and the cursor. A
+repeated parameter keeps its first value, and an empty value counts as not
+supplied.
 
 ### GET /v1/history/models/{column_id}
 
 `?capability=&difficulty=&dimension=&since=&limit=&cursor=`
 
-The aggregate series for one column. `dimension` ∈ `quality | pass_rate |
-ambiguity | latency_p50_ms | latency_p95_ms | cost_per_run_usd`, default
-`quality`. Columns are catalog-global (not tenant-scoped) and retired
-columns keep their history. Unknown column: `404`.
+The aggregate series for one column, ascending by `(as_of, capability,
+difficulty)`. `dimension` ∈ `quality | pass_rate | ambiguity |
+latency_p50_ms | latency_p95_ms | cost_per_run_usd`, default `quality`.
+`difficulty` is 1 to 5. Columns are catalog-global (not tenant-scoped), and
+retired columns keep their history. The parameters are validated before the
+column lookup; an unknown column is `404`.
 
 ```json
 {
@@ -378,11 +468,12 @@ columns keep their history. Unknown column: `404`.
 
 `ewma` is the stored raw value (quality in [0,1]); the ×100 display scale
 applies to recommendation scores, not the series. `regression: true` marks
-points flagged by the §6.5 regression scan.
+points that a §6.5 regression alert names (the column, capability, tier,
+dimension, and `as_of` night).
 
 ### GET /v1/history/recommendations
 
-`?prompt_hash=&capability=&since=&limit=&cursor=` — the tenant audit log,
+`?prompt_hash=&capability=&since=&limit=&cursor=`: the tenant audit log,
 newest first:
 
 ```json
@@ -400,14 +491,19 @@ newest first:
 }
 ```
 
-`prompt_hash=` answers "how often did this exact prompt arrive and how was
-it classified each time" — hashes are exact-match by design.
+Each summary comes from the stored decision: `capability` and `difficulty`
+from its classification; `pick` is the first recommendation (`null` when
+there was none); `mode`, `pool`, `constraints_met`, and `measured` from the
+response; `clears_difficulty` is the pick's. `since` is inclusive.
+`prompt_hash=` answers "how often did this exact prompt arrive, and how was it
+classified each time"; hashes are exact-match by design.
 
 ### GET /v1/history/recommendations/{recommendation_id}
 
-One full decision trace (§10.2): the verbatim request (prompt excluded on
-the prompt path), the classification block, every candidate considered, and
-the response snapshot.
+One full decision trace (§10.2): the request as received (with the prompt
+removed on the prompt path), the classification block, every candidate
+considered, and the response snapshot. The jsonb columns come back as Postgres
+stores them.
 
 ```json
 {
@@ -418,7 +514,8 @@ the response snapshot.
     { "column_id": "col_01K...", "provider": "anthropic", "model": "claude-sonnet-4-6",
       "endpoint": "direct", "status": "survivor", "rank": 0, "v": 0.87,
       "quality": 94.1, "pass_rate": 0.91, "cost_per_run_usd": 0.0042, "latency_p95_ms": 2100,
-      "leader": true, "measured": true, "clears_difficulty": true, "prefs_satisfied": true },
+      "leader": true, "measured": true, "clears_difficulty": true, "prefs_satisfied": true,
+      "availability": 0.99, "low_availability": false },
     { "column_id": "col_01H...", "provider": "openai", "model": "gpt-5.5",
       "endpoint": "direct", "status": "excluded", "exclusion_reason": "not_in_allowlist" }
   ],
@@ -428,23 +525,36 @@ the response snapshot.
 }
 ```
 
-Exclusion reasons (closed enum): `not_in_pool`, `not_in_allowlist`,
+Exclusion reasons (a closed enum): `not_in_pool`, `not_in_allowlist`,
 `standing_constraint:max_cost_per_run`, `standing_constraint:max_latency_ms`,
-`status_retired`, `no_data`. Another tenant's id: `404`.
+`standing_constraint:zero_retention` (D1), `status_retired`, `no_data`.
+Survivors carry `availability` and `low_availability` (D8). Another tenant's
+id is the same `404` as a missing one.
 
 ### GET /v1/history/outcomes
 
 `?recommendation_id=&outcome=&since=&limit=&cursor=` → `{"outcomes": [...],
-"next_cursor": ..., "matrix_version": ...}` with the stored outcome shape —
-now also carrying `endpoint_used` (the execution backend the telemetry item
-reported: `direct | vertex | bedrock | azure | openrouter`). Query semantics
-are unchanged from before `POST /v1/telemetry` replaced `POST /v1/outcomes`
-as the producer.
+"next_cursor": ..., "matrix_version": ...}`, newest first, scoped to the
+tenant through the owning recommendation:
+
+```json
+{ "id": "out_01K...", "recommendation_id": "rec_01K...",
+  "model_used": "claude-sonnet-4-6", "outcome": "parse_failure",
+  "escalated_to": null, "details": { "status": 200, "check_pass": false },
+  "endpoint_used": "direct", "created_at": "2026-07-07T21:03:01Z" }
+```
+
+`outcome` ∈ `success | parse_failure | quality_insufficient |
+latency_exceeded | provider_error | completed_unchecked | other`. The filter
+takes `completed_unchecked`, and the 422 for another value lists it (D40;
+D16 introduced the value). Filtering by another tenant's recommendation id
+gives an empty page. `details` is `null` when the row has none.
 
 ### GET /v1/history/calibration
 
-`?capability=&since=&limit=&cursor=` — the nightly prediction-calibration
-ledger (system-wide, not tenant-scoped):
+`?capability=&since=&limit=&cursor=`: the nightly prediction-calibration
+ledger (system-wide, not tenant-scoped), newest batch first and capabilities
+ascending within a batch:
 
 ```json
 {
@@ -460,8 +570,8 @@ ledger (system-wide, not tenant-scoped):
 
 ## Tenant configuration
 
-Reads mirror writes; PUTs are **full-replace** per resource, validated
-before anything is written (G4) — `200` with the stored config or `422` with
+Reads mirror writes. PUTs are **full-replace** per resource and are validated
+before anything is written (G4): `200` with the stored config, or `422` with
 nothing written.
 
 ### GET/PUT /v1/config/pools
@@ -478,9 +588,11 @@ nothing written.
 
 Exactly one pool must be `is_default: true`. Pools reference columns by
 `column_id` (precise config; request-time `allowed_models` takes model names
-for ergonomics). Violations: `422 unknown_model` (id not in catalog),
-`422 pool_would_be_empty` (a pool with no usable columns after retired
-columns and standing constraints are applied), `422 invalid_request`.
+for ergonomics). Violations: `422 unknown_model` (an id not in the catalog),
+`422 pool_would_be_empty` (a pool with no usable column once retired columns
+and the standing constraints apply, including zero retention: a
+zero-retention tenant's pools each need a column with valid zero-retention
+evidence, D1), `422 invalid_request`.
 
 ### GET/PUT /v1/config/weights
 
@@ -502,7 +614,7 @@ Violations: `422 invalid_request`.
 
 ### GET/PUT /v1/config/constraints
 
-Standing tenant constraints — hard filters on every request:
+Standing tenant constraints. They filter candidates hard on every request:
 
 ```json
 {
@@ -528,18 +640,38 @@ filters no model column, so it never causes `pool_would_be_empty`.
 
 ## Debug capture
 
+Debug capture is the only place the engine stores a prompt (G1). A tenant
+opens a window. While the window is active, the engine seals matching prompts
+with AES-256-GCM and keeps them for replay and reading. A zero-retention
+tenant cannot open a window and is never captured, even by a window it opened
+before it set the constraint (G5).
+
 ### POST /v1/debug/capture-windows
 
 ```json
 { "api_key_id": "key_01K...", "confidence_below": 0.5, "duration_minutes": 60 }
 ```
 
-Only `duration_minutes` is required (1 … `MAVERICK_CAPTURE_MAX_WINDOW_MINUTES`,
-default 1440). While a window is active, prompt-form recommend requests
-matching the window (tenant, optional key scope, optional
-classification-confidence threshold) have their prompt encrypted and stored
-for replay. Zero-retention tenants are refused `409
-zero_retention_conflict` (G5).
+- `duration_minutes` is required. It is an integer from 1 to
+  `MAVERICK_CAPTURE_MAX_WINDOW_MINUTES` (default 1440).
+- `confidence_below` is optional. It is a number in (0, 1]. The window
+  captures only classifications whose confidence is strictly below it. It is
+  stored as float32, so the reply echoes the widened value (0.8 reads
+  `0.800000011920929`).
+- `api_key_id` is optional. It must name one of your own keys, and the window
+  then captures only that key's requests.
+
+A failed check is `422 invalid_request`. After these checks, a zero-retention
+tenant gets `409 zero_retention_conflict`. So a bad `api_key_id` answers 422
+even for a zero-retention tenant (QUIRK Q8).
+
+A prompt-form recommend request is captured by the first window that is
+active, matches its key, and has its confidence bar above the classification's
+confidence. Declared requests have no prompt and are never captured. A capture
+keeps until the window's end plus `MAVERICK_CAPTURE_RETENTION_HOURS` (default
+72). Each capture is sealed under the current key of a key ring, with a new
+nonce, and stores its key version (D18). A capture failure is logged and never
+fails the recommendation.
 
 `201`:
 
@@ -551,33 +683,50 @@ zero_retention_conflict` (G5).
 
 ### DELETE /v1/debug/capture-windows/{id}
 
-Ends the window early. `204` on success; another tenant's window and a
-nonexistent one are the same `404`.
+Ends the window now: `204`. An unknown or already deleted window and another
+tenant's window are the same `404`. The window's captures stay, and their
+`window_id` becomes `null`.
 
 ### POST /v1/debug/replay/{capture_id}
 
-Body optional: `{"classifier_version": "..."}` (defaults to the current
-classifier; in v1 only the current version is runnable — anything else is
-`422`). Decrypts the captured prompt in memory, re-runs classification,
-answers:
+The body is optional: `{"classifier_version": "..."}`. v1 runs only the
+current classifier version. Any other value is `422 invalid_request` (details
+`classifier_version` and `current`).
+
+The engine decrypts the prompt in memory and classifies it again, without the
+classification cache. `match` is true when the replay has the stored
+capability and difficulty. Replay never returns the prompt.
 
 ```json
-{ "original_classification": { "...": "..." },
-  "replayed_classification": { "...": "..." },
+{ "original_classification": { "capability": "code_generation", "difficulty": 3, "...": "..." },
+  "replayed_classification": { "capability": "code_generation", "difficulty": 3,
+    "domain_tags": [], "high_stakes": false, "confidence": 0.91, "method": "classified" },
   "match": true }
 ```
 
-The prompt text is never returned by replay. Every replay is access-logged
-(§10.4). Expired captures: `410 capture_expired`. When the classification
-comparison isn't enough and you need the text itself, use the self-service
-read below.
+`original_classification` is the classification block of the capture's trace
+row. `replayed_classification` also has `truncated: true` when the classifier
+input was truncated.
+
+A replay is a real classifier call, so the prompt path's rules apply. A
+zero-retention tenant's prompt goes only to the zero-retention classifier
+column while its evidence is valid, and otherwise the answer is
+`fallback_default` (D2). The D4 quota and budget apply, and the call is
+recorded as classification spend.
+
+A replay appends a `capture_access_log` row (action `replay`, actor your API
+key id). An expired capture appends a `read` row and answers `410
+capture_expired`. A capture that the sweep already deleted also answers `410`.
+Another tenant's capture and an id that never existed are the same `404`. If
+the log append fails, the call fails.
 
 ### GET /v1/debug/captures
 
-Your own captures only — the tenant scope is unconditional in the query;
-no parameter widens it. `?window_id=&limit=&cursor=` with the standard
-[Pagination contract](#pagination-contract). **Never prompt text** — only
-the metadata already stored alongside the ciphertext:
+Your own captures, newest first. No parameter widens the tenant scope. The
+parameters are `window_id`, `limit` (default 50, 1 to 200), and `cursor` (the
+[Pagination contract](#pagination-contract) shape). Any other parameter is
+`422 invalid_request`. The list never has prompt text, and it is not
+access-logged.
 
 ```json
 {
@@ -592,15 +741,16 @@ the metadata already stored alongside the ciphertext:
 }
 ```
 
+`prompt_hash` and `classification` come from the capture's trace row.
+`expired` is `expires_at <= now`. An expired capture stays in the list until
+the sweep deletes it.
+
 ### GET /v1/debug/captures/{id}/prompt
 
-Decrypts **your own** captured prompt in memory and returns it. The custody
-model is unchanged from capture itself: the prompt only exists because you
-opened a window (the window is the consent act), it is encrypted at rest
-(AES-256-GCM, per-capture keys), it expires on the capture's own schedule
-(window end + 72h retention by default), and **every read — including a
-failed attempt — appends a `capture_access_log` row** (action `read`, actor
-your API key id), so the audit trail shows exactly who read what and when.
+Decrypts **your own** captured prompt in memory and returns it. The window is
+the consent act. The prompt is encrypted at rest, and it expires on the
+capture's schedule. Every read appends a `capture_access_log` row (action
+`read`, actor your API key id), and so does a read that answers 404 or 410.
 
 ```json
 { "id": "cap_01K...", "prompt": "...", "prompt_hash": "a3f2...",
@@ -609,115 +759,136 @@ your API key id), so the audit trail shows exactly who read what and when.
 ```
 
 `recommendation_id` joins to `GET /v1/history/recommendations/{id}` for the
-full decision trace — the trace says why, the capture says what. Another
-tenant's capture id and a nonexistent id are the same `404` (no
-cross-tenant existence oracle — the capture-windows DELETE convention).
-Expired or hard-deleted: `410 capture_expired`.
+full decision trace: the trace says why, and the capture says what. Another
+tenant's capture and an unknown id are the same `404`. Expired or
+hard-deleted: `410 capture_expired`.
 
 ## GET /up
 
-Unauthenticated liveness (the Kamal health check): `200 {"status": "ok"}`
-when the process reaches Postgres, `503 {"status": "unavailable"}` otherwise.
+Unauthenticated liveness (the Kamal health check): `200 {"status":"ok"}`
+when Postgres answers a ping within 2 s, else `503 {"status":"unavailable"}`.
 
 ## MCP server (`/mcp` and stdio)
 
-Two transports, same tools, same tenants, same audit trail as REST:
+Two transports serve the same three tools (spec §12). A tool call acts as a
+tenant exactly as the REST call does, and an MCP recommendation writes the same
+trace row.
 
-- **Streamable HTTP** at `POST /mcp` on the public listener, behind exactly
-  the `/v1` middleware chain: `Authorization: Bearer mk_live_...`, per-key
-  rate limiting, 2 MB body cap.
-- **stdio** for local development:
-  `maverick mcp-stdio --api-key mk_live_...` — the key is authenticated once
-  at startup and the session acts as that tenant. Logs go to stderr; stdout
-  is the protocol channel.
+- **Streamable HTTP** at `/mcp` on the public listener, behind the `/v1`
+  middleware: `Authorization: Bearer mk_live_...`, the per-key rate limit, and
+  the 2 MiB body cap. Each message acts as the key on its own HTTP request.
+  Each JSON-RPC response is one `event: message` SSE frame. `initialize`
+  opens a session and returns its id in `Mcp-Session-Id`. Later POSTs must
+  send that header: without it they are `400`, and with an unknown id they are
+  `404`. A notification is `202`. `DELETE /mcp` with the header ends the
+  session (`204`). Other methods are `405` with `Allow: POST, DELETE`. These
+  transport errors are plain text, not the error envelope.
+- **stdio** for local development: `maverick mcp-stdio --api-key mk_live_...`.
+  The key is authenticated once at startup, and the session acts as that
+  tenant. Messages are newline-delimited JSON-RPC. Logs go to stderr, and
+  stdout carries only the protocol.
 
-Three tools (thin wrappers over the same internal reads/pipeline — an
-MCP-originated recommendation writes an identical trace row):
+The server identifies as `model-maverick`, version `v1`. It speaks protocol
+versions `2025-11-25`, `2025-06-18`, `2025-03-26`, and `2024-11-05`. A client
+that asks for another version gets `2025-11-25`.
 
 | Tool | Input | Returns |
 |---|---|---|
-| `recommend_model` | The `POST /v1/recommend` request shape verbatim: `{workload: {prompt?} \| {capability?, difficulty?, domain_tags?}, pool?, allowed_models?, mode?, constraints?}` | The `POST /v1/recommend` response object |
-| `get_policy` | `{capability?, pool?}` | The `GET /v1/policies` response object |
-| `list_models` | `{}` | The `GET /v1/models` response object |
+| `recommend_model` | The `POST /v1/recommend` body: `{workload, pool?, allowed_models?, mode?, constraints?}`. The MCP prompt form has no `projection_version`. | The `POST /v1/recommend` response |
+| `get_policy` | `{capability?, pool?}` | The `GET /v1/policies` response (D42 applies) |
+| `list_models` | `{}` | The `GET /v1/models` response |
 
-Tool descriptions instruct agents to prefer declared workloads when the
-capability is already known (faster; nothing leaves the session).
+The tool descriptions ask agents to prefer the declared form when they know
+the capability: it is faster, and nothing leaves the session.
 
-The server identifies as `model-maverick` / `v1`.
+A successful result carries the REST body twice: as one text content item and
+as `structuredContent`. A failed call is a result with `isError: true` and one
+text item. An API error reads `<code>: <message>` (for example
+`unknown_pool: ...`), and an internal failure reads `internal error`. The
+arguments are checked against the tool's input schema first. A violation is
+an `isError` result whose text starts with `validating "arguments": ` (D34).
+An unknown tool is JSON-RPC error `-32602`, and an unknown method is
+`-32601`.
 
 ## SDK integration conventions
 
-Two conventions every MM-authored component — client SDKs, gateway plugins,
-the trial proxy — follows identically (integration-surfaces plan §1).
-Neither is part of the engine's own request/response wire contract, so
-they're documented here rather than under a numbered endpoint:
+Every MM-authored component (the client SDKs, the gateway plugins, and the
+trial proxy) follows two conventions (integration-surfaces plan §1). They are
+not part of the engine's own wire contract.
 
-- **Model-alias grammar.** `maverick/auto` (= balanced), `maverick/quality`,
-  `maverick/cost`, or the extension `maverick/<pool>:<mode>`. SDKs and
-  gateway plugins parse this string themselves; it is never sent to the
-  engine as a `model` value, and a concrete provider model name is never
-  valid where an alias is expected. The component resolves the alias to a
-  `POST /v1/recommend` call (declared or prompt form, per its configured
-  privacy mode) and drives its own chain executor over the returned pick and
-  fallback chain.
-- **Correlation response headers.** MM-authored components that sit in the
-  request path stamp `X-Maverick-Recommendation-Id` and
-  `X-Maverick-Model-Used` on the response they touched, so a caller can
-  correlate a provider response back to the recommendation that produced it
-  without parsing a body. The engine itself does not set these headers —
-  `POST /v1/recommend` already returns `recommendation_id` in the body; the
-  headers are a convention the components layer on top when they're the
-  ones actually proxying the call.
+- **Model-alias grammar.** `maverick/auto` (balanced), `maverick/quality`,
+  `maverick/cost`, or `maverick/<pool>:<mode>`, where `<mode>` is `auto`,
+  `quality`, or `cost`. The grammar is exact and case sensitive. The string
+  splits at the first `:`, and neither part may be empty. `maverick-core`
+  parses it, so the proxy and the SDK cores agree. An alias may end with
+  `?settings=caller`: the component then leaves the caller's settings alone
+  instead of applying the recommended entry's `settings` (D14). A string
+  without the `maverick/` prefix is not an alias: the proxy refuses it with
+  `400 invalid_model_alias`, and an SDK passes it through. The component never
+  sends an alias to the engine. It turns the alias into a `POST /v1/recommend`
+  call (declared or prompt form, per its privacy mode) and runs its own chain
+  executor over the returned chain.
+- **Correlation response headers.** A component that sits in the request path
+  sets `X-Maverick-Recommendation-Id` and `X-Maverick-Model-Used` (the model it
+  executed) on the response. A caller can then tie a provider response to its
+  recommendation without parsing a body. The engine does not set these
+  headers: `POST /v1/recommend` returns `recommendation_id` in the body.
 
 ---
 
 # Internal provisioning API (`/internal/v1`)
 
-The Rails seam (spec §13). Served **only** on the internal listener
-(`:8081`), never proxied. Callers are root — no tenant scoping.
+This is the Rails seam (spec §13). It is served **only** on the internal
+listener (`:8081`) and is never proxied. Callers are root: nothing is tenant
+scoped.
 
-**Auth:** `Authorization: Bearer <label>:<secret>` where the presented token
-is one full entry of `MAVERICK_INTERNAL_TOKENS` (comma-separated
-`label:secret` pairs; compare is constant-time). The matching label is
-recorded as the actor in the audit log. Example:
+**Auth:** `Authorization: Bearer <label>:<secret>`. The token is one full
+entry of `MAVERICK_INTERNAL_TOKENS`, a comma-separated list of `label:secret`
+pairs. The engine compares SHA-256 digests in constant time against every
+entry, and the first matching label is the actor in the audit log. A missing
+or wrong token is `401 unauthorized`. Example:
 
 ```sh
 curl -s http://localhost:8081/internal/v1/alerts \
   -H 'Authorization: Bearer ops:dev-internal-secret'
 ```
 
-Every mutating call appends a structured audit entry to the process log:
-`msg="internal provisioning write"`, `audit=true`, `actor=<label>`,
-`action=<dotted.action>`, plus subject ids.
+Every successful write logs one INFO audit line: `msg="internal provisioning
+write"`, `audit=true`, `actor=<label>`, `action=<dotted.action>` (for example
+`tenant.create`, `api_key.issue`, `column.update`), and the subject ids.
 
-All 15 endpoints:
+A route with a tenant `{id}` looks the tenant up before it reads the body. An
+unknown tenant is `404 not_found` (`tenant <id> does not exist`).
+
+All 16 routes:
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/internal/v1/tenants` | Create tenant |
-| GET | `/internal/v1/tenants/{id}` | Tenant + config summary |
-| POST | `/internal/v1/tenants/{id}/suspend` | Suspend tenant |
-| POST | `/internal/v1/tenants/{id}/activate` | Reactivate tenant |
-| POST | `/internal/v1/tenants/{id}/api-keys` | Issue API key |
-| DELETE | `/internal/v1/api-keys/{id}` | Revoke API key |
-| PUT | `/internal/v1/tenants/{id}/pools` | Replace pools (same payload/validation as `/v1/config/pools`) |
-| PUT | `/internal/v1/tenants/{id}/weights` | Replace weights (as `/v1/config/weights`) |
-| PUT | `/internal/v1/tenants/{id}/constraints` | Replace constraints (as `/v1/config/constraints`) |
+| POST | `/internal/v1/tenants` | Create a tenant |
+| GET | `/internal/v1/tenants/{id}` | Tenant and config summary |
+| POST | `/internal/v1/tenants/{id}/suspend` | Suspend a tenant |
+| POST | `/internal/v1/tenants/{id}/activate` | Reactivate a tenant |
+| POST | `/internal/v1/tenants/{id}/api-keys` | Issue an API key |
+| DELETE | `/internal/v1/api-keys/{id}` | Revoke an API key |
+| PUT | `/internal/v1/tenants/{id}/pools` | Replace pools (as `PUT /v1/config/pools`) |
+| PUT | `/internal/v1/tenants/{id}/weights` | Replace weights (as `PUT /v1/config/weights`) |
+| PUT | `/internal/v1/tenants/{id}/constraints` | Replace constraints (as `PUT /v1/config/constraints`) |
+| PUT | `/internal/v1/tenants/{id}/limits` | Set the classification quota override (D4) |
 | GET | `/internal/v1/alerts` | Operator alert feed |
-| POST | `/internal/v1/columns` | Create catalog column |
-| PUT | `/internal/v1/columns/{id}` | Edit column status/pricing/deprecation |
-| POST | `/internal/v1/corpus/activate` | Flip the active corpus version |
+| POST | `/internal/v1/columns` | Create a catalog column |
+| PUT | `/internal/v1/columns/{id}` | Edit a column |
+| POST | `/internal/v1/corpus/activate` | Change the active corpus version |
 | GET | `/internal/v1/captures` | List debug captures (no prompt text) |
 | GET | `/internal/v1/captures/{id}/prompt` | Decrypt and read one captured prompt (audited) |
 
 ### POST /internal/v1/tenants
 
-`{"name": "tenant-one"}` → `201` with the tenant + config summary. Creation
-mints the per-tenant prompt-HMAC key (32 random bytes, never leaves the
-engine) and a `default` pool containing **every `active` catalog column** at
-that moment (`is_default: true`). When the catalog has no active columns the
-tenant is created **without** a pool — set one with the pools PUT before the
-tenant can call `/v1/recommend`.
+`{"name": "tenant-one"}` → `201` with the tenant summary. Creation mints the
+tenant's prompt-HMAC key (32 random bytes that never leave the engine). It also
+creates a `default` pool (`is_default: true`) with **every `active` catalog
+column** at that moment. When the catalog has no active column, the tenant
+has **no** pool: set one with the pools PUT before the tenant calls
+`/v1/recommend`.
 
 ```json
 {
@@ -731,10 +902,12 @@ tenant can call `/v1/recommend`.
 }
 ```
 
-`GET /internal/v1/tenants/{id}` and the suspend/activate POSTs return the
-same summary shape (API keys appear with `last4` only). Suspension takes
-effect immediately: the tenant's keys answer `403 tenant_suspended` on the
-public listener.
+`pools`, `weights`, and `constraints` are exactly what the public config GETs
+return. `GET /internal/v1/tenants/{id}` and the suspend and activate POSTs
+return the same summary. Each API key appears as `{id, name, last4, status,
+created_at, revoked_at}`, never the raw key. Suspension takes effect on the
+next request: the tenant's keys answer `403 tenant_suspended` on the public
+listener. The suspend and activate POSTs read no body.
 
 ### POST /internal/v1/tenants/{id}/api-keys
 
@@ -744,12 +917,23 @@ public listener.
 { "id": "key_01K...", "key": "mk_live_KdVkJFBtDUy0xT5kVgMQWsPV4r2QUZxlLuHeo05Xuf6" }
 ```
 
-The raw key appears exactly once, here. Only the hash and last4 are stored;
-no endpoint can return it again.
+The raw key appears only here. The engine stores its hash and last four
+characters, and no endpoint can return it again.
 
-`DELETE /internal/v1/api-keys/{id}` → `200` with the key record
-(`status: "revoked"`). Rows are kept (history references them); revocation
-is idempotent and takes effect on the next request.
+`DELETE /internal/v1/api-keys/{id}` → `200` with the key record (`status:
+"revoked"`). The row stays, because history refers to it. Revocation is
+idempotent and takes effect on the next request. An unknown key is `404`.
+
+### PUT /internal/v1/tenants/{id}/limits
+
+`{"classification_daily_quota": 500}` sets the tenant's daily classification
+quota (D4). An absent field keeps the current override, `null` clears it, and
+a value must be at least 0. The reply is the effective quota: the override,
+or `MAVERICK_CLASSIFIER_DAILY_QUOTA` (default 1000) when there is none.
+
+```json
+{ "classification_daily_quota": 500 }
+```
 
 ### POST /internal/v1/columns
 
@@ -762,19 +946,45 @@ is idempotent and takes effect on the next request.
   "pricing": { "input_per_mtok": 3.0, "output_per_mtok": 15.0 },
   "quality_source_column_id": null,
   "deprecation_date": null,
-  "execution_aliases": { "openrouter": "anthropic/claude-sonnet-4-6" }
+  "execution_aliases": { "openrouter": "anthropic/claude-sonnet-4-6" },
+  "retention_mode": "zero",
+  "retention_verified_at": "2026-07-01T00:00:00Z",
+  "retention_valid_until": "2026-09-01T00:00:00Z",
+  "retention_source": "anthropic ZDR addendum 2026-06",
+  "execution_alias_retention": {
+    "openrouter": { "retention_mode": "standard" }
+  },
+  "param_constraints": {
+    "reasoning_effort": { "allowed": ["low", "high"], "order": ["low", "medium", "high"] }
+  }
 }
 ```
 
-`provider` ∈ `anthropic | openai | google | xai`; `endpoint` ∈ `direct |
-vertex | bedrock | azure | openrouter`; `settings` defaults `{}` (identical
-provider/model/endpoint/settings duplicates are rejected 422); `pricing` is
-USD per million tokens. `execution_aliases` is optional, defaulting to `{}`:
-an object with string values only, at most 10 keys, each value non-empty and
-at most 200 characters — otherwise `422 invalid_request`. New columns always
-enter the lifecycle at `status: "cold_start"` with `cold_start_until` = today +
-`MAVERICK_CATALOG_COLD_START_NIGHTS` (default 5) — status is not accepted in
-the create body. `201`:
+- `provider`, `model_id`, and `endpoint` are required. `provider` is one of
+  `anthropic`, `openai`, `google`, and `xai`. `endpoint` is one of `direct`,
+  `vertex`, `bedrock`, `azure`, and `openrouter`.
+- `settings` is an object and defaults to `{}`. A second column with the same
+  provider, model, endpoint, and settings is `422 invalid_request`.
+- `pricing` is USD per million tokens.
+- `quality_source_column_id`, when set, must name a catalog column.
+  `deprecation_date` is `YYYY-MM-DD`.
+- `execution_aliases` is optional and defaults to `{}`. It is an object with
+  string values only, at most 10 keys, and each value non-empty and at most 200
+  characters.
+- The retention evidence is optional (spec §4.5; D1, D15). `retention_mode` is
+  `unknown`, `standard`, or `zero`. The times are RFC 3339.
+  `retention_valid_until` needs `retention_verified_at` and is at most 90 days
+  after it. `execution_alias_retention` holds the same evidence for each alias,
+  keyed by an `execution_aliases` key.
+- `param_constraints` is optional (D29). It is keyed by a known parameter
+  (only `reasoning_effort` in v1). Each value has non-empty string lists
+  `allowed` and `order`, `order` has no repeated value, and every `allowed`
+  value is in `order`.
+
+A failed check is `422 invalid_request` with the field in `details.field`. A
+new column always starts at `status: "cold_start"`, with `cold_start_until` =
+today + `MAVERICK_CATALOG_COLD_START_NIGHTS` (default 5). The create body does
+not take `status`. `201`:
 
 ```json
 { "column_id": "col_01K...", "provider": "anthropic", "model_id": "claude-sonnet-4-6",
@@ -785,48 +995,64 @@ the create body. `201`:
   "deprecation_date": null, "created_at": "...", "updated_at": "..." }
 ```
 
+The reply has Go's column shape. It does not echo the retention evidence or
+`param_constraints`: `GET /v1/models` shows them.
+
 ### PUT /internal/v1/columns/{id}
 
-Partial update of `status`, `pricing`, `deprecation_date`, `execution_aliases`
-(absent fields keep their stored values). `status` ∈ `cold_start | active |
-deprecated | retired`. A transition to `retired` runs the §4.1 retirement
-guard: if any tenant pool would drop to zero usable columns the transition is
-rejected `422 pool_would_be_empty` (naming the pools), a critical alert row
-is written, and the column keeps its status. Price edits replace the
-list-price snapshot and log a `catalog_changes` entry — historical run costs
-are never restated. `execution_aliases`, when present, **replaces the stored
-map whole** (same validation as create) and also logs a `catalog_changes`
-entry; there is no per-key merge.
+A partial update of `status`, `pricing`, `deprecation_date`,
+`execution_aliases`, the retention evidence, `execution_alias_retention`, and
+`param_constraints`. An absent or `null` field keeps its stored value. The
+validation is the create's. `retention_valid_until` alone is checked against
+the stored `retention_verified_at`. `status` is one of `cold_start`, `active`,
+`deprecated`, and `retired`. An unknown column is `404`. The reply is the
+column, as for create.
+
+- **Retirement guard (§4.1).** A change to `retired` is refused when a tenant
+  pool would have no usable column left: `422 pool_would_be_empty` names the
+  pools, a critical alert is written, and the column keeps its status.
+- **Retention downgrade (D1).** A change that ends a column's valid zero
+  evidence is not refused. It runs the G4 simulation, and each zero-retention
+  tenant whose pool it would empty gets a critical `pool_would_be_empty`
+  alert.
+- `execution_aliases`, `execution_alias_retention`, and `param_constraints`
+  **replace the stored value whole**. There is no per-key merge.
+- A change of status, pricing, `execution_aliases`, or `param_constraints`
+  logs an INFO `catalog_changes` line with the old and new values. A price edit
+  replaces the list-price snapshot, and past run costs are never restated.
 
 ### GET /internal/v1/alerts
 
 `?since=&kind=` → `{"alerts": [{id, kind, severity, subject, message,
-created_at, acked_at}, ...]}`. The same rows are delivered by email/webhook
-per `docs/operations.md`.
+created_at, acked_at}, ...]}`, oldest first, with no pagination. `since` is an
+RFC 3339 timestamp or a `YYYY-MM-DD` date (midnight UTC). `subject` is the
+alert's JSON subject. Any other parameter is `422 invalid_request`. The same
+rows go out by email and webhook, as `docs/operations.md` describes.
 
 ### POST /internal/v1/corpus/activate
 
-`{"version": "2026-07-07"}` — flips the active corpus version atomically
-(the HTTP twin of `maverick corpus activate`). The version must already be
-loaded (`maverick corpus load`); unknown versions are `404`. `200` with the
-version record.
+`{"version": "2026-07-07"}` makes that corpus version the active one, in one
+step (the HTTP twin of `maverick corpus activate`). The version must already
+be loaded (`maverick corpus load`). An unknown version is `404`. `200`:
+
+```json
+{ "version": "2026-07-07", "description": "...", "task_count": 221, "active": true,
+  "created_at": "..." }
+```
 
 ### GET /internal/v1/captures, GET /internal/v1/captures/{id}/prompt
 
-The operator capture-read surface: judging whether a routed model was
-correct for a request requires reading the actual prompt that drove the
-classification, not just its fingerprint. This is the root, cross-tenant
-counterpart of the tenant self-service read (`GET /v1/debug/captures`,
-`GET /v1/debug/captures/{id}/prompt` — see "Debug capture" above, where a
-tenant can read only its own captures), inside the same custody model as
-the rest of debug capture: encrypted at rest AES-256-GCM, 72h default
-expiry, every touch audited. Capture itself is unchanged, and no tenant
-route ever returns another tenant's prompt text.
+The operator reads debug captures across tenants. To judge whether a routed
+model was right for a request, the operator needs the prompt that drove the
+classification, not only its fingerprint. The custody rules are the tenant
+reads' (see [Debug capture](#debug-capture)): AES-256-GCM at rest, the
+capture's own expiry, and an audit row for every prompt read. No tenant route
+ever returns another tenant's prompt.
 
-`GET /internal/v1/captures?window_id=&tenant_id=&limit=&cursor=` — every
-capture across tenants, newest first (same `limit`/`cursor`/`next_cursor`
-shape as the [Pagination contract](#pagination-contract)). **No prompt
-text** — only what's already stored alongside the ciphertext:
+`GET /internal/v1/captures?tenant_id=&window_id=&limit=&cursor=` lists every
+tenant's captures, newest first, with the tenant list's paging. Each entry
+also has `tenant_id`. The list has **no prompt text**, and it is not
+access-logged.
 
 ```json
 {
@@ -851,13 +1077,11 @@ returns:
   "captured_at": "2026-07-07T21:04:10Z", "expires_at": "2026-07-10T22:03:33Z" }
 ```
 
-`recommendation_id` is the join key into
-`GET /v1/history/recommendations/{id}` for the full decision trace — nothing
-is re-classified here, unlike replay. Every
-attempt — a hit, an expired-but-not-yet-swept capture, a hard-deleted one, or
-an unknown id — appends a `capture_access_log` row (action `read`, actor the
-internal token's label), so the read itself is exactly as audited as a
-replay. Expired or hard-deleted: `410 capture_expired`. Unknown id: `404`.
+`recommendation_id` joins to `GET /v1/history/recommendations/{id}` for the
+decision trace. Nothing is classified again here, unlike replay. Every attempt
+appends a `capture_access_log` row (action `read`, actor the internal token's
+label): a hit, an expired capture, a hard-deleted one, and an unknown id.
+Expired or hard-deleted: `410 capture_expired`. Unknown id: `404`.
 
 ## GET /health/detail (internal listener)
 
@@ -876,16 +1100,19 @@ Component health, behind the same internal bearer auth:
 }
 ```
 
-`503` with `status: "degraded"` when Postgres is unreachable: `db` reports
-`error` with the failure detail, and `job_queue` reports `unknown`
-(reading the queue state needs the same connection).
-`provider_client_config` reports `none_configured` when no provider API key
-is set. `job_queue` reflects live graphile_worker state read from Postgres, so
-an `--api-only` node reports the workers running in a separate
-`--worker-only` node: `no_workers` when no worker is registered, `stale` when
-no worker heartbeat is newer than 60s, `ok` otherwise. (The Go engine named
-this component `river_queues` and also had `paused`; see
-`parity/DIVERGENCES.md` D35.) `active_matrix_version` is the corpus version active right now
-(`null` on a cold stack, matching `matrix_version` elsewhere).
-`last_batch_times` maps job kind to its most recent completed batch
-(`batches.completed_at`; absent entries mean that kind has never completed).
+A component's `detail` is omitted when it is empty.
+
+- `db` is `ok` when Postgres answers a ping within 2 s. Otherwise it is
+  `error` with the failure, the reply is `503` with `status: "degraded"`,
+  `job_queue` is `unknown`, and the two top-level fields are `null`.
+- `job_queue` reads graphile_worker's worker registry from Postgres (D35).
+  So an `--api-only` node reports the workers of a separate `--worker-only`
+  node. It is `no_workers` when no worker is registered, `stale` when the
+  freshest heartbeat is older than 60 s, and `ok` otherwise. The Go engine
+  called this component `river_queues` and also had `paused`.
+- `provider_client_config` is `none_configured` when no provider API key is
+  set.
+- `active_matrix_version` is the active corpus version, or `null` on a cold
+  stack.
+- `last_batch_times` maps each batch kind to its newest completed batch
+  (`batches.completed_at`). A kind that never completed is absent.
