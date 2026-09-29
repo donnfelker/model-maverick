@@ -9,6 +9,10 @@
 //!
 //! Active windows are cached per tenant for 10 s. [`Capturer::invalidate`] drops a
 //! tenant's entry; the window endpoints call it when they create or end a window.
+//!
+//! The capturer also holds what the debug endpoints need: the longest window
+//! (`capture.max_window_minutes`) and [`Capturer::open`], which decrypts a capture with the
+//! key its stored version names (D18).
 
 use std::collections::HashMap;
 use std::fmt;
@@ -17,13 +21,16 @@ use std::time::{Duration, Instant};
 
 use chrono::{DateTime, Utc};
 use maverick_config::Config;
-use maverick_domain::capture::{self, CaptureWindow, KeyRing};
+use maverick_domain::capture::{self, CaptureWindow, KeyRing, NONCE_SIZE};
 use maverick_domain::ids;
-use maverick_store::capture::{self as store, NewDebugCapture};
+use maverick_store::capture::{self as store, DebugCapture, NewDebugCapture};
 use sqlx::PgPool;
 
 /// How long a tenant's active windows are reused (Go `window cache TTL`).
 pub const WINDOW_CACHE_TTL: Duration = Duration::from_secs(10);
+
+/// The default `capture.max_window_minutes` (spec §9.8).
+pub const DEFAULT_MAX_WINDOW_MINUTES: u32 = 1440;
 
 /// One prompt-path request, as the capture decision sees it.
 #[derive(Debug, Clone, Copy)]
@@ -48,6 +55,7 @@ pub struct CaptureRequest<'a> {
 pub struct Capturer {
     keys: KeyRing,
     retention: chrono::Duration,
+    max_window_minutes: u32,
     ttl: Option<Duration>,
     windows: Mutex<HashMap<String, (Instant, Vec<CaptureWindow>)>>,
 }
@@ -58,6 +66,7 @@ impl fmt::Debug for Capturer {
         f.debug_struct("Capturer")
             .field("key_version", &self.keys.current_version())
             .field("retention", &self.retention)
+            .field("max_window_minutes", &self.max_window_minutes)
             .field("ttl", &self.ttl)
             .finish_non_exhaustive()
     }
@@ -65,15 +74,49 @@ impl fmt::Debug for Capturer {
 
 impl Capturer {
     /// A capturer sealing with `keys` and keeping captures `retention_hours` past their
-    /// window's end.
+    /// window's end. Windows last at most [`DEFAULT_MAX_WINDOW_MINUTES`].
     #[must_use]
     pub fn new(keys: KeyRing, retention_hours: u32) -> Self {
         Self {
             keys,
             retention: chrono::Duration::hours(i64::from(retention_hours)),
+            max_window_minutes: DEFAULT_MAX_WINDOW_MINUTES,
             ttl: Some(WINDOW_CACHE_TTL),
             windows: Mutex::new(HashMap::new()),
         }
+    }
+
+    /// The same capturer with another longest window.
+    #[must_use]
+    pub fn with_max_window_minutes(mut self, minutes: u32) -> Self {
+        self.max_window_minutes = minutes;
+        self
+    }
+
+    /// The longest window a tenant may open, in minutes.
+    #[must_use]
+    pub fn max_window_minutes(&self) -> u32 {
+        self.max_window_minutes
+    }
+
+    /// The prompt of a stored capture, decrypted with the key of its stored version (D18).
+    /// The error text never contains the prompt.
+    pub fn open(&self, capture: &DebugCapture) -> Result<String, String> {
+        let nonce: &[u8; NONCE_SIZE] = capture.nonce.as_slice().try_into().map_err(|_| {
+            format!(
+                "capture {} has a {}-byte nonce, want {NONCE_SIZE}",
+                capture.id,
+                capture.nonce.len()
+            )
+        })?;
+        let version = u32::try_from(capture.capture_key_version)
+            .map_err(|_| format!("capture {} has a negative key version", capture.id))?;
+        let plaintext = self
+            .keys
+            .open(version, &capture.id, nonce, &capture.ciphertext)
+            .map_err(|error| error.to_string())?;
+        String::from_utf8(plaintext)
+            .map_err(|_| format!("capture {} is not UTF-8 text", capture.id))
     }
 
     /// The capturer the configuration describes.
@@ -90,6 +133,7 @@ impl Capturer {
             ),
             config.capture_retention_hours,
         )
+        .with_max_window_minutes(config.capture_max_window_minutes)
     }
 
     /// The same capturer with another window-cache lifetime; `None` reads the windows on
