@@ -836,7 +836,7 @@ fn retention_mode(stored: &str) -> RetentionMode {
     }
 }
 
-fn effective_retention(column: &ModelColumn, now: DateTime<Utc>) -> RetentionMode {
+pub(crate) fn effective_retention(column: &ModelColumn, now: DateTime<Utc>) -> RetentionMode {
     retention_mode(&column.retention_mode).effective(column.retention_valid_until, now)
 }
 
