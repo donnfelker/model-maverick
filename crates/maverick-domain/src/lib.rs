@@ -17,6 +17,7 @@ pub mod graders;
 pub mod ids;
 pub mod keys;
 pub mod policy;
+pub mod predictions;
 pub mod pricing;
 pub mod scoring;
 pub mod spend;
