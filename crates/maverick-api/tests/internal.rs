@@ -1358,3 +1358,107 @@ async fn provision_then_recommend_end_to_end() {
         );
     }
 }
+
+/// D29: the seam accepts per-model parameter constraints, validates their shape, stores
+/// them, and logs `catalog_changes` with `change=param_constraints` when they change.
+#[tokio::test]
+async fn param_constraints_are_validated_stored_and_logged() {
+    let db = db!();
+    let pool = db.pool().await;
+    let seam = seam(&pool);
+    let constraints = json!({"reasoning_effort": {"allowed": ["low", "high"], "order": ["minimal", "low", "medium", "high", "xhigh"]}});
+    let (status, body) = seam
+        .ops_json(
+            "POST",
+            "/internal/v1/columns",
+            &json!({"provider": "openai", "model_id": "gpt-d29", "endpoint": "direct", "param_constraints": constraints}).to_string(),
+        )
+        .await;
+    assert_eq!(status, 201, "{body}");
+    let id = body["column_id"].as_str().unwrap().to_owned();
+    let stored = get_model_column(&pool, &id).await.unwrap();
+    let stored: Value = serde_json::from_str(stored.param_constraints.get()).unwrap();
+    assert_eq!(stored, constraints);
+
+    for (bad, key) in [
+        (json!("nope"), None),
+        (
+            json!({"temperature": {"allowed": ["a"], "order": ["a"]}}),
+            Some("temperature"),
+        ),
+        (
+            json!({"reasoning_effort": {"allowed": [], "order": ["low"]}}),
+            Some("reasoning_effort"),
+        ),
+        (
+            json!({"reasoning_effort": {"allowed": ["max"], "order": ["low"]}}),
+            Some("reasoning_effort"),
+        ),
+        (
+            json!({"reasoning_effort": {"allowed": ["low"], "order": ["low", "low"]}}),
+            Some("reasoning_effort"),
+        ),
+        (
+            json!({"reasoning_effort": {"allowed": [1], "order": ["low"]}}),
+            Some("reasoning_effort"),
+        ),
+        (
+            json!({"reasoning_effort": {"allowed": ["low"]}}),
+            Some("reasoning_effort"),
+        ),
+        (
+            json!({"reasoning_effort": {"allowed": ["low"], "order": ["low"], "extra": 1}}),
+            Some("reasoning_effort"),
+        ),
+    ] {
+        let (status, body) = seam
+            .ops_json(
+                "PUT",
+                &format!("/internal/v1/columns/{id}"),
+                &json!({ "param_constraints": bad }).to_string(),
+            )
+            .await;
+        assert_eq!(status, 422, "{bad}");
+        assert_eq!(body["error"]["code"], "invalid_request");
+        assert_eq!(body["error"]["details"]["field"], "param_constraints");
+        assert_eq!(body["error"]["details"]["key"].as_str(), key, "{bad}");
+    }
+
+    let captured = Captured::default();
+    let _guard =
+        tracing::subscriber::set_default(tracing_subscriber::registry().with(captured.clone()));
+    let narrower = json!({"reasoning_effort": {"allowed": ["high"], "order": ["low", "high"]}});
+    let (status, _) = seam
+        .ops_json(
+            "PUT",
+            &format!("/internal/v1/columns/{id}"),
+            &json!({ "param_constraints": narrower }).to_string(),
+        )
+        .await;
+    assert_eq!(status, 200);
+    let changes = captured.lines("catalog_changes");
+    assert_eq!(changes.len(), 1);
+    assert_eq!(field(&changes[0], "change"), Some("param_constraints"));
+    assert_eq!(field(&changes[0], "column_id"), Some(id.as_str()));
+    // An update that does not send the field keeps it and logs nothing for it.
+    seam.ops_json(
+        "PUT",
+        &format!("/internal/v1/columns/{id}"),
+        r#"{"status":"active"}"#,
+    )
+    .await;
+    let stored = get_model_column(&pool, &id).await.unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(stored.param_constraints.get()).unwrap(),
+        narrower
+    );
+    assert!(
+        captured
+            .lines("catalog_changes")
+            .iter()
+            .all(
+                |fields| field(fields, "change") != Some("param_constraints")
+                    || fields == &changes[0]
+            )
+    );
+}
