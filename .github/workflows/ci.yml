@@ -11,12 +11,14 @@ on:
     - cron: "17 2 * * *"
   workflow_dispatch:
 
-# Many agents push to main. A newer push supersedes an older run on the same ref, so the
-# newest commit always gets the full gate set without a queue of stale runs. The event
-# name keeps a push from cancelling the nightly run.
+# Many agents push to main, often faster than the fast tier runs. On main a running run
+# is never cancelled: it finishes, and GitHub keeps only the newest pending run behind it,
+# so gates complete and the newest commit is tested next without a queue of stale runs.
+# A pull request's newer push cancels its older run. The event name keeps a push from
+# touching the nightly run.
 concurrency:
   group: ci-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
