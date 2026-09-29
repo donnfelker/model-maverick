@@ -2430,8 +2430,14 @@ name = "maverick-e2e"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "chrono",
+ "maverick-domain",
+ "maverick-jobs",
  "maverick-providers",
+ "maverick-testdb",
+ "reqwest",
  "serde_json",
+ "sqlx",
  "tokio",
 ]
 
