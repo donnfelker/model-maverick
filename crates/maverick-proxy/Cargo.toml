@@ -40,7 +40,12 @@ hyper-util = { version = "0.1", features = ["server", "server-graceful", "servic
 http-body-util = "0.1"
 
 [dev-dependencies]
+maverick-api = { workspace = true }
+maverick-domain = { workspace = true }
+maverick-store = { workspace = true }
+maverick-testdb = { workspace = true }
 parity-support = { path = "../parity-support" }
+chrono = { workspace = true }
 # Decode the OTLP/HTTP protobuf payloads in the D31 tests (both already in the graph).
 opentelemetry-proto = { version = "0.33", default-features = false, features = [
     "gen-tonic-messages",
@@ -48,6 +53,7 @@ opentelemetry-proto = { version = "0.33", default-features = false, features = [
     "metrics",
 ] }
 prost = "0.14"
+sqlx = { workspace = true }
 test-support = { path = "../test-support" }
 # A paused clock for the D26 `Retry-After` scenario.
 tokio = { workspace = true, features = ["test-util"] }
