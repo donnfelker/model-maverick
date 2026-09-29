@@ -372,7 +372,7 @@ impl Parser<'_> {
 }
 
 /// Go's `quoteChar` in `encoding/json` syntax errors: `'x'`, `'\''`, `'"'`.
-fn quote_char(c: char) -> String {
+pub fn quote_char(c: char) -> String {
     match c {
         '\'' => "'\\''".to_owned(),
         '"' => "'\"'".to_owned(),
