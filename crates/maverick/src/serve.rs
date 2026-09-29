@@ -270,7 +270,6 @@ fn listen_addr(addr: &str) -> String {
     }
 }
 
-/// A built provider client, or why it could not be built.
 /// Step 10: the prompt path's resolver, its classifier columns connected to the provider
 /// clients through the catalog. Without the catalog, every prompt request gets the
 /// fallback classification.
@@ -301,6 +300,7 @@ async fn classifier_resolver(
     }
 }
 
+/// A built provider client, or why it could not be built.
 type Built = Result<Arc<dyn ProviderClient>, String>;
 /// A provider's name, its API key, and how to build its client.
 type Candidate<'a> = (&'static str, &'a str, fn(&str) -> Built);

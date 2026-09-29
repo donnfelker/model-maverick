@@ -250,6 +250,12 @@ async fn api_only_runs_no_workers_and_starts_without_a_database() {
         !messages.iter().any(|m| m == "workers started"),
         "{messages:?}"
     );
+    // The classifier lookup needs the catalog: it logs, and serving continues.
+    assert!(
+        messages.iter().any(|m| m
+            == "classifier column unavailable; prompt-path requests will receive the fallback classification"),
+        "{messages:?}"
+    );
 }
 
 /// A port already in use is a listener failure: exit 1 after a clean shutdown of the rest.
