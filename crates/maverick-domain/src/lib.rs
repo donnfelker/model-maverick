@@ -10,7 +10,9 @@
 
 pub mod capture;
 pub mod ceilings;
+pub mod checks;
 pub mod classify;
+pub mod entries;
 pub mod gofmt;
 pub mod gojson;
 pub mod gostrconv;
