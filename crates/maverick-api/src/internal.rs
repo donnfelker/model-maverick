@@ -40,6 +40,8 @@ const ENDPOINTS: [&str; 5] = ["direct", "vertex", "bedrock", "azure", "openroute
 const STATUSES: [&str; 4] = ["cold_start", "active", "deprecated", "retired"];
 /// The retention modes (spec §4.5).
 const RETENTION_MODES: [&str; 3] = ["unknown", "standard", "zero"];
+/// The surface-neutral parameters a column may constrain (D29; `maverick_core::normalize`).
+const KNOWN_PARAMS: [&str; 1] = ["reasoning_effort"];
 /// `execution_aliases` limits.
 const MAX_ALIASES: usize = 10;
 const MAX_ALIAS_RUNES: usize = 200;
@@ -791,10 +793,12 @@ struct ColumnInput {
     retention_valid_until: Option<String>,
     retention_source: Option<String>,
     execution_alias_retention: Option<JsonValue>,
+    param_constraints: Option<JsonValue>,
 }
 
-/// The create body (reference §7.8) plus the retention evidence (spec §4.5; D1, D15).
-const CREATE_FIELDS: [&str; 13] = [
+/// The create body (reference §7.8) plus the retention evidence (spec §4.5; D1, D15) and
+/// the parameter constraints (D29).
+const CREATE_FIELDS: [&str; 14] = [
     "provider",
     "model_id",
     "endpoint",
@@ -808,10 +812,12 @@ const CREATE_FIELDS: [&str; 13] = [
     "retention_valid_until",
     "retention_source",
     "execution_alias_retention",
+    "param_constraints",
 ];
 
-/// The update body (reference §7.9) plus the retention evidence.
-const UPDATE_FIELDS: [&str; 9] = [
+/// The update body (reference §7.9) plus the retention evidence and the parameter
+/// constraints.
+const UPDATE_FIELDS: [&str; 10] = [
     "status",
     "pricing",
     "deprecation_date",
@@ -821,6 +827,7 @@ const UPDATE_FIELDS: [&str; 9] = [
     "retention_valid_until",
     "retention_source",
     "execution_alias_retention",
+    "param_constraints",
 ];
 
 fn decode_column(
@@ -848,6 +855,7 @@ fn decode_column(
                 "pricing" => out.pricing = json_value(),
                 "execution_aliases" => out.execution_aliases = json_value(),
                 "execution_alias_retention" => out.execution_alias_retention = json_value(),
+                "param_constraints" => out.param_constraints = json_value(),
                 "quality_source_column_id" => {
                     out.quality_source_column_id = strict::optional_string(value, strukt, field)?;
                 }
@@ -962,6 +970,79 @@ fn validate_aliases(
         }
     }
     Ok(Some((keys, gojson::marshal(value))))
+}
+
+/// `param_constraints` (D29): an object keyed by a known parameter name, each value
+/// `{"allowed": [...], "order": [...]}` with non-empty lists of strings, no repeated
+/// order value, and every allowed value in `order` (so "nearest" is defined). Returns
+/// the JSON text.
+fn validate_param_constraints(value: Option<&JsonValue>) -> Result<Option<String>, ApiError> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let JsonValue::Object(fields) = value else {
+        return Err(field_error(
+            "param_constraints",
+            "param_constraints must be an object keyed by parameter name".to_owned(),
+        ));
+    };
+    let strings = |value: &JsonValue| match value {
+        JsonValue::Array(items) => items
+            .iter()
+            .map(|item| match item {
+                JsonValue::String(s) => Some(s.clone()),
+                _ => None,
+            })
+            .collect::<Option<Vec<String>>>(),
+        _ => None,
+    };
+    for (name, constraint) in fields {
+        if !KNOWN_PARAMS.contains(&name.as_str()) {
+            return Err(field_error(
+                "param_constraints",
+                format!(
+                    "param_constraints names unknown parameter {} (known: [{}])",
+                    quote(name),
+                    KNOWN_PARAMS.join(" ")
+                ),
+            )
+            .detail("key", name.as_str()));
+        }
+        let malformed = || {
+            field_error(
+                "param_constraints",
+                format!(
+                    "param_constraints[{}] must be {{\"allowed\":[...],\"order\":[...]}} with non-empty string lists and every allowed value in order",
+                    quote(name)
+                ),
+            )
+            .detail("key", name.as_str())
+        };
+        let JsonValue::Object(parts) = constraint else {
+            return Err(malformed());
+        };
+        let (mut allowed, mut order) = (None, None);
+        for (key, value) in parts {
+            match key.as_str() {
+                "allowed" => allowed = Some(strings(value).ok_or_else(malformed)?),
+                "order" => order = Some(strings(value).ok_or_else(malformed)?),
+                _ => return Err(malformed()),
+            }
+        }
+        let (Some(allowed), Some(order)) = (allowed, order) else {
+            return Err(malformed());
+        };
+        let mut unique = order.clone();
+        unique.sort();
+        unique.dedup();
+        if allowed.is_empty()
+            || unique.len() != order.len()
+            || allowed.iter().any(|value| !order.contains(value))
+        {
+            return Err(malformed());
+        }
+    }
+    Ok(Some(gojson::marshal(value)))
 }
 
 /// Validated retention evidence for the column and its aliases (spec §4.5, D15).
@@ -1142,6 +1223,7 @@ async fn insert_column(api: &ApiState, actor: &InternalActor, request: Request) 
         .map(|(keys, _)| keys.clone())
         .unwrap_or_default();
     let retention = validate_retention(&input, &alias_keys, None)?;
+    let param_constraints = validate_param_constraints(input.param_constraints.as_ref())?;
     let db = pool_of(api)?;
     if let Some(source) = &input.quality_source_column_id {
         match catalog::get_model_column(db, source).await {
@@ -1164,6 +1246,7 @@ async fn insert_column(api: &ApiState, actor: &InternalActor, request: Request) 
     let pricing = raw(pricing)?;
     let aliases_raw = aliases.map(|(_, text)| raw(text)).transpose()?;
     let alias_retention_raw = retention.aliases.clone().map(raw).transpose()?;
+    let param_constraints_raw = param_constraints.map(raw).transpose()?;
     let settings_internal = api.internal();
     let today = settings_internal.now().date_naive();
     let cold_start_until = today + Duration::days(i64::from(settings_internal.cold_start_nights));
@@ -1187,7 +1270,7 @@ async fn insert_column(api: &ApiState, actor: &InternalActor, request: Request) 
             retention_valid_until: retention.valid_until,
             retention_source: retention.source.as_deref(),
             execution_alias_retention: alias_retention_raw.as_deref(),
-            param_constraints: None,
+            param_constraints: param_constraints_raw.as_deref(),
         },
     )
     .await;
@@ -1277,6 +1360,7 @@ async fn change_column(
         None => stored_alias_keys(&stored),
     };
     let retention = validate_retention(&input, &alias_keys, stored.retention_verified_at)?;
+    let param_constraints = validate_param_constraints(input.param_constraints.as_ref())?;
 
     let now = api.internal().now();
     if status == "retired" && stored.status != "retired" {
@@ -1309,6 +1393,7 @@ async fn change_column(
         .map(|(_, text)| raw(text.clone()))
         .transpose()?;
     let alias_retention_raw = retention.aliases.clone().map(raw).transpose()?;
+    let param_constraints_raw = param_constraints.map(raw).transpose()?;
     let retention_mode = retention
         .mode
         .clone()
@@ -1333,7 +1418,7 @@ async fn change_column(
             .as_deref()
             .or(stored.retention_source.as_deref()),
         execution_alias_retention: alias_retention_raw.as_deref(),
-        param_constraints: None,
+        param_constraints: param_constraints_raw.as_deref(),
     };
     let column = catalog::update_model_column(db, id, &update).await?;
 
@@ -1354,6 +1439,16 @@ async fn change_column(
             id,
             stored.execution_aliases.get(),
             column.execution_aliases.get(),
+        );
+    }
+    if input.param_constraints.is_some()
+        && column.param_constraints.get() != stored.param_constraints.get()
+    {
+        log_change(
+            CatalogChange::ParamConstraints,
+            id,
+            stored.param_constraints.get(),
+            column.param_constraints.get(),
         );
     }
     audit::column_update(&actor.0, id, &column.status);

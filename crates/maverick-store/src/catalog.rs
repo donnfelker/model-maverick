@@ -270,6 +270,8 @@ pub enum CatalogChange {
     Status,
     Pricing,
     ExecutionAliases,
+    /// Per-model parameter constraints (D29).
+    ParamConstraints,
 }
 
 impl CatalogChange {
@@ -278,12 +280,14 @@ impl CatalogChange {
             CatalogChange::Status => "status",
             CatalogChange::Pricing => "pricing",
             CatalogChange::ExecutionAliases => "execution_aliases",
+            CatalogChange::ParamConstraints => "param_constraints",
         }
     }
 }
 
 /// The INFO `catalog_changes` line (reference Part 5 §10.3): `change`, `column_id`,
-/// `old`, `new`. Pricing and aliases are passed as their JSON text; status as the name.
+/// `old`, `new`. Pricing, aliases, and parameter constraints are passed as their JSON
+/// text; status as the name.
 pub fn log_change(change: CatalogChange, column_id: &str, old: &str, new: &str) {
     tracing::info!(
         change = change.as_str(),
