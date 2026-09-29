@@ -5,12 +5,14 @@ use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use testcontainers::bollard::Docker;
+use testcontainers::bollard::models::{HostConfig, PortBinding};
 use testcontainers::bollard::query_parameters::{ListContainersOptions, RemoveContainerOptions};
 use testcontainers::core::wait::LogWaitStrategy;
 use testcontainers::core::{IntoContainerPort, WaitFor};
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{GenericImage, ImageExt};
 use tokio::sync::OnceCell;
+use ulid::Ulid;
 
 use crate::{DATABASE_URL_VAR, env_value};
 
@@ -18,6 +20,13 @@ use crate::{DATABASE_URL_VAR, env_value};
 /// real one.
 const READY_LINE: &str = "database system is ready to accept connections";
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(120);
+
+/// The only host address the container's port is published on. Docker-published ports
+/// bypass host firewalls such as ufw, so publishing on every interface would put a
+/// Postgres superuser on the network while tests run (model-maverick-l1q). A remote
+/// Docker daemon is not supported; use `MAVERICK_TEST_DATABASE_URL` for one.
+const PUBLISH_IP: &str = "127.0.0.1";
+const POSTGRES_PORT: &str = "5432/tcp";
 
 const LABEL: &str = "org.modelmaverick.testdb";
 const LABEL_VERSION: &str = "1";
@@ -69,6 +78,8 @@ async fn start() -> Result<Server, Unavailable> {
         .map_err(|err| Unavailable::Skip(format!("Docker daemon unreachable: {err}")))?;
     reap_orphans(&docker).await;
 
+    // A fresh password per server, so a leaked URL is useless once the binary exits.
+    let password = format!("mv{}", Ulid::generate().to_string().to_lowercase());
     let container = GenericImage::new("postgres", "16-alpine")
         .with_exposed_port(5432.tcp())
         .with_wait_for(WaitFor::log(
@@ -76,7 +87,7 @@ async fn start() -> Result<Server, Unavailable> {
         ))
         .with_env_var("POSTGRES_DB", "maverick")
         .with_env_var("POSTGRES_USER", "maverick")
-        .with_env_var("POSTGRES_PASSWORD", "maverick")
+        .with_env_var("POSTGRES_PASSWORD", password.as_str())
         // Durability settings only. Query, type, and transaction behavior is unchanged.
         .with_cmd([
             "postgres",
@@ -93,13 +104,10 @@ async fn start() -> Result<Server, Unavailable> {
         .with_label(PID_LABEL, std::process::id().to_string())
         .with_label(HOST_LABEL, hostname())
         .with_startup_timeout(STARTUP_TIMEOUT)
+        .with_host_config_modifier(publish_on_loopback)
         .start()
         .await
         .map_err(|err| Unavailable::Fatal(format!("start postgres:16-alpine: {err}")))?;
-    let host = container
-        .get_host()
-        .await
-        .map_err(|err| Unavailable::Fatal(format!("postgres container host: {err}")))?;
     let port = container
         .get_host_port_ipv4(5432)
         .await
@@ -113,9 +121,25 @@ async fn start() -> Result<Server, Unavailable> {
     std::mem::forget(container);
 
     Ok(Server {
-        admin_url: format!("postgres://maverick:maverick@{host}:{port}/maverick?sslmode=disable"),
+        admin_url: format!(
+            "postgres://maverick:{password}@{PUBLISH_IP}:{port}/maverick?sslmode=disable"
+        ),
         container_id: Some(container_id),
     })
+}
+
+/// Publishes only the Postgres port, on [`PUBLISH_IP`], at a host port Docker picks. It
+/// replaces the testcontainers default, which publishes every exposed port on all
+/// interfaces.
+fn publish_on_loopback(host_config: &mut HostConfig) {
+    host_config.publish_all_ports = Some(false);
+    host_config.port_bindings = Some(HashMap::from([(
+        POSTGRES_PORT.to_owned(),
+        Some(vec![PortBinding {
+            host_ip: Some(PUBLISH_IP.to_owned()),
+            host_port: Some(String::new()),
+        }]),
+    )]));
 }
 
 /// Removes containers that an earlier test binary on this host left behind. The Go
@@ -190,7 +214,56 @@ fn hostname() -> String {
 mod tests {
     use std::time::Duration;
 
-    use super::is_orphan;
+    use testcontainers::bollard::Docker;
+
+    use super::{POSTGRES_PORT, PUBLISH_IP, is_orphan, server};
+    use crate::{DATABASE_URL_VAR, Schema, env_value};
+
+    /// model-maverick-l1q: Docker-published ports bypass ufw, so the server must be
+    /// published on loopback only and never with the old fixed password.
+    #[tokio::test]
+    async fn the_server_is_published_on_loopback_only() {
+        // `database` starts the server and applies the skip rule (a failure under CI).
+        let Some(db) = crate::database(&Schema::empty()).await else {
+            return;
+        };
+        db.close().await;
+        if env_value(DATABASE_URL_VAR).is_some() {
+            return;
+        }
+        let server = server().await.unwrap_or_else(|_| panic!("server started"));
+        assert!(
+            server.admin_url.starts_with("postgres://maverick:mv")
+                && server.admin_url.contains(&format!("@{PUBLISH_IP}:")),
+            "admin URL {}",
+            server.admin_url
+        );
+        assert!(!server.admin_url.contains(":maverick@"));
+
+        let id = server.container_id.as_deref().expect("the container");
+        let docker = Docker::connect_with_defaults().expect("docker");
+        let inspect = docker.inspect_container(id, None).await.expect("inspect");
+        eprintln!("container {id}: {:?}", inspect.network_settings);
+        let host_config = inspect.host_config.expect("host config");
+        assert_eq!(host_config.publish_all_ports, Some(false));
+        let requested = host_config.port_bindings.expect("port bindings");
+        assert_eq!(requested.keys().collect::<Vec<_>>(), [POSTGRES_PORT]);
+        let published = inspect
+            .network_settings
+            .and_then(|settings| settings.ports)
+            .expect("published ports");
+        let mut addresses = Vec::new();
+        for bindings in published.values().flatten() {
+            for binding in bindings {
+                addresses.push(binding.host_ip.clone().unwrap_or_default());
+            }
+        }
+        assert!(!addresses.is_empty(), "{published:?}");
+        assert!(
+            addresses.iter().all(|ip| ip == PUBLISH_IP),
+            "published on {addresses:?}"
+        );
+    }
 
     #[test]
     fn a_container_without_an_owner_is_an_orphan() {
