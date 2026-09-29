@@ -4,6 +4,7 @@
 pub mod envelope;
 pub mod golden;
 pub mod goregex;
+pub mod json_schema;
 pub mod keyfacts;
 pub mod registry;
 pub mod rulescan;
@@ -14,6 +15,7 @@ pub use envelope::{
     parse_envelope, parse_envelope_value, raw_type,
 };
 pub use golden::GoldenAnswer;
+pub use json_schema::JsonSchema;
 pub use keyfacts::KeyFacts;
 pub use registry::{
     BoxError, BoxFuture, FailureCounter, GradeError, GradeInput, GradeResult, Grader, GraderError,
