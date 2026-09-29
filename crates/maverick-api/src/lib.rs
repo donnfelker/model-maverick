@@ -9,6 +9,7 @@ pub mod classify;
 pub mod config;
 mod debug;
 mod health;
+mod history;
 mod internal;
 pub mod mcp;
 mod models;
@@ -922,11 +923,26 @@ fn public_v1_router(state: AuthState, api: ApiState) -> Router {
             "/telemetry",
             any(telemetry::telemetry).with_state(api.clone()),
         )
-        .route("/history/models/{column_id}", any(route_stub))
-        .route("/history/recommendations", any(route_stub))
-        .route("/history/recommendations/{id}", any(route_stub))
-        .route("/history/outcomes", any(route_stub))
-        .route("/history/calibration", any(route_stub))
+        .route(
+            "/history/models/{column_id}",
+            any(history::model_handler).with_state(api.clone()),
+        )
+        .route(
+            "/history/recommendations",
+            any(history::recommendations_handler).with_state(api.clone()),
+        )
+        .route(
+            "/history/recommendations/{id}",
+            any(history::recommendation_handler).with_state(api.clone()),
+        )
+        .route(
+            "/history/outcomes",
+            any(history::outcomes_handler).with_state(api.clone()),
+        )
+        .route(
+            "/history/calibration",
+            any(history::calibration_handler).with_state(api.clone()),
+        )
         .route(
             "/debug/capture-windows",
             any(debug::windows_handler).with_state(api.clone()),
