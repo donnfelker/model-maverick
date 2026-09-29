@@ -11,6 +11,7 @@ use super::{
     Workload,
 };
 use crate::alias::Mode;
+use crate::gojson::{apply_bool, apply_string, members, type_error, write_string};
 
 // ---------------------------------------------------------------------------------------
 // Request body
@@ -75,31 +76,6 @@ fn engine_mode(mode: Mode) -> &'static str {
         Mode::Quality => "quality",
         Mode::Cost => "cost",
     }
-}
-
-/// Go `json.Marshal` string escaping: `\b \f \n \r \t` short forms, other control
-/// characters and the HTML-sensitive `< > &` plus U+2028/U+2029 as lowercase `\u00xx`.
-fn write_string(out: &mut String, text: &str) {
-    out.push('"');
-    for ch in text.chars() {
-        match ch {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            '\u{8}' => out.push_str("\\b"),
-            '\u{c}' => out.push_str("\\f"),
-            '<' | '>' | '&' | '\u{2028}' | '\u{2029}' => {
-                let _ = write!(out, "\\u{:04x}", u32::from(ch));
-            }
-            control if control < ' ' => {
-                let _ = write!(out, "\\u{:04x}", u32::from(control));
-            }
-            other => out.push(other),
-        }
-    }
-    out.push('"');
 }
 
 // ---------------------------------------------------------------------------------------
@@ -220,62 +196,6 @@ fn chain_entry(value: &Value) -> Result<ChainEntry, String> {
     Ok(entry)
 }
 
-/// Every member whose name folds to `field`, with an exact-case match last.
-fn members<'a>(object: &'a Map<String, Value>, field: &str) -> Vec<&'a Value> {
-    let mut folded = Vec::new();
-    let mut exact = None;
-    for (name, value) in object {
-        if name == field {
-            exact = Some(value);
-        } else if fold_eq(name, field) {
-            folded.push(value);
-        }
-    }
-    folded.extend(exact);
-    folded
-}
-
-/// Go's case-insensitive name match against an ASCII field name.
-fn fold_eq(name: &str, field: &str) -> bool {
-    let fold = |ch: char| match ch {
-        '\u{212a}' => Some('K'),
-        '\u{17f}' => Some('S'),
-        ch if ch.is_ascii() => Some(ch.to_ascii_uppercase()),
-        _ => None,
-    };
-    name.chars().count() == field.len()
-        && name
-            .chars()
-            .zip(field.chars())
-            .all(|(left, right)| fold(left).is_some_and(|left| Some(left) == fold(right)))
-}
-
-fn apply_string(
-    object: &Map<String, Value>,
-    field: &str,
-    target: &mut String,
-) -> Result<(), String> {
-    for value in members(object, field) {
-        match value {
-            Value::String(text) => text.clone_into(target),
-            Value::Null => {}
-            other => return Err(type_error(field, other, "string")),
-        }
-    }
-    Ok(())
-}
-
-fn apply_bool(object: &Map<String, Value>, field: &str, target: &mut bool) -> Result<(), String> {
-    for value in members(object, field) {
-        match value {
-            Value::Bool(flag) => *target = *flag,
-            Value::Null => {}
-            other => return Err(type_error(field, other, "bool")),
-        }
-    }
-    Ok(())
-}
-
 /// A Go `map[string]string`: members merge in, `null` clears, a `null` element is "".
 fn apply_string_map(
     object: &Map<String, Value>,
@@ -299,59 +219,4 @@ fn apply_string_map(
         }
     }
     Ok(())
-}
-
-fn type_error(field: &str, value: &Value, want: &str) -> String {
-    let got = match value {
-        Value::Null => "null",
-        Value::Bool(_) => "bool",
-        Value::Number(_) => "number",
-        Value::String(_) => "string",
-        Value::Array(_) => "array",
-        Value::Object(_) => "object",
-    };
-    format!("`{field}` is {got}, want {want}")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn strings_escape_like_go_json_marshal() {
-        let mut out = String::new();
-        write_string(
-            &mut out,
-            "q\"b\\n\nr\rt\tb\u{8}f\u{c}c\u{1}\u{1f}<>&\u{2028}\u{2029}\u{7f}é😀",
-        );
-        assert_eq!(
-            out,
-            "\"q\\\"b\\\\n\\nr\\rt\\tb\\bf\\fc\\u0001\\u001f\\u003c\\u003e\\u0026\\u2028\\u2029\u{7f}é😀\""
-        );
-    }
-
-    #[test]
-    fn fold_matches_go() {
-        assert!(fold_eq("MODEL", "model"));
-        assert!(fold_eq("Model", "model"));
-        assert!(fold_eq("\u{17f}ettings", "settings"));
-        assert!(fold_eq("\u{212a}ind", "kind"));
-        assert!(!fold_eq("model_", "model"));
-        assert!(!fold_eq("mode", "model"));
-        assert!(!fold_eq("m\u{f6}del", "model"));
-        assert!(!fold_eq("", "model"));
-    }
-
-    #[test]
-    fn exact_member_is_applied_last() {
-        let object: Map<String, Value> =
-            serde_json::from_str(r#"{"model":"exact","MODEL":"upper","Model":"title"}"#)
-                .expect("json");
-        let values: Vec<&str> = members(&object, "model")
-            .into_iter()
-            .filter_map(Value::as_str)
-            .collect();
-        assert_eq!(values.last(), Some(&"exact"));
-        assert_eq!(values.len(), 3);
-    }
 }

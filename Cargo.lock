@@ -2421,12 +2421,18 @@ name = "maverick-proxy"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
  "maverick-core",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
+ "parity-support",
+ "reqwest",
  "serde",
  "serde_json",
+ "test-support",
  "thiserror",
  "tokio",
  "tower",
