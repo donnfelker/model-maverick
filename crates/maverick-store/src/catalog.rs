@@ -263,3 +263,33 @@ pub async fn list_model_columns_by_ids<'e>(
     .fetch_all(db)
     .await
 }
+
+/// Which catalog field a `catalog_changes` line reports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CatalogChange {
+    Status,
+    Pricing,
+    ExecutionAliases,
+}
+
+impl CatalogChange {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CatalogChange::Status => "status",
+            CatalogChange::Pricing => "pricing",
+            CatalogChange::ExecutionAliases => "execution_aliases",
+        }
+    }
+}
+
+/// The INFO `catalog_changes` line (reference Part 5 §10.3): `change`, `column_id`,
+/// `old`, `new`. Pricing and aliases are passed as their JSON text; status as the name.
+pub fn log_change(change: CatalogChange, column_id: &str, old: &str, new: &str) {
+    tracing::info!(
+        change = change.as_str(),
+        column_id,
+        old,
+        new,
+        "catalog_changes"
+    );
+}

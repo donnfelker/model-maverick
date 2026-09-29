@@ -3,7 +3,9 @@
 //! This crate owns the wire contract and middleware. Endpoint handlers are kept
 //! deliberately small: business rules belong to the service crates.
 
+pub mod audit;
 mod health;
+pub mod observe;
 mod telemetry;
 
 pub use health::HealthState;
@@ -654,26 +656,28 @@ pub async fn request_id(mut request: Request, next: Next) -> Response<Body> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RequestId(pub String);
 
-/// Privacy-safe request logger. It records only method, path, status, timing,
-/// and request ID. Request bodies and authorization headers are never fields.
-pub async fn request_logger(request: Request, next: Next) -> Response<Body> {
+/// Privacy-safe request logger: one `request` line per request (see
+/// [`observe::RequestLog`]). Request bodies and headers are never fields.
+pub async fn request_logger(mut request: Request, next: Next) -> Response<Body> {
     let request_id = request
         .extensions()
         .get::<RequestId>()
         .map(|id| id.0.as_str())
         .unwrap_or("")
         .to_owned();
-    let method = request.method().clone();
+    let method = request.method().to_string();
     let path = request.uri().path().to_owned();
+    let log = observe::RequestLog::default();
+    request.extensions_mut().insert(log.clone());
     let started = Instant::now();
     let response = next.run(request).await;
-    tracing::info!(
-        request_id = %request_id,
-        method = %method,
-        path = %path,
-        status = response.status().as_u16(),
-        ms = started.elapsed().as_millis() as u64,
-        "request"
+    observe::log_request(
+        &method,
+        &path,
+        response.status().as_u16(),
+        started.elapsed(),
+        &request_id,
+        &log,
     );
     response
 }
@@ -739,6 +743,9 @@ pub async fn public_auth(
 
     match state.backend.authenticate(token).await {
         Ok(PublicAuthDecision::Authenticated(identity)) => {
+            if let Some(log) = request.extensions().get::<observe::RequestLog>() {
+                log.set_identity(&identity.tenant_id, &identity.api_key_id);
+            }
             request.extensions_mut().insert(identity);
             next.run(request).await
         }
@@ -773,6 +780,9 @@ pub async fn internal_auth(
 
     if let Some(label) = keys::authenticate_internal(authorization, state.internal_tokens.as_ref())
     {
+        if let Some(log) = request.extensions().get::<observe::RequestLog>() {
+            log.set_actor(label);
+        }
         request
             .extensions_mut()
             .insert(InternalActor(label.to_owned()));
@@ -871,12 +881,13 @@ fn internal_v1_router(state: AuthState) -> Router {
 }
 
 fn with_outer_middleware(router: Router) -> Router {
-    // Axum applies the last layer first. This produces RequestID -> Logger ->
-    // Recoverer -> router, matching the engine contract.
+    // Axum applies the last layer first. This produces TraceContext -> RequestID ->
+    // Logger -> Recoverer -> router: the engine contract, inside the request span.
     router
         .layer(middleware::from_fn(recoverer))
         .layer(middleware::from_fn(request_logger))
         .layer(middleware::from_fn(request_id))
+        .layer(middleware::from_fn(observe::trace_context))
 }
 
 /// Build the public listener router.
