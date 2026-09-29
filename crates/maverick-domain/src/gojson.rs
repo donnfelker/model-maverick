@@ -519,6 +519,28 @@ pub fn encode_f64(x: f64) -> Result<String, String> {
     }
 }
 
+/// Go's JSON form of a `float32` field: the shortest digits that round-trip as a
+/// float32, with [`encode_f64`]'s notation rule applied to the float32 value (`0.35`, not
+/// the widened `0.3499999940395355`).
+pub fn encode_f32(x: f32) -> Result<String, String> {
+    if !x.is_finite() {
+        return Err(format!(
+            "json: unsupported value: {}",
+            gofmt::fmt_v_f64(f64::from(x))
+        ));
+    }
+    let abs = x.abs();
+    if abs != 0.0 && !(1e-6..1e21).contains(&abs) {
+        let s = format!("{x:e}");
+        Ok(match s.split_once('e') {
+            Some((mantissa, exp)) if !exp.starts_with('-') => format!("{mantissa}e+{exp}"),
+            _ => s,
+        })
+    } else {
+        Ok(format!("{x}"))
+    }
+}
+
 /// `graders.JSONFromValue` for a YAML value: map keys must be strings (else
 /// `graders: envelope: non-string map key <key>`), then the value is marshaled.
 pub fn from_yaml(value: &serde_norway::Value) -> Result<JsonValue, String> {
@@ -617,6 +639,27 @@ mod tests {
 
     fn num(lit: &str) -> JsonValue {
         JsonValue::Number(lit.to_owned())
+    }
+
+    #[test]
+    fn float32_fields_use_shortest_float32_digits() {
+        let cases: [(f32, &str); 9] = [
+            (0.35, "0.35"),
+            (0.8, "0.8"),
+            (0.1505, "0.1505"),
+            (1.0, "1"),
+            (0.0, "0"),
+            (1e-6, "0.000001"),
+            (1e-7, "1e-7"),
+            (-2.5e-7, "-2.5e-7"),
+            (1e21, "1e+21"),
+        ];
+        for (x, want) in cases {
+            assert_eq!(encode_f32(x).unwrap(), want, "{x}");
+        }
+        assert_eq!(encode_f32(9.999e20).unwrap(), "999900000000000000000");
+        assert!(encode_f32(f32::NAN).is_err());
+        assert!(encode_f32(f32::INFINITY).is_err());
     }
 
     #[test]

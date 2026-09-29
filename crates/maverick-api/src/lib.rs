@@ -4,9 +4,11 @@
 //! deliberately small: business rules belong to the service crates.
 
 pub mod audit;
+pub mod config;
 mod health;
 pub mod observe;
 mod recommend;
+mod strict;
 mod telemetry;
 
 pub use health::HealthState;
@@ -634,10 +636,18 @@ pub async fn read_body(body: Body) -> Result<axum::body::Bytes, Response<Body>> 
     }
 }
 
+/// True when a body read failed on the size limit. The limit error can sit several
+/// `source()` levels down: `body_limit` wraps the body in a `Limited`, and `to_bytes`
+/// wraps it again, so a chunked oversize body arrives doubly wrapped.
 fn is_length_limit_error(error: &axum::Error) -> bool {
-    error
-        .source()
-        .is_some_and(|source| source.downcast_ref::<LengthLimitError>().is_some())
+    let mut source = error.source();
+    while let Some(current) = source {
+        if current.downcast_ref::<LengthLimitError>().is_some() {
+            return true;
+        }
+        source = current.source();
+    }
+    false
 }
 
 fn invalid_request(message: impl Into<String>) -> Response<Body> {
@@ -851,9 +861,18 @@ async fn route_stub(_: Request) -> Response<Body> {
 
 fn public_v1_router(state: AuthState, api: ApiState) -> Router {
     Router::new()
-        .route("/config/pools", any(route_stub))
-        .route("/config/weights", any(route_stub))
-        .route("/config/constraints", any(route_stub))
+        .route(
+            "/config/pools",
+            any(config::pools_handler).with_state(api.clone()),
+        )
+        .route(
+            "/config/weights",
+            any(config::weights_handler).with_state(api.clone()),
+        )
+        .route(
+            "/config/constraints",
+            any(config::constraints_handler).with_state(api.clone()),
+        )
         .route("/policies", any(route_stub))
         .route(
             "/recommend",
@@ -1493,6 +1512,17 @@ mod tests {
         let response = read_body(Body::from(vec![b'a'; BODY_LIMIT + 1]))
             .await
             .unwrap_err();
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    #[tokio::test]
+    async fn body_limit_maps_reads_behind_the_middleware() {
+        // `body_limit` wraps the body once and `read_body` again (model-maverick 5.3).
+        let body = Body::new(Limited::new(
+            Body::from(vec![b'a'; BODY_LIMIT + 1]),
+            BODY_LIMIT,
+        ));
+        let response = read_body(body).await.unwrap_err();
         assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
     }
 }
