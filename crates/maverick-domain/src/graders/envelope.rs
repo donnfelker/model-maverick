@@ -411,27 +411,8 @@ fn type_error(value: &str, field: &str, go_type: &str) -> String {
     )
 }
 
-/// Go's struct field matching: an exact name first, then a case-insensitive match that
-/// folds each rune to its simple case-fold class (so `TYPE`, `Spec`, and `ſpec` match).
 fn match_field(key: &str) -> Option<&'static str> {
-    FIELDS
-        .iter()
-        .find(|f| **f == key)
-        .or_else(|| FIELDS.iter().find(|f| fold_eq(f, key)))
-        .copied()
-}
-
-fn fold_eq(a: &str, b: &str) -> bool {
-    let fold = |c: char| -> String { c.to_uppercase().collect::<String>().to_lowercase() };
-    let mut a = a.chars();
-    let mut b = b.chars();
-    loop {
-        match (a.next(), b.next()) {
-            (None, None) => return true,
-            (Some(x), Some(y)) if fold(x) == fold(y) => {}
-            _ => return false,
-        }
-    }
+    gojson::match_field(key, &FIELDS)
 }
 
 /// Go `strconv.ParseFloat(lit, 64)` for a JSON number literal: `None` on overflow

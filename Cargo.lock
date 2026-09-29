@@ -2423,6 +2423,7 @@ version = "0.1.0"
 dependencies = [
  "maverick-domain",
  "maverick-providers",
+ "parity-support",
  "serde",
  "serde_json",
  "thiserror",
