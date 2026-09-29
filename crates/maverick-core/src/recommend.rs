@@ -340,6 +340,30 @@ impl EngineFailure {
     }
 }
 
+/// The caller's W3C trace context (`traceparent`, `tracestate`) to pass to the engine.
+/// A value that is not a valid header value is dropped.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TraceHeaders {
+    pub traceparent: Option<String>,
+    pub tracestate: Option<String>,
+}
+
+impl TraceHeaders {
+    /// The header pairs to send, in a fixed order.
+    fn pairs(&self) -> Vec<(&'static str, HeaderValue)> {
+        [
+            ("traceparent", &self.traceparent),
+            ("tracestate", &self.tracestate),
+        ]
+        .into_iter()
+        .filter_map(|(name, value)| {
+            let value = HeaderValue::from_str(value.as_deref()?).ok()?;
+            Some((name, value))
+        })
+        .collect()
+    }
+}
+
 /// Recommend client settings.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecommendClientConfig {
@@ -394,6 +418,18 @@ impl RecommendClient {
         key: &TenantKey,
         request: &RecommendRequest,
     ) -> Result<Recommendation, RecommendError> {
+        self.recommend_traced(key, request, &TraceHeaders::default())
+            .await
+    }
+
+    /// [`RecommendClient::recommend`] carrying the caller's W3C trace context, so the
+    /// engine's request span joins the caller's trace (spec §14.3).
+    pub async fn recommend_traced(
+        &self,
+        key: &TenantKey,
+        request: &RecommendRequest,
+        trace: &TraceHeaders,
+    ) -> Result<Recommendation, RecommendError> {
         let body = request.to_body();
         let deadline = Instant::now() + self.timeout;
         let mut attempt = 1;
@@ -402,7 +438,7 @@ impl RecommendClient {
             if remaining.is_zero() {
                 return Err(EngineFailure::Timeout.into());
             }
-            match self.attempt(key, &body, remaining).await {
+            match self.attempt(key, &body, remaining, trace).await {
                 Err(RecommendError::Engine(failure))
                     if attempt < self.attempts && failure.is_retryable() =>
                 {
@@ -418,15 +454,20 @@ impl RecommendClient {
         key: &TenantKey,
         body: &str,
         timeout: Duration,
+        trace: &TraceHeaders,
     ) -> Result<Recommendation, RecommendError> {
         let mut authorization = HeaderValue::from_str(&format!("Bearer {}", key.expose()))
             .map_err(|_| EngineFailure::InvalidTenantKey)?;
         authorization.set_sensitive(true);
-        let response = self
+        let mut builder = self
             .http
             .post(&self.url)
             .header(CONTENT_TYPE, "application/json")
-            .header(AUTHORIZATION, authorization)
+            .header(AUTHORIZATION, authorization);
+        for (name, value) in trace.pairs() {
+            builder = builder.header(name, value);
+        }
+        let response = builder
             .body(body.to_owned())
             .timeout(timeout)
             .send()
@@ -544,6 +585,19 @@ mod tests {
         assert!(shown.contains("<redacted, 18 chars>"), "{shown}");
         let key = format!("{:?}", TenantKey::new("mk_live_abc"));
         assert_eq!(key, "TenantKey(<redacted>)");
+    }
+
+    /// W3C trace context is sent only as valid header values, `traceparent` first.
+    #[test]
+    fn trace_headers_skip_absent_and_invalid_values() {
+        let trace = TraceHeaders {
+            traceparent: Some("00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01".into()),
+            tracestate: Some("bad\nvalue".into()),
+        };
+        let pairs = trace.pairs();
+        assert_eq!(pairs.len(), 1);
+        assert_eq!(pairs[0].0, "traceparent");
+        assert!(TraceHeaders::default().pairs().is_empty());
     }
 
     /// D29: entries carry the catalog constraints; a malformed value is no constraint.

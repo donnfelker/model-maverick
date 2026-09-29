@@ -23,6 +23,7 @@ pub mod chain;
 pub mod config;
 pub mod credentials;
 pub mod envelope;
+pub mod otel;
 pub mod ratelimit;
 pub mod relay;
 pub mod reports;

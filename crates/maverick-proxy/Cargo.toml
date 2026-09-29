@@ -41,6 +41,13 @@ http-body-util = "0.1"
 
 [dev-dependencies]
 parity-support = { path = "../parity-support" }
+# Decode the OTLP/HTTP protobuf payloads in the D31 tests (both already in the graph).
+opentelemetry-proto = { version = "0.33", default-features = false, features = [
+    "gen-tonic-messages",
+    "logs",
+    "metrics",
+] }
+prost = "0.14"
 test-support = { path = "../test-support" }
 # A paused clock for the D26 `Retry-After` scenario.
 tokio = { workspace = true, features = ["test-util"] }
