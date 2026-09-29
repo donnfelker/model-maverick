@@ -9,6 +9,12 @@ publish.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+# The library holds `run` so tests drive the CLI without a process. It is named
+# `maverick_cli` so its output does not collide with the `maverick` binary.
+[lib]
+name = "maverick_cli"
+path = "src/lib.rs"
+
 [[bin]]
 name = "maverick"
 path = "src/main.rs"
