@@ -15,6 +15,18 @@
 //!
 //! A Go test is divergence-justified when a `parity/DIVERGENCES.md` row (`| D<n> | ... |`)
 //! names it (for example D37 names `TestMigrationsUpDownUpClean`).
+//!
+//! It also audits the tags and the divergence rows (bead 9.1). `--strict` fails when:
+//! - a `parity:` tag sits outside test code (a `tests/` directory, or after `#[cfg(test)]`
+//!   in a source file), so it cannot claim a test;
+//! - a test (a `parity_support::divergence!("D<n>")` marker, or a one- or two-digit `D<n>`
+//!   mention in a test comment) or `parity/blackbox/replay-allowlist.json` cites a row that
+//!   does not exist;
+//! - a DIVERGENCES row is named by no test: every approved difference is asserted
+//!   somewhere.
+//!
+//! `--list-missing` prints each uncovered Go test; `--list-rows` prints each DIVERGENCES row
+//! with its test citations.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -64,6 +76,7 @@ fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let strict = args.iter().any(|arg| arg == "--strict");
     let list_missing = args.iter().any(|arg| arg == "--list-missing");
+    let list_rows = args.iter().any(|arg| arg == "--list-rows");
 
     let root = match repo_root() {
         Ok(root) => root.to_path_buf(),
@@ -73,7 +86,7 @@ fn main() -> ExitCode {
         }
     };
 
-    match run(&root, strict, list_missing) {
+    match run(&root, strict, list_missing, list_rows) {
         Ok(exit) => exit,
         Err(error) => {
             eprintln!("parity-coverage: {error}");
@@ -82,16 +95,32 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(root: &Path, strict: bool, list_missing: bool) -> Result<ExitCode, String> {
+fn run(root: &Path, strict: bool, list_missing: bool, list_rows: bool) -> Result<ExitCode, String> {
     let manifest_dir = parity_path("manifest").map_err(|error| error.to_string())?;
     let go_tests = load_manifest_go_tests(&manifest_dir)?;
 
-    let tags = scan_parity_tags(&root.join("crates"))?;
+    let scan = scan_sources(&root.join("crates"))?;
+    let tags = scan.tags;
 
     let divergences_md = parity_path("DIVERGENCES.md").map_err(|error| error.to_string())?;
     let divergences_text = fs::read_to_string(&divergences_md)
         .map_err(|error| format!("read {}: {error}", divergences_md.display()))?;
     let divergence_refs = divergence_refs(&divergences_text, &go_tests);
+
+    let rows: BTreeSet<String> = divergences_text
+        .lines()
+        .filter_map(|line| row_divergence_id(line.trim_start()))
+        .collect();
+    let mut cited = scan.divergence_mentions;
+    let allowlist =
+        parity_path("blackbox/replay-allowlist.json").map_err(|error| error.to_string())?;
+    for id in allowlist_divergences(&allowlist)? {
+        cited
+            .entry(id)
+            .or_default()
+            .push(allowlist.display().to_string());
+    }
+    let row_audit = audit_rows(&rows, &cited);
 
     let valid_specs = valid_specs(&go_tests);
     let unknown_tags: BTreeMap<String, Vec<String>> = tags
@@ -119,16 +148,86 @@ fn run(root: &Path, strict: bool, list_missing: bool) -> Result<ExitCode, String
     }
 
     print_report(&per_area, &unknown_tags, strict);
+    print_audit(&scan.untested_tags, &row_audit);
 
     if list_missing {
         print_missing(&missing);
     }
+    if list_rows {
+        print_rows(&rows, &cited);
+    }
 
     let total_missing: usize = per_area.values().map(|counts| counts.missing).sum();
-    if strict && (total_missing > 0 || !unknown_tags.is_empty()) {
+    let audit_failed = !scan.untested_tags.is_empty()
+        || !row_audit.unknown.is_empty()
+        || !row_audit.unasserted.is_empty();
+    if strict && (total_missing > 0 || !unknown_tags.is_empty() || audit_failed) {
         return Ok(ExitCode::FAILURE);
     }
     Ok(ExitCode::SUCCESS)
+}
+
+/// The divergence rows cited by tests and the replay allowlist, checked against
+/// `DIVERGENCES.md`.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct RowAudit {
+    /// Cited ids with no row, and where they are cited.
+    unknown: BTreeMap<String, Vec<String>>,
+    /// Rows no test names.
+    unasserted: Vec<String>,
+    /// How many citations each row has.
+    citations: BTreeMap<String, usize>,
+}
+
+fn audit_rows(rows: &BTreeSet<String>, cited: &BTreeMap<String, Vec<String>>) -> RowAudit {
+    let mut audit = RowAudit::default();
+    for (id, places) in cited {
+        if rows.contains(id) {
+            audit.citations.insert(id.clone(), places.len());
+        } else {
+            audit.unknown.insert(id.clone(), places.clone());
+        }
+    }
+    let mut unasserted: Vec<String> = rows
+        .iter()
+        .filter(|row| !cited.contains_key(*row))
+        .cloned()
+        .collect();
+    unasserted.sort_by_key(|id| id[1..].parse::<u32>().unwrap_or(u32::MAX));
+    audit.unasserted = unasserted;
+    audit
+}
+
+/// Every `divergences` id in the replay allowlist (rules and entries).
+fn allowlist_divergences(path: &Path) -> Result<Vec<String>, String> {
+    let text = match fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(format!("read {}: {error}", path.display())),
+    };
+    let value: Value = serde_json::from_str(&text)
+        .map_err(|error| format!("parse {}: {error}", path.display()))?;
+    let mut ids = Vec::new();
+    for key in ["rules", "entries"] {
+        for item in value
+            .get(key)
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            for id in item
+                .get("divergences")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+            {
+                if let Some(id) = id.as_str() {
+                    ids.push(id.to_string());
+                }
+            }
+        }
+    }
+    Ok(ids)
 }
 
 /// Decide how a Go test is covered. A `parity:` tag wins over a divergence row.
@@ -203,27 +302,112 @@ fn load_manifest_go_tests(manifest_dir: &Path) -> Result<Vec<GoTest>, String> {
     Ok(go_tests)
 }
 
-/// Walk `crates/` for `.rs` files and collect every `parity:` tag spec with its locations.
-fn scan_parity_tags(crates_dir: &Path) -> Result<BTreeMap<String, Vec<String>>, String> {
+/// What the source scan found.
+#[derive(Debug, Default)]
+struct Scan {
+    /// Every `parity:` tag spec in test code, with its locations.
+    tags: BTreeMap<String, Vec<String>>,
+    /// Tags outside test code (they claim nothing).
+    untested_tags: Vec<String>,
+    /// Every divergence id a test cites: a `divergence!("D<n>")` marker or a `D<n>` in a
+    /// test comment, with its locations.
+    divergence_mentions: BTreeMap<String, Vec<String>>,
+}
+
+/// True for a file under a `tests/` or `benches/` directory of a crate.
+fn is_test_file(path: &Path) -> bool {
+    path.components()
+        .any(|part| matches!(part.as_os_str().to_str(), Some("tests" | "benches")))
+}
+
+/// Walk `crates/` for `.rs` files: the `parity:` tags and the divergence citations in test
+/// code. A source file's test code starts at its first `#[cfg(test)]`.
+fn scan_sources(crates_dir: &Path) -> Result<Scan, String> {
     let mut sources = Vec::new();
     collect_rs_files(crates_dir, &mut sources)?;
     sources.sort();
 
-    let mut tags: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut scan = Scan::default();
     for source in sources {
+        // This checker's own examples are not evidence for any row.
+        if source.ends_with("parity-support/src/bin/parity_coverage.rs") {
+            continue;
+        }
         let text = fs::read_to_string(&source)
             .map_err(|error| format!("read {}: {error}", source.display()))?;
+        let mut in_test = is_test_file(&source);
         for (index, line) in text.lines().enumerate() {
+            if line.trim_start().starts_with("#[cfg(test)]") {
+                in_test = true;
+            }
+            let place = format!("{}:{}", source.display(), index + 1);
             if let Some(spec) = tag_spec(line) {
-                tags.entry(spec.to_string()).or_default().push(format!(
-                    "{}:{}",
-                    source.display(),
-                    index + 1
-                ));
+                if in_test {
+                    scan.tags
+                        .entry(spec.to_string())
+                        .or_default()
+                        .push(place.clone());
+                } else {
+                    scan.untested_tags.push(format!("{spec}  ({place})"));
+                }
+            }
+            if in_test {
+                for id in divergence_citations(line) {
+                    scan.divergence_mentions
+                        .entry(id)
+                        .or_default()
+                        .push(place.clone());
+                }
             }
         }
     }
-    Ok(tags)
+    Ok(scan)
+}
+
+/// The divergence ids a test line cites: a `divergence!("D<n>")` marker anywhere on the
+/// line, or a `D<n>` token in its comment.
+fn divergence_citations(line: &str) -> Vec<String> {
+    let mut ids = Vec::new();
+    let mut rest = line;
+    while let Some(at) = rest.find("divergence!(\"") {
+        let after = &rest[at + "divergence!(\"".len()..];
+        if let Some(id) = divergence_token(after) {
+            ids.push(id);
+        }
+        rest = after;
+    }
+    // In prose only one- and two-digit ids count, so hex such as a UTF-16 unit `D800` is not
+    // read as a citation. Markers and the allowlist are checked at any length.
+    if let Some(at) = line.find("//") {
+        let comment = &line[at..];
+        let bytes = comment.as_bytes();
+        for (index, _) in comment.match_indices('D') {
+            let boundary = index == 0 || !bytes[index - 1].is_ascii_alphanumeric();
+            if boundary
+                && let Some(id) = divergence_token(&comment[index..])
+                && id.len() <= 3
+            {
+                ids.push(id);
+            }
+        }
+    }
+    ids.dedup();
+    ids
+}
+
+/// `D<digits>` at the start of `text`, ending at a non-alphanumeric character.
+fn divergence_token(text: &str) -> Option<String> {
+    let digits: String = text
+        .strip_prefix('D')?
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect();
+    let next = text[1 + digits.len()..].chars().next();
+    if digits.is_empty() || next.is_some_and(|c| c.is_ascii_alphanumeric() || c == '_') {
+        None
+    } else {
+        Some(format!("D{digits}"))
+    }
 }
 
 /// Extract a tag spec from a comment whose body starts with `parity:`. Returns the trimmed
@@ -329,6 +513,45 @@ fn print_report(
         );
         for (spec, locations) in unknown_tags {
             println!("  {spec}  ({})", locations.join(", "));
+        }
+    }
+}
+
+/// Each DIVERGENCES row with the number of test citations and the first one.
+fn print_rows(rows: &BTreeSet<String>, cited: &BTreeMap<String, Vec<String>>) {
+    println!("\n== divergence rows (row: citations, first) ==");
+    let mut ordered: Vec<&String> = rows.iter().collect();
+    ordered.sort_by_key(|id| id[1..].parse::<u32>().unwrap_or(u32::MAX));
+    for id in ordered {
+        match cited.get(id.as_str()) {
+            Some(places) => println!("  {id}: {} ({})", places.len(), places[0]),
+            None => println!("  {id}: 0"),
+        }
+    }
+}
+
+fn print_audit(untested_tags: &[String], audit: &RowAudit) {
+    println!(
+        "\n== divergence rows: {} cited by tests, {} named by no test ==",
+        audit.citations.len(),
+        audit.unasserted.len()
+    );
+    if !audit.unasserted.is_empty() {
+        println!("!! rows no test names: {}", audit.unasserted.join(", "));
+    }
+    if !audit.unknown.is_empty() {
+        println!("!! cited ids with no DIVERGENCES row:");
+        for (id, places) in &audit.unknown {
+            println!("  {id}  ({})", places.join(", "));
+        }
+    }
+    if !untested_tags.is_empty() {
+        println!(
+            "!! {} parity tag(s) outside test code:",
+            untested_tags.len()
+        );
+        for tag in untested_tags {
+            println!("  {tag}");
         }
     }
 }
@@ -457,6 +680,50 @@ mod tests {
     }
 
     #[test]
+    fn divergence_citations_read_markers_and_comment_tokens() {
+        assert_eq!(
+            divergence_citations(r#"    let _d16 = parity_support::divergence!("D16");"#),
+            ["D16"]
+        );
+        assert_eq!(
+            divergence_citations("    // D21/D22: sqlx and graphile"),
+            ["D21", "D22"]
+        );
+        assert_eq!(
+            divergence_citations("/// DIVERGENCE: D16 and D40."),
+            ["D16", "D40"]
+        );
+        // Not a comment, not a marker, or not a bare token.
+        assert!(divergence_citations(r#"    let d = "D16";"#).is_empty());
+        assert!(divergence_citations("    // ID12 D12x AD3 D_4").is_empty());
+        // Hex in prose is not a citation; a marker is checked at any length.
+        assert!(divergence_citations("    // U+10000 is D800 DC00 in UTF-16").is_empty());
+        assert_eq!(divergence_citations(r#"divergence!("D400")"#), ["D400"]);
+    }
+
+    #[test]
+    fn row_audit_finds_unknown_and_unasserted_rows() {
+        let rows: BTreeSet<String> = ["D1", "D2", "D10"]
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect();
+        let mut cited: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        cited.insert("D2".into(), vec!["a.rs:1".into()]);
+        cited.insert("D99".into(), vec!["b.rs:2".into()]);
+        let audit = audit_rows(&rows, &cited);
+        assert_eq!(audit.unasserted, ["D1", "D10"]);
+        assert_eq!(audit.unknown.keys().collect::<Vec<_>>(), ["D99"]);
+        assert_eq!(audit.citations.get("D2"), Some(&1));
+    }
+
+    #[test]
+    fn test_code_is_a_tests_dir_or_after_cfg_test() {
+        assert!(is_test_file(Path::new("crates/x/tests/a.rs")));
+        assert!(is_test_file(Path::new("crates/x/tests/replay/mod.rs")));
+        assert!(!is_test_file(Path::new("crates/x/src/lib.rs")));
+    }
+
+    #[test]
     fn manifests_and_repo_scan_are_consistent() {
         // Runs against the real repository: every manifest test lands in exactly one bucket.
         let root = repo_root().expect("repo root");
@@ -468,7 +735,9 @@ mod tests {
             go_tests.len()
         );
 
-        let tags = scan_parity_tags(&root.join("crates")).expect("scan crates");
+        let tags = scan_sources(&root.join("crates"))
+            .expect("scan crates")
+            .tags;
         let divergences_text =
             fs::read_to_string(parity_path("DIVERGENCES.md").expect("divergences path"))
                 .expect("read divergences");

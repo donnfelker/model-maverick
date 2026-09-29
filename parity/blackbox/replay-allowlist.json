@@ -216,9 +216,10 @@
     },
     {
       "divergences": [
+        "D25",
         "D36"
       ],
-      "reason": "The engine-authored prefix 'malformed request body: ' is kept; the decoder's own text after it is Rust's (serde_json), not Go's encoding/json.",
+      "reason": "The engine-authored prefix 'malformed request body: ' is kept (D25, a case of the general D36 rule); the decoder's own text after it is Rust's (serde_json), not Go's encoding/json.",
       "match": [
         {
           "method": "POST",
