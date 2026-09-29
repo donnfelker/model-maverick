@@ -1,0 +1,8 @@
+---
+source: crates/maverick-core/tests/projection.rs
+description: "chat: one user message"
+---
+truncated: false
+---
+[conversation]
+user: Extract the parties and the effective date from this contract.

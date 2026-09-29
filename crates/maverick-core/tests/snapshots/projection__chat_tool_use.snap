@@ -1,0 +1,19 @@
+---
+source: crates/maverick-core/tests/projection.rs
+description: "chat: tools, assistant tool_calls (arguments in JCS), tool results"
+---
+truncated: false
+---
+[system]
+You are a travel assistant.
+
+[tools]
+get_weather: Current weather for a city.
+search_docs
+
+[conversation]
+user: Do I need an umbrella in Paris today?
+assistant: tool_call get_weather {"city":"Paris","units":"metric"}
+tool: {"rain_probability": 0.8}
+assistant: Yes, rain is likely.
+user: And tomorrow?

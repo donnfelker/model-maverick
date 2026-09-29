@@ -143,6 +143,22 @@ mod tests {
 
     /// Drives every `parse_alias-*` row from the parity fixture. These are the Go-parity
     /// rows and carry no suffix, so `settings_mode` is always `Apply` here.
+    // parity: proxy.TestParseAlias
+    // parity: proxy.TestParseAlias/top-level_auto
+    // parity: proxy.TestParseAlias/top-level_quality
+    // parity: proxy.TestParseAlias/top-level_cost
+    // parity: proxy.TestParseAlias/pool_with_auto
+    // parity: proxy.TestParseAlias/pool_with_quality
+    // parity: proxy.TestParseAlias/pool_with_cost
+    // parity: proxy.TestParseAlias/concrete_model
+    // parity: proxy.TestParseAlias/concrete_anthropic_model
+    // parity: proxy.TestParseAlias/empty_string
+    // parity: proxy.TestParseAlias/bare_prefix
+    // parity: proxy.TestParseAlias/unknown_top-level_mode
+    // parity: proxy.TestParseAlias/unknown_pool_mode
+    // parity: proxy.TestParseAlias/empty_pool
+    // parity: proxy.TestParseAlias/empty_mode_after_colon
+    // parity: proxy.TestParseAlias/double_colon
     #[test]
     fn parse_alias_parity_rows() {
         let rows = parse_alias_rows();

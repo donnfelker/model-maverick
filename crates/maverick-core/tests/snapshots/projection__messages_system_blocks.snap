@@ -1,0 +1,12 @@
+---
+source: crates/maverick-core/tests/projection.rs
+description: "messages: top-level system as text blocks"
+---
+truncated: false
+---
+[system]
+You are a contracts analyst.
+Cite clauses.
+
+[conversation]
+user: Which party can terminate early?

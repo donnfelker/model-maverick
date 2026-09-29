@@ -1,0 +1,9 @@
+---
+source: crates/maverick-core/tests/projection.rs
+description: "chat: image, audio, and file parts contribute nothing"
+---
+truncated: false
+---
+[conversation]
+user: What is in these?
+Describe each briefly.

@@ -1,0 +1,9 @@
+---
+source: crates/maverick-core/tests/projection.rs
+description: "messages: an assistant prefill after the question does not push the question out"
+---
+truncated: false
+---
+[conversation]
+user: Classify this ticket as bug, feature, or question: the export button does nothing.
+assistant: {

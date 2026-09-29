@@ -1,0 +1,10 @@
+---
+source: crates/maverick-core/tests/projection.rs
+description: "chat: older turns past the 16,000 budget are dropped; the walk stops at the first misfit"
+---
+truncated: false
+---
+[conversation]
+user: ⟦c×6000⟧
+assistant: ⟦c×6000⟧
+user: latest question
