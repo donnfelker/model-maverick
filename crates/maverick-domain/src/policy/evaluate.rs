@@ -164,9 +164,7 @@ pub fn evaluate(
         }
     } else {
         let excesses: Vec<f64> = checked.iter().map(|(_, found)| excess(found)).collect();
-        let best = excesses
-            .iter()
-            .fold(f64::INFINITY, |best, &e| if e < best { e } else { best });
+        let best = excesses.iter().copied().fold(f64::INFINITY, f64::min);
         let mut retained = Vec::new();
         for ((column, found), e) in checked.into_iter().zip(excesses) {
             // Exact float equality (QUIRK): differently rounded equal excesses do not tie.
