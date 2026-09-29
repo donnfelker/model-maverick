@@ -263,12 +263,12 @@ fn valid_config_reaches_the_pending_body_and_fails_loudly() {
         ),
     ]
     .map(|(k, v)| (k.to_owned(), v.to_owned()));
-    let (code, stdout, stderr) = invoke(&strings(&["serve", "--api-only"]), &env);
+    let (code, stdout, stderr) = invoke(&strings(&["demo-run"]), &env);
     assert_eq!(code, 1);
     assert_eq!(stderr, "");
     assert_eq!(
         mask_times(&stdout),
-        "{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"serve: not implemented yet\",\
-         \"bead\":\"model-maverick-rust-port-3hk.3.12\"}\n"
+        "{\"time\":\"<TS>\",\"level\":\"ERROR\",\"msg\":\"demo-run: not implemented yet\",\
+         \"bead\":\"model-maverick-rust-port-3hk.3.13\"}\n"
     );
 }

@@ -112,16 +112,18 @@ fn serve(
     let Some(flags) = parse_flags(&set, args, &mut stderr) else {
         return EXIT_USAGE;
     };
-    with_logger(stdout, || {
-        if flags.bool("api-only") && flags.bool("worker-only") {
+    let (api_only, worker_only) = (flags.bool("api-only"), flags.bool("worker-only"));
+    let loaded = with_logger(stdout.clone(), || {
+        if api_only && worker_only {
             tracing::error!("serve: --api-only and --worker-only are mutually exclusive");
-            return EXIT_USAGE;
+            return Err(EXIT_USAGE);
         }
-        if load_config(lookup).is_err() {
-            return EXIT_FAILURE;
-        }
-        not_implemented("serve", "model-maverick-rust-port-3hk.3.12")
-    })
+        load_config(lookup).map_err(|_| EXIT_FAILURE)
+    });
+    match loaded {
+        Ok(config) => crate::serve::serve(config, api_only, worker_only, stdout),
+        Err(code) => code,
+    }
 }
 
 /// `migrate` (§7.7): loads the FULL config (QUIRK: only the database URL is used), then

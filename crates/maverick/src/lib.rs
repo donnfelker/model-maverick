@@ -11,6 +11,7 @@ mod cli;
 pub mod flags;
 pub mod logging;
 pub mod otel;
+mod serve;
 
 pub use cli::{CORPUS_USAGE, MAIN_USAGE, run};
 pub use logging::Output;
