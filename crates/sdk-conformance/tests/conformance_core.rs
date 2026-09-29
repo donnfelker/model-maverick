@@ -19,8 +19,7 @@
 //!   hosted-mode gating, so the tenant key stays `mk_test_conformance` (groups 10 to 12).
 //! - A concrete model name passes through untouched, with no recommend call (S09a).
 //!
-//! This covers groups 5, 6, 10, 11, and 12 and S09a. S06j (the zero-retention workload-form
-//! switch) is deferred; see `CORE_DEFER`.
+//! This covers every core-only scenario: groups 5, 6, 10, 11, and 12, and S09a.
 
 mod common;
 
@@ -59,10 +58,9 @@ const CORE_GROUPS: [u64; 5] = [5, 6, 10, 11, 12];
 /// passthrough (group 9).
 const CORE_EXTRA: [&str; 1] = ["S09a"];
 
-/// Group 6 scenarios not yet covered. S06j switches the workload to the declared form once
-/// the tenant is known zero retention, which reuses the engine's cached classification; that
-/// is the next phase on this bead.
-const CORE_DEFER: [&str; 1] = ["S06j"];
+/// Scenarios in a covered group that are still deferred. Empty: the runner covers every
+/// core-only scenario, including S06j (the zero-retention workload-form switch).
+const CORE_DEFER: [&str; 0] = [];
 
 /// Per-scenario wiring shared by every step.
 struct Ctx {
@@ -188,8 +186,9 @@ async fn run_scenario_core(loaded: &Loaded) -> Result<(), String> {
 
     let privacy = match config.get("privacy").and_then(Value::as_str) {
         Some("off") => Privacy::Off,
-        Some("prompt") => Privacy::Prompt,
-        _ => Privacy::Declared,
+        Some("declared") => Privacy::Declared,
+        // The SDK default sends the prompt for classification unless told otherwise.
+        _ => Privacy::Prompt,
     };
     let failopen = FailOpen::new(FailOpenConfig {
         default_model: config
@@ -261,9 +260,18 @@ async fn run_call(ctx: &Ctx, call: &Value, expect: &Value, where_: &str) -> Resu
         }
     };
 
+    // A declared header is always honored. Otherwise the prompt is projected only when
+    // privacy allows it and the tenant is not known zero retention; a zero-retention tenant
+    // sends the declared fallback so nothing about the prompt leaves the process (S06j).
     let workload_header = call.get("workload").and_then(Value::as_str);
-    let workload = Workload::for_chat_request(&body, workload_header)
-        .map_err(|e| format!("{where_}: workload: {e}"))?;
+    let workload = if workload_header.is_some() {
+        Workload::for_chat_request(&body, workload_header)
+            .map_err(|e| format!("{where_}: workload: {e}"))?
+    } else if ctx.privacy == Privacy::Prompt && !ctx.failopen.is_zero_retention(&ctx.tenant) {
+        Workload::for_chat_request(&body, None).map_err(|e| format!("{where_}: workload: {e}"))?
+    } else {
+        Workload::declared_fallback()
+    };
     let request = RecommendRequest::for_alias(&alias, workload);
     let tenant_key = TenantKey::new(ctx.tenant.clone());
     let trace = TraceHeaders {
