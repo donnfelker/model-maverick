@@ -90,12 +90,6 @@ pub(crate) fn load_config(lookup: &dyn Fn(&str) -> Option<String>) -> Result<Con
     loaded
 }
 
-/// The stop for a command body that another bead still has to write.
-fn not_implemented(command: &str, bead: &str) -> i32 {
-    tracing::error!(bead, "{command}: not implemented yet");
-    EXIT_FAILURE
-}
-
 /// `serve [--api-only] [--worker-only]` (§7.3). Logs to stdout.
 fn serve(
     args: &[String],
@@ -183,15 +177,15 @@ fn demo_run(
             "scripts/demo/fixtures",
             "directory of deterministic fake-provider fixtures",
         );
-    if parse_flags(&set, args, &mut stderr).is_none() {
+    let Some(flags) = parse_flags(&set, args, &mut stderr) else {
         return EXIT_USAGE;
-    }
-    with_logger(stdout, || {
-        if load_config(lookup).is_err() {
-            return EXIT_FAILURE;
-        }
-        not_implemented("demo-run", "model-maverick-rust-port-3hk.3.13")
-    })
+    };
+    crate::demo::run(
+        flags.string("seed"),
+        flags.string("fake-fixtures"),
+        lookup,
+        stdout,
+    )
 }
 
 /// `corpus <load|activate|status|calibrate>` (§7.5).

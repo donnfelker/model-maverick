@@ -9,6 +9,7 @@
 
 mod cli;
 mod corpus;
+mod demo;
 pub mod flags;
 pub mod logging;
 pub mod otel;
