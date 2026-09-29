@@ -1,9 +1,12 @@
 //! Corpus versions and tasks.
 //!
-//! Go sources: `parity/schema/queries/corpus_versions.sql` and `tasks.sql`.
+//! Go sources: `parity/schema/queries/corpus_versions.sql` and `tasks.sql`, plus the
+//! `Store` and `Activate` transactions of `internal/tasks` ([`store_corpus`],
+//! [`activate_corpus`]; reference Part 1 §3, Part 2 §13.3).
 
 use chrono::{DateTime, Utc};
-use sqlx::PgExecutor;
+use maverick_domain::tasks::Corpus;
+use sqlx::{PgExecutor, PgPool};
 
 use crate::{Json, JsonRawValue};
 
@@ -318,4 +321,147 @@ pub async fn list_active_tasks_by_corpus_version<'e>(
     )
     .fetch_all(db)
     .await
+}
+
+// ---- internal/tasks Store and Activate ----
+
+/// An error from [`store_corpus`] or [`activate_corpus`]. The texts are the Go ones.
+#[derive(Debug, thiserror::Error)]
+pub enum CorpusError {
+    #[error("tasks: store: version is required")]
+    VersionRequired,
+    #[error("tasks: store {version}: corpus has no tasks")]
+    NoTasks { version: String },
+    #[error("tasks: store {version}: task {id}: {message}")]
+    Task {
+        version: String,
+        id: String,
+        message: String,
+    },
+    #[error("tasks: store {version}: deactivating removed tasks: {source}")]
+    Deactivate {
+        version: String,
+        source: sqlx::Error,
+    },
+    #[error("tasks: store {version}: {source}")]
+    Store {
+        version: String,
+        source: sqlx::Error,
+    },
+    /// `ErrUnknownVersion` in Go.
+    #[error("tasks: activate \"{version}\": unknown corpus version")]
+    UnknownVersion { version: String },
+    #[error("tasks: activate {version}: {source}")]
+    Activate {
+        version: String,
+        source: sqlx::Error,
+    },
+}
+
+/// Persists a loaded corpus under `version` in one transaction (Go `tasks.Store`).
+///
+/// The version row is upserted inactive (a reload keeps its active flag), every task is
+/// upserted in load order and marked active, and the version's tasks that are not in
+/// the corpus are deactivated. Any error rolls everything back. Validate the corpus
+/// first; this function does not.
+///
+/// QUIRK Q-T3: the task id is the primary key, so a task id that exists under another
+/// version moves to this one.
+pub async fn store_corpus(
+    pool: &PgPool,
+    version: &str,
+    description: &str,
+    corpus: &Corpus,
+) -> Result<(), CorpusError> {
+    if version.is_empty() {
+        return Err(CorpusError::VersionRequired);
+    }
+    if corpus.tasks.is_empty() {
+        return Err(CorpusError::NoTasks {
+            version: version.to_owned(),
+        });
+    }
+    let store_err = |source| CorpusError::Store {
+        version: version.to_owned(),
+        source,
+    };
+    let task_count = i32::try_from(corpus.tasks.len()).unwrap_or(i32::MAX);
+
+    let mut tx = pool.begin().await.map_err(store_err)?;
+    upsert_corpus_version(&mut *tx, version, description, task_count, false)
+        .await
+        .map_err(store_err)?;
+    let mut ids = Vec::with_capacity(corpus.tasks.len());
+    for task in &corpus.tasks {
+        let task_err = |message: String| CorpusError::Task {
+            version: version.to_owned(),
+            id: task.id.clone(),
+            message,
+        };
+        let raw = |text: String| JsonRawValue::from_string(text).map_err(|err| err.to_string());
+        let knobs = task
+            .difficulty_knobs_json()
+            .and_then(raw)
+            .map_err(task_err)?;
+        let weights = task
+            .dimension_weights_json()
+            .and_then(raw)
+            .map_err(task_err)?;
+        let attachments = raw(task.attachments_json()).map_err(task_err)?;
+        let graders = raw(task.grader_specs_json()).map_err(task_err)?;
+        let row = TaskUpsert {
+            id: &task.id,
+            capability: &task.capability,
+            domain_tags: &task.domain_tags,
+            // Go converted int to int16 and int32 with wraparound; validation rejects
+            // such values before a store.
+            difficulty_tier: task.tier_or_zero() as i16,
+            difficulty_knobs: &knobs,
+            prompt: &task.prompt,
+            attachments: &attachments,
+            temperature: task.temperature,
+            max_tokens: task.max_tokens.unwrap_or(0) as i32,
+            grader_specs: &graders,
+            dimension_weights: &weights,
+            pass_threshold: task.pass_threshold as f32,
+            smoke_member: task.smoke_member,
+            corpus_version: version,
+            active: true,
+        };
+        upsert_task(&mut *tx, &row)
+            .await
+            .map_err(|err| task_err(err.to_string()))?;
+        ids.push(task.id.clone());
+    }
+    deactivate_corpus_tasks_not_in(&mut *tx, version, &ids)
+        .await
+        .map_err(|source| CorpusError::Deactivate {
+            version: version.to_owned(),
+            source,
+        })?;
+    tx.commit().await.map_err(store_err)
+}
+
+/// Makes `version` the only active corpus version in one transaction (Go
+/// `tasks.Activate`). The advisory lock serializes concurrent activations, and readers
+/// see exactly one active version at every moment.
+pub async fn activate_corpus(pool: &PgPool, version: &str) -> Result<(), CorpusError> {
+    let activate_err = |source| CorpusError::Activate {
+        version: version.to_owned(),
+        source,
+    };
+    let mut tx = pool.begin().await.map_err(activate_err)?;
+    acquire_corpus_activation_lock(&mut *tx, CORPUS_ACTIVATION_LOCK_KEY)
+        .await
+        .map_err(activate_err)?;
+    let touched = activate_corpus_version(&mut *tx, version)
+        .await
+        .map_err(activate_err)?;
+    if touched == 0 {
+        tx.rollback().await.map_err(activate_err)?;
+        return Err(CorpusError::UnknownVersion {
+            version: version.to_owned(),
+        });
+    }
+    tx.commit().await.map_err(activate_err)
 }
