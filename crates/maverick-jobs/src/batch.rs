@@ -602,6 +602,7 @@ pub async fn run_batch(
         duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
         "batch complete"
     );
+    crate::metrics::batch_spend(kind, output.actual_usd);
     Ok(BatchOutcome::Ran(output))
 }
 

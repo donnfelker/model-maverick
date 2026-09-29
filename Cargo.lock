@@ -2454,6 +2454,8 @@ dependencies = [
  "maverick-runner",
  "maverick-store",
  "maverick-testdb",
+ "opentelemetry",
+ "opentelemetry_sdk",
  "parity-support",
  "regex-syntax",
  "reqwest",
@@ -2473,6 +2475,8 @@ name = "maverick-providers"
 version = "0.1.0"
 dependencies = [
  "maverick-domain",
+ "opentelemetry",
+ "opentelemetry_sdk",
  "parity-support",
  "rand 0.10.3",
  "reqwest",

@@ -19,6 +19,30 @@ pub struct WorkerHeartbeat {
     pub age_seconds: f64,
 }
 
+/// The runnable jobs of the queue schema.
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct QueueStats {
+    /// Jobs that are unlocked, not exhausted, and due.
+    pub depth: i64,
+    /// Seconds since the oldest such job became due, by the database clock; 0 when none.
+    pub oldest_age_seconds: f64,
+}
+
+/// The queue depth and the oldest runnable job's age, for the queue metrics.
+pub async fn queue_stats<'e>(db: impl PgExecutor<'e>, schema: &str) -> sqlx::Result<QueueStats> {
+    let sql = format!(
+        "select count(*)::int8 as depth,
+                coalesce(extract(epoch from (now() - min(run_at))), 0)::float8
+                  as oldest_age_seconds
+         from {}._private_jobs
+         where locked_at is null and attempts < max_attempts and run_at <= now()",
+        quote_identifier(schema)
+    );
+    sqlx::query_as::<_, QueueStats>(AssertSqlSafe(sql))
+        .fetch_one(db)
+        .await
+}
+
 /// Every registered worker, ordered by id. An empty list means no worker is running.
 /// Workers deregister on clean shutdown; a crashed worker stays until graphile_worker
 /// sweeps it, with a growing heartbeat age.

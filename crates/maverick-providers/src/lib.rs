@@ -26,6 +26,7 @@ use tokio::time::Instant;
 pub mod anthropic;
 pub mod fake;
 pub mod google;
+mod metrics;
 pub mod openai;
 
 pub type ProviderResult<T> = Result<T, ProviderError>;
@@ -587,6 +588,31 @@ where
     }
 
     unreachable!("retry loop returns from every branch")
+}
+
+/// [`retry_provider`] for a client call: it also records the call's final status and
+/// its retries under `provider` (spec §14.3).
+pub async fn retry_provider_observed<T, F, Fut>(
+    provider: &'static str,
+    policy: RetryPolicy,
+    mut operation: F,
+) -> Result<T, ProviderError>
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<T, ProviderError>>,
+{
+    let mut attempts = 0usize;
+    let result = retry_provider(policy, || {
+        attempts += 1;
+        operation()
+    })
+    .await;
+    let status = match &result {
+        Ok(_) => "ok",
+        Err(error) => error.kind().as_str(),
+    };
+    metrics::provider_call(provider, status, attempts);
+    result
 }
 
 pub async fn retry_provider<T, F, Fut>(

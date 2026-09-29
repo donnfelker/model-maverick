@@ -12,6 +12,7 @@ mod health;
 mod history;
 mod internal;
 pub mod mcp;
+mod metrics;
 mod models;
 pub mod observe;
 mod policies;

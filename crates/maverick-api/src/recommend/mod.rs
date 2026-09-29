@@ -215,8 +215,42 @@ pub(crate) async fn checks_handler(Path(path): Path<String>, request: Request) -
     }
 }
 
-/// Makes and persists one recommendation for `identity` from a request body.
+/// Makes and persists one recommendation for `identity` from a request body, and records
+/// the recommend metrics (spec §14.3).
 pub async fn recommend(
+    pool: &PgPool,
+    config: &RecommendConfig,
+    identity: &Identity,
+    body: &[u8],
+) -> Result<Recommended, RecommendError> {
+    let started = std::time::Instant::now();
+    let result = recommend_uninstrumented(pool, config, identity, body).await;
+    let succeeded = result.as_ref().ok().map(|recommended| {
+        #[derive(serde::Deserialize)]
+        struct Labels {
+            #[serde(default)]
+            measured: bool,
+            #[serde(default)]
+            classification: Method,
+        }
+        #[derive(Default, serde::Deserialize)]
+        struct Method {
+            #[serde(default)]
+            method: String,
+        }
+        let labels: Option<Labels> = serde_json::from_str(&recommended.body).ok();
+        labels.map_or((false, "other"), |l| {
+            (
+                l.measured,
+                crate::metrics::method_label(&l.classification.method),
+            )
+        })
+    });
+    crate::metrics::recommend_finished(started.elapsed(), succeeded);
+    result
+}
+
+async fn recommend_uninstrumented(
     pool: &PgPool,
     config: &RecommendConfig,
     identity: &Identity,
