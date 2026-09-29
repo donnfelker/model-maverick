@@ -11,7 +11,8 @@ use maverick_testdb::{Schema, database};
 static SCHEMA: LazyLock<Schema> = LazyLock::new(|| Schema::sqlx(&MIGRATOR));
 
 /// A minimal valid corpus, relative to the crate directory (the test working directory).
-const VALID_DIR: &str = "../../parity/fixtures/measurement-io/testdata/internal/tasks/testdata/valid";
+const VALID_DIR: &str =
+    "../../parity/fixtures/measurement-io/testdata/internal/tasks/testdata/valid";
 
 #[derive(Clone)]
 struct Shared(Arc<Mutex<Vec<u8>>>);
@@ -44,8 +45,9 @@ async fn cli(args: &[&str], env: Vec<(String, String)>) -> (i32, String, String)
             Output::new(Shared(out.clone())),
             Output::new(Shared(err.clone())),
         );
-        let read =
-            |buffer: &Arc<Mutex<Vec<u8>>>| String::from_utf8(buffer.lock().expect("lock").clone()).expect("utf8");
+        let read = |buffer: &Arc<Mutex<Vec<u8>>>| {
+            String::from_utf8(buffer.lock().expect("lock").clone()).expect("utf8")
+        };
         (code, read(&out), read(&err))
     })
     .await
@@ -60,7 +62,10 @@ async fn corpus_load_activate_status_calibrate_round_trip() {
     let env = vec![
         ("MAVERICK_DATABASE_URL".to_owned(), db.url().to_owned()),
         ("MAVERICK_CAPTURE_MASTER_KEY".to_owned(), "ab".repeat(32)),
-        ("MAVERICK_INTERNAL_TOKENS".to_owned(), "rails:s3cret".to_owned()),
+        (
+            "MAVERICK_INTERNAL_TOKENS".to_owned(),
+            "rails:s3cret".to_owned(),
+        ),
     ];
 
     // load: a valid corpus stores inactive (warnings on stderr, success on stdout).
@@ -70,7 +75,10 @@ async fn corpus_load_activate_status_calibrate_round_trip() {
     )
     .await;
     assert_eq!(code, 0, "load exit; stderr: {err}");
-    assert!(out.contains("loaded corpus version v-test:"), "load stdout: {out}");
+    assert!(
+        out.contains("loaded corpus version v-test:"),
+        "load stdout: {out}"
+    );
     assert!(
         out.contains("(inactive; run `maverick corpus activate --version v-test`)"),
         "load stdout: {out}"
@@ -87,12 +95,18 @@ async fn corpus_load_activate_status_calibrate_round_trip() {
     // activate: the version becomes active, with the exact message.
     let (code, out, err) = cli(&["corpus", "activate", "--version", "v-test"], env.clone()).await;
     assert_eq!(code, 0, "activate exit; stderr: {err}");
-    assert_eq!(out, "corpus version v-test is now active\n", "activate stdout");
+    assert_eq!(
+        out, "corpus version v-test is now active\n",
+        "activate stdout"
+    );
 
     // status: now active.
     let (code, out, _) = cli(&["corpus", "status"], env.clone()).await;
     assert_eq!(code, 0);
-    assert!(out.contains("v-test") && out.contains("true"), "status active: {out}");
+    assert!(
+        out.contains("v-test") && out.contains("true"),
+        "status active: {out}"
+    );
 
     // calibrate: no measured aggregates yet, so the no-data report and exit 0.
     let (code, out, _) = cli(&["corpus", "calibrate"], env.clone()).await;
