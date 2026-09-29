@@ -6,6 +6,7 @@
 pub mod batch;
 pub mod catalog;
 pub mod fold;
+pub mod predictions;
 pub mod probes;
 pub mod rebuild;
 pub mod regression_scan;
