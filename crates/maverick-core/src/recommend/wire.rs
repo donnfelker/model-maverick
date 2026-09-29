@@ -193,6 +193,11 @@ fn chain_entry(value: &Value) -> Result<ChainEntry, String> {
         .into_iter()
         .map(|(alias, mode)| (alias, RetentionMode::parse(&mode)))
         .collect();
+    // D29 is Rust-only: a malformed value fails open to the Go mappings instead of
+    // failing the decode.
+    for value in members(object, "param_constraints") {
+        entry.param_constraints = crate::normalize::parse_constraints(value);
+    }
     Ok(entry)
 }
 

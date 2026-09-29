@@ -244,6 +244,9 @@ pub struct ChainEntry {
     pub execution_aliases: BTreeMap<String, String>,
     /// Each execution alias's effective retention mode (D15).
     pub execution_alias_retention: BTreeMap<String, RetentionMode>,
+    /// The model's parameter constraints from the catalog (D29), keyed by
+    /// surface-neutral field. Empty means the Go mappings apply.
+    pub param_constraints: crate::normalize::ParamConstraints,
 }
 
 /// A decoded recommend response.
@@ -541,6 +544,22 @@ mod tests {
         assert!(shown.contains("<redacted, 18 chars>"), "{shown}");
         let key = format!("{:?}", TenantKey::new("mk_live_abc"));
         assert_eq!(key, "TenantKey(<redacted>)");
+    }
+
+    /// D29: entries carry the catalog constraints; a malformed value is no constraint.
+    #[test]
+    fn entries_carry_param_constraints() {
+        let body = br#"{"recommendations":[
+            {"model":"a","param_constraints":{"reasoning_effort":{"allowed":["low","high"],"order":["low","medium","high"]}}},
+            {"model":"b","param_constraints":"garbage"},
+            {"model":"c"}
+        ]}"#;
+        let decoded = wire::decode_response(body).expect("decodes");
+        let effort = &decoded.chain[0].param_constraints[crate::normalize::REASONING_EFFORT];
+        assert_eq!(effort.allowed.len(), 2);
+        assert_eq!(effort.order.len(), 3);
+        assert!(decoded.chain[1].param_constraints.is_empty());
+        assert!(decoded.chain[2].param_constraints.is_empty());
     }
 
     #[test]
