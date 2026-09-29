@@ -28,7 +28,7 @@ use sqlx::{PgConnection, PgPool};
 use crate::fold::{CellKey, FoldParams, fold_observations};
 use crate::{
     BatchEnd, BatchFollowupArgs, BatchLease, BatchLeaseError, BatchLeaseManager, JobArgs, JobKind,
-    JobsError,
+    JobsError, with_job_timeout,
 };
 
 /// What `aggregate_rebuild` needs besides the pool.
@@ -478,10 +478,12 @@ impl TaskHandler for AggregateRebuildJob {
         let Some(config) = ctx.extensions().get::<RebuildConfig>() else {
             return Err("jobs: aggregate_rebuild: the worker has no RebuildConfig".to_owned());
         };
-        aggregate_rebuild(ctx.pg_pool(), &self.0, config, ctx.worker_id())
-            .await
-            .map(|_| ())
-            .map_err(|e| e.to_string())
+        with_job_timeout(&ctx, JobKind::AggregateRebuild, async {
+            aggregate_rebuild(ctx.pg_pool(), &self.0, config, ctx.worker_id())
+                .await
+                .map(|_| ())
+        })
+        .await
     }
 }
 

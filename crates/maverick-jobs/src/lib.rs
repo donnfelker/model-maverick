@@ -19,7 +19,8 @@ use chrono::{
     Timelike, Utc,
 };
 use graphile_worker::{
-    CronJobKeyMode, Crontab, CrontabTimer, CrontabValue, JobKeyMode, JobSpec, WorkerRecoveryConfig,
+    CronJobKeyMode, Crontab, CrontabTimer, CrontabValue, JobKeyMode, JobSpec, WorkerContext,
+    WorkerRecoveryConfig,
 };
 use maverick_store::{
     batches::{self, BatchClaim, ClaimOutcome},
@@ -28,7 +29,10 @@ use maverick_store::{
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::fmt;
+use std::future::Future;
+use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 use std::time::Duration;
 use ulid::Ulid;
 
@@ -258,6 +262,42 @@ impl JobArgs {
     }
 }
 
+/// Runs one delivery under the explicit per-kind `tokio::time::timeout` of master plan
+/// §3.1 (graphile_worker has no job timeout). An overrun drops the handler, which stops
+/// its runs and its lease heartbeat, and fails the job. graphile_worker retries it on
+/// the same worker, and the retry resumes under the same lease. The limits come from
+/// the worker's [`JobClientConfig`] extension, or the defaults without one.
+pub async fn with_job_timeout<E: fmt::Display>(
+    ctx: &WorkerContext,
+    kind: JobKind,
+    work: impl Future<Output = Result<(), E>>,
+) -> Result<(), String> {
+    let limit = match ctx.extensions().get::<JobClientConfig>() {
+        Some(config) => kind.timeout(config),
+        None => kind.timeout(&JobClientConfig::default()),
+    };
+    run_with_timeout(kind, limit, work).await
+}
+
+/// The core of [`with_job_timeout`].
+pub async fn run_with_timeout<E: fmt::Display>(
+    kind: JobKind,
+    limit: Duration,
+    work: impl Future<Output = Result<(), E>>,
+) -> Result<(), String> {
+    match tokio::time::timeout(limit, work).await {
+        Ok(result) => result.map_err(|e| e.to_string()),
+        Err(_) => {
+            tracing::warn!(
+                job = kind.as_str(),
+                timeout_ms = u64::try_from(limit.as_millis()).unwrap_or(u64::MAX),
+                "job handler timed out"
+            );
+            Err(format!("jobs: {kind}: handler timed out after {limit:?}"))
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JobClientConfig {
     pub batch_job_timeout: Duration,
@@ -479,6 +519,16 @@ impl BatchLeaseManager {
         worker_id: &str,
     ) -> Result<BatchLeaseOutcome, BatchLeaseError> {
         let id = deterministic_batch_id(kind, window);
+        let Some(live) = LiveLease::acquire(worker_id, &id) else {
+            // A live handler in this process holds the window, so this delivery is a
+            // duplicate on the same worker id.
+            let batch = batches::get_batch_by_id(pool, &id).await?;
+            return Ok(if batch.status == "running" {
+                BatchLeaseOutcome::HeldByOther(batch)
+            } else {
+                BatchLeaseOutcome::Finished(batch)
+            });
+        };
         // Registry read failures fail closed: live foreign owners stay no-op until
         // expiry instead of burning graphile max_attempts.
         let workers = health::list_worker_heartbeats(pool, &self.config.graphile_schema)
@@ -504,7 +554,49 @@ impl BatchLeaseManager {
             kind,
             worker_id,
             self.config.lease_ttl_secs(),
+            live,
         ))
+    }
+}
+
+/// The leases that live handlers in this process hold, as (worker id, batch id).
+///
+/// Every delivery on one graphile_worker worker shares its worker id. The store alone
+/// cannot tell a retry after this worker dropped its handler (a timeout, a panic) from a
+/// second delivery while the first still runs (a recovery sweep that took a stalled but
+/// live worker for dead). The first may take the lease over; the second must not. A
+/// dropped handler drops its [`BatchLease`] and so releases its entry.
+static LIVE_LEASES: LazyLock<Mutex<HashSet<(String, String)>>> = LazyLock::new(Mutex::default);
+
+#[derive(Debug, PartialEq, Eq)]
+struct LiveLease {
+    worker_id: String,
+    batch_id: String,
+}
+
+impl LiveLease {
+    fn acquire(worker_id: &str, batch_id: &str) -> Option<Self> {
+        let key = (worker_id.to_owned(), batch_id.to_owned());
+        let inserted = LIVE_LEASES
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(key);
+        inserted.then(|| LiveLease {
+            worker_id: worker_id.to_owned(),
+            batch_id: batch_id.to_owned(),
+        })
+    }
+}
+
+impl Drop for LiveLease {
+    fn drop(&mut self) {
+        LIVE_LEASES
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(&(
+                std::mem::take(&mut self.worker_id),
+                std::mem::take(&mut self.batch_id),
+            ));
     }
 }
 
@@ -515,15 +607,24 @@ pub struct BatchLease {
     kind: JobKind,
     worker_id: String,
     lease_ttl_secs: f64,
+    /// This process's claim on the lease; released when the last clone drops.
+    live: Arc<LiveLease>,
 }
 
 impl BatchLease {
-    fn new(batch: Batch, kind: JobKind, worker_id: &str, lease_ttl_secs: f64) -> Self {
+    fn new(
+        batch: Batch,
+        kind: JobKind,
+        worker_id: &str,
+        lease_ttl_secs: f64,
+        live: LiveLease,
+    ) -> Self {
         Self {
             batch,
             kind,
             worker_id: worker_id.to_string(),
             lease_ttl_secs,
+            live: Arc::new(live),
         }
     }
 
@@ -607,14 +708,23 @@ impl BatchLeaseOutcome {
         kind: JobKind,
         worker_id: &str,
         lease_ttl_secs: f64,
+        live: LiveLease,
     ) -> Self {
         match outcome {
-            ClaimOutcome::Claimed(batch) => {
-                Self::Claimed(BatchLease::new(batch, kind, worker_id, lease_ttl_secs))
-            }
-            ClaimOutcome::TookOver(batch) => {
-                Self::TookOver(BatchLease::new(batch, kind, worker_id, lease_ttl_secs))
-            }
+            ClaimOutcome::Claimed(batch) => Self::Claimed(BatchLease::new(
+                batch,
+                kind,
+                worker_id,
+                lease_ttl_secs,
+                live,
+            )),
+            ClaimOutcome::TookOver(batch) => Self::TookOver(BatchLease::new(
+                batch,
+                kind,
+                worker_id,
+                lease_ttl_secs,
+                live,
+            )),
             ClaimOutcome::Finished(batch) => Self::Finished(batch),
             ClaimOutcome::HeldByOther(batch) => Self::HeldByOther(batch),
         }
@@ -1477,5 +1587,32 @@ mod tests {
             &Some(CronJobKeyMode::PreserveRunAt)
         );
         assert_eq!(nightly.payload(), &Some(json!({ "night": "2030-06-02" })));
+    }
+
+    #[tokio::test]
+    async fn run_with_timeout_fails_an_overrunning_handler() {
+        let limit = Duration::from_millis(50);
+        let slow = async {
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            Ok::<(), String>(())
+        };
+        assert_eq!(
+            run_with_timeout(JobKind::AggregateRebuild, limit, slow).await,
+            Err("jobs: aggregate_rebuild: handler timed out after 50ms".to_owned())
+        );
+        assert_eq!(
+            run_with_timeout(JobKind::AggregateRebuild, limit, async {
+                Err::<(), _>("boom")
+            })
+            .await,
+            Err("boom".to_owned())
+        );
+        assert_eq!(
+            run_with_timeout(JobKind::AggregateRebuild, limit, async {
+                Ok::<(), String>(())
+            })
+            .await,
+            Ok(())
+        );
     }
 }

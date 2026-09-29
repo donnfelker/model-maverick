@@ -37,7 +37,7 @@ use crate::rebuild::{enqueue_in, with_heartbeat};
 use crate::spend_guard::{SpendGuardError, check_spend};
 use crate::{
     BatchEnd, BatchFollowupArgs, BatchLeaseError, BatchLeaseManager, BatchLeaseOutcome, JobArgs,
-    JobKind, JobsError, NightlySmokeArgs, WeeklySweepArgs,
+    JobKind, JobsError, NightlySmokeArgs, WeeklySweepArgs, with_job_timeout,
 };
 
 /// Below this completion rate the batch writes a `job_failure` warning (strict).
@@ -612,16 +612,19 @@ async fn run_handler(ctx: &WorkerContext, job: JobArgs) -> Result<(), String> {
             job.kind()
         ));
     };
-    run_batch(
-        ctx.pg_pool(),
-        &job,
-        config,
-        ctx.worker_id(),
-        &Cancellation::new(),
-    )
+    let kind = job.kind();
+    with_job_timeout(ctx, kind, async {
+        run_batch(
+            ctx.pg_pool(),
+            &job,
+            config,
+            ctx.worker_id(),
+            &Cancellation::new(),
+        )
+        .await
+        .map(|_| ())
+    })
     .await
-    .map(|_| ())
-    .map_err(|e| e.to_string())
 }
 
 /// The `nightly_smoke` graphile task. The worker must carry a [`BatchConfig`].
