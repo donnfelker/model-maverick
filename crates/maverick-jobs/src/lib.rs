@@ -3,6 +3,8 @@
 //! This crate owns the queue-facing contract: job kind names, argument JSON,
 //! schedule validation, queue keys, retry attempts, and per-kind timeouts.
 
+pub mod retention;
+
 use chrono::{
     DateTime, Datelike, Duration as ChronoDuration, Months, NaiveDate, NaiveDateTime, TimeZone,
     Timelike, Utc,
