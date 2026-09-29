@@ -21,8 +21,10 @@
 //!
 //! Every request is recorded ([`Served`]) with its prompt hash, never its prompt text.
 //!
-//! [`process`] runs the real binaries as OS processes for `tests/full_stack.rs`.
+//! [`process`] runs the real binaries as OS processes, and [`harness`] holds the step
+//! logging and HTTP helpers, for `tests/full_stack.rs` and `tests/latency.rs`.
 
+pub mod harness;
 pub mod process;
 
 use std::sync::{Arc, Mutex};

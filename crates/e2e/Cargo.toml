@@ -18,10 +18,11 @@ axum = { workspace = true }
 chrono = { workspace = true }
 reqwest = { workspace = true }
 serde_json = { workspace = true }
+sqlx = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
 maverick-domain = { workspace = true }
 maverick-jobs = { workspace = true }
+maverick-store = { workspace = true }
 maverick-testdb = { workspace = true }
-sqlx = { workspace = true }
