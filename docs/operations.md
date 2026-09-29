@@ -382,11 +382,31 @@ scripts/live-smoke.sh
 
 ## Hot-path latency
 
-Spec §2.3 sets the budget: the declared recommend path makes one Postgres round trip for the
-aggregates and one insert, and no provider call, with a **p95 below 50 ms** in the region.
-A prompt-form request with a classification-cache hit must meet the same budget. On a cache
-miss the classifier call dominates, and the target is a p95 below 2.5 s. The Rust latency
-harness is planned: bead 9.3.
+Spec §2.3 sets the budget: the declared recommend path reads precomputed aggregates, inserts
+one trace row, and calls no provider, with a **p95 below 50 ms** in the region. A
+prompt-form request with a classification-cache hit must meet the same budget. On a cache
+miss the classifier call dominates. That target is a **p95 below 1.8 s** (D20; the Go
+target was 2.5 s), inside the SDK's 2 s timeout, and the classifier deadline is 1.5 s (D3).
+
+`scripts/latency.sh` measures the hot path (bead 9.3). It builds release binaries, seeds a
+realistic catalog (12 columns, a week of aggregates per cell), and runs `serve --api-only`
+and the proxy against the fake provider. It prints p50, p95, and p99 for:
+
+- the declared path, with one client and with several;
+- the uncached prompt path, with a fake classifier latency you set
+  (`MAVERICK_LATENCY_CLASSIFIER_MS`), plus one call past the classifier deadline;
+- the proxy's added time to first byte.
+
+The report goes to `target/latency/<timestamp>/report.json`. It also shows an environment
+floor (a Postgres round trip, a commit, and `/up`) and the API's CPU time and database
+transactions per request, so a busy host can be told apart from engine cost. By default the
+script only reports. `MAVERICK_LATENCY_ASSERT=1` asserts the targets; run that gate on a
+quiet, production-like host.
+
+The first measurement (2026-09-29, on the shared development host at load average 15 to 30)
+met the prompt-path target: p95 1.26 s with a 600 ms classifier. It missed the declared
+target: p95 236 ms with one client. The declared path costs about 16 to 19 ms of API CPU and
+10 database transactions per request. Bead `model-maverick-e3x` cuts that cost.
 
 ## Local checks
 
