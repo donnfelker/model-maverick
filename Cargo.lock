@@ -2430,9 +2430,12 @@ version = "0.1.0"
 dependencies = [
  "maverick-domain",
  "maverick-providers",
+ "maverick-store",
+ "maverick-testdb",
  "parity-support",
  "serde",
  "serde_json",
+ "sqlx",
  "thiserror",
  "tokio",
  "tracing",
