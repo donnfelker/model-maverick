@@ -366,32 +366,24 @@ mod tests {
     }
 
     #[test]
-    fn audit_lines_carry_lists_and_objects_as_json() {
-        use std::collections::BTreeMap;
+    fn audit_lines_carry_counts_and_json_fields() {
         let out = capture(|| {
-            maverick_api::audit::tenant_create(
-                "ops",
-                "ten_1",
-                "Acme",
-                &["col_a".to_owned(), "col_b".to_owned()],
-            );
-            maverick_api::audit::weights_replace(
-                "rails",
-                "ten_1",
-                &[BTreeMap::from([
-                    ("capability", "coding"),
-                    ("mode", "quality"),
-                ])],
-            );
+            maverick_api::audit::tenant_create("ops", "ten_1", "Acme", 2);
+            maverick_api::audit::weights_replace("rails", "ten_1", 1);
             maverick_api::audit::tenant_suspend("ops", "ten_1", "suspended");
+            tracing::info!(
+                pool = ?maverick_api::audit::JsonField::of(&["gemini-3.1-pro/direct"]),
+                "judge pool unavailable"
+            );
         });
         let lines: Vec<String> = out.lines().map(mask_time).collect();
         assert_eq!(
             lines,
             [
-                r#"{"time":"<TS>","level":"INFO","msg":"internal provisioning write","audit":true,"actor":"ops","action":"tenant.create","tenant_id":"ten_1","name":"Acme","default_pool_columns":["col_a","col_b"]}"#,
-                r#"{"time":"<TS>","level":"INFO","msg":"internal provisioning write","audit":true,"actor":"rails","action":"tenant.weights.replace","tenant_id":"ten_1","weights":[{"capability":"coding","mode":"quality"}]}"#,
+                r#"{"time":"<TS>","level":"INFO","msg":"internal provisioning write","audit":true,"actor":"ops","action":"tenant.create","tenant_id":"ten_1","name":"Acme","default_pool_columns":2}"#,
+                r#"{"time":"<TS>","level":"INFO","msg":"internal provisioning write","audit":true,"actor":"rails","action":"tenant.weights.replace","tenant_id":"ten_1","weights":1}"#,
                 r#"{"time":"<TS>","level":"INFO","msg":"internal provisioning write","audit":true,"actor":"ops","action":"tenant.suspend","tenant_id":"ten_1","status":"suspended"}"#,
+                r#"{"time":"<TS>","level":"INFO","msg":"judge pool unavailable","pool":["gemini-3.1-pro/direct"]}"#,
             ]
         );
     }

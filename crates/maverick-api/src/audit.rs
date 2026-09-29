@@ -1,6 +1,8 @@
-//! The internal audit lines (reference Part 5 §10.2): INFO `internal provisioning write`
-//! with `audit=true`, `actor` (the internal token label), `action`, then the action's
-//! subject pairs. Handlers call these only after the write succeeded.
+//! The internal audit lines (reference Part 5 §10.2, §7): INFO `internal provisioning
+//! write` with `audit=true`, `actor` (the internal token label), `action`, then the
+//! action's subject pairs (counts for the default pool, pools, and weights). Handlers call
+//! these only after the write succeeded. [`JsonField`] carries a list or object attribute
+//! as raw JSON for other structured lines.
 
 use std::fmt;
 
@@ -50,15 +52,16 @@ fn escape_like_go(json: &str) -> String {
     out
 }
 
-/// `tenant.create` (tenant_id, name, default_pool_columns).
-pub fn tenant_create(actor: &str, tenant_id: &str, name: &str, default_pool_columns: &[String]) {
+/// `tenant.create` (tenant_id, name, default_pool_columns: the default pool's column
+/// count).
+pub fn tenant_create(actor: &str, tenant_id: &str, name: &str, default_pool_columns: usize) {
     tracing::info!(
         audit = true,
         actor,
         action = "tenant.create",
         tenant_id,
         name,
-        default_pool_columns = ?JsonField::of(&default_pool_columns),
+        default_pool_columns,
         "internal provisioning write"
     );
 }
@@ -110,26 +113,26 @@ pub fn api_key_revoke(actor: &str, tenant_id: &str, api_key_id: &str) {
     );
 }
 
-/// `tenant.pools.replace` (tenant_id, pools as JSON).
-pub fn pools_replace(actor: &str, tenant_id: &str, pools: &impl Serialize) {
+/// `tenant.pools.replace` (tenant_id, pools: the stored pool count).
+pub fn pools_replace(actor: &str, tenant_id: &str, pools: usize) {
     tracing::info!(
         audit = true,
         actor,
         action = "tenant.pools.replace",
         tenant_id,
-        pools = ?JsonField::of(pools),
+        pools,
         "internal provisioning write"
     );
 }
 
-/// `tenant.weights.replace` (tenant_id, weights as JSON).
-pub fn weights_replace(actor: &str, tenant_id: &str, weights: &impl Serialize) {
+/// `tenant.weights.replace` (tenant_id, weights: the stored row count).
+pub fn weights_replace(actor: &str, tenant_id: &str, weights: usize) {
     tracing::info!(
         audit = true,
         actor,
         action = "tenant.weights.replace",
         tenant_id,
-        weights = ?JsonField::of(weights),
+        weights,
         "internal provisioning write"
     );
 }

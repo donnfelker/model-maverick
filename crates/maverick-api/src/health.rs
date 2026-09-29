@@ -240,7 +240,7 @@ fn json(code: StatusCode, body: &[u8]) -> Response<Body> {
 }
 
 /// Go's `time.Time` JSON form in UTC: RFC 3339 with trailing fractional zeros trimmed.
-fn rfc3339_nano(at: DateTime<Utc>) -> String {
+pub(crate) fn rfc3339_nano(at: DateTime<Utc>) -> String {
     let base = at.format("%Y-%m-%dT%H:%M:%S").to_string();
     let nanos = at.nanosecond() % 1_000_000_000;
     if nanos == 0 {

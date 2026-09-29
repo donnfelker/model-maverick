@@ -2329,6 +2329,7 @@ dependencies = [
  "opentelemetry",
  "opentelemetry_sdk",
  "parity-support",
+ "rand 0.10.3",
  "rmcp",
  "serde",
  "serde_json",

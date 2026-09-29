@@ -35,6 +35,8 @@ tracing-opentelemetry = { workspace = true }
 futures-util = "0.3"
 http-body-util = "0.1"
 ulid = { workspace = true }
+# The internal seam mints tenant HMAC keys.
+rand = { workspace = true }
 sqlx = { workspace = true }
 chrono = { workspace = true }
 
