@@ -292,7 +292,13 @@ macro_rules! cron_trigger {
             const IDENTIFIER: &'static str = $identifier;
 
             async fn run(self, ctx: WorkerContext) -> impl IntoTaskHandlerResult {
-                enqueue_scheduled(ctx.pg_pool(), $kind, &self.0).await
+                // A trigger only enqueues, so it runs under the fast timeout.
+                crate::run_with_timeout(
+                    $kind,
+                    crate::FAST_JOB_TIMEOUT,
+                    enqueue_scheduled(ctx.pg_pool(), $kind, &self.0),
+                )
+                .await
             }
         }
     };
