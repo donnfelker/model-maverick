@@ -18,6 +18,7 @@ workspace = true
 
 [dependencies]
 maverick-core = { workspace = true }
+reqwest = { workspace = true }
 axum = { workspace = true }
 tower = { workspace = true }
 tower-http = { workspace = true }
@@ -31,3 +32,12 @@ tracing-opentelemetry = { workspace = true }
 opentelemetry = { workspace = true }
 opentelemetry_sdk = { workspace = true }
 opentelemetry-otlp = { workspace = true }
+# The server runs on hyper directly (not `axum::serve`) for the 10 s header-read timeout.
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["server", "server-graceful", "service", "tokio", "http1"] }
+# D38 body cap: `Limited` reports a size overrun apart from a read error.
+http-body-util = "0.1"
+
+[dev-dependencies]
+parity-support = { path = "../parity-support" }
+test-support = { path = "../test-support" }
