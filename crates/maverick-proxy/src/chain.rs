@@ -4,6 +4,7 @@
 //! (bead 6.2) and the chat and messages surfaces (bead 6.7) provide the real runner. Until
 //! they land, [`NoExecutor`] answers as Go did when no chain entry could be executed.
 
+use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::time::Instant;
@@ -14,6 +15,7 @@ use axum::response::Response;
 use maverick_core::alias::Alias;
 use maverick_core::recommend::{Recommendation, TenantKey};
 
+use crate::credentials::{CallerCredential, EnvKeys};
 use crate::envelope;
 
 /// A boxed, sendable future.
@@ -39,11 +41,19 @@ impl Surface {
     }
 }
 
-/// Everything the chain walk needs from one inbound request.
-#[derive(Debug)]
+/// Everything the chain walk needs from one inbound request. `Debug` output shows no
+/// header value, body byte, or key.
 pub struct ChainRequest {
     /// The surface the caller used.
     pub surface: Surface,
+    /// The caller's provider credential from the surface's native slot (D12). Pass it to
+    /// [`crate::credentials::resolve_key`] for each entry.
+    pub credential: CallerCredential,
+    /// The upstream base headers (Go `buildUpstreamHeaders` plus D30). Add the credential
+    /// per attempt with [`crate::credentials::attempt_headers`].
+    pub upstream_headers: HeaderMap,
+    /// The env keys the configuration loaded (none in hosted mode, D12).
+    pub env_keys: EnvKeys,
     /// The inbound headers, including the caller's provider credential. Never log them.
     pub headers: HeaderMap,
     /// The inbound body, exactly as received.
@@ -56,6 +66,26 @@ pub struct ChainRequest {
     pub tenant_key: TenantKey,
     /// When the proxy received the request.
     pub received_at: Instant,
+}
+
+impl fmt::Debug for ChainRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ChainRequest")
+            .field("surface", &self.surface)
+            .field("credential", &self.credential)
+            .field(
+                "upstream_headers",
+                &self.upstream_headers.keys().collect::<Vec<_>>(),
+            )
+            .field("env_keys", &self.env_keys)
+            .field("headers", &self.headers.keys().collect::<Vec<_>>())
+            .field("body", &format_args!("<{} bytes>", self.body.len()))
+            .field("alias", &self.alias)
+            .field("recommendation_id", &self.recommendation.recommendation_id)
+            .field("chain_len", &self.recommendation.chain.len())
+            .field("tenant_key", &self.tenant_key)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Walks a recommended chain and produces the caller's response.
