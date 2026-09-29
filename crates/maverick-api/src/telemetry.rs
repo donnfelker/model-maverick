@@ -5,6 +5,9 @@
 //! an unknown recommendation id, and another tenant's id are all just counted as
 //! dropped, so the endpoint is no existence oracle. Each accepted item appends one
 //! `outcomes` row. There is no `POST /v1/outcomes`.
+//!
+//! D39: when the caller's tenant has opted out of telemetry, every item is dropped the
+//! same way and no `outcomes` row is written. The response has the same shape.
 
 use std::collections::HashSet;
 use std::fmt;
@@ -14,7 +17,7 @@ use axum::extract::{Extension, Request, State};
 use axum::http::{Method, Response, StatusCode};
 use maverick_domain::gojson::match_field;
 use maverick_domain::{ids, telemetry};
-use maverick_store::{JsonRawValue, decisions};
+use maverick_store::{JsonRawValue, decisions, is_not_found, tenancy};
 use serde::de::{MapAccess, Visitor};
 
 use crate::{
@@ -117,6 +120,17 @@ pub(crate) async fn telemetry(
         return internal_error();
     };
 
+    // D39: an opted-out tenant's items are all dropped, and nothing is read or written.
+    match tenancy::get_tenant_constraints(pool, &identity.tenant_id).await {
+        Ok(row) if row.telemetry_opt_out => return counts(0, raw_items.len() as u64),
+        Ok(_) => {}
+        Err(error) if is_not_found(&error) => {}
+        Err(error) => {
+            tracing::error!(error = %error, "telemetry: constraints query failed");
+            return internal_error();
+        }
+    }
+
     let mut dropped: u64 = 0;
     let mut items = Vec::with_capacity(raw_items.len());
     for raw in &raw_items {
@@ -169,7 +183,11 @@ pub(crate) async fn telemetry(
         }
         accepted += 1;
     }
+    counts(accepted, dropped)
+}
 
+/// `200 {"accepted":n,"dropped":m}`.
+fn counts(accepted: u64, dropped: u64) -> Response<Body> {
     let body = format!("{{\"accepted\":{accepted},\"dropped\":{dropped}}}\n");
     response_with_json(StatusCode::OK, body.into_bytes())
 }

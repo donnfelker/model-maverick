@@ -206,7 +206,7 @@ async fn trace_rows(pool: &PgPool) -> i64 {
         .unwrap()
 }
 
-/// D8/D9/D15/D29: the Go golden text with the Rust fields inserted in their positions.
+/// D8/D9/D15/D29/D39: the Go golden text with the Rust fields inserted in their positions.
 fn with_rust_fields(go: &str, retention: &str) -> String {
     go.replace(
         "\"execution_aliases\":{},",
@@ -220,7 +220,7 @@ fn with_rust_fields(go: &str, retention: &str) -> String {
     )
     .replace(
         "\"measured\":true}",
-        "\"measured\":true,\"zero_retention\":false}",
+        "\"measured\":true,\"zero_retention\":false,\"telemetry\":true}",
     )
 }
 
@@ -422,6 +422,41 @@ async fn entries_carry_effective_alias_retention() {
         ),
         "{body}"
     );
+    db.close().await;
+}
+
+/// DIVERGENCE: D39. Every response carries `telemetry` right after `zero_retention`:
+/// `false` while the tenant has opted out, else `true`. It filters no column, so the
+/// pick is the same.
+#[tokio::test]
+async fn responses_carry_the_tenant_telemetry_flag() {
+    let d39 = parity_support::divergence!("D39");
+    assert_eq!(d39.id(), "D39");
+    let Some((db, pool)) = database().await else {
+        return;
+    };
+    column(&pool, "col_a", "anthropic", "claude-a", None, None).await;
+    pool_of(&pool, "default", &["col_a"], true).await;
+    let request = r#"{"workload":{"capability":"factual_qa"}}"#;
+
+    let (status, body) = recommend(&pool, request).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        body.ends_with(",\"zero_retention\":false,\"telemetry\":true}\n"),
+        "{body}"
+    );
+
+    tenancy::upsert_tenant_constraints(&pool, TENANT, None, None, false, true)
+        .await
+        .unwrap();
+    let (status, opted_out) = recommend(&pool, request).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        opted_out.ends_with(",\"zero_retention\":false,\"telemetry\":false}\n"),
+        "{opted_out}"
+    );
+    let parsed: serde_json::Value = serde_json::from_str(&opted_out).unwrap();
+    assert_eq!(parsed["recommendations"][0]["column_id"], "col_a");
     db.close().await;
 }
 

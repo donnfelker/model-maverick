@@ -427,3 +427,48 @@ async fn several_items_for_one_recommendation_are_appended() {
     pool.close().await;
     db.close().await;
 }
+
+/// DIVERGENCE: D39. An opted-out tenant's items are all dropped and counted, valid or not,
+/// and no `outcomes` row is written; the response has the usual shape. A malformed
+/// envelope is still a 422. Another tenant's batch still writes rows, and opting back in
+/// restores writes.
+#[tokio::test]
+async fn an_opted_out_tenants_items_are_dropped() {
+    let d39 = parity_support::divergence!("D39");
+    assert_eq!(d39.id(), "D39");
+    let Some(db) = maverick_testdb::database(&SCHEMA).await else {
+        return;
+    };
+    let pool = db.pool().await;
+    tenant(&pool, "ten_a").await;
+    tenant(&pool, "ten_b").await;
+    recommendation(&pool, "rec_a", "ten_a").await;
+    recommendation(&pool, "rec_b", "ten_b").await;
+    tenancy::upsert_tenant_constraints(&pool, "ten_a", None, None, false, true)
+        .await
+        .unwrap();
+    let item = |rec: &str| json!({"recommendation_id": rec, "model_used": "m", "status": 200});
+
+    let batch = json!({"items": [item("rec_a"), item("rec_a"), {"status": 200}]});
+    let (status, body) = send(&pool, "ten_a", batch).await;
+    assert_eq!(
+        (status, body.as_str()),
+        (StatusCode::OK, "{\"accepted\":0,\"dropped\":3}\n")
+    );
+    assert!(outcomes(&pool, "rec_a").await.is_empty(), "no outcomes row");
+    let (status, _) = send(&pool, "ten_a", json!({"items": null})).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+
+    let (_, body) = send(&pool, "ten_b", json!({"items": [item("rec_b")]})).await;
+    assert_eq!(body, "{\"accepted\":1,\"dropped\":0}\n");
+    assert_eq!(outcomes(&pool, "rec_b").await.len(), 1);
+
+    tenancy::upsert_tenant_constraints(&pool, "ten_a", None, None, false, false)
+        .await
+        .unwrap();
+    let (_, body) = send(&pool, "ten_a", json!({"items": [item("rec_a")]})).await;
+    assert_eq!(body, "{\"accepted\":1,\"dropped\":0}\n");
+    assert_eq!(outcomes(&pool, "rec_a").await.len(), 1);
+    pool.close().await;
+    db.close().await;
+}

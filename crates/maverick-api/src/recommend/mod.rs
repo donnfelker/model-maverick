@@ -15,10 +15,10 @@
 //! trace row stores the prompt hash and the request without the prompt. After the trace
 //! row, the capture hook may seal the prompt into a debug capture.
 //!
-//! The Rust response adds D8, D9, D15, and D29 to the Go shape: each entry carries
+//! The Rust response adds D8, D9, D15, D29, and D39 to the Go shape: each entry carries
 //! `execution_alias_retention`, `settings`, `param_constraints`, and `retention_mode`
-//! after `execution_aliases` and `low_availability` after `clears_difficulty`, and the
-//! response ends with `zero_retention` (spec §9.2).
+//! after `execution_aliases` and `low_availability` after `clears_difficulty`, and
+//! `zero_retention` and then `telemetry` follow `measured` (spec §9.2, §9.10).
 
 mod prompt;
 mod request;
@@ -236,13 +236,16 @@ pub async fn recommend(
     // zero-retention constraint (D2) and the catalog before it classifies.
     let pools = tenancy::list_pools_by_tenant(pool, tenant).await?;
     let weights = tenancy::list_tenant_weights_by_tenant(pool, tenant).await?;
-    let standing = match tenancy::get_tenant_constraints(pool, tenant).await {
-        Ok(row) => StandingConstraints {
-            max_cost_per_run: row.max_cost_per_run.map(numeric_to_f64),
-            max_latency_ms: row.max_latency_ms,
-            zero_retention: row.zero_retention,
-        },
-        Err(error) if is_not_found(&error) => StandingConstraints::default(),
+    let (standing, telemetry_opt_out) = match tenancy::get_tenant_constraints(pool, tenant).await {
+        Ok(row) => (
+            StandingConstraints {
+                max_cost_per_run: row.max_cost_per_run.map(numeric_to_f64),
+                max_latency_ms: row.max_latency_ms,
+                zero_retention: row.zero_retention,
+            },
+            row.telemetry_opt_out,
+        ),
+        Err(error) if is_not_found(&error) => (StandingConstraints::default(), false),
         Err(error) => return Err(error.into()),
     };
     let zero_retention = standing.zero_retention;
@@ -585,6 +588,8 @@ pub async fn recommend(
         ("measured", JsonValue::Bool(pick.flags.measured)),
         // D9.
         ("zero_retention", JsonValue::Bool(zero_retention)),
+        // D39: false when the tenant opted out of telemetry.
+        ("telemetry", JsonValue::Bool(!telemetry_opt_out)),
     ]);
     // D4: only when the budget stopped the classifier.
     if prompt_path
