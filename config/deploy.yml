@@ -1,0 +1,135 @@
+# Model Maverick engine: the Kamal 2 deployment (bead 9.4; master plan §4 "Deployment";
+# spec §14.2). docker/README.md has the build, the local smoke, and the backup steps.
+#
+# One host runs everything:
+# - `web` runs `maverick serve --api-only`. kamal-proxy routes its PUBLIC listener (:8080:
+#   /v1/*, /mcp, /up) with automatic HTTPS and the /up health check.
+# - `worker` runs exactly one `maverick serve --worker-only`: the graphile_worker jobs.
+# - The INTERNAL listener (:8081: /internal/v1/*, /health/detail) is never routed. The web
+#   container publishes it on the host loopback only. Operators reach it over SSH:
+#     ssh -N -L 8081:127.0.0.1:8081 <user>@<HOST>
+# - Postgres 16 is an accessory on the same host. The app reaches it as `maverick-postgres`
+#   on the `kamal` Docker network. Its data is on the named volume `postgres-data`, and its
+#   port is on the host loopback only. `kamal accessory remove postgres` DELETES the data.
+# - The `backup` accessory runs scripts/backup.sh every night (see the accessory below).
+# - The hosted trial proxy is its own service: config/deploy-proxy.yml.
+#
+# Migrations: .kamal/hooks/pre-app-boot runs `maverick migrate` with the new image before
+# each new app container boots, so the schema is current before traffic moves. The
+# `migrate` alias runs it by hand: `kamal migrate`.
+#
+# Placeholders to replace before `kamal setup` (secret values: .kamal/secrets):
+#   <HOST>                 the server's address
+#   maverick.example.com   the public DNS name; its A record must exist before the deploy
+#   <REGISTRY_USERNAME>    the registry user (the example uses GHCR)
+
+service: maverick
+image: <REGISTRY_USERNAME>/maverick
+
+servers:
+  web:
+    hosts:
+      - <HOST>
+    cmd: serve --api-only
+    options:
+      # The internal listener, on the host loopback only.
+      publish: "127.0.0.1:8081:8081"
+  worker:
+    hosts:
+      - <HOST>
+    # Exactly one worker process (spec §14.2).
+    cmd: serve --worker-only
+
+proxy:
+  host: maverick.example.com
+  app_port: 8080
+  ssl: true
+  healthcheck:
+    path: /up
+    interval: 3
+    timeout: 5
+
+registry:
+  server: ghcr.io
+  username: <REGISTRY_USERNAME>
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+builder:
+  arch: amd64
+  dockerfile: docker/Dockerfile
+  target: engine
+
+env:
+  # Values come from .kamal/secrets and go to an env file on the host, never inline.
+  secret:
+    - MAVERICK_DATABASE_URL # the DSN of the postgres accessory, host maverick-postgres
+    - MAVERICK_INTERNAL_TOKENS # "label:secret,..." for /internal/v1/*
+    - MAVERICK_CAPTURE_MASTER_KEY # 64 hex characters; capture encryption (D18)
+    - MAVERICK_CAPTURE_PREVIOUS_MASTER_KEY # "version:hex" during a key rotation, else empty
+    # Operator provider keys: benchmarks and classification only, never customer traffic.
+    # An empty value disables that provider.
+    - MAVERICK_ANTHROPIC_API_KEY
+    - MAVERICK_OPENAI_API_KEY
+    - MAVERICK_GOOGLE_API_KEY
+    - MAVERICK_XAI_API_KEY
+    - MAVERICK_SMTP_URL # optional; carries SMTP credentials
+    - MAVERICK_ALERTS_WEBHOOK_SECRET # required when the webhook URL is set
+  clear:
+    MAVERICK_PUBLIC_ADDR: ":8080"
+    MAVERICK_INTERNAL_ADDR: ":8081"
+    MAVERICK_CAPTURE_MASTER_KEY_VERSION: "1"
+    # Every other MAVERICK_* variable is optional; the defaults are in
+    # crates/maverick-config and spec §14.1. Examples:
+    # MAVERICK_ALERTS_WEBHOOK_URL: "https://ops.example.com/hooks/maverick"
+    # MAVERICK_OTEL_EXPORTER_ENDPOINT: "http://otel-collector:4318"
+    # MAVERICK_SPEND_NIGHTLY_CAP_USD: "100"
+    # MAVERICK_SPEND_WEEKLY_CAP_USD: "500"
+
+accessories:
+  postgres:
+    image: postgres:16
+    host: <HOST>
+    # Host loopback only, for psql from the host. The app uses the kamal network.
+    port: "127.0.0.1:5432:5432"
+    env:
+      clear:
+        POSTGRES_DB: maverick
+        POSTGRES_USER: maverick
+      secret:
+        - POSTGRES_PASSWORD
+    directories:
+      - postgres-data:/var/lib/postgresql/data
+
+  # The nightly backup: scripts/backup.sh --daemon in a Postgres 16 client image. It dumps
+  # at 02:30 UTC into the `maverick-backups` volume, keeps 7 dumps, and copies each off the
+  # box with rclone when MAVERICK_BACKUP_TARGET is set (for example `offsite:maverick`,
+  # with the remote configured by RCLONE_CONFIG_OFFSITE_* secrets). Unset, it logs a
+  # warning every night. Restore test: docker/README.md.
+  backup:
+    image: postgres:16-alpine
+    host: <HOST>
+    files:
+      - scripts/backup.sh:/usr/local/bin/maverick-backup
+    cmd: sh /usr/local/bin/maverick-backup --daemon
+    env:
+      clear:
+        MAVERICK_BACKUP_DIR: /backups
+        MAVERICK_BACKUP_AT: "02:30"
+        MAVERICK_BACKUP_KEEP: "7"
+        # The backup image has no rclone; install it when a target is set.
+        MAVERICK_BACKUP_INSTALL_RCLONE: "1"
+      secret:
+        - MAVERICK_DATABASE_URL
+        - MAVERICK_BACKUP_TARGET
+        - RCLONE_CONFIG_OFFSITE_TYPE
+        - RCLONE_CONFIG_OFFSITE_PROVIDER
+        - RCLONE_CONFIG_OFFSITE_ENDPOINT
+        - RCLONE_CONFIG_OFFSITE_ACCESS_KEY_ID
+        - RCLONE_CONFIG_OFFSITE_SECRET_ACCESS_KEY
+    directories:
+      - maverick-backups:/backups
+
+aliases:
+  # A one-off migration with the deployed image: `kamal migrate`.
+  migrate: app exec --roles=web --primary "migrate"

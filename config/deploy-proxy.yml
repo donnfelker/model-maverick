@@ -1,0 +1,58 @@
+# The hosted trial proxy: its own Kamal 2 service (bead 9.4; owner decision 2026-09-28;
+# master plan §4 "Deployment"). Deploy it with the config flag:
+#
+#   kamal setup  -c config/deploy-proxy.yml
+#   kamal deploy -c config/deploy-proxy.yml
+#
+# It runs in hosted mode on the engine's host, behind the same kamal-proxy, with its own
+# public name:
+# - Each caller sends its tenant key in `X-Maverick-API-Key` (D13) and its own provider
+#   credential. The proxy has NO MM key and NO provider key in its environment, and hosted
+#   mode never reads one (D12).
+# - Per-tenant rate limits (D28): MAVERICK_PROXY_RATELIMIT_RPM.
+# - It calls the engine's PUBLIC listener. Never point it at the internal listener.
+#
+# Placeholders: <HOST> and <REGISTRY_USERNAME> as in config/deploy.yml, and
+# proxy.example.com (its A record must exist before the deploy).
+
+service: maverick-proxy
+image: <REGISTRY_USERNAME>/maverick-proxy
+
+servers:
+  web:
+    hosts:
+      - <HOST>
+
+proxy:
+  host: proxy.example.com
+  app_port: 8090
+  ssl: true
+  healthcheck:
+    path: /up
+    interval: 3
+    timeout: 5
+
+registry:
+  server: ghcr.io
+  username: <REGISTRY_USERNAME>
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+builder:
+  arch: amd64
+  dockerfile: docker/Dockerfile
+  target: proxy
+
+# The engine's pre-app-boot migration hook must not run for the proxy.
+hooks_path: .kamal/hooks-proxy
+
+env:
+  # No secrets: hosted mode reads no MAVERICK_API_KEY and no provider env key.
+  clear:
+    MAVERICK_PROXY_MODE: hosted
+    MAVERICK_PROXY_ADDR: ":8090"
+    MAVERICK_ENGINE_URL: https://maverick.example.com
+    MAVERICK_PROXY_RATELIMIT_RPM: "60"
+    # `off` sends no telemetry at all (G13); the default is on.
+    # MAVERICK_PROXY_TELEMETRY: "off"
+    # MAVERICK_PROXY_OTLP_ENDPOINT: "http://otel-collector:4318"

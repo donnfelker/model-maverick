@@ -1,0 +1,9 @@
+# The build context for docker/Dockerfile: the workspace sources and nothing else.
+# rust-toolchain.toml stays out, so the image's own stable toolchain builds without a
+# download; parity/ stays out, because only tests read it.
+*
+!Cargo.toml
+!Cargo.lock
+!crates/
+!.sqlx/
+crates/**/target
