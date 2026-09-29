@@ -1356,6 +1356,7 @@ mod tests {
         .expect("cron fixture must be valid JSON")
     }
 
+    /// parity: jobs.TestParseCronAcceptsConfigDefaults
     #[test]
     fn parse_cron_accepts_config_defaults() {
         for case in cron_fixture().parse_accept.cases {
@@ -1364,6 +1365,7 @@ mod tests {
         }
     }
 
+    /// parity: jobs.TestParseCronRejectsInvalid
     #[test]
     fn parse_cron_rejects_invalid_with_exact_errors() {
         for case in cron_fixture().parse_reject.cases {
@@ -1373,6 +1375,7 @@ mod tests {
         }
     }
 
+    /// parity: jobs.TestCronNext
     #[test]
     fn cron_next_matches_reference() {
         for case in cron_fixture().next.cases {
@@ -1387,6 +1390,7 @@ mod tests {
         }
     }
 
+    /// parity: jobs.TestCronFiresOn
     #[test]
     fn cron_fires_on_matches_reference() {
         let fixture = cron_fixture().fires_on;
@@ -1406,6 +1410,7 @@ mod tests {
         assert_eq!(err.to_string(), fixture.invalid_expression_error);
     }
 
+    /// parity: jobs.TestIsoWeek
     #[test]
     fn iso_week_matches_reference() {
         for case in cron_fixture().iso_week.cases {
@@ -1506,6 +1511,7 @@ mod tests {
         );
     }
 
+    /// parity: jobs.TestNewClientRejectsBadNightlyCron
     #[test]
     fn job_client_validates_all_crons_and_lease_ttl() {
         let client = JobClient::new(JobClientConfig::default()).expect("default config is valid");
