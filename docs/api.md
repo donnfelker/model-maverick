@@ -14,7 +14,9 @@ All request and response bodies are JSON (`Content-Type: application/json`).
 Request bodies are capped at 2 MiB (2,097,152 bytes; `413 payload_too_large`).
 Request bodies and query strings are decoded strictly: unknown JSON fields,
 trailing content, and unknown query parameters are `422 invalid_request`.
-Timestamps in responses are RFC 3339 in UTC.
+Timestamps in responses are RFC 3339 in UTC, in Go's RFC3339Nano form: a `Z`
+suffix, and a fraction with its trailing zeros trimmed (none on a whole
+second).
 
 `POST /v1/recommend`, `GET /v1/policies`, `GET /v1/models`, and the history
 lists carry `matrix_version`: the active corpus version, or `""` when no corpus
@@ -73,12 +75,16 @@ The code list is closed. No response carries a code outside this table:
 | 422 | `unknown_pool` | Pool name not configured for the tenant |
 | 422 | `pool_would_be_empty` | Config write or retirement would empty a pool (names the pool) |
 | 422 | `zero_retention_requires_declared` | Zero-retention tenant sent the prompt form, and no zero-retention classifier column is configured (D2) |
-| 422 | `grader_unsupported` | Corpus load: reserved grader type in v1 |
+| 422 | `grader_unsupported` | Corpus load: reserved grader type in v1 (no HTTP route returns it in v1) |
 | 429 | `rate_limited` | Per-key limit; `Retry-After` set |
 | 500 | `internal_error` | Bug; logged with the request id |
 
 There is no 405 entry: a wrong method on a known path answers exactly like an
-unknown path (`404 not_found`).
+unknown path (`404 not_found`). Every authenticated public route, `/mcp`
+included, can answer 401, 403, 413, and 429. Every route that reads the store
+can answer 500. Internal routes have no 403 and no 429.
+`crates/maverick-api/tests/CONTRACT.md` lists every (endpoint, status, code)
+pair the API returns, with the test that pins it.
 
 The four 422 policy codes (`unknown_model`, `model_not_in_pool`,
 `unknown_pool`, `pool_would_be_empty`) are contractual (G3): callers are
@@ -635,8 +641,11 @@ is `null` or `false`.
 `telemetry_opt_out: true` (D39) turns off outcome telemetry for the tenant.
 Recommend responses then carry `"telemetry": false`, MM components send no
 telemetry, and the engine drops any telemetry items it still receives. The
-trial proxy also exports no OTel record for the tenant's requests (D43). It
-filters no model column, so it never causes `pool_would_be_empty`.
+trial proxy also exports no OTel record for a request whose recommendation
+says `telemetry: false`: no log record, and no count in
+`maverick_proxy_recommendations_total` (D43). A request that fails before the
+engine answers has no flag, so it is still recorded. The constraint filters no
+model column, so it never causes `pool_would_be_empty`.
 
 ## Debug capture
 
@@ -789,8 +798,11 @@ trace row.
   stdout carries only the protocol.
 
 The server identifies as `model-maverick`, version `v1`. It speaks protocol
-versions `2025-11-25`, `2025-06-18`, `2025-03-26`, and `2024-11-05`. A client
-that asks for another version gets `2025-11-25`.
+versions `2025-11-25`, `2025-06-18`, `2025-03-26`, and `2024-11-05`, and it
+echoes the client's version when it is on that list. A client that asks for
+another version gets `2025-11-25`. The capabilities are `logging` and
+`tools.listChanged`. `tools/list` is the Go server's list byte for byte, with
+the three tools sorted by name.
 
 | Tool | Input | Returns |
 |---|---|---|
@@ -803,8 +815,10 @@ the capability: it is faster, and nothing leaves the session.
 
 A successful result carries the REST body twice: as one text content item and
 as `structuredContent`. A failed call is a result with `isError: true` and one
-text item. An API error reads `<code>: <message>` (for example
-`unknown_pool: ...`), and an internal failure reads `internal error`. The
+text item. An API error reads `<code>: <message>`, with the HTTP route's code
+and message (for example `unknown_pool: ...`, or
+`zero_retention_requires_declared: ...` for the prompt form of a
+zero-retention tenant). An internal failure reads `internal error`. The
 arguments are checked against the tool's input schema first. A violation is
 an `isError` result whose text starts with `validating "arguments": ` (D34).
 An unknown tool is JSON-RPC error `-32602`, and an unknown method is
