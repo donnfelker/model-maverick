@@ -364,6 +364,7 @@ fn openai_script() -> Vec<ScriptedResponse> {
     ]
 }
 
+// parity: measurement-io/livesmoke.TestLiveSmoke
 #[tokio::test]
 #[ignore = "opt-in: run with MAVERICK_LIVE_SMOKE=1 and provider keys (scripts/live-smoke.sh)"]
 async fn live_smoke() {
