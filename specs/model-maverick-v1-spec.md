@@ -1090,6 +1090,7 @@ Env vars, prefix `MAVERICK_`, parsed and validated at boot (fail fast, print the
 | `MAVERICK_INTERNAL_TOKENS` | — (required) | `label:secret,...` |
 | `MAVERICK_CAPTURE_MASTER_KEY` | — (required) | 32-byte hex; capture encryption (current key of the §10.4 ring) |
 | `MAVERICK_ANTHROPIC_API_KEY` etc. | — | Provider credentials (one per provider; endpoint variants configured per column) |
+| `MAVERICK_ANTHROPIC_BASE_URL` etc. | the provider's default | Provider API base URL, `http://` or `https://`. The engine reads no ambient SDK variables (D23), so this is the only way to move a provider: a gateway, or the e2e fake provider (added 2026-09-29 for the Rust port) |
 | `MAVERICK_CLASSIFIER_COLUMN` | `claude-haiku-4-5/direct` | §8.3 |
 | `MAVERICK_CLASSIFIER_ZERO_RETENTION_COLUMN` | unset | §8.3; must be a column with valid zero-retention evidence |
 | `MAVERICK_CLASSIFIER_DEADLINE` | `1.5s` | §8.3 total classifier deadline, retry included |

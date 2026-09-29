@@ -417,8 +417,9 @@ async fn classifier_resolver(
 
 /// A built provider client, or why it could not be built.
 type Built = Result<Arc<dyn ProviderClient>, String>;
-/// A provider's name, its API key, and how to build its client.
-type Candidate<'a> = (&'static str, &'a str, fn(&str) -> Built);
+/// A provider's name, its API key, its base URL (empty is the default), and how to build
+/// its client.
+type Candidate<'a> = (&'static str, &'a str, &'a str, fn(&str, &str) -> Built);
 
 fn shared<C: ProviderClient + 'static>(built: Result<C, impl std::fmt::Display>) -> Built {
     built
@@ -427,26 +428,59 @@ fn shared<C: ProviderClient + 'static>(built: Result<C, impl std::fmt::Display>)
 }
 
 /// One client per provider whose API key is set, in the order anthropic, openai, xai,
-/// google. A client that cannot be built is logged and left out.
+/// google. A non-empty `MAVERICK_<PROVIDER>_BASE_URL` replaces the provider's default URL.
+/// A client that cannot be built is logged and left out.
 fn provider_clients(config: &Config) -> Vec<(&'static str, Arc<dyn ProviderClient>)> {
     let candidates: [Candidate<'_>; 4] = [
-        ("anthropic", &config.anthropic_api_key, |key| {
-            shared(AnthropicClient::new(key))
-        }),
-        ("openai", &config.openai_api_key, |key| {
-            shared(OpenAiClient::openai(key))
-        }),
-        ("xai", &config.xai_api_key, |key| {
-            shared(OpenAiClient::xai(key))
-        }),
-        ("google", &config.google_api_key, |key| {
-            shared(GoogleClient::new(key))
-        }),
+        (
+            "anthropic",
+            &config.anthropic_api_key,
+            &config.anthropic_base_url,
+            |key, url| {
+                shared(AnthropicClient::new(key).map(|client| match url {
+                    "" => client,
+                    url => client.with_base_url(url),
+                }))
+            },
+        ),
+        (
+            "openai",
+            &config.openai_api_key,
+            &config.openai_base_url,
+            |key, url| {
+                shared(OpenAiClient::openai(key).map(|client| match url {
+                    "" => client,
+                    url => client.with_base_url(url),
+                }))
+            },
+        ),
+        (
+            "xai",
+            &config.xai_api_key,
+            &config.xai_base_url,
+            |key, url| {
+                shared(OpenAiClient::xai(key).map(|client| match url {
+                    "" => client,
+                    url => client.with_base_url(url),
+                }))
+            },
+        ),
+        (
+            "google",
+            &config.google_api_key,
+            &config.google_base_url,
+            |key, url| {
+                shared(GoogleClient::new(key).map(|client| match url {
+                    "" => client,
+                    url => client.with_base_url(url),
+                }))
+            },
+        ),
     ];
     candidates
         .into_iter()
-        .filter(|(_, key, _)| !key.is_empty())
-        .filter_map(|(name, key, build)| match build(key) {
+        .filter(|(_, key, _, _)| !key.is_empty())
+        .filter_map(|(name, key, url, build)| match build(key, url) {
             Ok(client) => Some((name, client)),
             Err(error) => {
                 tracing::error!(error = %error, "configuring {name} provider client");
@@ -615,5 +649,53 @@ mod tests {
     fn go_style_addresses_bind_every_interface() {
         assert_eq!(listen_addr(":8080"), "0.0.0.0:8080");
         assert_eq!(listen_addr("127.0.0.1:8081"), "127.0.0.1:8081");
+    }
+
+    /// `MAVERICK_<PROVIDER>_BASE_URL` moves that provider's client (D23: only the engine's
+    /// own config does), and a provider without one keeps its default URL.
+    #[tokio::test]
+    async fn a_provider_base_url_redirects_its_client() {
+        let seen = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let app = axum::Router::new().fallback({
+            let seen = Arc::clone(&seen);
+            move |request: axum::extract::Request| {
+                let seen = Arc::clone(&seen);
+                async move {
+                    seen.lock().unwrap().push(request.uri().path().to_owned());
+                    axum::Json(serde_json::json!({
+                        "content": [{"type": "text", "text": "ok"}],
+                        "usage": {"input_tokens": 1, "output_tokens": 1},
+                    }))
+                }
+            }
+        });
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+        let config = Config::load_with(|name| match name {
+            "MAVERICK_DATABASE_URL" => Some("postgres://db".to_owned()),
+            "MAVERICK_INTERNAL_TOKENS" => Some("ops:alpha".to_owned()),
+            "MAVERICK_CAPTURE_MASTER_KEY" => Some("ab".repeat(32)),
+            "MAVERICK_ANTHROPIC_API_KEY" => Some("test-key".to_owned()),
+            "MAVERICK_ANTHROPIC_BASE_URL" => Some(url.clone()),
+            _ => None,
+        })
+        .unwrap();
+        let clients = provider_clients(&config);
+        let names: Vec<&str> = clients.iter().map(|(name, _)| *name).collect();
+        assert_eq!(names, ["anthropic"], "only providers with a key");
+        let _ = clients[0]
+            .1
+            .complete(CompletionRequest {
+                model: "claude-test".to_owned(),
+                system: String::new(),
+                prompt: "hi".to_owned(),
+                temperature: 0.0,
+                max_tokens: 8,
+                settings: serde_json::Map::new(),
+            })
+            .await;
+        assert_eq!(*seen.lock().unwrap(), ["/v1/messages"]);
     }
 }
