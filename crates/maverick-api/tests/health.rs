@@ -6,8 +6,8 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
 use axum::{Router, response::Response};
 use maverick_api::{
-    AuthState, HealthState, Identity, RateLimiter, StaticAuthBackend, internal_router_with,
-    public_router_with,
+    ApiState, AuthState, HealthState, Identity, RateLimiter, StaticAuthBackend,
+    internal_router_with, public_router_with,
 };
 use maverick_domain::keys;
 use maverick_store::health::GRAPHILE_WORKER_SCHEMA;
@@ -50,11 +50,13 @@ fn auth() -> AuthState {
 }
 
 fn internal(pool: PgPool, providers: Vec<&'static str>) -> Router {
-    internal_router_with(auth(), HealthState::with_providers(pool, providers))
+    let health = HealthState::with_providers(pool.clone(), providers);
+    internal_router_with(auth(), ApiState::with_health(pool, health))
 }
 
 fn public(pool: PgPool) -> Router {
-    public_router_with(auth(), HealthState::with_providers(pool, Vec::new()))
+    let health = HealthState::with_providers(pool.clone(), Vec::new());
+    public_router_with(auth(), ApiState::with_health(pool, health))
 }
 
 async fn get(router: Router, path: &str, token: Option<&str>) -> (StatusCode, String, Response) {
