@@ -4,6 +4,7 @@
 //! schedule validation, queue keys, retry attempts, and per-kind timeouts.
 
 pub mod fold;
+pub mod probes;
 pub mod rebuild;
 pub mod retention;
 pub mod spend_guard;
