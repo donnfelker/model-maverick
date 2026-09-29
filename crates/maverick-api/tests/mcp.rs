@@ -526,6 +526,52 @@ async fn recommend_model_bad_arguments_are_tool_errors() {
     }
 }
 
+/// Spec Appendix B: the two privacy codes reach an MCP caller as tool errors, with the
+/// code and message of the REST answer (the contract matrix, bead 5.17).
+#[tokio::test]
+async fn recommend_model_surfaces_the_privacy_codes() {
+    let db = db!();
+    let pool = db.pool().await;
+    matrix(&pool).await;
+    let key = tenant(&pool, "ten_zr", "default").await;
+    tenancy::upsert_tenant_constraints(&pool, "ten_zr", None, None, true, false)
+        .await
+        .unwrap();
+    let router = router(&pool, 1000);
+    let session = open(&router, &key).await;
+    for (arguments, status, code) in [
+        (
+            json!({"workload": {"prompt": "Summarize the contract."}}),
+            422,
+            "zero_retention_requires_declared",
+        ),
+        (
+            json!({"workload": {"capability": "factual_qa"}}),
+            409,
+            "no_compliant_columns",
+        ),
+    ] {
+        let rest = send(
+            &router,
+            "POST",
+            "/v1/recommend",
+            Some(&key),
+            None,
+            &arguments.to_string(),
+        )
+        .await;
+        assert_eq!(rest.status, status, "{}", rest.body);
+        let envelope: Value = serde_json::from_str(&rest.body).unwrap();
+        assert_eq!(envelope["error"]["code"], code);
+        let result = tool(&router, &key, &session, "recommend_model", &arguments).await;
+        assert_eq!(result["isError"], true);
+        assert_eq!(
+            text(&result),
+            format!("{code}: {}", envelope["error"]["message"].as_str().unwrap())
+        );
+    }
+}
+
 /// parity: api.TestMCPStdioStyleTransportBindsRunContextIdentity
 #[tokio::test]
 async fn the_stdio_transport_binds_the_run_identity() {
