@@ -43,7 +43,7 @@ use maverick_core::alias::parse_alias;
 use maverick_core::gojson::{apply_string, type_error};
 use maverick_core::recommend::{
     EngineFailure, RecommendClient, RecommendClientConfig, RecommendError, RecommendRequest,
-    TenantKey, Workload,
+    TenantKey, TraceHeaders, Workload,
 };
 use serde_json::Value;
 use tokio::net::TcpListener;
@@ -207,7 +207,17 @@ impl Proxy {
 
         // 5. Recommend.
         let request = RecommendRequest::for_alias(&alias, workload);
-        let recommendation = match self.engine.recommend(&tenant_key, &request).await {
+        // D31: the caller's W3C trace context continues into the engine. Providers get it
+        // too: tracing headers are among the inbound headers Go forwards upstream.
+        let trace = TraceHeaders {
+            traceparent: first_header(&parts.headers, "traceparent"),
+            tracestate: first_header(&parts.headers, "tracestate"),
+        };
+        let recommendation = match self
+            .engine
+            .recommend_traced(&tenant_key, &request, &trace)
+            .await
+        {
             Ok(recommendation) => recommendation,
             Err(RecommendError::ZeroRetentionRequiresDeclared { message, .. }) => {
                 return relay_terminal(
@@ -311,6 +321,11 @@ fn workload_header(headers: &HeaderMap) -> Result<Option<&str>, ()> {
         .get(WORKLOAD_HEADER)
         .map(|value| value.to_str().map_err(|_| ()))
         .transpose()
+}
+
+/// The first value of a text header.
+fn first_header(headers: &HeaderMap, name: &str) -> Option<String> {
+    headers.get(name)?.to_str().ok().map(str::to_owned)
 }
 
 /// The declared `Content-Length`, when present and numeric.

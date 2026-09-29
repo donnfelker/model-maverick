@@ -104,14 +104,17 @@ opentelemetry_sdk = { version = "0.33", features = [
     "rt-tokio",
     "experimental_trace_batch_span_processor_with_async_runtime",
     "experimental_metrics_periodicreader_with_async_runtime",
+    "experimental_logs_batch_log_processor_with_async_runtime",
 ] }
-# OTLP over HTTP with the reqwest+rustls client (no tonic, no OpenSSL).
+# OTLP over HTTP with the reqwest+rustls client (no tonic, no OpenSSL). `logs` carries
+# the proxy's `maverick.recommendation` record (D31).
 opentelemetry-otlp = { version = "0.33", default-features = false, features = [
     "http-proto",
     "reqwest-client",
     "reqwest-rustls",
     "trace",
     "metrics",
+    "logs",
 ] }
 
 # --- TLS for the SMTP STARTTLS alert channel (same rustls stack as reqwest; aws-lc-rs
