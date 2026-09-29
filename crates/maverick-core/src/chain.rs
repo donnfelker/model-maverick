@@ -45,6 +45,7 @@ use reqwest::header::{HeaderMap, RETRY_AFTER};
 use tokio::time::Instant;
 
 use crate::recommend::ChainEntry;
+use crate::telemetry::TelemetryItem;
 
 /// The per-attempt response-header timeout (Go constant).
 pub const RESPONSE_HEADER_TIMEOUT: Duration = Duration::from_secs(30);
@@ -60,25 +61,10 @@ pub struct PreparedAttempt {
     pub endpoint_used: String,
 }
 
-/// Why a transport-level attempt failed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ErrorClass {
-    /// A timeout, the response-header timeout included.
-    Timeout,
-    /// Any other transport failure, a cancelled request included.
-    ConnectError,
-}
-
-impl ErrorClass {
-    /// The telemetry `error_class` value.
-    #[must_use]
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Timeout => "timeout",
-            Self::ConnectError => "connect_error",
-        }
-    }
-}
+/// Why a transport-level attempt failed: `Timeout` (the response-header timeout included)
+/// or `ConnectError` (any other transport failure, a cancelled request included). It is the
+/// telemetry item's class, so a record converts to an item as is.
+pub use crate::telemetry::ErrorClass;
 
 /// One attempt, as telemetry records it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -103,6 +89,26 @@ pub struct AttemptRecord {
     pub retry_after_wait: Option<Duration>,
     /// True for the attempt whose response was relayed.
     pub relayed: bool,
+}
+
+impl AttemptRecord {
+    /// The attempt's telemetry item. Token counts are the caller's to add (the settled,
+    /// buffered 2xx only), and no check ran.
+    #[must_use]
+    pub fn telemetry_item(&self, recommendation_id: &str) -> TelemetryItem {
+        TelemetryItem {
+            recommendation_id: recommendation_id.to_owned(),
+            model_used: self.model.clone(),
+            status: self.status,
+            latency_ms: i64::try_from(self.latency_ms).unwrap_or(i64::MAX),
+            tokens_in: None,
+            tokens_out: None,
+            error_class: self.error_class,
+            endpoint_used: self.endpoint_used.clone(),
+            check_pass: None,
+            settings_applied: Some(self.settings_applied),
+        }
+    }
 }
 
 /// A 429 or 5xx response, drained before the executor advanced.
@@ -404,8 +410,31 @@ mod tests {
     }
 
     #[test]
-    fn error_classes_have_telemetry_names() {
-        assert_eq!(ErrorClass::Timeout.as_str(), "timeout");
-        assert_eq!(ErrorClass::ConnectError.as_str(), "connect_error");
+    fn records_become_telemetry_items() {
+        let record = AttemptRecord {
+            index: 2,
+            provider: "openai".to_owned(),
+            model: "gpt-a".to_owned(),
+            endpoint_used: "direct".to_owned(),
+            status: 0,
+            error_class: Some(ErrorClass::Timeout),
+            latency_ms: 30_000,
+            settings_applied: true,
+            retry_after_wait: None,
+            relayed: false,
+        };
+        let mut json = String::new();
+        record.telemetry_item("rec_1").write_json(&mut json);
+        assert_eq!(
+            json,
+            "{\"recommendation_id\":\"rec_1\",\"model_used\":\"gpt-a\",\"status\":0,\
+             \"latency_ms\":30000,\"error_class\":\"timeout\",\"endpoint_used\":\"direct\",\
+             \"settings_applied\":true}"
+        );
+        let huge = AttemptRecord {
+            latency_ms: u64::MAX,
+            ..record
+        };
+        assert_eq!(huge.telemetry_item("r").latency_ms, i64::MAX);
     }
 }

@@ -13,9 +13,15 @@
 //! - [`envelope`]: the exact error envelope and routing responses.
 //! - [`server`]: routing, the request pipeline, and the HTTP server.
 //! - [`chain`]: the chain-walk seam that the chain executor plugs into.
+//! - [`surface`]: the chat and messages surfaces on the `maverick-core` chain executor.
+//! - [`rewrite`]: Go `rewriteModel`, the per-attempt upstream body.
+//! - [`relay`]: the relay of the settled attempt (streaming or buffered).
 
 pub mod chain;
 pub mod config;
 pub mod credentials;
 pub mod envelope;
+pub mod relay;
+pub mod rewrite;
 pub mod server;
+pub mod surface;

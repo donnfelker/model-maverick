@@ -56,6 +56,12 @@ const HOP_BY_HOP: [&str; 8] = [
     "upgrade",
 ];
 
+/// True for a name in Go's static hop-by-hop list. The relay drops these from upstream
+/// responses too (reference part 6 §9.2).
+pub(crate) fn is_hop_by_hop(name: &HeaderName) -> bool {
+    HOP_BY_HOP.contains(&name.as_str())
+}
+
 /// Headers never forwarded: framing, the client's credentials, and (D30) the tenant key.
 const NEVER_FORWARDED: [&str; 5] = [
     "host",
@@ -210,7 +216,7 @@ pub fn upstream_base_headers(client: &HeaderMap) -> HeaderMap {
     let mut base = HeaderMap::new();
     for (name, value) in client {
         let dropped = connection_named.contains(name)
-            || HOP_BY_HOP.contains(&name.as_str())
+            || is_hop_by_hop(name)
             || NEVER_FORWARDED.contains(&name.as_str());
         if !dropped {
             base.append(name.clone(), value.clone());

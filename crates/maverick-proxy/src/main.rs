@@ -7,9 +7,9 @@
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use maverick_proxy::chain::NoExecutor;
 use maverick_proxy::config::{Config, listen_addr, load_config};
 use maverick_proxy::server::{Proxy, ServeSettings, serve, shutdown_signal};
+use maverick_proxy::surface::{ExecutorRunner, NoReports};
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
@@ -55,8 +55,15 @@ async fn run(config: Config) -> ExitCode {
         }
     };
     let mode = config.mode.as_str();
-    // Beads 6.2 and 6.7 replace `NoExecutor` with the chain executor.
-    let proxy = match Proxy::new(config, Arc::new(NoExecutor)) {
+    // Bead 6.9 replaces `NoReports` with telemetry and OTel.
+    let runner = match ExecutorRunner::new(&config, Arc::new(NoReports)) {
+        Ok(runner) => runner,
+        Err(error) => {
+            tracing::error!(error = %error, "maverick-proxy: cannot build the upstream client");
+            return ExitCode::FAILURE;
+        }
+    };
+    let proxy = match Proxy::new(config, Arc::new(runner)) {
         Ok(proxy) => proxy,
         Err(error) => {
             tracing::error!(error = %error, "maverick-proxy: cannot build the engine client");

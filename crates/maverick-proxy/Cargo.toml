@@ -24,7 +24,8 @@ tower = { workspace = true }
 tower-http = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
+# `RawValue`: the per-attempt body rewrite keeps every value's raw bytes.
+serde_json = { workspace = true, features = ["raw_value"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
@@ -41,3 +42,5 @@ http-body-util = "0.1"
 [dev-dependencies]
 parity-support = { path = "../parity-support" }
 test-support = { path = "../test-support" }
+# A paused clock for the D26 `Retry-After` scenario.
+tokio = { workspace = true, features = ["test-util"] }

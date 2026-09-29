@@ -244,6 +244,7 @@ impl Proxy {
                 env_keys: EnvKeys::from_config(&self.config),
                 headers: parts.headers,
                 body,
+                raw_query: parts.uri.query().unwrap_or_default().to_owned(),
                 alias,
                 recommendation,
                 tenant_key,
