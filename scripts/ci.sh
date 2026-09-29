@@ -128,6 +128,12 @@ run_parity() {
     # groups run in the core-direct runner (bead model-maverick-5fs).
     run_logged parity conformance-proxy \
         cargo test -p sdk-conformance --test conformance -- --nocapture
+
+    # The same scenarios against maverick-core directly (bead model-maverick-5fs): the
+    # groups the proxy is exempt from by position. Phase 1 covers exhaustion relay (group
+    # 5), OpenRouter (groups 10 to 12), and concrete-model passthrough (S09a).
+    run_logged parity conformance-core \
+        cargo test -p sdk-conformance --test conformance_core -- --nocapture
 }
 
 run_e2e() {
