@@ -71,47 +71,48 @@ pub struct SimulationState {
     pub column_retention: BTreeMap<String, ColumnRetention>,
 }
 
-/// The outcome of simulating one pool.
-enum FloorResult {
-    /// The pool keeps at least one column in every cell.
-    Ok,
-    /// Every column is retired.
-    Retired,
-    /// D1: no column holds valid, unexpired zero-retention evidence.
-    ZeroRetention,
-    /// The first cell (in capability, tier order) a constraint empties, and which constraint.
-    Emptied {
-        constraint: &'static str,
-        capability: String,
-        tier: i32,
-    },
+/// A pool's floor (reference §1.5 `poolFloor`): the fewest usable columns any cell leaves,
+/// the filter that reduced the pool to it, and that cell. The constraint is `status_retired`
+/// when every column is retired, `zero_retention` when D1 leaves none, and empty (with no
+/// cell) when no filter reduced the pool. The G4 simulation fails a pool at 0 survivors; the
+/// nightly drift check alerts at 1 or fewer.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PoolFloor {
+    /// The fewest usable columns in any cell.
+    pub survivors: usize,
+    /// The filter that reduced the pool to `survivors`, or empty.
+    pub constraint: &'static str,
+    /// The first cell (in capability, tier order) with that minimum.
+    pub cell: Option<SimCell>,
 }
 
-/// The constraint that empties a cell for these columns, or `None` when at least one column
-/// survives. Cost is applied, then latency to the cost-survivors; a column is kept iff it has no
-/// EWMA in the cell or its EWMA is within the limit (equal passes). When both filters run and
-/// latency removes the last survivor, latency is the reported constraint (reference §1.5 QUIRK).
-fn cell_emptied_by(
+/// The survivors of one cell and the last filter that removed a column there. Cost is applied,
+/// then latency to the cost-survivors; a column is kept iff it has no EWMA in the cell or its
+/// EWMA is within the limit (equal passes). When cost removes some columns and latency the rest,
+/// latency is the reducer (reference §1.5 QUIRK). Go stops filtering a cell at 0 survivors;
+/// latency then has nothing to remove, so cost stays the reducer here too.
+fn cell_survivors(
     usable: &[&String],
     cell: &SimCell,
     constraints: &StandingConstraints,
     state: &SimulationState,
-) -> Option<&'static str> {
+) -> (usize, &'static str) {
     let mut survivors: Vec<&String> = usable.to_vec();
     if let Some(limit) = constraints.max_cost_per_run {
         survivors.retain(|id| ewma_for(&state.cost_ewmas, id, cell).is_none_or(|e| e <= limit));
-        if survivors.is_empty() {
-            return Some("max_cost_per_run");
-        }
     }
+    let after_cost = survivors.len();
     if let Some(limit) = constraints.max_latency_ms {
         let limit = f64::from(limit);
         survivors.retain(|id| ewma_for(&state.latency_ewmas, id, cell).is_none_or(|e| e <= limit));
-        if survivors.is_empty() {
-            return Some("max_latency_ms");
-        }
     }
-    None
+    // Read only when the cell removed a column: latency if it removed any, else cost.
+    let reducer = if survivors.len() < after_cost {
+        "max_latency_ms"
+    } else {
+        "max_cost_per_run"
+    };
+    (survivors.len(), reducer)
 }
 
 fn ewma_for(ewmas: &[CellEwma], column_id: &str, cell: &SimCell) -> Option<f64> {
@@ -125,15 +126,23 @@ fn ewma_for(ewmas: &[CellEwma], column_id: &str, cell: &SimCell) -> Option<f64> 
         .map(|ewma| ewma.ewma)
 }
 
-/// Whether a pool keeps at least one usable column in every cell, or the first cell (and
-/// constraint) that empties it (reference §1.5 `poolFloor`). Retired columns are never usable;
-/// under D1 zero retention, only columns with valid, unexpired zero-retention evidence are.
-fn pool_floor(
+/// The floor of a pool's columns (reference §1.5 `poolFloor`). Retired columns are never usable
+/// (an id with no status is usable); under D1 zero retention, only columns with valid,
+/// unexpired zero-retention evidence are. Each cell in sorted order can only lower the floor
+/// (strictly), so the first cell that reaches the minimum is the one reported. Go returned at
+/// the first empty cell; no later cell can go below 0, so the result is the same.
+#[must_use]
+pub fn pool_floor(
     ids: &[String],
     constraints: &StandingConstraints,
     state: &SimulationState,
     now: DateTime<Utc>,
-) -> FloorResult {
+) -> PoolFloor {
+    let empty = |constraint| PoolFloor {
+        survivors: 0,
+        constraint,
+        cell: None,
+    };
     let mut usable: Vec<&String> = ids
         .iter()
         .filter(|id| {
@@ -144,7 +153,7 @@ fn pool_floor(
         })
         .collect();
     if usable.is_empty() {
-        return FloorResult::Retired;
+        return empty("status_retired");
     }
 
     if constraints.zero_retention {
@@ -158,20 +167,26 @@ fn pool_floor(
                 == RetentionMode::Zero
         });
         if usable.is_empty() {
-            return FloorResult::ZeroRetention;
+            return empty("zero_retention");
         }
     }
 
+    let mut floor = PoolFloor {
+        survivors: usable.len(),
+        constraint: "",
+        cell: None,
+    };
     for cell in &state.cells_sorted {
-        if let Some(constraint) = cell_emptied_by(&usable, cell, constraints, state) {
-            return FloorResult::Emptied {
-                constraint,
-                capability: cell.capability.clone(),
-                tier: cell.difficulty_tier,
+        let (survivors, reducer) = cell_survivors(&usable, cell, constraints, state);
+        if survivors < floor.survivors {
+            floor = PoolFloor {
+                survivors,
+                constraint: reducer,
+                cell: Some(cell.clone()),
             };
         }
     }
-    FloorResult::Ok
+    floor
 }
 
 /// Simulate a proposed config: return a `pool_would_be_empty` violation for every pool the
@@ -187,38 +202,40 @@ pub fn simulate(
     let mut errors = Vec::new();
     for pool in pools {
         let name = pool.name.as_str();
-        let error = match pool_floor(&pool.model_column_ids, constraints, state, now) {
-            FloorResult::Ok => continue,
-            FloorResult::Retired => ConfigError {
+        let floor = pool_floor(&pool.model_column_ids, constraints, state, now);
+        if floor.survivors > 0 {
+            continue;
+        }
+        let error = match (floor.constraint, floor.cell) {
+            ("status_retired", _) => ConfigError {
                 code: ConfigErrorCode::PoolWouldBeEmpty,
                 message: format!(
                     "pool {name:?} would have no usable columns: every column is retired"
                 ),
                 details: json!({ "pool": name, "constraint": "status_retired" }),
             },
-            FloorResult::ZeroRetention => ConfigError {
+            ("zero_retention", _) => ConfigError {
                 code: ConfigErrorCode::PoolWouldBeEmpty,
                 message: format!(
                     "pool {name:?} would have no columns with valid zero-retention evidence"
                 ),
                 details: json!({ "pool": name, "constraint": "zero_retention" }),
             },
-            FloorResult::Emptied {
-                constraint,
-                capability,
-                tier,
-            } => ConfigError {
+            (constraint, Some(cell)) => ConfigError {
                 code: ConfigErrorCode::PoolWouldBeEmpty,
                 message: format!(
-                    "constraint {constraint:?} would leave pool {name:?} with zero candidates for {capability} tier {tier}"
+                    "constraint {constraint:?} would leave pool {name:?} with zero candidates for {} tier {}",
+                    cell.capability, cell.difficulty_tier
                 ),
                 details: json!({
                     "pool": name,
                     "constraint": constraint,
-                    "capability": capability,
-                    "difficulty_tier": tier,
+                    "capability": cell.capability,
+                    "difficulty_tier": cell.difficulty_tier,
                 }),
             },
+            // A zero floor past the pool-level checks always names the cell that emptied it.
+            (_, None) => continue,
         };
         errors.push(error);
     }
