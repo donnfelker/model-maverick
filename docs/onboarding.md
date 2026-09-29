@@ -23,12 +23,14 @@ and recommends without them — the differences are called out honestly below.
 ## 1. Postgres
 
 One throwaway container (host port 5433 to avoid colliding with a local
-Postgres):
+Postgres). Publish it on 127.0.0.1 only: Docker-published ports bypass host
+firewalls such as ufw, so `-p 5433:5432` would expose the database to the
+network.
 
 ```sh
 docker run -d --name maverick-pg \
   -e POSTGRES_USER=maverick -e POSTGRES_PASSWORD=maverick -e POSTGRES_DB=maverick \
-  -p 5433:5432 postgres:16
+  -p 127.0.0.1:5433:5432 postgres:16
 ```
 
 Wait until it answers:
@@ -44,7 +46,7 @@ list in `internal/config/config.go`). Boot fails fast and names every
 missing or malformed variable.
 
 ```sh
-export MAVERICK_DATABASE_URL="postgres://maverick:maverick@localhost:5433/maverick?sslmode=disable"
+export MAVERICK_DATABASE_URL="postgres://maverick:maverick@127.0.0.1:5433/maverick?sslmode=disable"
 export MAVERICK_INTERNAL_TOKENS="ops:dev-internal-secret"
 export MAVERICK_CAPTURE_MASTER_KEY="$(openssl rand -hex 32)"
 ```

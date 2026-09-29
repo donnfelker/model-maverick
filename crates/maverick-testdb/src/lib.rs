@@ -4,8 +4,10 @@
 //! Float32 `real` storage, `timestamptz` behavior, and transaction semantics only match on
 //! real Postgres.
 //!
-//! Each test binary starts one `postgres:16-alpine` container. The image, the credentials,
-//! and the readiness rule are the ones of the Go `storetest` harness (reference Part 1 §5).
+//! Each test binary starts one `postgres:16-alpine` container. The image, the user, and
+//! the readiness rule are the ones of the Go `storetest` harness (reference Part 1 §5).
+//! The container publishes its port on 127.0.0.1 only and gets a random password, because
+//! Docker-published ports bypass host firewalls such as ufw.
 //! A [`Schema`] is applied once to a template database. Every test gets its own database,
 //! cloned from that template, so tests never share rows.
 //!
