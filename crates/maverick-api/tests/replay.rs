@@ -33,6 +33,27 @@ static SCHEMA: LazyLock<Schema> = LazyLock::new(|| {
 /// Replays the 188 Go tests the manifest points at `parity/blackbox/` (all but
 /// `TestPhase2ExitEndToEndRecommend`, which builds its own database; bead 5.16's
 /// `crates/maverick/tests/e2e.rs` covers it).
+///
+/// `api.TestMain` is the Go suite harness: one migrated Postgres for every recorded test,
+/// which is what this test builds. The `server_test.go` rows below assert only on their
+/// responses (status, envelope bytes, the rate-limit, `Retry-After`, and request-id
+/// headers under the fixed clock), and the replay compares those exactly.
+// parity: api.TestMain
+// parity: api.TestPublicUnknownPathReturnsEnvelope
+// parity: api.TestPublicMethodNotAllowedReturnsEnvelope
+// parity: api.TestV1MissingKey401
+// parity: api.TestV1MissingKeyEnvelopeByteExact
+// parity: api.TestV1GarbageKey401
+// parity: api.TestV1UnknownKey401
+// parity: api.TestV1RevokedKey401
+// parity: api.TestV1SuspendedTenant403
+// parity: api.TestV1AuthedResponseCarriesRateLimitHeaders
+// parity: api.TestV1RateLimitExceeded429
+// parity: api.TestV1RateLimitIsPerKey
+// parity: api.TestV1OversizeBody413
+// parity: api.TestV1BodyAtCapIsNotRejected
+// parity: api.TestKeyIssueVerifyRoundTrip
+// parity: api.TestPublicResponsesCarryRequestID
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn the_go_recording_replays_with_no_unexplained_diffs() {
     let Some(db) = maverick_testdb::database(&SCHEMA).await else {
