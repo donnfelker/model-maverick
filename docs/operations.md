@@ -408,9 +408,10 @@ Production is one server deployed with Kamal 2. `config/deploy.yml` (the engine)
 - kamal-proxy routes the **public** listener only (`app_port: 8080`), with automatic HTTPS
   and the `GET /up` check. The web role runs `serve --api-only`, and one `worker` role runs
   `serve --worker-only`.
-- The **internal** listener (:8081) has no proxy route and is published on the host loopback
-  only. Reach it with `ssh -N -L 8081:127.0.0.1:8081 <user>@<host>` and call
-  `http://localhost:8081/internal/v1/...` through the tunnel.
+- The **internal** listener (:8081) has no proxy route, and no container publishes it on the
+  host. Open a tunnel with `scripts/internal-tunnel.sh <user>@<host>` and call
+  `http://127.0.0.1:8081/internal/v1/...` through it. The script finds the running web
+  container's address on the `kamal` network, so run it again after each deploy.
 - Postgres 16 is the `postgres` accessory on the same host, with its data on the named
   volume `postgres-data` and its port on the host loopback only. `kamal deploy` does not
   touch accessories. `kamal accessory remove postgres` deletes the data.
