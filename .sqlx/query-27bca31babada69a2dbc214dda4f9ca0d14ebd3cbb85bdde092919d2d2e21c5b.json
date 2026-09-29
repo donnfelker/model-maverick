@@ -1,0 +1,103 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select d.id, d.window_id, d.recommendation_id, d.captured_at, d.expires_at,\n                  r.prompt_hash, r.classification as \"classification: _\"\n           from debug_captures d\n           join recommendations r on r.id = d.recommendation_id\n           where d.tenant_id = $1\n             and ($2::text = '' or d.window_id = $2)\n             and ($3::text = '' or d.id < $3)\n           order by d.id desc\n           limit $4",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "debug_captures",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "window_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "debug_captures",
+            "name": "window_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "recommendation_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "debug_captures",
+            "name": "recommendation_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "captured_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "debug_captures",
+            "name": "captured_at"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "expires_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "debug_captures",
+            "name": "expires_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "prompt_hash",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "recommendations",
+            "name": "prompt_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "classification: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "recommendations",
+            "name": "classification"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "27bca31babada69a2dbc214dda4f9ca0d14ebd3cbb85bdde092919d2d2e21c5b"
+}

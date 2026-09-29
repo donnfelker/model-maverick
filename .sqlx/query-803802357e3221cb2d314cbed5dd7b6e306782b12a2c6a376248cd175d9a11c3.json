@@ -1,0 +1,117 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "insert into outcomes (id, recommendation_id, model_used, outcome, endpoint_used, details)\n           values ($1, $2, $3, $4, $5, $6)\n           returning id, recommendation_id, model_used, outcome, escalated_to,\n                     details as \"details: _\", created_at, endpoint_used",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "outcomes",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "recommendation_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "outcomes",
+            "name": "recommendation_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "model_used",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "outcomes",
+            "name": "model_used"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "outcome",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "outcomes",
+            "name": "outcome"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "escalated_to",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "outcomes",
+            "name": "escalated_to"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "details: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "outcomes",
+            "name": "details"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "outcomes",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "endpoint_used",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "outcomes",
+            "name": "endpoint_used"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "803802357e3221cb2d314cbed5dd7b6e306782b12a2c6a376248cd175d9a11c3"
+}

@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select exists (\n             select 1 from capture_access_log\n             where capture_id = $1 and tenant_id = $2 and action = 'delete'\n           ) as \"deleted!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "deleted!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "a9dfaa10a17d8a4cffb3706004ab0c5def892a7d3975c3de2eca9fed35bed5b0"
+}

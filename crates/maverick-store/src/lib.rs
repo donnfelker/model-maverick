@@ -14,9 +14,13 @@
 
 use sqlx::migrate::Migrator;
 
+pub mod alerts;
 pub mod batches;
+pub mod capture;
 pub mod catalog;
 pub mod corpus;
+pub mod decisions;
+pub mod health;
 pub mod measurement;
 pub mod tenancy;
 

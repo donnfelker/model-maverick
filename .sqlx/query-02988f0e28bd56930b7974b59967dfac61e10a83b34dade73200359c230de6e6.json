@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "delete from capture_windows where id = $1 and tenant_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "02988f0e28bd56930b7974b59967dfac61e10a83b34dade73200359c230de6e6"
+}

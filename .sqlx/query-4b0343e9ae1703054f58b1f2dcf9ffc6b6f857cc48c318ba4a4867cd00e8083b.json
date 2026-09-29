@@ -1,0 +1,117 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select o.id, o.recommendation_id, o.model_used, o.outcome, o.escalated_to,\n                  o.details as \"details: _\", o.created_at, o.endpoint_used\n           from outcomes o\n           join recommendations r on r.id = o.recommendation_id\n           where r.tenant_id = $1\n             and ($2::text = '' or o.recommendation_id = $2)\n             and ($3::text = '' or o.outcome = $3)\n             and ($4::timestamptz is null or o.created_at >= $4)\n             and ($5::text = '' or o.id < $5)\n           order by o.id desc\n           limit $6",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "outcomes",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "recommendation_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "outcomes",
+            "name": "recommendation_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "model_used",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "outcomes",
+            "name": "model_used"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "outcome",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "outcomes",
+            "name": "outcome"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "escalated_to",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "outcomes",
+            "name": "escalated_to"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "details: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "outcomes",
+            "name": "details"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "outcomes",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "endpoint_used",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "outcomes",
+            "name": "endpoint_used"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "4b0343e9ae1703054f58b1f2dcf9ffc6b6f857cc48c318ba4a4867cd00e8083b"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "delete from outcomes o\n         using recommendations r\n         where o.recommendation_id = r.id\n           and r.created_at < $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c8e19c7bdbc3fce09bdfc66ccc33943731143861d9d946dcc64b1c78105f5850"
+}

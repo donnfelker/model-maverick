@@ -1,0 +1,100 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select id, kind, severity, subject as \"subject: _\", message, created_at, acked_at\n           from alerts\n           where kind = $1\n           order by created_at, id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "severity",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "severity"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "subject: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "subject"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "message",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "acked_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "acked_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "f8b7ad10bafb0eb8755d6e358f7b257fe2ff981b1120d824ec65e1f9505205cc"
+}

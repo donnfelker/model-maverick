@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "insert into classification_cache (tenant_id, prompt_hash, classifier_version, classification)\n         values ($1, $2, $3, $4)\n         on conflict (tenant_id, prompt_hash, classifier_version) do nothing",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b5baaaa1123fa5242e1993fdd296c423a9c7239a343bf5a5b357a2debf139047"
+}

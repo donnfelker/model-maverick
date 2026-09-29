@@ -1,0 +1,104 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "insert into alerts (id, kind, severity, subject, message)\n           values ($1, $2, $3, $4, $5)\n           returning id, kind, severity, subject as \"subject: _\", message, created_at,\n                     acked_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "severity",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "severity"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "subject: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "subject"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "message",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "acked_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "acked_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "dd53ed362259cabecb3ae82e47ffb402cb872ba991a1ade2e059bec89302ea36"
+}
