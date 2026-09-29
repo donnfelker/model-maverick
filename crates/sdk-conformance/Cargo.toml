@@ -21,6 +21,13 @@ path = "src/main.rs"
 workspace = true
 
 [dependencies]
+axum = { workspace = true }
+tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+maverick-core = { path = "../maverick-core" }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
