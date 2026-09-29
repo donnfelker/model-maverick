@@ -896,12 +896,14 @@ async fn outcomes_list_newest_first_and_filter() {
     db.close().await;
 }
 
-/// DIVERGENCE: D16. An unchecked 2xx is `completed_unchecked`, listed like any outcome and
-/// accepted by the `outcome` filter.
+/// DIVERGENCE: D16 and D40. An unchecked 2xx is `completed_unchecked` (D16), listed like any
+/// outcome and accepted by the `outcome` filter (D40).
 #[tokio::test]
 async fn completed_unchecked_outcomes_are_listed_and_filterable() {
     let d16 = parity_support::divergence!("D16");
     assert_eq!(d16.id(), "D16");
+    let d40 = parity_support::divergence!("D40");
+    assert_eq!(d40.id(), "D40");
     let Some((db, pool)) = database().await else {
         return;
     };
@@ -1538,7 +1540,7 @@ async fn calibration_filters_and_pages() {
 // ---- recorded Go exchanges ----
 
 /// Every recorded non-200 history exchange, replayed against an empty database: the
-/// status and body are Go's bytes. The one exception is D16's widened outcome list.
+/// status and body are Go's bytes. The one exception is D40's widened outcome list.
 #[tokio::test]
 async fn recorded_error_exchanges_match_go_bytes() {
     let Some((db, pool)) = database().await else {
@@ -1567,7 +1569,7 @@ async fn recorded_error_exchanges_match_go_bytes() {
             send(router(Some(&pool), backend), Method::GET, target, "").await;
         let mut want = row["response"]["body"].as_str().unwrap().to_owned();
         if target.contains("outcome=shrug") {
-            let _d16 = parity_support::divergence!("D16");
+            let _d40 = parity_support::divergence!("D40");
             want = want.replace(
                 "provider_error other",
                 "provider_error completed_unchecked other",

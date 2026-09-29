@@ -894,7 +894,7 @@ All list endpoints paginate: `?limit=` (default 50, max 200) `&cursor=`; respons
 - `GET /v1/history/models/{column_id}?capability=&difficulty=&dimension=quality&since=` — the aggregate series: `[{as_of, ewma, variance, n, measured, matrix_version, regression: false}, ...]` with regression markers.
 - `GET /v1/history/recommendations?prompt_hash=&capability=&since=` — the tenant audit log (summaries: id, created_at, capability, difficulty, pick, mode, pool, flags).
 - `GET /v1/history/recommendations/{recommendation_id}` — one full decision trace (§10.2).
-- `GET /v1/history/outcomes?recommendation_id=&outcome=&since=` — reported outcomes.
+- `GET /v1/history/outcomes?recommendation_id=&outcome=&since=` — reported outcomes. `outcome` is one of `success`, `parse_failure`, `quality_insufficient`, `latency_exceeded`, `provider_error`, `completed_unchecked`, `other`; any other value is `422 invalid_request` (`outcome "<v>" is not one of [success parse_failure quality_insufficient latency_exceeded provider_error completed_unchecked other]`). (changed 2026-09-29 for the Rust port, D40; the Go engine never stored `completed_unchecked`, so its filter and message lack it)
 - `GET /v1/history/calibration?capability=&since=` — `[{batch_id, capability, brier_score, overconfidence, n, scored_at}, ...]`.
 
 ### 9.7 Tenant configuration
