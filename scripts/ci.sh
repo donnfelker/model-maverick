@@ -97,10 +97,24 @@ run_db() {
 
 run_parity() {
     log_dir parity
-    # Placeholder: the parity fixture tests run today inside the fast tier's `cargo test --workspace`.
-    # This tier gets its own suite when one exists (API/proxy replay, e2e script).
-    echo "no separate parity suite yet; its tests run in the fast tier (cargo test --workspace)" \
-        | tee "target/ci/parity/placeholder.log"
+    # The proxy replay (bead 6.11): every scenario in parity/fixtures/proxy/scenarios.json
+    # through the real proxy against a mock engine, mock upstreams, and a mock OTLP
+    # collector, checked against the reviewed D-row allowlist; plus the unit.json rows in
+    # maverick-core and maverick-proxy. Each scenario writes its outcome under
+    # target/ci/parity/proxy-replay/. The other parity fixture tests still run in the
+    # fast tier's `cargo test --workspace`; the API replay (bead 5.15) joins this tier.
+    rm -rf target/ci/parity/proxy-replay
+    run_logged parity proxy-replay cargo test -p maverick-proxy -p maverick-core
+    local replayed
+    replayed="$(find target/ci/parity/proxy-replay -name '*.txt' | wc -l)"
+    {
+        echo "proxy replay: ${replayed} scenarios"
+        cat target/ci/parity/proxy-replay/*.txt
+    } | tee target/ci/parity/proxy-replay-report.log
+    if [[ "$replayed" -ne 54 ]]; then
+        echo "Step failed: parity/proxy-replay reported ${replayed} of 54 scenarios"
+        exit 1
+    fi
 }
 
 run_e2e() {
