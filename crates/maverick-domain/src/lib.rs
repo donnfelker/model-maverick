@@ -9,6 +9,7 @@
 //! Package 2a fills this in, one module per work package.
 
 pub mod capture;
+pub mod catalog;
 pub mod ceilings;
 pub mod checks;
 pub mod classify;
