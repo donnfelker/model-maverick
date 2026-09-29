@@ -522,7 +522,8 @@ is `null` or `false`.
 
 `telemetry_opt_out: true` (D39) turns off outcome telemetry for the tenant.
 Recommend responses then carry `"telemetry": false`, MM components send no
-telemetry, and the engine drops any telemetry items it still receives. It
+telemetry, and the engine drops any telemetry items it still receives. The
+trial proxy also exports no OTel record for the tenant's requests (D43). It
 filters no model column, so it never causes `pool_would_be_empty`.
 
 ## Debug capture

@@ -110,7 +110,9 @@ and the proxy sends no telemetry for that tenant. Operators can also set
 `MAVERICK_PROXY_TELEMETRY=off` to send no proxy telemetry at all.
 
 OTel logs and metrics are separate operator observability. They are enabled only
-when the proxy has `MAVERICK_PROXY_OTLP_ENDPOINT`.
+when the proxy has `MAVERICK_PROXY_OTLP_ENDPOINT`. An opted-out tenant's requests
+export no OTel record either: no log record, and the request counter does not
+count them (D43).
 
 ## Nice To Have (Not Planned)
 
