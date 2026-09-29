@@ -23,6 +23,8 @@ use tokio::sync::{Mutex, oneshot};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
+pub mod fake;
+
 pub type ProviderResult<T> = Result<T, ProviderError>;
 pub type ProviderFuture<'a> =
     Pin<Box<dyn Future<Output = ProviderResult<CompletionResponse>> + Send + 'a>>;
