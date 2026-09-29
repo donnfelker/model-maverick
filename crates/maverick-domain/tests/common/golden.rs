@@ -31,10 +31,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use maverick_domain::gojson::{self, JsonValue};
 use maverick_domain::graders::{
-    FailureCounter, GradeError, GradeInput, GradeResult, Grader, Registry, RunMeta,
+    FailureCounter, GradeError, GradeInput, GradeResult, GradeTask, Grader, Registry, RunMeta,
     parse_envelope_value,
 };
-use maverick_domain::tasks::Task;
 use serde::Deserialize;
 
 use super::block_on;
@@ -191,21 +190,11 @@ pub fn grade_fixture(
     let mut registry = Registry::with_failure_counter(counter.clone());
     let kind = grader.kind().to_owned();
     registry.must_register(grader);
-    let task = fixture.task.as_ref().map(|t| Task {
-        file: String::new(),
+    let task = fixture.task.as_ref().map(|t| GradeTask {
         id: t.id.clone(),
         capability: t.capability.clone(),
-        domain_tags: Vec::new(),
-        difficulty_tier: None,
-        difficulty_knobs: None,
         prompt: t.prompt.clone(),
-        attachments: Vec::new(),
-        temperature: 0.0,
-        max_tokens: None,
-        grader_specs: Vec::new(),
-        dimension_weights: BTreeMap::new(),
-        pass_threshold: 0.0,
-        smoke_member: false,
+        attachments_json: String::new(),
     });
     let run = match &fixture.run {
         Some(run) => RunMeta {

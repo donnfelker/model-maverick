@@ -131,6 +131,20 @@ mod tests {
     }
 
     #[test]
+    fn grade_task_carries_the_raw_attachments() {
+        let corpus = crate::tasks::load_documents(vec![(
+            "t.yaml".to_owned(),
+            b"id: task_g\ncapability: factual_qa\nprompt: P\nattachments: [{name: a, content: b}]\n"
+                .to_vec(),
+        )]);
+        let view = corpus.tasks[0].grade_task();
+        assert_eq!(view.id, "task_g");
+        assert_eq!(view.capability, "factual_qa");
+        assert_eq!(view.prompt, "P");
+        assert_eq!(view.attachments_json, r#"[{"name":"a","content":"b"}]"#);
+    }
+
+    #[test]
     fn attachments_decode_like_go() {
         assert_eq!(parse_attachments(""), Ok(Vec::new()));
         assert_eq!(parse_attachments("null"), Ok(Vec::new()));

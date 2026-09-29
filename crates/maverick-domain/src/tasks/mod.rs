@@ -93,6 +93,16 @@ impl Task {
         i64::try_from(bytes.div_ceil(4)).unwrap_or(i64::MAX)
     }
 
+    /// The grader's view of this task.
+    pub fn grade_task(&self) -> crate::graders::GradeTask {
+        crate::graders::GradeTask {
+            id: self.id.clone(),
+            capability: self.capability.clone(),
+            prompt: self.prompt.clone(),
+            attachments_json: self.attachments_json(),
+        }
+    }
+
     /// The `attachments` column: `[{"name":...,"content":...}]`, `[]` when none.
     pub fn attachments_json(&self) -> String {
         let items = self
