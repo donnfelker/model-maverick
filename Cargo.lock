@@ -2263,6 +2263,9 @@ name = "maverick"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum",
+ "hyper",
+ "hyper-util",
  "maverick-alerts",
  "maverick-api",
  "maverick-config",
@@ -2271,9 +2274,13 @@ dependencies = [
  "maverick-providers",
  "maverick-runner",
  "maverick-store",
+ "maverick-testdb",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
+ "reqwest",
+ "serde_json",
+ "sqlx",
  "tokio",
  "tracing",
  "tracing-opentelemetry",

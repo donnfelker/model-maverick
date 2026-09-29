@@ -12,6 +12,7 @@ pub mod rebuild;
 pub mod regression_scan;
 pub mod retention;
 pub mod spend_guard;
+pub mod worker;
 
 use chrono::{
     DateTime, Datelike, Duration as ChronoDuration, Months, NaiveDate, NaiveDateTime, TimeZone,
