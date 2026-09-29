@@ -9,6 +9,8 @@ pub mod alias;
 pub mod chain;
 pub mod failopen;
 pub mod gojson;
+pub mod normalize;
 pub mod projection;
 pub mod recommend;
+pub mod settings;
 pub mod telemetry;

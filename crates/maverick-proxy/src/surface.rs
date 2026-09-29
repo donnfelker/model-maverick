@@ -14,8 +14,9 @@
 //!   is `{anthropic}/v1/messages`. The credential goes in `X-Api-Key`.
 //!
 //! Both append `?` and the inbound raw query when it is not empty, rewrite the body per
-//! attempt ([`rewrite_model`]; a body that is not an object skips the entry), and send the
-//! base upstream headers plus the credential ([`attempt_headers`]).
+//! attempt ([`rewrite_attempt`]: the model, the entry's settings (D14), and parameter
+//! normalization (D29); a body that is not an object skips the entry), and send the base
+//! upstream headers plus the credential ([`attempt_headers`]).
 //!
 //! The walk runs in its own task. When the client goes away, axum drops the handler; the
 //! walk then sees its `cancelled` signal and ends every remaining attempt as
@@ -30,7 +31,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use axum::response::Response;
-use maverick_core::alias::Mode;
+use maverick_core::alias::{Mode, SettingsMode};
 use maverick_core::chain::{ChainExecutor, ChainResult, PreparedAttempt};
 use maverick_core::recommend::{ChainEntry, TenantKey};
 use maverick_core::telemetry::TelemetryItem;
@@ -40,7 +41,7 @@ use crate::chain::{BoxFuture, ChainRequest, ChainRunner, Surface, exhausted};
 use crate::config::Config;
 use crate::credentials::{attempt_headers, resolve_key};
 use crate::relay::{Done, relay};
-use crate::rewrite::{Normalizer, rewrite_model};
+use crate::rewrite::{AttemptParams, rewrite_attempt, wire_format};
 
 /// At most this many idle upstream connections are kept per host (Go transport setting).
 pub const MAX_IDLE_PER_HOST: usize = 2;
@@ -218,14 +219,28 @@ async fn walk(
         received_at,
         ..
     } = request;
-    let normalizer = Normalizer::for_surface(surface);
+    let format = wire_format(surface);
     let prepare = |_index: usize, entry: &ChainEntry| -> Option<PreparedAttempt> {
         if surface == Surface::Messages && entry.provider != "anthropic" {
             return None;
         }
         let key = resolve_key(&entry.provider, surface, &credential, &env_keys)?;
         let url = runner.upstreams.url(surface, &entry.provider, &raw_query)?;
-        let body = rewrite_model(&body, &entry.model, normalizer).ok()?;
+        // D14: the entry's settings unless the alias opted out; D29: its constraints.
+        let settings = match alias.settings_mode {
+            SettingsMode::Apply => Some(&entry.settings),
+            SettingsMode::Caller => None,
+        };
+        let rewritten = rewrite_attempt(
+            &body,
+            &entry.model,
+            &AttemptParams {
+                format,
+                settings,
+                constraints: &entry.param_constraints,
+            },
+        )
+        .ok()?;
         let headers = attempt_headers(surface, &upstream_headers, key)?;
         let Ok(url) = reqwest::Url::parse(&url) else {
             tracing::warn!(
@@ -236,10 +251,10 @@ async fn walk(
         };
         let mut upstream = reqwest::Request::new(reqwest::Method::POST, url);
         *upstream.headers_mut() = headers;
-        *upstream.body_mut() = Some(body.into());
+        *upstream.body_mut() = Some(rewritten.body.into());
         Some(PreparedAttempt {
             request: upstream,
-            settings_applied: false,
+            settings_applied: rewritten.settings_applied,
             endpoint_used: "direct".to_owned(),
         })
     };

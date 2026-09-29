@@ -4,8 +4,9 @@
 //!    A duplicate key keeps its last value.
 //! 2. Set `model` to the entry's model, encoded as a Go JSON string (HTML-escaped). Only the
 //!    exact lowercase key `model` is replaced; a `MODEL` key stays as well (QUIRK 4).
-//! 3. Apply the surface's normalizer (the two fixed Go mappings; D29 adds catalog-driven
-//!    constraints in bead 6.8).
+//! 3. Apply the entry's `settings` (D14; skipped for `?settings=caller`), then normalize:
+//!    the entry's catalog constraints (D29) where it has one for a field, else the two
+//!    fixed Go mappings. Normalization never adds a missing field.
 //! 4. Re-encode: top-level keys sorted by byte value, every value compacted (no whitespace
 //!    between tokens, nested whitespace included), `<` `>` `&` and U+2028 / U+2029 inside
 //!    strings escaped as Go does. Every other byte of a value is kept: number spellings
@@ -17,7 +18,12 @@
 use std::collections::BTreeMap;
 
 use maverick_core::gojson::{quote, write_string};
+use maverick_core::normalize::{
+    self, FIELDS, ParamConstraints, WireFormat, WirePath, go_fallback, wire_path,
+};
+use maverick_core::settings::wire_settings;
 use serde_json::value::RawValue;
+use serde_json::{Map, Value};
 
 use crate::chain::Surface;
 
@@ -42,6 +48,43 @@ impl Normalizer {
             Surface::Messages => Self::Messages,
         }
     }
+
+    /// The wire format the normalizer works on; `None` normalizes nothing.
+    fn format(self) -> Option<WireFormat> {
+        match self {
+            Self::None => None,
+            Self::Chat => Some(WireFormat::ChatCompletions),
+            Self::Messages => Some(WireFormat::Messages),
+        }
+    }
+}
+
+/// The surface's wire format.
+#[must_use]
+pub fn wire_format(surface: Surface) -> WireFormat {
+    match surface {
+        Surface::Chat => WireFormat::ChatCompletions,
+        Surface::Messages => WireFormat::Messages,
+    }
+}
+
+/// What one attempt's body takes from its chain entry besides the model.
+#[derive(Debug, Clone, Copy)]
+pub struct AttemptParams<'a> {
+    /// The surface's wire format.
+    pub format: WireFormat,
+    /// The entry's settings (D14), or `None` when the alias ends in `?settings=caller`.
+    pub settings: Option<&'a Map<String, Value>>,
+    /// The entry's parameter constraints (D29).
+    pub constraints: &'a ParamConstraints,
+}
+
+/// An attempt's upstream body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Rewritten {
+    pub body: Vec<u8>,
+    /// At least one entry setting was written (D14 `settings_applied`).
+    pub settings_applied: bool,
 }
 
 /// The body is not a JSON object. The attempt is skipped.
@@ -51,50 +94,134 @@ pub struct NotAnObject;
 
 type Members = BTreeMap<String, Box<RawValue>>;
 
-/// The upstream body for one attempt: `body` with `model` replaced and the surface's
-/// normalizer applied, re-encoded as Go did.
+/// Go `rewriteModel`: `body` with `model` replaced and the surface's fixed normalizer
+/// applied, re-encoded as Go did. No settings and no catalog constraints.
 pub fn rewrite_model(
     body: &[u8],
     model: &str,
     normalizer: Normalizer,
 ) -> Result<Vec<u8>, NotAnObject> {
+    rewrite(
+        body,
+        model,
+        normalizer.format(),
+        None,
+        &ParamConstraints::new(),
+    )
+    .map(|rewritten| rewritten.body)
+}
+
+/// The upstream body for one attempt: the model replaced, the entry's settings applied
+/// (D14), each parameter normalized (D29, else the Go mapping), re-encoded as Go did.
+pub fn rewrite_attempt(
+    body: &[u8],
+    model: &str,
+    params: &AttemptParams<'_>,
+) -> Result<Rewritten, NotAnObject> {
+    rewrite(
+        body,
+        model,
+        Some(params.format),
+        params.settings,
+        params.constraints,
+    )
+}
+
+fn rewrite(
+    body: &[u8],
+    model: &str,
+    format: Option<WireFormat>,
+    settings: Option<&Map<String, Value>>,
+    constraints: &ParamConstraints,
+) -> Result<Rewritten, NotAnObject> {
     let text = String::from_utf8_lossy(body);
     let mut members: Members = serde_json::from_str(&text).map_err(|_| NotAnObject)?;
     members.insert("model".to_owned(), raw(quote(model)));
-    match normalizer {
-        Normalizer::None => {}
-        Normalizer::Chat => {
-            if is_string(members.get("reasoning_effort").map(Box::as_ref), "xhigh") {
-                members.insert("reasoning_effort".to_owned(), raw(quote("high")));
+    let mut settings_applied = false;
+    if let (Some(format), Some(settings)) = (format, settings) {
+        let (fields, skipped) = wire_settings(settings, format);
+        for key in &skipped {
+            tracing::debug!(
+                setting = %key,
+                surface = format.as_str(),
+                "maverick-proxy: entry setting has no wire field on this surface; left untouched"
+            );
+        }
+        for field in &fields {
+            if write_path(&mut members, field.path, &field.value) {
+                settings_applied = true;
+            } else {
+                tracing::debug!(
+                    setting = %field.key,
+                    surface = format.as_str(),
+                    "maverick-proxy: the request field for this setting is not an object; left untouched"
+                );
             }
         }
-        Normalizer::Messages => normalize_output_config(&mut members),
     }
-    Ok(encode_object(&members).into_bytes())
-}
-
-/// Messages: `output_config` must decode as an object whose `effort` is the string
-/// `"xhigh"`. Then `effort` becomes `"max"` and the object is re-encoded (sorted keys,
-/// sibling values kept). Otherwise `output_config` is left to the final compaction.
-fn normalize_output_config(members: &mut Members) {
-    let Some(config) = members.get("output_config") else {
-        return;
-    };
-    let Ok(Some(mut config)) = serde_json::from_str::<Option<Members>>(config.get()) else {
-        return;
-    };
-    if !is_string(config.get("effort").map(Box::as_ref), "xhigh") {
-        return;
+    if let Some(format) = format {
+        for field in FIELDS {
+            let Some(path) = wire_path(field, format) else {
+                continue;
+            };
+            // Never add a missing field.
+            let Some(current) = read_path(&members, path) else {
+                continue;
+            };
+            let target = match normalize::normalize(field, &current, constraints) {
+                Some(target) => target,
+                None => match go_fallback(field, format, &current) {
+                    Some(target) => target,
+                    None => continue,
+                },
+            };
+            if target != current {
+                write_path(&mut members, path, &target);
+            }
+        }
     }
-    config.insert("effort".to_owned(), raw(quote("max")));
-    members.insert("output_config".to_owned(), raw(encode_object(&config)));
-}
-
-/// True when `value` decodes as the JSON string `want` (escapes decoded, exact case).
-fn is_string(value: Option<&RawValue>, want: &str) -> bool {
-    value.is_some_and(|value| {
-        serde_json::from_str::<String>(value.get()).is_ok_and(|text| text == want)
+    Ok(Rewritten {
+        body: encode_object(&members).into_bytes(),
+        settings_applied,
     })
+}
+
+/// The value at `path`, when present. A nested field needs its parent to decode as an
+/// object; a `null` or non-object parent has no field.
+fn read_path(members: &Members, path: WirePath) -> Option<Value> {
+    match path {
+        WirePath::Top(name) => serde_json::from_str(members.get(name)?.get()).ok(),
+        WirePath::Nested { object, field } => {
+            let parent: Members = serde_json::from_str(members.get(object)?.get()).ok()?;
+            serde_json::from_str(parent.get(field)?.get()).ok()
+        }
+    }
+}
+
+/// Writes `value` at `path`. A nested field's parent must be absent, `null`, or an
+/// object: it is then re-encoded with sorted keys (siblings keep their raw bytes), as
+/// Go's messages normalizer did. Returns false, writing nothing, for any other parent.
+fn write_path(members: &mut Members, path: WirePath, value: &Value) -> bool {
+    let encoded = raw(value.to_string());
+    match path {
+        WirePath::Top(name) => {
+            members.insert(name.to_owned(), encoded);
+            true
+        }
+        WirePath::Nested { object, field } => {
+            let mut parent: Members = match members.get(object) {
+                None => Members::new(),
+                Some(existing) => match serde_json::from_str::<Option<Members>>(existing.get()) {
+                    Ok(Some(parent)) => parent,
+                    Ok(None) => Members::new(),
+                    Err(_) => return false,
+                },
+            };
+            parent.insert(field.to_owned(), encoded);
+            members.insert(object.to_owned(), raw(encode_object(&parent)));
+            true
+        }
+    }
 }
 
 /// A raw value from JSON text this module produced.
