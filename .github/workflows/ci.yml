@@ -108,6 +108,10 @@ jobs:
     name: mutants (changed lines)
     if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    # `actions: read` lets scripts/mutants-base.sh list this workflow's runs and jobs.
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: Free runner disk space
         # cargo-mutants builds a second copy of the workspace, so disk matters here too.
@@ -142,12 +146,23 @@ jobs:
             cargo install cargo-mutants --version 27.1.0 --locked --force
           fi
 
+      - name: Test the mutants base picker
+        # A fake `gh` and a throwaway repo: no network, about a second.
+        run: bash scripts/tests/mutants-base.sh
+
       - name: Run mutants on changed lines
         env:
           PUSH_BEFORE: ${{ github.event.before }}
           PR_BASE: ${{ github.event.pull_request.base.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          base="${PR_BASE:-$PUSH_BEFORE}"
+          base="$PR_BASE"
+          if [[ -z "$base" ]]; then
+            # On main a newer push replaces a pending run, so the replaced pushes never
+            # run this job. Test everything since the newest run whose mutants passed,
+            # not only this push (bead model-maverick-hhum). It falls back to "before".
+            base="$(scripts/mutants-base.sh "$PUSH_BEFORE")"
+          fi
           # A new branch has no "before" commit; fall back to the parent.
           if [[ -z "$base" || "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
             base="HEAD~1"
