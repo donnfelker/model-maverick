@@ -36,8 +36,16 @@ impl Artifacts {
     /// # Errors
     /// When the directory cannot be created.
     pub fn create(workspace: &Path) -> io::Result<Self> {
+        Self::create_named(workspace, "e2e")
+    }
+
+    /// Creates `<workspace>/target/<kind>/<timestamp>/`.
+    ///
+    /// # Errors
+    /// When the directory cannot be created.
+    pub fn create_named(workspace: &Path, kind: &str) -> io::Result<Self> {
         let stamp = chrono::Utc::now().format("%Y%m%dT%H%M%S%.3fZ").to_string();
-        let dir = workspace.join("target").join("e2e").join(stamp);
+        let dir = workspace.join("target").join(kind).join(stamp);
         fs::create_dir_all(&dir)?;
         Ok(Self {
             dir,
@@ -134,6 +142,20 @@ impl Process {
         fs::read_to_string(&self.log).unwrap_or_default()
     }
 
+    /// The CPU time (user + system) it has used, from `/proc/<pid>/stat`. `None` off Linux or
+    /// when the file cannot be read.
+    #[must_use]
+    pub fn cpu_seconds(&self) -> Option<f64> {
+        let stat = fs::read_to_string(format!("/proc/{}/stat", self.child.id())).ok()?;
+        // Fields after the `(comm)` entry, which may itself hold spaces: utime and stime
+        // are fields 14 and 15 of the whole line, so 12 and 13 after it.
+        let rest = stat.rsplit_once(')')?.1;
+        let fields: Vec<&str> = rest.split_whitespace().collect();
+        let ticks: f64 =
+            fields.get(11)?.parse::<f64>().ok()? + fields.get(12)?.parse::<f64>().ok()?;
+        Some(ticks / clock_ticks_per_second())
+    }
+
     /// Waits for the process to exit by itself.
     ///
     /// # Errors
@@ -175,6 +197,17 @@ impl Drop for Process {
             let _ = self.child.wait();
         }
     }
+}
+
+/// `getconf CLK_TCK`, or Linux's usual 100.
+fn clock_ticks_per_second() -> f64 {
+    Command::new("getconf")
+        .arg("CLK_TCK")
+        .output()
+        .ok()
+        .and_then(|out| String::from_utf8(out.stdout).ok())
+        .and_then(|text| text.trim().parse().ok())
+        .unwrap_or(100.0)
 }
 
 /// A free local port. Another process can take it before it is used, which is fine for a
