@@ -2319,6 +2319,7 @@ dependencies = [
  "futures-util",
  "graphile_worker",
  "http-body-util",
+ "jsonschema",
  "maverick-alerts",
  "maverick-config",
  "maverick-domain",

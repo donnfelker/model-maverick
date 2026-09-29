@@ -9,6 +9,7 @@ pub mod classify;
 pub mod config;
 mod health;
 mod internal;
+pub mod mcp;
 mod models;
 pub mod observe;
 mod policies;
@@ -29,6 +30,7 @@ pub struct ApiState {
     health: HealthState,
     recommend: RecommendConfig,
     internal: InternalSettings,
+    mcp: mcp::McpSessions,
 }
 
 impl ApiState {
@@ -46,6 +48,7 @@ impl ApiState {
             health,
             recommend: RecommendConfig::default(),
             internal: InternalSettings::default(),
+            mcp: mcp::McpSessions::default(),
         }
     }
 
@@ -56,6 +59,7 @@ impl ApiState {
             health: HealthState::detached(),
             recommend: RecommendConfig::default(),
             internal: InternalSettings::default(),
+            mcp: mcp::McpSessions::default(),
         }
     }
 
@@ -84,6 +88,11 @@ impl ApiState {
     /// The internal seam's settings.
     pub fn internal(&self) -> &InternalSettings {
         &self.internal
+    }
+
+    /// The live MCP streamable-HTTP sessions.
+    pub fn mcp_sessions(&self) -> &mcp::McpSessions {
+        &self.mcp
     }
 }
 
@@ -976,8 +985,9 @@ pub fn public_router_with(state: AuthState, api: ApiState) -> Router {
         .route("/up", any(health::up))
         .with_state(api.health.clone());
     let mcp = Router::new()
-        .route("/", any(route_stub))
+        .route("/", any(mcp::mcp_handler))
         .fallback(route_stub)
+        .with_state(api.clone())
         .layer(middleware::from_fn(body_limit))
         .layer(middleware::from_fn_with_state(state.clone(), rate_limit))
         .layer(middleware::from_fn_with_state(state.clone(), public_auth));

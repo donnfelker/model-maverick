@@ -16,14 +16,13 @@ use maverick_domain::gojson::{self, JsonValue};
 const FIXTURE: &str = include_str!("../../../parity/fixtures/store/cli.json");
 
 /// Rows whose command body is another bead's.
-const OTHER_BEADS: [(&str, &str); 7] = [
+const OTHER_BEADS: [(&str, &str); 6] = [
     ("corpus-load-invalid-tier-range", "3.10 corpus load"),
     ("corpus-load-invalid-test-suite", "3.10 corpus load"),
     ("corpus-load-valid-unreachable-db", "3.10 corpus load"),
     ("corpus-activate-unreachable-db", "3.10 corpus activate"),
     ("corpus-calibrate-unreachable-db", "3.10 corpus calibrate"),
     ("probe-corpus-status-unreachable-db", "3.10 corpus status"),
-    ("mcp-stdio-unreachable-db", "the MCP stdio bead"),
 ];
 
 fn field<'a>(value: &'a JsonValue, key: &str) -> &'a JsonValue {
@@ -158,6 +157,7 @@ fn mask_error_keeps_everything_but_the_error_text() {
 // parity: main.TestRunCorpusActivateRequiresVersion
 // parity: main.TestRunMCPStdioRequiresAPIKey
 // parity: main.TestRunMCPStdioFailsFastNamingMissingVarsOnStderr
+// parity: main.TestRunMCPStdioFailsOnUnreachableDatabase
 // parity: main.TestRunServeFailsFastNamingMissingVars
 // parity: main.TestRunServeFailsFastNamingMalformedVar
 // parity: main.TestRunServeLogsJSON
@@ -213,7 +213,7 @@ fn cli_rows_match_go() {
         );
         checked += 1;
     }
-    assert_eq!(checked, 17);
+    assert_eq!(checked, 18);
 }
 
 fn strings(args: &[&str]) -> Vec<String> {

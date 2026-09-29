@@ -59,8 +59,8 @@ pub(crate) async fn models_handler(
     }
 }
 
-/// The response body: compact JSON and one `\n`.
-async fn models(pool: &PgPool, now: DateTime<Utc>) -> Result<String, String> {
+/// The response body: compact JSON and one `\n` (also the MCP `list_models` tool).
+pub(crate) async fn models(pool: &PgPool, now: DateTime<Utc>) -> Result<String, String> {
     let statuses: Vec<String> = LISTED_STATUSES.iter().map(|s| (*s).to_owned()).collect();
     let columns = catalog::list_model_columns_by_statuses(pool, &statuses)
         .await
