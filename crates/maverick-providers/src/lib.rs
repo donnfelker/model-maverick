@@ -25,6 +25,7 @@ use tokio::time::Instant;
 
 pub mod anthropic;
 pub mod fake;
+pub mod google;
 pub mod openai;
 
 pub type ProviderResult<T> = Result<T, ProviderError>;
