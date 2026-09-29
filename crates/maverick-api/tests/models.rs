@@ -100,6 +100,7 @@ struct Col<'a> {
     aliases: Option<&'a str>,
     alias_retention: Option<&'a str>,
     retention: Option<(&'a str, DateTime<Utc>, DateTime<Utc>, &'a str)>,
+    param_constraints: Option<&'a str>,
 }
 
 async fn column(pool: &PgPool, col: Col<'_>) {
@@ -116,6 +117,7 @@ async fn column(pool: &PgPool, col: Col<'_>) {
     });
     let aliases = col.aliases.map(raw);
     let alias_retention = col.alias_retention.map(raw);
+    let param_constraints = col.param_constraints.map(raw);
     catalog::create_model_column(
         pool,
         &NewModelColumn {
@@ -135,7 +137,7 @@ async fn column(pool: &PgPool, col: Col<'_>) {
             retention_valid_until: col.retention.map(|r| r.2),
             retention_source: col.retention.map(|r| r.3),
             execution_alias_retention: alias_retention.as_deref(),
-            param_constraints: None,
+            param_constraints: param_constraints.as_deref(),
         },
     )
     .await
@@ -279,14 +281,15 @@ async fn the_catalog_fields_are_exact() {
     db.close().await;
 }
 
-/// DIVERGENCE: D1, D15. Go's eleven keys come first, in order; the retention fields follow.
-/// No score of any kind.
+/// DIVERGENCE: D1, D15, D29. Go's eleven keys come first, in order; the retention fields
+/// and `param_constraints` follow. No score of any kind.
 // parity: api.TestModelsEntryKeySetExact
 #[tokio::test]
 async fn the_entry_keys_are_exact() {
     let d1 = parity_support::divergence!("D1");
     let d15 = parity_support::divergence!("D15");
-    assert_eq!((d1.id(), d15.id()), ("D1", "D15"));
+    let d29 = parity_support::divergence!("D29");
+    assert_eq!((d1.id(), d15.id(), d29.id()), ("D1", "D15", "D29"));
     let Some((db, pool)) = database().await else {
         return;
     };
@@ -304,7 +307,7 @@ async fn the_entry_keys_are_exact() {
     let (_, text) = models(&pool).await;
     assert!(
         text.starts_with(
-            r#"{"models":[{"column_id":"col_keys","provider":"anthropic","model_id":"claude-keys","endpoint":"direct","settings":{},"execution_aliases":{},"status":"active","pricing":{},"deprecation_date":null,"measured":false,"quality_source_column_id":null,"retention_mode":"unknown","retention_verified_at":null,"retention_valid_until":null,"retention_source":null,"execution_alias_retention":{}}],"matrix_version":"#
+            r#"{"models":[{"column_id":"col_keys","provider":"anthropic","model_id":"claude-keys","endpoint":"direct","settings":{},"execution_aliases":{},"status":"active","pricing":{},"deprecation_date":null,"measured":false,"quality_source_column_id":null,"retention_mode":"unknown","retention_verified_at":null,"retention_valid_until":null,"retention_source":null,"execution_alias_retention":{},"param_constraints":{}}],"matrix_version":"#
         ),
         "{text}"
     );
@@ -408,6 +411,55 @@ async fn retention_fields_are_effective_after_expiry() {
     assert_eq!(
         expired["execution_alias_retention"],
         serde_json::json!({"openrouter": "unknown"})
+    );
+    db.close().await;
+}
+
+/// DIVERGENCE: D29. Each model shows its stored `param_constraints` verbatim, as the last
+/// key; a column without constraints shows `{}`.
+#[tokio::test]
+async fn param_constraints_are_returned_verbatim() {
+    let _d29 = parity_support::divergence!("D29");
+    let Some((db, pool)) = database().await else {
+        return;
+    };
+    column(
+        &pool,
+        Col {
+            id: "col_a_constrained",
+            model: "claude-effort",
+            endpoint: "direct",
+            status: "active",
+            param_constraints: Some(
+                r#"{"reasoning_effort": {"allowed": ["low", "high"], "order": ["low", "medium", "high"]}}"#,
+            ),
+            ..Col::default()
+        },
+    )
+    .await;
+    column(
+        &pool,
+        Col {
+            id: "col_b_plain",
+            model: "claude-plain",
+            endpoint: "direct",
+            status: "active",
+            ..Col::default()
+        },
+    )
+    .await;
+    let (_, text) = models(&pool).await;
+    // jsonb order: "order" (5 bytes) before "allowed" (7 bytes).
+    assert!(
+        text.contains(
+            r#""execution_alias_retention":{},"param_constraints":{"reasoning_effort":{"order":["low","medium","high"],"allowed":["low","high"]}}}"#
+        ),
+        "{text}"
+    );
+    let body = parse(&text);
+    assert_eq!(
+        entries(&body)[1]["param_constraints"],
+        serde_json::json!({})
     );
     db.close().await;
 }

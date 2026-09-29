@@ -206,12 +206,12 @@ async fn trace_rows(pool: &PgPool) -> i64 {
         .unwrap()
 }
 
-/// D8/D9: the Go golden text with the Rust fields inserted in their positions.
+/// D8/D9/D15/D29: the Go golden text with the Rust fields inserted in their positions.
 fn with_rust_fields(go: &str, retention: &str) -> String {
     go.replace(
         "\"execution_aliases\":{},",
         &format!(
-            "\"execution_aliases\":{{}},\"execution_alias_retention\":{{}},\"settings\":{{}},\"retention_mode\":\"{retention}\","
+            "\"execution_aliases\":{{}},\"execution_alias_retention\":{{}},\"settings\":{{}},\"param_constraints\":{{}},\"retention_mode\":\"{retention}\","
         ),
     )
     .replace(
@@ -377,7 +377,7 @@ async fn entries_carry_execution_aliases_and_settings_verbatim() {
     // jsonb order (shorter keys first) and number spelling, compacted (reference §3.9).
     assert!(
         body.contains(
-            r#""execution_aliases":{"vertex":"a","openrouter":"anthropic/claude-recommend-alias"},"execution_alias_retention":{"vertex":"unknown","openrouter":"unknown"},"settings":{"effort":3.0,"thinking":true},"retention_mode":"unknown","#
+            r#""execution_aliases":{"vertex":"a","openrouter":"anthropic/claude-recommend-alias"},"execution_alias_retention":{"vertex":"unknown","openrouter":"unknown"},"settings":{"effort":3.0,"thinking":true},"param_constraints":{},"retention_mode":"unknown","#
         ),
         "{body}"
     );
@@ -419,6 +419,38 @@ async fn entries_carry_effective_alias_retention() {
     assert!(
         body.contains(
             r#""execution_alias_retention":{"azure":"unknown","bedrock":"unknown","openrouter":"zero"},"#
+        ),
+        "{body}"
+    );
+    db.close().await;
+}
+
+/// DIVERGENCE: D29. Each entry carries its column's `param_constraints` after `settings`:
+/// the stored jsonb verbatim (jsonb key order), so the proxy and the SDK cores can
+/// normalize caller values to what the routed model accepts.
+#[tokio::test]
+async fn entries_carry_param_constraints_verbatim() {
+    let d29 = parity_support::divergence!("D29");
+    assert_eq!(d29.id(), "D29");
+    let Some((db, pool)) = database().await else {
+        return;
+    };
+    column(&pool, "col_a", "anthropic", "claude-a", None, None).await;
+    sqlx::query("UPDATE model_columns SET param_constraints = $1::jsonb")
+        .bind(
+            r#"{"reasoning_effort": {"allowed": ["low", "high"],
+                "order": ["minimal", "low", "medium", "high", "xhigh", "max"]}}"#,
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+    pool_of(&pool, "default", &["col_a"], true).await;
+    let (status, body) = recommend(&pool, r#"{"workload":{"capability":"factual_qa"}}"#).await;
+    assert_eq!(status, StatusCode::OK);
+    // jsonb order: "order" (5 bytes) before "allowed" (7 bytes).
+    assert!(
+        body.contains(
+            r#""settings":{},"param_constraints":{"reasoning_effort":{"order":["minimal","low","medium","high","xhigh","max"],"allowed":["low","high"]}},"retention_mode":"unknown","#
         ),
         "{body}"
     );

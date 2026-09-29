@@ -847,7 +847,7 @@ Response `200`:
 }
 ```
 
-`score` is the absolute displayed quality (§6.7). `prompt_hash` present only on prompt-form requests. Every entry carries its column's `settings` and effective `retention_mode` (§4.5, §7.4), and `low_availability` (§7.4 step 6). `zero_retention` is always present; when true, SDK cores switch to declared mode and treat the tenant as zero-retention for their fail-open ladder (G14). `classification_quota_exceeded: true` appears only when the classifier budget was hit (§8.3), as the last key of the response. The prompt form also accepts `workload.projection_version` (string, §8.1). (changed 2026-09-28 for the Rust port; the Go engine implements the prior rule: entries carry no `settings`, `retention_mode`, or `low_availability`, and responses carry no `zero_retention`) `violations` entries: `{"constraint": "max_latency_ms", "limit": 2000, "estimated": 3400}`.
+`score` is the absolute displayed quality (§6.7). `prompt_hash` present only on prompt-form requests. Every entry carries its column's `settings`, its `param_constraints` after `settings` (§3, D29; the stored value verbatim, `{}` when none), and effective `retention_mode` (§4.5, §7.4), and `low_availability` (§7.4 step 6). `zero_retention` is always present; when true, SDK cores switch to declared mode and treat the tenant as zero-retention for their fail-open ladder (G14). `classification_quota_exceeded: true` appears only when the classifier budget was hit (§8.3), as the last key of the response. The prompt form also accepts `workload.projection_version` (string, §8.1). (changed 2026-09-28 for the Rust port; the Go engine implements the prior rule: entries carry no `settings`, `param_constraints`, `retention_mode`, or `low_availability`, and responses carry no `zero_retention`) `violations` entries: `{"constraint": "max_latency_ms", "limit": 2000, "estimated": 3400}`.
 
 ### 9.3 GET /v1/policies
 
@@ -874,7 +874,7 @@ Response `200`:
 
 ### 9.4 GET /v1/models
 
-Returns the column catalog visible to the tenant (all non-retired columns): provider, model_id, endpoint, settings, status, pricing snapshot, `deprecation_date`, `measured` (any measured cells), `quality_source_column_id`, and the retention fields (`retention_mode` as effective after expiry, `retention_verified_at`, `retention_valid_until`, `retention_source`; §4.5). No scores here — scores are per-cell and live in policies/history.
+Returns the column catalog visible to the tenant (all non-retired columns): provider, model_id, endpoint, settings, status, pricing snapshot, `deprecation_date`, `measured` (any measured cells), `quality_source_column_id`, and the retention fields (`retention_mode` as effective after expiry, `retention_verified_at`, `retention_valid_until`, `retention_source`; §4.5), then `execution_alias_retention` (each alias's effective mode; openrouter spec §2.3) and `param_constraints` (§3, D29; the stored value verbatim, `{}` when none) as the last key. No scores here — scores are per-cell and live in policies/history.
 
 ### 9.5 POST /v1/outcomes
 

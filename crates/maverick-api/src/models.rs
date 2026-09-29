@@ -13,6 +13,8 @@
 //! - D15: `execution_alias_retention`: each `execution_aliases` key, in that map's order,
 //!   with its effective retention mode (openrouter spec §2.3). A key without stored
 //!   evidence, or with expired evidence, reads as `unknown`.
+//! - D29: `param_constraints`: the column's stored per-model parameter constraints,
+//!   verbatim; `{}` means none.
 
 use std::collections::HashSet;
 
@@ -125,6 +127,11 @@ fn entry(column: &ModelColumn, measured: bool, now: DateTime<Utc>) -> Result<Jso
     ));
     // D15.
     members.push(("execution_alias_retention".to_owned(), per_alias));
+    // D29.
+    members.push((
+        "param_constraints".to_owned(),
+        jsonb(column.param_constraints.get())?,
+    ));
     Ok(JsonValue::Object(members))
 }
 
