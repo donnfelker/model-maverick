@@ -221,7 +221,7 @@ fn resolve_request(
         });
         match ours {
             Some(at) => {
-                let text = at.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true);
+                let text = rfc3339_nano(*at);
                 if let Err(conflict) = tokens.insert(&ts, &text) {
                     report
                         .notes
@@ -234,6 +234,25 @@ fn resolve_request(
             )),
         }
     }
+}
+
+/// A timestamp as the server writes it (Go RFC 3339 nano: UTC, trailing fraction zeros
+/// trimmed), so a value copied into a request is the same text a response carries.
+fn rfc3339_nano(at: DateTime<Utc>) -> String {
+    let base = at.format("%Y-%m-%dT%H:%M:%S");
+    match at.timestamp_subsec_nanos() {
+        0 => format!("{base}Z"),
+        nanos => format!("{base}.{}Z", format!("{nanos:09}").trim_end_matches('0')),
+    }
+}
+
+#[test]
+fn timestamps_are_written_as_the_server_writes_them() {
+    use chrono::TimeZone;
+    let at = Utc.with_ymd_and_hms(2026, 9, 29, 18, 29, 51).unwrap();
+    assert_eq!(rfc3339_nano(at), "2026-09-29T18:29:51Z");
+    let at = at + chrono::Duration::microseconds(343_040);
+    assert_eq!(rfc3339_nano(at), "2026-09-29T18:29:51.34304Z");
 }
 
 struct Sent {
