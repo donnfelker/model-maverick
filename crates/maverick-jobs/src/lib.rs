@@ -8,6 +8,7 @@ pub mod catalog;
 pub mod fold;
 pub mod probes;
 pub mod rebuild;
+pub mod regression_scan;
 pub mod retention;
 pub mod spend_guard;
 
