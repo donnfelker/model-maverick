@@ -98,34 +98,29 @@ fn special(s: &str) -> Option<f64> {
 /// `digits* ('.' digits*)? ([eE] [+-]? digits+)?` with at least one mantissa digit.
 fn is_decimal_literal(s: &str) -> bool {
     let bytes = s.as_bytes();
-    let mut i = 0;
-    let mut mantissa_digits = 0;
-    while i < bytes.len() && bytes[i].is_ascii_digit() {
-        i += 1;
-        mantissa_digits += 1;
-    }
-    if i < bytes.len() && bytes[i] == b'.' {
-        i += 1;
-        while i < bytes.len() && bytes[i].is_ascii_digit() {
-            i += 1;
-            mantissa_digits += 1;
-        }
+    // Counting digits with an iterator keeps every scan bounded: a `while` that steps
+    // `i += 1` hangs under a mutated `i *= 1`, and a cargo-mutants timeout fails CI.
+    let digits_from = |i: usize| bytes[i..].iter().take_while(|b| b.is_ascii_digit()).count();
+    let mut i = digits_from(0);
+    let mut mantissa_digits = i;
+    if bytes.get(i) == Some(&b'.') {
+        let fraction = digits_from(i + 1);
+        i += 1 + fraction;
+        mantissa_digits += fraction;
     }
     if mantissa_digits == 0 {
         return false;
     }
-    if i < bytes.len() && (bytes[i] == b'e' || bytes[i] == b'E') {
+    if let Some(b'e' | b'E') = bytes.get(i) {
         i += 1;
-        if i < bytes.len() && (bytes[i] == b'+' || bytes[i] == b'-') {
+        if let Some(b'+' | b'-') = bytes.get(i) {
             i += 1;
         }
-        let exponent_start = i;
-        while i < bytes.len() && bytes[i].is_ascii_digit() {
-            i += 1;
-        }
-        if i == exponent_start {
+        let exponent = digits_from(i);
+        if exponent == 0 {
             return false;
         }
+        i += exponent;
     }
     i == bytes.len()
 }
@@ -192,17 +187,16 @@ fn underscore_ok(s: &str) -> bool {
     let bytes = s.as_bytes();
     // `^` start, `0` digit or base prefix, `_` underscore, `!` anything else.
     let mut saw = b'^';
-    let mut i = 0;
+    let mut start = 0;
     let mut hex = false;
     if let [b'0', base, ..] = bytes {
         if matches!(base.to_ascii_lowercase(), b'b' | b'o' | b'x') {
-            i = 2;
+            start = 2;
             saw = b'0';
             hex = base.eq_ignore_ascii_case(&b'x');
         }
     }
-    while i < bytes.len() {
-        let c = bytes[i];
+    for &c in &bytes[start..] {
         if c.is_ascii_digit() || (hex && c.is_ascii_hexdigit()) {
             saw = b'0';
         } else if c == b'_' {
@@ -216,7 +210,6 @@ fn underscore_ok(s: &str) -> bool {
             }
             saw = b'!';
         }
-        i += 1;
     }
     saw != b'_'
 }

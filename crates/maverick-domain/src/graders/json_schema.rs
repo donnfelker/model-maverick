@@ -170,8 +170,14 @@ pub fn parse_path(path: &str) -> Result<Vec<Segment>, String> {
     let bytes = rest.as_bytes();
     let mut segments = Vec::new();
     let mut i = 0;
-    while i < bytes.len() {
-        match bytes[i] {
+    // Each pass consumes at least one byte, so the path length bounds the loop. A
+    // `while i < len` loop would re-parse forever under a mutated index, and a
+    // cargo-mutants timeout fails CI.
+    for _ in 0..bytes.len() {
+        let Some(&b) = bytes.get(i) else {
+            break;
+        };
+        match b {
             b'.' => {
                 let start = i + 1;
                 let end = bytes[start..]
