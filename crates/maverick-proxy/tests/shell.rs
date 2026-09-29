@@ -869,3 +869,210 @@ async fn shutdown_drains_and_returns() {
         started.elapsed()
     );
 }
+
+// ---------------------------------------------------------------------------------------
+// Tenant auth and credentials through the pipeline (bead 6.6; D12, D13, D30)
+
+fn hosted(engine_url: &str) -> Config {
+    config_from(&[
+        ("MAVERICK_PROXY_MODE", "hosted"),
+        ("MAVERICK_ENGINE_URL", engine_url),
+        ("OPENAI_API_KEY", "operator-openai-secret"),
+        ("ANTHROPIC_API_KEY", "operator-anthropic-secret"),
+    ])
+    .expect("hosted config")
+}
+
+/// What the chain walk received about credentials.
+#[derive(Debug, Clone, PartialEq)]
+struct CredentialHandoff {
+    tenant_key: String,
+    credential: maverick_proxy::credentials::CallerCredential,
+    openai_key: Option<String>,
+    anthropic_key: Option<String>,
+    upstream_header_names: Vec<String>,
+}
+
+#[derive(Clone, Default)]
+struct CredentialRecorder {
+    seen: Arc<Mutex<Vec<CredentialHandoff>>>,
+}
+
+impl ChainRunner for CredentialRecorder {
+    fn run(&self, request: ChainRequest) -> BoxFuture<'_, axum::response::Response> {
+        use maverick_proxy::credentials::resolve_key;
+        let key = |provider: &str| {
+            resolve_key(
+                provider,
+                request.surface,
+                &request.credential,
+                &request.env_keys,
+            )
+            .map(str::to_owned)
+        };
+        let handoff = CredentialHandoff {
+            tenant_key: request.tenant_key.expose().to_owned(),
+            credential: request.credential.clone(),
+            openai_key: key("openai"),
+            anthropic_key: key("anthropic"),
+            upstream_header_names: request
+                .upstream_headers
+                .keys()
+                .map(|name| name.as_str().to_owned())
+                .collect(),
+        };
+        self.seen.lock().expect("recorder").push(handoff);
+        Box::pin(async { axum::response::Response::new(axum::body::Body::from("chain ran")) })
+    }
+}
+
+#[tokio::test]
+async fn hosted_tenant_keys_are_checked_and_isolated() {
+    let reply = r#"{"recommendation_id":"rec_t","recommendations":[{"provider":"openai","model":"gpt-a"}]}"#;
+    let engine = MockEngine::start(vec![(200, reply), (200, reply)]).await;
+    let recorder = CredentialRecorder::default();
+    let proxy = TestProxy::start(
+        hosted(&engine.url),
+        Arc::new(recorder.clone()),
+        ServeSettings::default(),
+    )
+    .await;
+    let unauthorized = envelope_body("unauthorized", "missing or invalid X-Maverick-API-Key");
+
+    // Malformed keys never reach the engine (the engine requires the `mk_live_` prefix).
+    for bad in ["sk-not-maverick", "Bearer mk_live_x", "MK_LIVE_x"] {
+        let response = post(
+            &proxy.addr,
+            "/v1/chat/completions",
+            &[("X-Maverick-API-Key", bad)],
+            CHAT_HI,
+        )
+        .await;
+        assert_response(bad, &response, 401, &unauthorized);
+    }
+    assert!(engine.requests().is_empty());
+
+    // Two tenants: each engine call and each chain walk carries its own key.
+    for (tenant, credential) in [
+        ("mk_live_tenant_a", "sk-a-openai"),
+        ("mk_live_tenant_b", "sk-b-openai"),
+    ] {
+        let response = post(
+            &proxy.addr,
+            "/v1/chat/completions",
+            &[
+                ("X-Maverick-API-Key", tenant),
+                ("Authorization", &format!("Bearer {credential}")),
+            ],
+            CHAT_HI,
+        )
+        .await;
+        assert_response(tenant, &response, 200, "chain ran");
+    }
+    let engine_keys: Vec<String> = engine
+        .requests()
+        .into_iter()
+        .map(|(headers, _)| headers["authorization"].clone())
+        .collect();
+    assert_eq!(
+        engine_keys,
+        ["Bearer mk_live_tenant_a", "Bearer mk_live_tenant_b"]
+    );
+
+    let seen = recorder.seen.lock().expect("recorder").clone();
+    assert_eq!(seen.len(), 2);
+    for (handoff, (tenant, credential)) in seen.iter().zip([
+        ("mk_live_tenant_a", "sk-a-openai"),
+        ("mk_live_tenant_b", "sk-b-openai"),
+    ]) {
+        assert_eq!(handoff.tenant_key, tenant);
+        assert_eq!(
+            handoff.openai_key.as_deref(),
+            Some(credential),
+            "the caller's own key"
+        );
+        assert_eq!(
+            handoff.anthropic_key, None,
+            "D12: no operator key in hosted mode"
+        );
+        assert!(
+            !handoff
+                .upstream_header_names
+                .iter()
+                .any(|name| name == "x-maverick-api-key" || name == "authorization"),
+            "D30: {:?}",
+            handoff.upstream_header_names
+        );
+    }
+    proxy.stop().await.expect("clean shutdown");
+}
+
+#[tokio::test]
+async fn hosted_engine_401_and_403_map_to_the_tenant() {
+    let engine = MockEngine::start(vec![
+        (401, r#"{"error":{"code":"unauthorized","message":"missing or invalid API key","details":{}}}"#),
+        (403, r#"{"error":{"code":"tenant_suspended","message":"tenant is suspended","details":{}}}"#),
+    ])
+    .await;
+    let proxy = start(hosted(&engine.url)).await;
+    let tenant = [("X-Maverick-API-Key", "mk_live_revoked")];
+    let response = post(&proxy.addr, "/v1/chat/completions", &tenant, CHAT_HI).await;
+    assert_response(
+        "engine 401",
+        &response,
+        401,
+        &envelope_body("unauthorized", "missing or invalid X-Maverick-API-Key"),
+    );
+    let response = post(&proxy.addr, "/v1/messages", &tenant, CHAT_HI).await;
+    assert_response(
+        "engine 403",
+        &response,
+        403,
+        "{\"error\":{\"code\":\"tenant_suspended\",\"message\":\"tenant is suspended\"}}\n",
+    );
+    proxy.stop().await.expect("clean shutdown");
+}
+
+#[tokio::test]
+async fn self_hosted_engine_401_stays_engine_error() {
+    let engine = MockEngine::start(vec![(401, r#"{"error":{"code":"unauthorized"}}"#)]).await;
+    let proxy = start(self_hosted(&engine.url)).await;
+    let response = post(&proxy.addr, "/v1/chat/completions", &[], CHAT_HI).await;
+    assert_eq!(response.status(), 502, "{}", response.body_text());
+    assert!(response.body_text().contains("engine_error"));
+    proxy.stop().await.expect("clean shutdown");
+}
+
+/// G5: provider keys and tenant keys stay out of every log line.
+#[tokio::test(flavor = "current_thread")]
+async fn keys_never_reach_the_logs() {
+    let logs = test_support::init_test_tracing_with_secrets(&[
+        "mk_live_tenant_logcheck",
+        "sk-caller-logcheck",
+        "operator-openai-secret",
+    ]);
+    let engine = MockEngine::start(vec![(500, "{}")]).await;
+    let proxy = TestProxy::start(
+        hosted(&engine.url),
+        Arc::new(CredentialRecorder::default()),
+        ServeSettings::default(),
+    )
+    .await;
+    let response = post(
+        &proxy.addr,
+        "/v1/chat/completions",
+        &[
+            ("X-Maverick-API-Key", "mk_live_tenant_logcheck"),
+            ("Authorization", "Bearer sk-caller-logcheck"),
+        ],
+        CHAT_HI,
+    )
+    .await;
+    assert_eq!(response.status(), 502);
+    assert!(
+        !logs.captured_lines().is_empty(),
+        "the engine failure was logged"
+    );
+    proxy.stop().await.expect("clean shutdown");
+    // Dropping `logs` fails the test if any registered secret reached a log line.
+}

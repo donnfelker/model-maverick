@@ -8,14 +8,16 @@
 //!
 //! # Pipeline (the first failing step decides)
 //!
-//! 0. Hosted mode only (D13): the tenant key from `X-Maverick-API-Key`, else `401`.
+//! 0. Hosted mode only (D13): the tenant key from `X-Maverick-API-Key` (it must start with
+//!    `mk_live_`), else `401 unauthorized`.
 //! 1. Read the body. Over the D38 cap (declared `Content-Length`, or bytes read): `413
 //!    payload_too_large`. Read error: `400 invalid_request`.
 //! 2. Decode `{model: string}` with Go's rules: `400 invalid_request` on error.
 //! 3. Parse the alias: `400 invalid_model_alias` on any error. The engine is not called.
 //! 4. Choose the workload (D5): a malformed `X-Maverick-Workload` is `400 invalid_request`.
 //! 5. Recommend. Terminal privacy errors are relayed as `422`/`409` with their code (D17).
-//!    Any other failure is `502 engine_error` and one ERROR log line.
+//!    Hosted mode maps an engine 401 to `401 unauthorized` and relays a 403 with its code
+//!    (D13). Any other failure is `502 engine_error` and one ERROR log line.
 //! 6. Hand the chain to the [`ChainRunner`].
 //!
 //! Logs never carry a body, a prompt, or a credential.
@@ -39,13 +41,15 @@ use hyper_util::service::TowerToHyperService;
 use maverick_core::alias::parse_alias;
 use maverick_core::gojson::{apply_string, type_error};
 use maverick_core::recommend::{
-    RecommendClient, RecommendClientConfig, RecommendError, RecommendRequest, TenantKey, Workload,
+    EngineFailure, RecommendClient, RecommendClientConfig, RecommendError, RecommendRequest,
+    TenantKey, Workload,
 };
 use serde_json::Value;
 use tokio::net::TcpListener;
 
 use crate::chain::{ChainRequest, ChainRunner, Surface};
 use crate::config::{Config, DeploymentMode};
+use crate::credentials::{self, CallerCredential, EnvKeys};
 use crate::envelope;
 
 /// The engine client's total timeout per call (Go constant).
@@ -56,6 +60,9 @@ pub const WORKLOAD_HEADER: HeaderName = HeaderName::from_static("x-maverick-work
 
 /// The hosted-mode tenant key header (D13).
 pub const TENANT_KEY_HEADER: HeaderName = HeaderName::from_static("x-maverick-api-key");
+
+/// Every Maverick API key starts with this prefix (spec §9.1).
+pub const TENANT_KEY_PREFIX: &str = "mk_live_";
 
 /// The proxy: configuration, the engine client, and the chain runner.
 pub struct Proxy {
@@ -194,6 +201,28 @@ impl Proxy {
                     &message,
                 );
             }
+            Err(RecommendError::Engine(EngineFailure::Status { status: 401, .. }))
+                if self.config.mode == DeploymentMode::Hosted =>
+            {
+                // D13: the engine rejected this tenant's key.
+                return envelope::error(
+                    StatusCode::UNAUTHORIZED,
+                    envelope::UNAUTHORIZED,
+                    envelope::UNAUTHORIZED_MESSAGE,
+                );
+            }
+            Err(RecommendError::Engine(EngineFailure::Status { status: 403, code }))
+                if self.config.mode == DeploymentMode::Hosted =>
+            {
+                // D13: a suspended tenant's 403 is relayed with the engine's code.
+                let code = code.as_deref().unwrap_or(envelope::TENANT_SUSPENDED);
+                let message = if code == envelope::TENANT_SUSPENDED {
+                    envelope::TENANT_SUSPENDED_MESSAGE
+                } else {
+                    code
+                };
+                return envelope::error(StatusCode::FORBIDDEN, code, message);
+            }
             Err(RecommendError::Engine(failure)) => {
                 tracing::error!(error = %failure, "maverick-proxy: engine recommend failed");
                 return envelope::error(
@@ -204,10 +233,15 @@ impl Proxy {
             }
         };
 
-        // 6. Chain walk.
+        // 6. Chain walk, with the caller's credential and the upstream base headers (D12, D30).
+        let credential = CallerCredential::from_headers(surface, &parts.headers, self.config.mode);
+        let upstream_headers = credentials::upstream_base_headers(&parts.headers);
         self.chain
             .run(ChainRequest {
                 surface,
+                credential,
+                upstream_headers,
+                env_keys: EnvKeys::from_config(&self.config),
                 headers: parts.headers,
                 body,
                 alias,
@@ -238,11 +272,14 @@ async fn messages(State(proxy): State<Arc<Proxy>>, request: Request) -> Response
     proxy.handle(Surface::Messages, request).await
 }
 
-/// The hosted tenant key: a present, non-empty `X-Maverick-API-Key` that is a valid header
-/// string. Bead 6.6 owns the full D13 rules.
+/// The hosted tenant key (D13): the first `X-Maverick-API-Key` value, when it is a text
+/// header that starts with [`TENANT_KEY_PREFIX`]. This mirrors the engine's own parse, so
+/// the proxy never rejects a key the engine would accept.
 fn hosted_tenant_key(headers: &HeaderMap) -> Option<TenantKey> {
     let value = headers.get(TENANT_KEY_HEADER)?.to_str().ok()?;
-    (!value.is_empty()).then(|| TenantKey::new(value))
+    value
+        .starts_with(TENANT_KEY_PREFIX)
+        .then(|| TenantKey::new(value))
 }
 
 /// The first `X-Maverick-Workload` value: `Ok(None)` when absent, `Err` when it is not text.

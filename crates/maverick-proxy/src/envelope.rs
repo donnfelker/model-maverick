@@ -39,10 +39,14 @@ pub const NO_EXECUTABLE_CANDIDATES_CHAT: &str =
 pub const NO_EXECUTABLE_CANDIDATES_MESSAGES: &str = "no anthropic chain entry could be executed (no anthropic candidate, no credential, or every attempt failed)";
 /// `payload_too_large` (D38).
 pub const PAYLOAD_TOO_LARGE: &str = "payload_too_large";
-/// `unauthorized` (hosted mode, D13; bead 6.6 owns the full rules).
+/// `unauthorized` (hosted mode, D13).
 pub const UNAUTHORIZED: &str = "unauthorized";
 /// The hosted-mode message for a missing or unusable tenant key.
 pub const UNAUTHORIZED_MESSAGE: &str = "missing or invalid X-Maverick-API-Key";
+/// `tenant_suspended`, relayed from the engine in hosted mode (D13).
+pub const TENANT_SUSPENDED: &str = "tenant_suspended";
+/// The engine's exact `tenant_suspended` message.
+pub const TENANT_SUSPENDED_MESSAGE: &str = "tenant is suspended";
 /// `zero_retention_requires_declared`, relayed from the engine (D17).
 pub const ZERO_RETENTION_REQUIRES_DECLARED: &str = "zero_retention_requires_declared";
 /// `no_compliant_columns`, relayed from the engine (D17).
