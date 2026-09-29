@@ -23,11 +23,11 @@ tracing = { workspace = true }
 ulid = { workspace = true }
 chrono = { workspace = true }
 rust_decimal = { workspace = true }
+# `migrate` applies graphile_worker's own schema after the engine migrations.
+graphile_worker = { workspace = true }
 
 [dev-dependencies]
 maverick-testdb = { workspace = true }
-# Applies the real graphile_worker schema in the job health test.
-graphile_worker = { workspace = true }
 sha2 = { workspace = true }
 test-support = { path = "../test-support" }
 testcontainers = { workspace = true }
