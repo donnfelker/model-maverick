@@ -12,8 +12,8 @@ This directory explains how Model Maverick is built, one document per area. Star
 - [Jobs and scheduling](jobs-and-scheduling.md): the `graphile_worker` job kinds, cron, leases, and the shutdown rule.
 - [Telemetry and outcomes](telemetry-and-outcomes.md): `/v1/telemetry`, the batcher, and why there is no `POST /v1/outcomes`.
 - [Privacy and zero retention](privacy-and-zero-retention.md): the redaction rule, the fail-closed zero-retention rule, and debug capture.
-- [Observability](observability.md): structured tracing, the `skip_all` rule, and OTLP export.
-- [Testing and parity](testing-and-parity.md): the parity data, the coverage checker, and mutation testing.
+- [Observability](observability.md): structured tracing, the `skip_all` rule, OTLP export, and alerts.
+- [Testing and parity](testing-and-parity.md): the parity data, the strict manifest audit, the CI tiers, the acceptance, end-to-end, and latency harnesses, and mutation testing.
 
 ## The one-paragraph version
 

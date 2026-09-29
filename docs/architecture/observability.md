@@ -14,9 +14,9 @@ The redaction rule is enforced at the span boundary:
 
 ## OTLP export
 
-When `MAVERICK_OTEL_EXPORTER_ENDPOINT` is set, the engine exports traces and metrics over OTLP with `opentelemetry-otlp` and `tracing-opentelemetry`. An empty endpoint disables the export, so a local run needs no collector. `MAVERICK_OTEL_SERVICE_NAME` sets the service name (default `maverick`). The proxy has its own OTLP settings (`MAVERICK_PROXY_OTLP_ENDPOINT`, `MAVERICK_PROXY_OTLP_SERVICE_NAME`) and records every settled request, including one that dispatched nothing (D31 continues the caller's W3C trace context into the engine and the providers).
+When `MAVERICK_OTEL_EXPORTER_ENDPOINT` is set, the engine exports traces and metrics over OTLP with `opentelemetry-otlp` and `tracing-opentelemetry`. An empty endpoint disables the export, so a local run needs no collector. `MAVERICK_OTEL_SERVICE_NAME` sets the service name (default `maverick`). The proxy has its own OTLP settings (`MAVERICK_PROXY_OTLP_ENDPOINT`, `MAVERICK_PROXY_OTLP_SERVICE_NAME`). It exports no spans. For each settled request, including one that dispatched nothing, it exports a `maverick.recommendation` log record and counts the request in `maverick_proxy_recommendations_total` (labels `measured` and `classification_method`). It continues the caller's W3C trace context into the engine and the providers (D31). A request whose recommendation says `telemetry: false` (the D39 opt-out) exports no record and is not counted (D43). A request that fails before the engine answers has no opt-out flag, so it is recorded.
 
-Tests point the exporter at a mock OTLP collector (in `maverick-acceptance`), so the export path is exercised without a real backend.
+The privacy acceptance suite (`maverick-acceptance`) points the engine's and the proxy's exporters at one mock OTLP collector. Its canary test flushes both pipelines and checks that no canary appears in any exported span, log record, or metric label.
 
 ## Metrics
 
@@ -25,3 +25,5 @@ The engine records operational metrics at their producers (batch progress, spend
 ## Alerts
 
 `maverick-alerts` turns operational conditions (a regression, a spend-cap trip, a failed batch) into alert rows and delivers them by SMTP (`MAVERICK_SMTP_URL`) and by a signed HMAC webhook (`MAVERICK_ALERTS_WEBHOOK_URL`, `MAVERICK_ALERTS_WEBHOOK_SECRET`). Alerts are the human-facing side of observability, separate from the trace and metric streams a collector ingests.
+
+An unresolved classifier makes no classifier calls, so the classifier's failure-rate alert cannot fire. The engine raises its own `classifier_degraded` alert instead: critical, with subject `reason: "unresolved"`, once the classifier has been unresolved for 5 min. A later resolution writes an `info` alert of the same kind (`reason: "resolved"`). See D41 in [Request path](request-path.md).
