@@ -78,6 +78,11 @@ run_fast() {
     run_logged fast deny cargo deny check --hide-inclusion-graph -A duplicate -A license-not-encountered
     run_sqlx_check
 
+    # The final manifest audit (bead 9.1): every Go test in parity/manifest/ has a tagged
+    # Rust test, every tag sits in test code, and every DIVERGENCES row is named by a test
+    # (and no test or the replay allowlist cites a row that does not exist).
+    run_logged fast parity-coverage cargo run -q -p parity-support --bin parity_coverage -- --strict --list-rows
+
     if git ls-files --error-unmatch scripts/check-instrumentation.sh >/dev/null 2>&1 &&
         [[ -x scripts/check-instrumentation.sh ]]; then
         run_logged fast instrument scripts/check-instrumentation.sh
