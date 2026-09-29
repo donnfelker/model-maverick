@@ -1,0 +1,150 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "update batches\n         set lease_expires_at = now() + make_interval(secs => $3),\n             heartbeat_at = now(),\n             updated_at = now()\n         where id = $1 and lease_owner = $2 and status = 'running'\n         returning id, kind, batch_window, status, lease_owner, lease_expires_at,\n                   heartbeat_at, attempt, completed_at, created_at, updated_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "batches",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "batches",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "batch_window",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "batches",
+            "name": "batch_window"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "batches",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "lease_owner",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "batches",
+            "name": "lease_owner"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "lease_expires_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "batches",
+            "name": "lease_expires_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "heartbeat_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "batches",
+            "name": "heartbeat_at"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "attempt",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "batches",
+            "name": "attempt"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "completed_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "batches",
+            "name": "completed_at"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "batches",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "batches",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "da251a5887c84b10640987891585144a6f8732e8d3d6ffc29c7e5020756d1479"
+}

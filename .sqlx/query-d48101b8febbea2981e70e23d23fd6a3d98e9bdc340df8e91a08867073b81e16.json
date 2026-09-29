@@ -1,0 +1,92 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "insert into calibration (batch_id, capability, brier_score, overconfidence, n)\n         values ($1, $2, $3, $4, $5)\n         on conflict (batch_id, capability) do update set\n           brier_score = excluded.brier_score,\n           overconfidence = excluded.overconfidence,\n           n = excluded.n,\n           scored_at = now()\n         returning batch_id, capability, brier_score, overconfidence, n, scored_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "batch_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "calibration",
+            "name": "batch_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "capability",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "calibration",
+            "name": "capability"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "brier_score",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "calibration",
+            "name": "brier_score"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "overconfidence",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "calibration",
+            "name": "overconfidence"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "n",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "calibration",
+            "name": "n"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "scored_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "calibration",
+            "name": "scored_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Float4",
+        "Float4",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "d48101b8febbea2981e70e23d23fd6a3d98e9bdc340df8e91a08867073b81e16"
+}

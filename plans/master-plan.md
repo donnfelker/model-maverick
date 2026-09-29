@@ -250,14 +250,14 @@ Deployment: multi-stage Docker (cargo-chef for cached dependency layers) buildin
 
 ## 5. Data model
 
-Twenty-one tables in the engine (including `batches`, new in the Rust port), grouped:
+Twenty-two tables in the engine (including `batches` and `classifier_usage`, new in the Rust port), grouped:
 
 | Group | Tables |
 |---|---|
 | Tenancy | `tenants`, `api_keys`, `pools`, `tenant_weights`, `tenant_constraints` |
 | Catalog and corpus | `model_columns` (with `execution_aliases`), `tasks`, `corpus_versions` |
 | Measurement | `runs`, `scores`, `aggregates` (append-only, `as_of`), `predictions`, `calibration` |
-| Decisions | `recommendations` (full candidate trace), `classification_cache`, `outcomes` (with `endpoint_used`) |
+| Decisions | `recommendations` (full candidate trace), `classification_cache`, `classifier_usage` (classifier budget counters; new in the Rust port), `outcomes` (with `endpoint_used`) |
 | Privacy | `capture_windows`, `debug_captures`, `capture_access_log` |
 | Operations | `alerts`, `batches` (lease and status per job kind × window; new in the Rust port, adopted into the spec 2026-09-28) |
 

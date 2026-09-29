@@ -1,0 +1,80 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "insert into scores (run_id, grader_idx, dimension, value, detail)\n           values ($1, $2, $3, $4, $5)\n           returning run_id, grader_idx, dimension, value, detail as \"detail: _\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "run_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "scores",
+            "name": "run_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "grader_idx",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "scores",
+            "name": "grader_idx"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "dimension",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "scores",
+            "name": "dimension"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "value",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "scores",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "detail: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "scores",
+            "name": "detail"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int2",
+        "Text",
+        "Float4",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "e95abf56f5700584b4d740cb0e6d3ef209c8de887c2e1a6501fac73f0d5461e8"
+}
