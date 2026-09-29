@@ -39,7 +39,9 @@ use maverick_domain::classify::{
 use maverick_domain::gofmt::quote;
 use maverick_domain::policy::RetentionMode;
 use maverick_domain::pricing;
-use maverick_providers::{CompletionRequest, ProviderClient, SETTING_RESPONSE_SCHEMA};
+use maverick_providers::{
+    CompletionRequest, ProviderClient, ProviderError, SETTING_RESPONSE_SCHEMA,
+};
 use maverick_store::catalog::ModelColumn;
 use maverick_store::{Decimal, JsonRawValue, decisions, is_not_found};
 use serde_json::{Map, Value};
@@ -84,6 +86,62 @@ pub struct ClassifyError {
     pub column: String,
     /// The last attempt's error.
     pub cause: String,
+    /// `cause` without any text the model or the provider wrote (G5, D19): a parse error
+    /// names only the check that failed, and a provider error drops the provider's
+    /// response body.
+    pub redacted_cause: String,
+}
+
+impl ClassifyError {
+    fn new(column: &str, cause: String, redacted_cause: String) -> Self {
+        Self {
+            column: column.to_owned(),
+            cause,
+            redacted_cause,
+        }
+    }
+
+    /// The error as a log line may carry it: `classify: column <column>: <redacted cause>`.
+    /// `cause` can quote the classifier's output (which can echo the prompt) or a
+    /// provider's error body, so it never goes into a log field (G5, D19).
+    #[must_use]
+    pub fn redacted(&self) -> String {
+        format!("classify: column {}: {}", self.column, self.redacted_cause)
+    }
+}
+
+/// A provider error as [`ProviderError`]'s `Display` writes it, without the wrapped
+/// source: that is where the provider's response body goes.
+fn provider_summary(error: &ProviderError) -> String {
+    let mut summary = format!("{}: {}", error.provider(), error.kind());
+    if error.status() != 0 {
+        summary.push_str(&format!(" (status {})", error.status()));
+    }
+    if error.attempts() > 0 {
+        summary.push_str(&format!(" after {} attempt(s)", error.attempts()));
+    }
+    summary
+}
+
+/// A structured-output parse error (`classify::parse`) reduced to the check that failed.
+/// Only `trailing data` and the `missing` errors carry no model text, so only they pass
+/// through as they are.
+fn parse_summary(error: &str) -> String {
+    const TRAILING: &str = "parsing structured output: trailing data after JSON object";
+    let summary = if error == TRAILING || error.starts_with("structured output missing ") {
+        error
+    } else if error.starts_with("parsing structured output: ") {
+        "parsing structured output: not a JSON object of the response schema"
+    } else if error.starts_with("capability ") {
+        "capability is not a v1 capability"
+    } else if error.starts_with("difficulty ") {
+        "difficulty is out of range 1-5"
+    } else if error.starts_with("confidence ") {
+        "confidence is out of range 0-1"
+    } else {
+        "structured output did not parse"
+    };
+    summary.to_owned()
 }
 
 /// The outcome of one [`Classifier::classify`] call.
@@ -179,11 +237,13 @@ impl Classifier {
     /// Classify `prompt`. Every attempt must finish by `deadline` (D3); none starts after it.
     pub async fn classify(&self, prompt: &str, deadline: Instant) -> Attempts {
         let (request, truncated) = self.request(prompt);
+        let deadline_exceeded = "context deadline exceeded";
         let mut attempts = Attempts {
-            outcome: Err(ClassifyError {
-                column: self.column.clone(),
-                cause: "context deadline exceeded".to_owned(),
-            }),
+            outcome: Err(ClassifyError::new(
+                &self.column,
+                deadline_exceeded.to_owned(),
+                deadline_exceeded.to_owned(),
+            )),
             calls: 0,
             tokens_in: 0,
             tokens_out: 0,
@@ -193,14 +253,18 @@ impl Classifier {
                 break;
             }
             attempts.calls += 1;
-            let cause = match tokio::time::timeout_at(
+            let (cause, redacted_cause) = match tokio::time::timeout_at(
                 deadline,
                 self.client.complete(request.clone()),
             )
             .await
             {
-                Err(_) => format!("{}: timeout: context deadline exceeded", self.client.name()),
-                Ok(Err(error)) => error.to_string(),
+                Err(_) => {
+                    let timeout =
+                        format!("{}: timeout: context deadline exceeded", self.client.name());
+                    (timeout.clone(), timeout)
+                }
+                Ok(Err(error)) => (error.to_string(), provider_summary(&error)),
                 Ok(Ok(response)) => {
                     attempts.tokens_in += response.tokens_in;
                     attempts.tokens_out += response.tokens_out;
@@ -212,14 +276,14 @@ impl Classifier {
                             attempts.outcome = Ok(classification);
                             return attempts;
                         }
-                        Err(error) => error,
+                        Err(error) => {
+                            let redacted = parse_summary(&error);
+                            (error, redacted)
+                        }
                     }
                 }
             };
-            attempts.outcome = Err(ClassifyError {
-                column: self.column.clone(),
-                cause,
-            });
+            attempts.outcome = Err(ClassifyError::new(&self.column, cause, redacted_cause));
         }
         attempts
     }
@@ -686,8 +750,9 @@ impl Resolver {
         match attempts.outcome {
             Ok(classification) => Called::Classified(classification),
             Err(error) => {
+                // G5, D19: the redacted form, never the error's own text (see ClassifyError).
                 tracing::warn!(
-                    error = %error,
+                    error = %error.redacted(),
                     calls = attempts.calls,
                     "classifier failed; answering the fallback classification"
                 );

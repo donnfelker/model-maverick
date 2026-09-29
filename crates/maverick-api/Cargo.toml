@@ -45,6 +45,8 @@ chrono = { workspace = true }
 [dev-dependencies]
 maverick-testdb = { workspace = true }
 parity-support = { path = "../parity-support" }
+# Log capture with a secret-leak guard (G5): the classifier log redaction test.
+test-support = { path = "../test-support" }
 tracing-subscriber = { workspace = true }
 # The in-memory span exporter for the request-span tests.
 opentelemetry_sdk = { workspace = true, features = ["testing"] }
