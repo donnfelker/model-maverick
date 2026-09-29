@@ -13,6 +13,7 @@ mod demo;
 pub mod flags;
 pub mod logging;
 pub mod otel;
+mod rewatch;
 mod serve;
 
 pub use cli::{CORPUS_USAGE, MAIN_USAGE, run};

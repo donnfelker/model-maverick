@@ -23,11 +23,9 @@ use maverick_api::{
     internal_router_with, mcp, public_router_with,
 };
 use maverick_config::Config;
-use maverick_domain::graders::judge_rubric::{
-    FamilyResolver, JudgeClient, JudgeRequest, PoolColumn, pool_from_config,
-};
+use maverick_domain::graders::judge_rubric::{FamilyResolver, JudgeClient, JudgeRequest};
 use maverick_domain::graders::{
-    BoxError, BoxFuture, GoldenAnswer, JsonSchema, JudgeRubric, KeyFacts, Registry, RuleScan,
+    BoxError, BoxFuture, GoldenAnswer, JsonSchema, KeyFacts, Registry, RuleScan,
 };
 use maverick_jobs::JobClient;
 use maverick_jobs::worker::{self, RunningWorker, WorkerDeps};
@@ -45,6 +43,7 @@ use tokio::time::Instant;
 
 use crate::logging::{self, Output};
 use crate::otel::Otel;
+use crate::rewatch::{self, JudgeSlot, Rewatch};
 
 /// `mcp-stdio --api-key <key>` after the flags and the config (reference Part 1 §7.4).
 /// The key is authenticated once, and the whole session acts as it. stdout is the MCP
@@ -275,8 +274,19 @@ async fn run(config: &Config, api_only: bool, worker_only: bool) -> i32 {
     let notifier: Arc<dyn AlertNotifier> = fanout.clone();
 
     let mut workers: Option<RunningWorker> = None;
+    // D41: background re-resolution of the judge pool and the classifier columns.
+    let mut watchers: Vec<JoinHandle<()>> = Vec::new();
     if !api_only {
         let graders = grader_registry(config, &pool, &providers).await;
+        watchers.push(tokio::spawn(rewatch::watch_judge(
+            Arc::clone(&graders.judge),
+            config.judge_pool.clone(),
+            pool.clone(),
+            graders.judges,
+            graders.families,
+            Rewatch::DEFAULT,
+        )));
+        let graders = graders.registry;
         let client = match JobClient::from_config(config) {
             Ok(client) => client,
             Err(error) => {
@@ -312,8 +322,16 @@ async fn run(config: &Config, api_only: bool, worker_only: bool) -> i32 {
     // Step 10: the classifier resolver (unless --worker-only). A column that does not
     // resolve logs `classifier column unavailable; ...` and serving continues.
     if !worker_only {
-        recommend.classifier =
+        let resolver =
             Arc::new(classifier_resolver(config, &pool, &providers, Arc::clone(&notifier)).await);
+        watchers.push(tokio::spawn(rewatch::watch_classifier(
+            Arc::clone(&resolver),
+            pool.clone(),
+            client_map(&providers),
+            Arc::clone(&notifier),
+            Rewatch::DEFAULT,
+        )));
+        recommend.classifier = resolver;
     }
     let auth = match AuthState::from_config(pool.clone(), config) {
         Ok(auth) => auth,
@@ -370,6 +388,9 @@ async fn run(config: &Config, api_only: bool, worker_only: bool) -> i32 {
             code = EXIT_FAILURE;
         }
     }
+    for watcher in watchers {
+        watcher.abort();
+    }
     fanout.wait().await;
     pool.close().await;
     tracing::info!("stopped");
@@ -396,13 +417,7 @@ async fn classifier_resolver(
 ) -> Resolver {
     let resolver = Resolver::new(ResolverSettings::from_config(config)).with_alerts(notifier);
     match maverick_store::catalog::list_model_columns(pool).await {
-        Ok(columns) => {
-            let clients: HashMap<String, Arc<dyn ProviderClient>> = providers
-                .iter()
-                .map(|(name, client)| ((*name).to_owned(), Arc::clone(client)))
-                .collect();
-            resolver.connect(&columns, &clients)
-        }
+        Ok(columns) => resolver.connect(&columns, &client_map(providers)),
         Err(error) => {
             tracing::error!(
                 column = %config.classifier_column,
@@ -413,6 +428,16 @@ async fn classifier_resolver(
             resolver
         }
     }
+}
+
+/// The provider clients by provider name.
+fn client_map(
+    providers: &[(&'static str, Arc<dyn ProviderClient>)],
+) -> HashMap<String, Arc<dyn ProviderClient>> {
+    providers
+        .iter()
+        .map(|(name, client)| ((*name).to_owned(), Arc::clone(client)))
+        .collect()
 }
 
 /// A built provider client, or why it could not be built.
@@ -524,14 +549,23 @@ impl FamilyResolver for StoreFamilies {
     }
 }
 
-/// json_schema, rule_scan, golden_answer, and key_facts always; judge_rubric when the
-/// judge pool resolves against the catalog and the provider clients. Otherwise judge
-/// gradings fail (a validation-only instance) and serving continues.
+/// The worker's graders, and what the judge watcher needs.
+struct Graders {
+    registry: Registry,
+    judge: Arc<JudgeSlot>,
+    judges: HashMap<String, Arc<dyn JudgeClient>>,
+    families: Arc<dyn FamilyResolver>,
+}
+
+/// json_schema, rule_scan, golden_answer, and key_facts always; judge_rubric through a
+/// [`JudgeSlot`] that grades once the judge pool resolves against the catalog and the
+/// provider clients. Until then judge gradings fail (the validation-only instance),
+/// serving continues, and [`rewatch::watch_judge`] keeps trying (D41).
 async fn grader_registry(
     config: &Config,
     pool: &PgPool,
     providers: &[(&'static str, Arc<dyn ProviderClient>)],
-) -> Registry {
+) -> Graders {
     let mut registry = Registry::new();
     registry.must_register(Arc::new(JsonSchema));
     registry.must_register(Arc::new(RuleScan));
@@ -546,35 +580,27 @@ async fn grader_registry(
             )
         })
         .collect();
-    let judge = async {
-        let columns = maverick_store::catalog::list_model_columns(pool)
-            .await
-            .map_err(|error| error.to_string())?;
-        let catalog: Vec<PoolColumn<'_>> = columns
-            .iter()
-            .map(|column| PoolColumn {
-                model_id: &column.model_id,
-                endpoint: &column.endpoint,
-                provider: &column.provider,
-            })
-            .collect();
-        let refs: Vec<&str> = config.judge_pool.iter().map(String::as_str).collect();
-        let members = pool_from_config(&refs, &catalog, &judges)?;
-        JudgeRubric::new(members, Some(Arc::new(StoreFamilies(pool.clone()))))
-    }
-    .await;
-    match judge {
-        Ok(judge) => registry.must_register(Arc::new(judge)),
+    let families: Arc<dyn FamilyResolver> = Arc::new(StoreFamilies(pool.clone()));
+    let judge =
+        rewatch::resolve_judge(&config.judge_pool, pool, &judges, Arc::clone(&families)).await;
+    let judge = match judge {
+        Ok(judge) => Arc::new(JudgeSlot::new(Some(judge))),
         Err(error) => {
             tracing::error!(
                 pool = ?JsonField::of(&config.judge_pool),
                 error = %error,
                 "judge pool unavailable; judge_rubric gradings will fail until it resolves"
             );
-            registry.must_register(Arc::new(JudgeRubric::validator()));
+            Arc::new(JudgeSlot::new(None))
         }
+    };
+    registry.must_register(Arc::clone(&judge) as Arc<dyn maverick_domain::graders::Grader>);
+    Graders {
+        registry,
+        judge,
+        judges,
+        families,
     }
-    registry
 }
 
 /// One HTTP listener: the accept loop runs until [`Server::shutdown`].

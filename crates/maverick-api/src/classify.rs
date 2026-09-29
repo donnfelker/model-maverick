@@ -26,7 +26,7 @@
 
 use std::collections::HashMap;
 use std::fmt;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError, RwLock};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
@@ -336,6 +336,31 @@ pub struct Resolution {
     pub quota_exceeded: bool,
 }
 
+/// Which classifier columns resolved against the catalog (D41).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Connection {
+    /// `classifier.column`.
+    pub default: bool,
+    /// `classifier.zero_retention_column`, when one is configured.
+    pub zero_retention: Option<bool>,
+}
+
+impl Connection {
+    /// True when every configured classifier column resolved.
+    #[must_use]
+    pub fn complete(&self) -> bool {
+        self.default && self.zero_retention != Some(false)
+    }
+}
+
+fn read<T>(lock: &RwLock<T>) -> std::sync::RwLockReadGuard<'_, T> {
+    lock.read().unwrap_or_else(PoisonError::into_inner)
+}
+
+fn write<T>(lock: &RwLock<T>) -> std::sync::RwLockWriteGuard<'_, T> {
+    lock.write().unwrap_or_else(PoisonError::into_inner)
+}
+
 /// D2: the tenant is zero-retention and no usable zero-retention classifier exists.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 #[error(
@@ -347,8 +372,9 @@ pub struct ZeroRetentionRefused;
 /// The prompt-path resolver: one per process.
 pub struct Resolver {
     settings: ResolverSettings,
-    default: Option<Classifier>,
-    zero_retention: Option<Classifier>,
+    /// Swappable after startup (D41): [`Resolver::reconnect`] replaces both.
+    default: RwLock<Option<Arc<Classifier>>>,
+    zero_retention: RwLock<Option<Arc<Classifier>>>,
     trackers: Mutex<HashMap<String, DegradedTracker>>,
     alerts: Option<Arc<dyn AlertNotifier>>,
 }
@@ -357,8 +383,8 @@ impl fmt::Debug for Resolver {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Resolver")
             .field("settings", &self.settings)
-            .field("default", &self.default)
-            .field("zero_retention", &self.zero_retention)
+            .field("default", &self.classifier())
+            .field("zero_retention", &self.zero_retention_classifier())
             .field("alerts", &self.alerts.is_some())
             .finish_non_exhaustive()
     }
@@ -377,8 +403,8 @@ impl Resolver {
     pub fn new(settings: ResolverSettings) -> Self {
         Self {
             settings,
-            default: None,
-            zero_retention: None,
+            default: RwLock::new(None),
+            zero_retention: RwLock::new(None),
             trackers: Mutex::new(HashMap::new()),
             alerts: None,
         }
@@ -387,35 +413,82 @@ impl Resolver {
     /// Finds both classifier columns' clients in `clients` (by the catalog column's
     /// provider). A column that does not resolve logs ERROR `classifier column
     /// unavailable; ...` with `column` and `error` (serve step 10); its requests then get
-    /// the fallback classification.
+    /// the fallback classification until a later [`Resolver::reconnect`] resolves it (D41).
     #[must_use]
     pub fn connect(
-        mut self,
+        self,
         columns: &[ModelColumn],
         clients: &HashMap<String, Arc<dyn ProviderClient>>,
     ) -> Self {
-        let version = self.settings.prompt_version.clone();
-        self.default = connect_column(columns, clients, &self.settings.column, &version);
-        self.zero_retention = self
+        self.resolve_columns(columns, clients, true);
+        self
+    }
+
+    /// Resolves both classifier columns again against the current catalog and swaps the
+    /// result in, without a restart (D41). It logs nothing: the caller logs transitions.
+    pub fn reconnect(
+        &self,
+        columns: &[ModelColumn],
+        clients: &HashMap<String, Arc<dyn ProviderClient>>,
+    ) -> Connection {
+        self.resolve_columns(columns, clients, false)
+    }
+
+    fn resolve_columns(
+        &self,
+        columns: &[ModelColumn],
+        clients: &HashMap<String, Arc<dyn ProviderClient>>,
+        log: bool,
+    ) -> Connection {
+        let version = self.settings.prompt_version.as_str();
+        let default = connect_column(columns, clients, &self.settings.column, version, log);
+        let zero_retention = self
             .settings
             .zero_retention_column
             .as_deref()
-            .and_then(|column| connect_column(columns, clients, column, &version));
-        self
+            .map(|column| connect_column(columns, clients, column, version, log));
+        let connection = Connection {
+            default: default.is_some(),
+            zero_retention: zero_retention.as_ref().map(Option::is_some),
+        };
+        *write(&self.default) = default.map(Arc::new);
+        *write(&self.zero_retention) = zero_retention.flatten().map(Arc::new);
+        connection
+    }
+
+    /// Which classifier columns are resolved now.
+    #[must_use]
+    pub fn connection(&self) -> Connection {
+        Connection {
+            default: self.classifier().is_some(),
+            zero_retention: self
+                .settings
+                .zero_retention_column
+                .as_ref()
+                .map(|_| self.zero_retention_classifier().is_some()),
+        }
     }
 
     /// The same resolver with `classifier` for ordinary tenants.
     #[must_use]
-    pub fn with_classifier(mut self, classifier: Classifier) -> Self {
-        self.default = Some(classifier);
+    pub fn with_classifier(self, classifier: Classifier) -> Self {
+        *write(&self.default) = Some(Arc::new(classifier));
         self
     }
 
     /// The same resolver with `classifier` for zero-retention tenants (D2).
     #[must_use]
-    pub fn with_zero_retention_classifier(mut self, classifier: Classifier) -> Self {
-        self.zero_retention = Some(classifier);
+    pub fn with_zero_retention_classifier(self, classifier: Classifier) -> Self {
+        *write(&self.zero_retention) = Some(Arc::new(classifier));
         self
+    }
+
+    fn classifier(&self) -> Option<Arc<Classifier>> {
+        read(&self.default).clone()
+    }
+
+    fn zero_retention_classifier(&self) -> Option<Arc<Classifier>> {
+        read(&self.zero_retention).clone()
     }
 
     /// The same resolver, notifying `alerts` after a `classifier_degraded` row.
@@ -435,7 +508,7 @@ impl Resolver {
     /// `<classifier.column>/<prompt version>`: the only one `POST /v1/debug/replay` accepts.
     #[must_use]
     pub fn current_version(&self) -> String {
-        self.version_of(&self.settings.column, self.default.as_ref())
+        self.version_of(&self.settings.column, self.classifier().as_deref())
     }
 
     /// Classify `input.prompt` (see the module documentation).
@@ -446,7 +519,7 @@ impl Resolver {
     ) -> Result<Resolution, ZeroRetentionRefused> {
         // D2 comes first: a refused prompt is not even hashed.
         let (column, classifier) = self.select(input)?;
-        let base_version = self.version_of(column, classifier);
+        let base_version = self.version_of(column, classifier.as_deref());
         let cache_version = match input.projection_version {
             Some(projection) => format!("{base_version}/{projection}"),
             None => base_version.clone(),
@@ -485,7 +558,7 @@ impl Resolver {
         crate::metrics::classifier_cache(false);
         let started = std::time::Instant::now();
         let called = self
-            .call(pool, input, column, classifier, &base_version)
+            .call(pool, input, column, classifier.as_deref(), &base_version)
             .await;
         crate::metrics::classifier_call(
             started.elapsed(),
@@ -540,8 +613,11 @@ impl Resolver {
         let Ok((column, classifier)) = self.select(input) else {
             return (Classification::fallback(), Method::FallbackDefault);
         };
-        let version = self.version_of(column, classifier);
-        match self.call(pool, input, column, classifier, &version).await {
+        let version = self.version_of(column, classifier.as_deref());
+        match self
+            .call(pool, input, column, classifier.as_deref(), &version)
+            .await
+        {
             Called::Classified(classification) => (classification, Method::Classified),
             Called::Fallback { .. } => (Classification::fallback(), Method::FallbackDefault),
         }
@@ -552,9 +628,9 @@ impl Resolver {
     fn select(
         &self,
         input: &ResolveInput<'_>,
-    ) -> Result<(&str, Option<&Classifier>), ZeroRetentionRefused> {
+    ) -> Result<(&str, Option<Arc<Classifier>>), ZeroRetentionRefused> {
         if !input.zero_retention {
-            return Ok((self.settings.column.as_str(), self.default.as_ref()));
+            return Ok((self.settings.column.as_str(), self.classifier()));
         }
         let Some(column) = self.settings.zero_retention_column.as_deref() else {
             return Err(ZeroRetentionRefused);
@@ -562,7 +638,7 @@ impl Resolver {
         if !has_zero_evidence(input.columns, column, input.now) {
             return Err(ZeroRetentionRefused);
         }
-        Ok((column, self.zero_retention.as_ref()))
+        Ok((column, self.zero_retention_classifier()))
     }
 
     /// `<column>/<prompt version>`, from the connected classifier when there is one.
@@ -735,10 +811,14 @@ fn connect_column(
     clients: &HashMap<String, Arc<dyn ProviderClient>>,
     column: &str,
     prompt_version: &str,
+    log: bool,
 ) -> Option<Classifier> {
     match client_for(columns, clients, column) {
         Ok(client) => Some(Classifier::new(client, column).with_prompt_version(prompt_version)),
         Err(error) => {
+            if !log {
+                return None;
+            }
             tracing::error!(
                 column,
                 error = %error,
