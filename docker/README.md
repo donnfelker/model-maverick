@@ -57,8 +57,11 @@ Replace the placeholders (`<HOST>`, `<REGISTRY_USERNAME>`, `maverick.example.com
 `proxy.example.com`) before `kamal setup`. `kamal config` and `kamal config -c
 config/deploy-proxy.yml` print the resolved configuration without contacting a host.
 
-The internal listener (:8081) is never routed. The web container publishes it on the host
-loopback only; reach it over SSH (`ssh -N -L 8081:127.0.0.1:8081 <user>@<HOST>`).
+The internal listener (:8081) is never routed, and no app role publishes a host port.
+Kamal boots the new container before it stops the old one, so a fixed host port would clash
+on every deploy (bead 9.13). Reach the listener over SSH with `scripts/internal-tunnel.sh
+<user>@<HOST>`. It looks up the running web container's address on the `kamal` network and
+forwards `127.0.0.1:8081` on your machine to it. Run it again after each deploy.
 
 ## Backups
 

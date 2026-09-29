@@ -5,9 +5,12 @@
 # - `web` runs `maverick serve --api-only`. kamal-proxy routes its PUBLIC listener (:8080:
 #   /v1/*, /mcp, /up) with automatic HTTPS and the /up health check.
 # - `worker` runs exactly one `maverick serve --worker-only`: the graphile_worker jobs.
-# - The INTERNAL listener (:8081: /internal/v1/*, /health/detail) is never routed. The web
-#   container publishes it on the host loopback only. Operators reach it over SSH:
-#     ssh -N -L 8081:127.0.0.1:8081 <user>@<HOST>
+# - The INTERNAL listener (:8081: /internal/v1/*, /health/detail) is never routed, and no
+#   role publishes it on the host (bead 9.13): Kamal boots a new container before it stops
+#   the old one, and `kamal app exec` copies the role's options, so a fixed host port would
+#   clash on every deploy. Operators reach it over SSH, straight to the web container's
+#   address on the `kamal` network:
+#     scripts/internal-tunnel.sh <user>@<HOST>
 # - Postgres 16 is an accessory on the same host. The app reaches it as `maverick-postgres`
 #   on the `kamal` Docker network. Its data is on the named volume `postgres-data`, and its
 #   port is on the host loopback only. `kamal accessory remove postgres` DELETES the data.
@@ -30,10 +33,8 @@ servers:
   web:
     hosts:
       - <HOST>
+    # No `publish` option: see the internal listener above.
     cmd: serve --api-only
-    options:
-      # The internal listener, on the host loopback only.
-      publish: "127.0.0.1:8081:8081"
   worker:
     hosts:
       - <HOST>
