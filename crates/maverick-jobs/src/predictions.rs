@@ -24,7 +24,7 @@ use sqlx::{PgConnection, PgPool};
 use crate::rebuild::{TaskError, TaskInfo, group_scores, load_task, score_run};
 use crate::{
     BatchEnd, BatchFollowupArgs, BatchLeaseError, BatchLeaseManager, BatchLeaseOutcome, CronError,
-    CronExpr, JobArgs, JobKind, JobsError, PredictionLockArgs,
+    CronExpr, JobArgs, JobKind, JobsError, PredictionLockArgs, with_job_timeout,
 };
 
 /// What `prediction_lock` needs besides the pool.
@@ -217,10 +217,12 @@ impl TaskHandler for PredictionLockJob {
         let Some(config) = ctx.extensions().get::<PredictionLockConfig>() else {
             return Err("jobs: prediction_lock: the worker has no PredictionLockConfig".to_owned());
         };
-        prediction_lock(ctx.pg_pool(), &self.0, config, ctx.worker_id())
-            .await
-            .map(|_| ())
-            .map_err(|e| e.to_string())
+        with_job_timeout(&ctx, JobKind::PredictionLock, async {
+            prediction_lock(ctx.pg_pool(), &self.0, config, ctx.worker_id())
+                .await
+                .map(|_| ())
+        })
+        .await
     }
 }
 
@@ -408,10 +410,12 @@ impl TaskHandler for CalibrationScoreJob {
         let Some(config) = ctx.extensions().get::<CalibrationConfig>() else {
             return Err("jobs: calibration_score: the worker has no CalibrationConfig".to_owned());
         };
-        calibration_score(ctx.pg_pool(), &self.0, config, ctx.worker_id())
-            .await
-            .map(|_| ())
-            .map_err(|e| e.to_string())
+        with_job_timeout(&ctx, JobKind::CalibrationScore, async {
+            calibration_score(ctx.pg_pool(), &self.0, config, ctx.worker_id())
+                .await
+                .map(|_| ())
+        })
+        .await
     }
 }
 

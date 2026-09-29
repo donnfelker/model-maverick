@@ -19,7 +19,7 @@ use sqlx::PgPool;
 use tokio::time::Instant;
 
 use crate::fold::{CellKey, FoldParams, fold_observations};
-use crate::{HourArgs, JobArgs, JobsError};
+use crate::{HourArgs, JobArgs, JobKind, JobsError, with_job_timeout};
 
 /// The 60-character probe line; the prompt is this line 67 times (4020 characters).
 pub const PROBE_LINE: &str = "Reply with the single word pong to this latency probe line. ";
@@ -238,9 +238,11 @@ impl TaskHandler for LatencyProbesJob {
         let Some(config) = ctx.extensions().get::<ProbeConfig>() else {
             return Err("jobs: latency_probes: the worker has no ProbeConfig".to_owned());
         };
-        latency_probes(ctx.pg_pool(), &self.0, config, &Cancellation::new())
-            .await
-            .map(|_| ())
-            .map_err(|e| e.to_string())
+        with_job_timeout(&ctx, JobKind::LatencyProbes, async {
+            latency_probes(ctx.pg_pool(), &self.0, config, &Cancellation::new())
+                .await
+                .map(|_| ())
+        })
+        .await
     }
 }

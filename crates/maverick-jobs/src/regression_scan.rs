@@ -25,7 +25,7 @@ use sqlx::PgPool;
 
 use crate::{
     BatchEnd, BatchFollowupArgs, BatchLeaseError, BatchLeaseManager, BatchLeaseOutcome, JobArgs,
-    JobKind, JobsError,
+    JobKind, JobsError, with_job_timeout,
 };
 
 /// What `regression_scan` needs besides the pool.
@@ -345,9 +345,11 @@ impl TaskHandler for RegressionScanJob {
         let Some(config) = ctx.extensions().get::<RegressionScanConfig>() else {
             return Err("jobs: regression_scan: the worker has no RegressionScanConfig".to_owned());
         };
-        regression_scan(ctx.pg_pool(), &self.0, config, ctx.worker_id())
-            .await
-            .map(|_| ())
-            .map_err(|e| e.to_string())
+        with_job_timeout(&ctx, JobKind::RegressionScan, async {
+            regression_scan(ctx.pg_pool(), &self.0, config, ctx.worker_id())
+                .await
+                .map(|_| ())
+        })
+        .await
     }
 }

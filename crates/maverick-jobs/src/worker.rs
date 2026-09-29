@@ -35,7 +35,7 @@ use crate::regression_scan::{RegressionScanConfig, RegressionScanJob};
 use crate::retention::{self, RetentionDeps};
 use crate::{
     BatchLeaseManager, DEFAULT_QUEUE_NAME, DayArgs, HourArgs, JobClient, JobKind,
-    WORKER_CONCURRENCY, scheduled_args,
+    WORKER_CONCURRENCY, scheduled_args, with_job_timeout,
 };
 
 /// The kinds that get a cron trigger, in schedule order: every scheduled kind. The
@@ -170,6 +170,8 @@ pub fn worker_options(
         .concurrency(WORKER_CONCURRENCY)
         .worker_recovery(client.recovery_config())
         .listen_os_shutdown_signals(false)
+        // The per-kind handler timeouts (`with_job_timeout`) read the job client config.
+        .add_extension(client.config().clone())
         .add_extension(batch)
         .add_extension(PredictionLockConfig::from_config(config, lease.clone()))
         .add_extension(CalibrationConfig {
@@ -354,10 +356,12 @@ impl TaskHandler for PriceSyncJob {
         let Some(config) = ctx.extensions().get::<CatalogConfig>() else {
             return Err(missing(JobKind::PriceSync, "CatalogConfig"));
         };
-        catalog::run_price_sync(&catalog_deps(&ctx, config), &self.0)
-            .await
-            .map(|_| ())
-            .map_err(|error| error.to_string())
+        with_job_timeout(&ctx, JobKind::PriceSync, async {
+            catalog::run_price_sync(&catalog_deps(&ctx, config), &self.0)
+                .await
+                .map(|_| ())
+        })
+        .await
     }
 }
 
@@ -373,10 +377,12 @@ impl TaskHandler for CatalogSyncJob {
         let Some(config) = ctx.extensions().get::<CatalogConfig>() else {
             return Err(missing(JobKind::CatalogSync, "CatalogConfig"));
         };
-        catalog::run_catalog_sync(&catalog_deps(&ctx, config), &self.0, Utc::now())
-            .await
-            .map(|_| ())
-            .map_err(|error| error.to_string())
+        with_job_timeout(&ctx, JobKind::CatalogSync, async {
+            catalog::run_catalog_sync(&catalog_deps(&ctx, config), &self.0, Utc::now())
+                .await
+                .map(|_| ())
+        })
+        .await
     }
 }
 
@@ -392,10 +398,12 @@ impl TaskHandler for CaptureExpiryJob {
         let Some(config) = ctx.extensions().get::<RetentionConfig>() else {
             return Err(missing(JobKind::CaptureExpiry, "RetentionConfig"));
         };
-        retention::run_capture_expiry(&retention_deps(&ctx, config), &self.0, Utc::now())
-            .await
-            .map(|_| ())
-            .map_err(|error| error.to_string())
+        with_job_timeout(&ctx, JobKind::CaptureExpiry, async {
+            retention::run_capture_expiry(&retention_deps(&ctx, config), &self.0, Utc::now())
+                .await
+                .map(|_| ())
+        })
+        .await
     }
 }
 
@@ -411,10 +419,12 @@ impl TaskHandler for HistoryPruneJob {
         let Some(config) = ctx.extensions().get::<RetentionConfig>() else {
             return Err(missing(JobKind::HistoryPrune, "RetentionConfig"));
         };
-        retention::run_history_prune(&retention_deps(&ctx, config), &self.0, Utc::now())
-            .await
-            .map(|_| ())
-            .map_err(|error| error.to_string())
+        with_job_timeout(&ctx, JobKind::HistoryPrune, async {
+            retention::run_history_prune(&retention_deps(&ctx, config), &self.0, Utc::now())
+                .await
+                .map(|_| ())
+        })
+        .await
     }
 }
 
