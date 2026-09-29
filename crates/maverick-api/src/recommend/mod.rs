@@ -15,9 +15,10 @@
 //! trace row stores the prompt hash and the request without the prompt. After the trace
 //! row, the capture hook may seal the prompt into a debug capture.
 //!
-//! The Rust response adds D8 and D9 to the Go shape: each entry carries `settings` and
-//! `retention_mode` after `execution_aliases` and `low_availability` after
-//! `clears_difficulty`, and the response ends with `zero_retention` (spec §9.2).
+//! The Rust response adds D8, D9, D15, and D29 to the Go shape: each entry carries
+//! `execution_alias_retention`, `settings`, `param_constraints`, and `retention_mode`
+//! after `execution_aliases` and `low_availability` after `clears_difficulty`, and the
+//! response ends with `zero_retention` (spec §9.2).
 
 mod prompt;
 mod request;
@@ -841,8 +842,9 @@ async fn write_alert(
     .map_err(|error| RecommendError::Internal(error.to_string()))
 }
 
-/// One `recommendations` entry on the wire. `execution_aliases` and `settings` are the
-/// stored jsonb text, compacted, with its key order and number spelling.
+/// One `recommendations` entry on the wire. `execution_aliases`, `settings`, and
+/// `param_constraints` are the stored jsonb text, compacted, with its key order and
+/// number spelling.
 fn entry_json(
     entry: &entries::RecommendationEntry,
     column: &ModelColumn,
@@ -865,6 +867,8 @@ fn entry_json(
         ),
         // D9.
         ("settings", jsonb(column.settings.get())?),
+        // D29: the model's parameter constraints, verbatim; `{}` means none.
+        ("param_constraints", jsonb(column.param_constraints.get())?),
         ("retention_mode", string(entry.retention_mode.as_str())),
         ("score", score),
         (
