@@ -25,3 +25,4 @@ pub mod ranking;
 pub mod scoring;
 pub mod spend;
 pub mod tasks;
+pub mod telemetry;
