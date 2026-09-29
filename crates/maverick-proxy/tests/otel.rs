@@ -3,12 +3,13 @@
 //! the tests decode each OTLP request a mock collector received and compare its content
 //! with the fixture's JSON template.
 
+mod otlp;
+
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use axum::Router;
-use axum::body::Bytes;
-use axum::extract::{Request, State};
+use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::routing::post;
 use maverick_core::recommend::{
@@ -16,40 +17,12 @@ use maverick_core::recommend::{
 };
 use maverick_core::telemetry::{Telemetry, TelemetryItem};
 use maverick_proxy::chain::Surface;
-use maverick_proxy::otel::{COUNTER, ProxyOtel, RECORD_BODY};
+use maverick_proxy::otel::ProxyOtel;
 use maverick_proxy::reports::ProxyReports;
 use maverick_proxy::surface::{ChainReport, ReportSink};
-use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
-use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
-use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value};
-use opentelemetry_proto::tonic::metrics::v1::metric::Data;
-use opentelemetry_proto::tonic::metrics::v1::number_data_point::Value as Point;
-use prost::Message;
+use otlp::{collector, counter_points, json_attributes, received_logs, sorted};
 use serde_json::{Value, json};
 use tokio::net::TcpListener;
-
-type Received = Arc<Mutex<Vec<(String, Bytes)>>>;
-
-/// A collector that stores every request's path and body.
-async fn collector() -> (String, Received) {
-    let received: Received = Arc::default();
-    let store = |State(received): State<Received>, request: Request| async move {
-        let path = request.uri().path().to_owned();
-        let body = axum::body::to_bytes(request.into_body(), usize::MAX)
-            .await
-            .expect("body");
-        received.lock().unwrap().push((path, body));
-    };
-    let app = Router::new()
-        .route("/v1/logs", post(store))
-        .route("/v1/metrics", post(store))
-        .fallback(store)
-        .with_state(received.clone());
-    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
-    let url = format!("http://{}", listener.local_addr().expect("addr"));
-    tokio::spawn(async move { axum::serve(listener, app).await.expect("serve") });
-    (url, received)
-}
 
 fn item(model: &str, status: u16) -> TelemetryItem {
     TelemetryItem {
@@ -96,113 +69,6 @@ async fn flush(otel: &Arc<ProxyOtel>) {
         .expect("flush");
 }
 
-/// A decoded OTLP value as the fixture's proto3 JSON writes it.
-fn json_value(value: &Option<AnyValue>) -> Value {
-    match value.as_ref().and_then(|v| v.value.as_ref()) {
-        Some(any_value::Value::StringValue(s)) => json!({"stringValue": s}),
-        Some(any_value::Value::IntValue(i)) => json!({"intValue": i.to_string()}),
-        Some(any_value::Value::BoolValue(b)) => json!({"boolValue": b}),
-        other => panic!("unexpected OTLP value {other:?}"),
-    }
-}
-
-fn json_attributes(attributes: &[KeyValue]) -> Value {
-    Value::Array(
-        attributes
-            .iter()
-            .map(|kv| json!({"key": kv.key, "value": json_value(&kv.value)}))
-            .collect(),
-    )
-}
-
-/// The fixture's OTLP templates for a scenario: (logs, metrics).
-fn fixture_templates(id: &str) -> (Value, Value) {
-    let scenarios = parity_support::fixture("proxy", "scenarios.json").expect("scenarios.json");
-    let scenarios = scenarios["scenarios"]
-        .as_array()
-        .or_else(|| scenarios.as_array())
-        .expect("scenario list")
-        .clone();
-    let scenario = scenarios
-        .iter()
-        .find(|s| s["id"] == id)
-        .unwrap_or_else(|| panic!("scenario {id}"));
-    let requests = scenario["expected"]["otlp_requests_after_forced_flush"]
-        .as_array()
-        .expect("otlp requests");
-    let template = |path: &str| -> Value {
-        let body = requests
-            .iter()
-            .find(|r| r["path"] == path)
-            .unwrap_or_else(|| panic!("{id}: no {path} request"))["body_template"]
-            .as_str()
-            .expect("template")
-            .replace("<UNIX_NANO>", "0");
-        serde_json::from_str(&body).expect("template JSON")
-    };
-    (template("/v1/logs"), template("/v1/metrics"))
-}
-
-fn received_logs(received: &Received) -> Vec<ExportLogsServiceRequest> {
-    received
-        .lock()
-        .unwrap()
-        .iter()
-        .filter(|(path, _)| path == "/v1/logs")
-        .map(|(_, body)| ExportLogsServiceRequest::decode(body.clone()).expect("logs protobuf"))
-        .collect()
-}
-
-fn received_metrics(received: &Received) -> Vec<ExportMetricsServiceRequest> {
-    received
-        .lock()
-        .unwrap()
-        .iter()
-        .filter(|(path, _)| path == "/v1/metrics")
-        .map(|(_, body)| {
-            ExportMetricsServiceRequest::decode(body.clone()).expect("metrics protobuf")
-        })
-        .collect()
-}
-
-/// Attributes sorted by key: the SDK does not keep a data point's attribute order, and
-/// D31 leaves the payload layout free.
-fn sorted(attributes: Value) -> Value {
-    let mut items = attributes.as_array().cloned().unwrap_or_default();
-    items.sort_by(|a, b| a["key"].as_str().cmp(&b["key"].as_str()));
-    Value::Array(items)
-}
-
-/// The counter's data points of the newest metrics export: (attributes sorted by key,
-/// count).
-fn counter_points(received: &Received) -> Vec<(Value, i64)> {
-    let exports = received_metrics(received);
-    let latest = exports.last().expect("a metrics export");
-    let resource = &latest.resource_metrics[0];
-    let scope = &resource.scope_metrics[0];
-    assert_eq!(scope.scope.as_ref().expect("scope").name, "maverick-proxy");
-    let metric = scope
-        .metrics
-        .iter()
-        .find(|m| m.name == COUNTER)
-        .expect("the counter");
-    let Some(Data::Sum(sum)) = &metric.data else {
-        panic!("{COUNTER} is not a sum: {metric:?}");
-    };
-    assert_eq!(sum.aggregation_temporality, 2, "cumulative");
-    assert!(sum.is_monotonic);
-    sum.data_points
-        .iter()
-        .map(|point| {
-            let Some(Point::AsInt(count)) = point.value else {
-                panic!("not an int point: {point:?}");
-            };
-            assert!(point.start_time_unix_nano > 0 && point.time_unix_nano > 0);
-            (sorted(json_attributes(&point.attributes)), count)
-        })
-        .collect()
-}
-
 /// One scenario: record its report, flush, and compare the decoded payloads with the
 /// fixture's templates.
 async fn check_scenario(id: &str, report: ChainReport) {
@@ -210,50 +76,15 @@ async fn check_scenario(id: &str, report: ChainReport) {
     let otel = Arc::new(ProxyOtel::init_with(&url, "maverick-proxy").expect("enabled"));
     otel.record(&report);
     flush(&otel).await;
-    let (want_logs, want_metrics) = fixture_templates(id);
-
-    let logs = received_logs(&received);
-    assert_eq!(logs.len(), 1, "{id}: one logs request");
-    assert_eq!(logs[0].resource_logs.len(), 1);
-    let resource = &logs[0].resource_logs[0];
-    assert_eq!(
-        json_attributes(&resource.resource.as_ref().expect("resource").attributes),
-        want_logs["resourceLogs"][0]["resource"]["attributes"],
-        "{id}: resource"
-    );
-    assert_eq!(resource.scope_logs.len(), 1);
-    let scope = &resource.scope_logs[0];
-    assert_eq!(
-        scope.scope.as_ref().expect("scope").name,
-        want_logs["resourceLogs"][0]["scopeLogs"][0]["scope"]["name"]
-    );
-    assert_eq!(scope.log_records.len(), 1, "{id}: one record");
-    let record = &scope.log_records[0];
-    assert_eq!(
-        json_value(&record.body),
-        json!({"stringValue": RECORD_BODY})
-    );
-    assert_ne!(record.time_unix_nano, 0, "{id}: timeUnixNano set");
-    assert_eq!(
-        json_attributes(&record.attributes),
-        want_logs["resourceLogs"][0]["scopeLogs"][0]["logRecords"][0]["attributes"],
-        "{id}: record attributes"
-    );
-
-    let want_point = &want_metrics["resourceMetrics"][0]["scopeMetrics"][0]["metrics"][0]["sum"]["dataPoints"]
-        [0];
-    assert_eq!(
-        counter_points(&received),
-        [(
-            sorted(want_point["attributes"].clone()),
-            want_point["asInt"]
-                .as_str()
-                .expect("asInt")
-                .parse::<i64>()
-                .expect("count")
-        )],
-        "{id}: counter"
-    );
+    let scenarios = parity_support::fixture("proxy", "scenarios.json").expect("scenarios.json");
+    let scenario = scenarios["scenarios"]
+        .as_array()
+        .expect("scenarios")
+        .iter()
+        .find(|s| s["id"] == id)
+        .unwrap_or_else(|| panic!("scenario {id}"))
+        .clone();
+    otlp::assert_matches_fixture(id, &received, &scenario);
     otel.shutdown();
 }
 

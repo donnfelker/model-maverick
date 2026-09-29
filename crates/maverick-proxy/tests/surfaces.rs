@@ -14,10 +14,25 @@
 //!
 //! D32: the transport headers Go's client added (`Accept-Encoding: gzip`,
 //! `User-Agent: Go-http-client/1.1`) and the one reqwest adds (`Accept: */*`) are ignored,
-//! unless the client sent that header; then it must reach the upstream unchanged. OTLP
-//! payloads (bead `model-maverick-7sa`) are not compared.
+//! unless the client sent that header; then it must reach the upstream unchanged.
+//!
+//! OTel (D31): a mock collector receives the production sink's OTLP. After the flush, the
+//! `otel_*` scenarios' decoded payloads must match `otlp_requests_after_forced_flush`,
+//! and every other scenario must send the collector nothing.
+//!
+//! No proxy or tenant key reaches an upstream header value (Go's `mk_live_test` check,
+//! and D30 for the hosted key).
+//!
+//! The reviewed allowlist ([`ALLOWLIST`]): each scenario records the D-rows whose
+//! tolerances it actually used, and they must be among the rows reviewed for it. An
+//! unreviewed difference fails the scenario. Each scenario writes its outcome to
+//! `target/ci/parity/proxy-replay/<id>.txt` for the CI parity tier. Set
+//! `PROXY_REPLAY_PRINT_TOLERANCES=1` to print the used rows (after a fixture recapture)
+//! instead of checking them.
 
-use std::collections::BTreeMap;
+mod otlp;
+
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
@@ -28,6 +43,7 @@ use maverick_core::recommend::{
 };
 use maverick_core::telemetry::{BatcherConfig, HttpSink, Telemetry};
 use maverick_proxy::config::{Config, load_config};
+use maverick_proxy::otel::ProxyOtel;
 use maverick_proxy::reports::ProxyReports;
 use maverick_proxy::server::{Proxy, ServeSettings, serve};
 use maverick_proxy::surface::{ChainReport, ExecutorRunner, ReportSink, Upstreams};
@@ -395,11 +411,16 @@ fn scenario(id: &str) -> Value {
         .clone()
 }
 
-/// Drop the D32 transport headers from both sides unless the client sent them.
-fn without_transport(mut headers: HeaderValues, client_sent: &HeaderValues) -> HeaderValues {
+/// Drop the D32 transport headers from both sides unless the client sent them, and note
+/// D32 when one was there.
+fn without_transport(
+    mut headers: HeaderValues,
+    client_sent: &HeaderValues,
+    used: &mut BTreeSet<&'static str>,
+) -> HeaderValues {
     for name in TRANSPORT_HEADERS {
-        if !client_sent.contains_key(name) {
-            headers.remove(name);
+        if !client_sent.contains_key(name) && headers.remove(name).is_some() {
+            used.insert("D32");
         }
     }
     headers
@@ -480,7 +501,8 @@ async fn start_proxy(config: Config, header_timeout: Duration) -> RunningProxy {
         )
     } else {
         Telemetry::off()
-    });
+    })
+    .with_otel(ProxyOtel::init(&config).map(Arc::new));
     let upstream_http = reqwest::Client::builder()
         .no_proxy()
         .build()
@@ -543,8 +565,15 @@ fn normalize_telemetry(body: &str) -> String {
 
 /// Replay one scenario and check it. Returns the reports for extra checks.
 async fn replay(id: &str) -> Vec<ChainReport> {
+    replay_noting(id, &[]).await
+}
+
+/// [`replay`], adding the D-rows a caller's own checks rely on (such as D26).
+async fn replay_noting(id: &str, extra: &[&'static str]) -> Vec<ChainReport> {
     let scenario = scenario(id);
     let expected = &scenario["expected"];
+    let mut used: BTreeSet<&'static str> = extra.iter().copied().collect();
+    let (collector_url, collected) = otlp::collector().await;
 
     // Mocks.
     let engine_log: Log = Arc::default();
@@ -593,7 +622,7 @@ async fn replay(id: &str) -> Vec<ChainReport> {
             }
             (
                 name.clone(),
-                value.replace("<mock collector base URL>", "http://collector.invalid"),
+                value.replace("<mock collector base URL>", &collector_url),
             )
         })
         .collect();
@@ -708,10 +737,31 @@ async fn replay(id: &str) -> Vec<ChainReport> {
             let mut got_headers = header_map(&got.headers);
             got_headers.remove("Host");
             assert_eq!(
-                without_transport(got_headers, &client_sent),
-                without_transport(expected_headers(&want["headers"]), &client_sent),
+                without_transport(got_headers, &client_sent, &mut used),
+                without_transport(expected_headers(&want["headers"]), &client_sent, &mut used),
                 "{at}: headers"
             );
+        }
+    }
+
+    // No proxy key (Go's `mk_live_test` check) and no hosted tenant key (D30) in any
+    // upstream header value.
+    let mut keys: Vec<String> = env.get("MAVERICK_API_KEY").cloned().into_iter().collect();
+    keys.extend(
+        client_sent
+            .get("X-Maverick-Api-Key")
+            .into_iter()
+            .flatten()
+            .cloned(),
+    );
+    for (upstream, _, request) in &attempts {
+        for (name, value) in &request.headers {
+            for key in keys.iter().filter(|key| !key.is_empty()) {
+                assert!(
+                    !value.contains(key.as_str()),
+                    "{context}: a key reached {upstream} in {name}"
+                );
+            }
         }
     }
 
@@ -746,14 +796,15 @@ async fn replay(id: &str) -> Vec<ChainReport> {
         let want_body = text(&want["body"]);
         if got.body_text() != want_body {
             check_d5_recommend_body(&context, &got.body_text(), &want_body, &body, &client_sent);
+            used.insert("D5");
             // The body length differs with the body.
             got_headers.remove("Content-Length");
             want_headers.remove("Content-Length");
         }
         let none = HeaderValues::new();
         assert_eq!(
-            without_transport(got_headers, &none),
-            without_transport(want_headers, &none),
+            without_transport(got_headers, &none, &mut used),
+            without_transport(want_headers, &none, &mut used),
             "{context}: recommend headers"
         );
     }
@@ -784,7 +835,14 @@ async fn replay(id: &str) -> Vec<ChainReport> {
         "{context}: telemetry POSTs {:?}",
         telemetry.iter().map(Message::body_text).collect::<Vec<_>>()
     );
+    if !want_telemetry.is_empty() {
+        // Delivery goes through the D27 batcher; the harness observes it at the flush.
+        used.insert("D27");
+    }
     for (got, want) in telemetry.iter().zip(want_telemetry) {
+        if got.body_text().contains("\"settings_applied\"") {
+            used.insert("D14");
+        }
         let (method, path, _) = got.target();
         assert_eq!(method, want["method"], "{context}");
         assert_eq!(path, want["path"], "{context}");
@@ -800,14 +858,133 @@ async fn replay(id: &str) -> Vec<ChainReport> {
         want_headers.remove("Content-Length");
         let none = HeaderValues::new();
         assert_eq!(
-            without_transport(got_headers, &none),
-            without_transport(want_headers, &none),
+            without_transport(got_headers, &none, &mut used),
+            without_transport(want_headers, &none, &mut used),
             "{context}: telemetry headers"
         );
     }
 
+    // OTel (D31): the telemetry flush above shut the sink down, which flushed OTLP.
+    if expected.get("otlp_requests_after_forced_flush").is_some() {
+        otlp::assert_matches_fixture(&context, &collected, &scenario);
+        used.insert("D31");
+    } else {
+        assert!(
+            lock(&collected).is_empty(),
+            "{context}: OTLP without an endpoint"
+        );
+    }
+
     running.stop().await;
+    check_allowlist(id, &used);
     reports
+}
+
+/// Refused before the engine is called: nothing differs.
+const REJECTED_BEFORE_ENGINE: &[&str] = &[];
+/// The recommend call (D5 body, D32 transport headers), any upstream attempts (D32), and
+/// no telemetry POST.
+const ENGINE_NO_TELEMETRY: &[&str] = &["D5", "D32"];
+/// A settled chain with telemetry: D14 `settings_applied` in each item and D27 delivery.
+const FULL_CHAIN: &[&str] = &["D5", "D14", "D27", "D32"];
+/// A settled chain with OTel export (D31).
+const OTEL: &[&str] = &["D5", "D14", "D27", "D31", "D32"];
+/// The 429 whose `Retry-After` the executor obeys (D26).
+const RETRY_AFTER: &[&str] = &["D5", "D14", "D26", "D27", "D32"];
+
+/// The reviewed allowlist: for each scenario, the DIVERGENCES rows whose tolerances its
+/// comparison may use. D32 (transport headers) is on every scenario that reaches an
+/// upstream, the engine, or telemetry; D5 where the recommend body carries the Rust
+/// workload projection; D14 and D27 where telemetry items are compared; D26 on the
+/// `Retry-After` scenario; D31 on the OTel scenarios.
+const ALLOWLIST: &[(&str, &[&str])] = &[
+    ("up", REJECTED_BEFORE_ENGINE),
+    ("chat_engine_error_502", ENGINE_NO_TELEMETRY),
+    ("chat_concrete_model_rejected", REJECTED_BEFORE_ENGINE),
+    ("chat_malformed_alias_rejected", REJECTED_BEFORE_ENGINE),
+    ("chat_happy_path", FULL_CHAIN),
+    ("chat_first_503_second_used", FULL_CHAIN),
+    ("chat_semantic_400_no_fallback", FULL_CHAIN),
+    ("chat_byok_native_provider", FULL_CHAIN),
+    ("chat_cross_provider_env_key", FULL_CHAIN),
+    ("chat_pool_mode_alias", FULL_CHAIN),
+    ("chat_prompt_last_user", FULL_CHAIN),
+    ("chat_declared_fallback", FULL_CHAIN),
+    ("chat_telemetry_off", ENGINE_NO_TELEMETRY),
+    ("chat_streaming_sse", FULL_CHAIN),
+    ("messages_anthropic_only_skip_others", FULL_CHAIN),
+    ("messages_default_anthropic_version", FULL_CHAIN),
+    ("messages_byok_x_api_key", FULL_CHAIN),
+    ("messages_zero_anthropic_502", ENGINE_NO_TELEMETRY),
+    ("messages_beta_body_and_header_passthrough", FULL_CHAIN),
+    ("messages_client_authorization_stripped", FULL_CHAIN),
+    ("chat_client_x_api_key_stripped", FULL_CHAIN),
+    ("chat_hop_by_hop_stripped", FULL_CHAIN),
+    ("chat_custom_header_forwarded", FULL_CHAIN),
+    ("messages_custom_header_forwarded", FULL_CHAIN),
+    ("messages_query_string_forwarded", FULL_CHAIN),
+    ("chat_query_string_forwarded", FULL_CHAIN),
+    ("messages_effort_xhigh_to_max", FULL_CHAIN),
+    ("chat_reasoning_effort_xhigh_to_high", FULL_CHAIN),
+    ("otel_happy_path_log_record", OTEL),
+    ("otel_measured_false_fallback_counted", OTEL),
+    ("otel_disabled_emits_nothing", FULL_CHAIN),
+    ("x_chat_connect_error_advances", FULL_CHAIN),
+    ("x_chat_header_timeout_advances", FULL_CHAIN),
+    ("x_chat_all_fail_exhausted_502", FULL_CHAIN),
+    ("x_chat_no_credential_502", ENGINE_NO_TELEMETRY),
+    ("x_chat_google_xai_paths", FULL_CHAIN),
+    ("x_chat_stream_after_503", FULL_CHAIN),
+    ("x_messages_streaming_sse", FULL_CHAIN),
+    ("x_messages_mid_stream_abort", FULL_CHAIN),
+    ("x_chat_404_relayed", FULL_CHAIN),
+    ("x_chat_invalid_json_400", REJECTED_BEFORE_ENGINE),
+    ("x_chat_model_not_string_400", REJECTED_BEFORE_ENGINE),
+    ("x_chat_missing_model_400_alias", REJECTED_BEFORE_ENGINE),
+    ("x_messages_concrete_model_400", REJECTED_BEFORE_ENGINE),
+    ("x_engine_malformed_json_502", ENGINE_NO_TELEMETRY),
+    ("x_engine_empty_chain_502", ENGINE_NO_TELEMETRY),
+    ("x_chat_prompt_escaping_and_array", FULL_CHAIN),
+    ("x_chat_body_reencoding", FULL_CHAIN),
+    ("x_chat_upstream_sets_maverick_header", FULL_CHAIN),
+    ("x_chat_sse_content_type_case", FULL_CHAIN),
+    ("x_method_not_allowed", REJECTED_BEFORE_ENGINE),
+    ("x_unknown_path_404", REJECTED_BEFORE_ENGINE),
+    ("x_post_up_405", REJECTED_BEFORE_ENGINE),
+    ("x_chat_429_advances", RETRY_AFTER),
+];
+
+/// Checks the rows a scenario used against its reviewed entry and writes its outcome for
+/// the CI parity tier.
+fn check_allowlist(id: &str, used: &BTreeSet<&'static str>) {
+    let rows: Vec<&str> = used.iter().copied().collect();
+    if std::env::var_os("PROXY_REPLAY_PRINT_TOLERANCES").is_some() {
+        eprintln!("TOLERANCES {id} {rows:?}");
+        return;
+    }
+    let allowed = ALLOWLIST
+        .iter()
+        .find(|(scenario, _)| *scenario == id)
+        .map_or(&[][..], |(_, rows)| *rows);
+    let unreviewed: Vec<&str> = rows
+        .iter()
+        .copied()
+        .filter(|row| !allowed.contains(row))
+        .collect();
+    assert!(
+        unreviewed.is_empty(),
+        "{id}: differences under {unreviewed:?} are not in the reviewed allowlist"
+    );
+    let outcome = if rows.is_empty() {
+        format!("{id}: passed\n")
+    } else {
+        format!("{id}: allowlisted ({})\n", rows.join(", "))
+    };
+    let dir = parity_support::repo_root()
+        .expect("repo root")
+        .join("target/ci/parity/proxy-replay");
+    std::fs::create_dir_all(&dir).expect("report directory");
+    std::fs::write(dir.join(format!("{id}.txt")), outcome).expect("report");
 }
 
 macro_rules! scenarios {
@@ -1184,10 +1361,33 @@ async fn x_chat_429_advances() {
             false
         }
     });
-    replay("x_chat_429_advances").await;
+    replay_noting("x_chat_429_advances", &["D26"]).await;
     assert!(driver.await.expect("driver"), "the D26 wait was logged");
     assert_eq!(started.elapsed(), Duration::from_secs(30));
     drop(release);
+}
+
+/// The reviewed allowlist has one entry per scenario, and every row it names exists in
+/// `parity/DIVERGENCES.md`.
+#[test]
+fn the_allowlist_covers_every_scenario_with_known_rows() {
+    let doc = parity_support::fixture("proxy", "scenarios.json").expect("scenarios.json");
+    let ids: BTreeSet<String> = doc["scenarios"]
+        .as_array()
+        .expect("scenarios")
+        .iter()
+        .map(|scenario| text(&scenario["id"]))
+        .collect();
+    let listed: BTreeSet<String> = ALLOWLIST.iter().map(|(id, _)| (*id).to_owned()).collect();
+    assert_eq!(listed, ids, "one reviewed entry per scenario");
+    for (id, rows) in ALLOWLIST {
+        for row in *rows {
+            assert!(
+                parity_support::divergence(row).is_ok(),
+                "{id}: {row} is not a DIVERGENCES.md row"
+            );
+        }
+    }
 }
 
 /// The fixture has exactly these 54 scenarios, so a new capture fails here until it is
