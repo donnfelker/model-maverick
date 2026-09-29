@@ -177,10 +177,19 @@ async fn migrate_runs_the_engine_then_the_job_queue_idempotently() {
     let pool = db.pool().await;
     for pass in 1..=2 {
         step!("migrate, pass {pass}");
-        MIGRATOR.run(&pool).await.expect("engine migrations");
-        migrate_job_queue(db.url().to_owned())
+        let applied = maverick_store::migrate::migrate(db.url())
             .await
-            .expect("job queue migrations");
+            .expect("migrate");
+        assert_eq!(
+            applied.schema.is_empty(),
+            pass == 2,
+            "pass {pass}: {applied:?}"
+        );
+        assert_eq!(
+            applied.queue.is_empty(),
+            pass == 2,
+            "pass {pass}: {applied:?}"
+        );
     }
     step!("check the tables");
     for table in [

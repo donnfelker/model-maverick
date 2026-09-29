@@ -22,6 +22,7 @@ pub mod corpus;
 pub mod decisions;
 pub mod health;
 pub mod measurement;
+pub mod migrate;
 pub mod tenancy;
 
 pub use rust_decimal::Decimal;
@@ -35,6 +36,7 @@ pub type Json = Box<JsonRawValue>;
 /// Every engine migration in `migrations/`, embedded at compile time.
 ///
 /// Up only (D37). The graphile_worker job queue applies its own schema; it is not here.
+/// [`migrate::migrate`] runs both.
 pub static MIGRATOR: Migrator = sqlx::migrate!();
 
 /// The version of `migrations/0001_baseline.sql`: the Go schema at goose head (D21).

@@ -3,7 +3,9 @@
 //! Every row whose command stops before a database is exercised here with exact
 //! streams and exit codes. Rows that need the database (or a corpus directory) belong
 //! to the beads that write those command bodies; they are listed in `OTHER_BEADS` so
-//! none is dropped silently.
+//! none is dropped silently. On `*-unreachable-db` rows the `error` text comes from the
+//! Go database driver, and the fixture marks it informative: it is masked after checking
+//! it is present.
 
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
@@ -14,14 +16,13 @@ use maverick_domain::gojson::{self, JsonValue};
 const FIXTURE: &str = include_str!("../../../parity/fixtures/store/cli.json");
 
 /// Rows whose command body is another bead's.
-const OTHER_BEADS: [(&str, &str); 8] = [
+const OTHER_BEADS: [(&str, &str); 7] = [
     ("corpus-load-invalid-tier-range", "3.10 corpus load"),
     ("corpus-load-invalid-test-suite", "3.10 corpus load"),
     ("corpus-load-valid-unreachable-db", "3.10 corpus load"),
     ("corpus-activate-unreachable-db", "3.10 corpus activate"),
     ("corpus-calibrate-unreachable-db", "3.10 corpus calibrate"),
     ("probe-corpus-status-unreachable-db", "3.10 corpus status"),
-    ("migrate-unreachable-db", "3.11 migrate"),
     ("mcp-stdio-unreachable-db", "the MCP stdio bead"),
 ];
 
@@ -119,6 +120,36 @@ fn mask_times(stream: &str) -> String {
     out
 }
 
+/// Masks each JSON log `error` value as `<ERR>`, checking it is not empty first.
+fn mask_error(stream: &str) -> String {
+    const KEY: &str = ",\"error\":\"";
+    let mut out = String::with_capacity(stream.len());
+    let mut rest = stream;
+    while let Some(at) = rest.find(KEY) {
+        let start = at + KEY.len();
+        let bytes = rest.as_bytes();
+        let mut end = start;
+        while bytes[end] != b'"' {
+            end += if bytes[end] == b'\\' { 2 } else { 1 };
+        }
+        assert!(end > start, "empty error text: {stream}");
+        out.push_str(&rest[..start]);
+        out.push_str("<ERR>");
+        rest = &rest[end..];
+    }
+    out.push_str(rest);
+    out
+}
+
+#[test]
+fn mask_error_keeps_everything_but_the_error_text() {
+    assert_eq!(
+        mask_error("{\"msg\":\"x\",\"error\":\"a \\\"b\\\" c\",\"n\":1}\n"),
+        "{\"msg\":\"x\",\"error\":\"<ERR>\",\"n\":1}\n"
+    );
+    assert_eq!(mask_error("{\"msg\":\"x\"}"), "{\"msg\":\"x\"}");
+}
+
 // parity: main.TestRunNoCommandPrintsUsage
 // parity: main.TestRunUnknownCommand
 // parity: main.TestRunCorpusWithoutSubcommand
@@ -132,6 +163,7 @@ fn mask_times(stream: &str) -> String {
 // parity: main.TestRunServeLogsJSON
 // parity: main.TestRunServeRejectsConflictingFlags
 // parity: main.TestRunMigrateFailsFastOnMissingConfig
+// parity: main.TestRunMigrateFailsOnUnreachableDatabase
 #[test]
 fn cli_rows_match_go() {
     let fixture = gojson::unmarshal(FIXTURE).expect("cli.json parses");
@@ -158,21 +190,30 @@ fn cli_rows_match_go() {
             other => panic!("exit_code: {other:?}"),
         };
 
+        let informative = id.ends_with("-unreachable-db");
+        let mask = |stream: &str| {
+            if informative {
+                mask_error(stream)
+            } else {
+                stream.to_owned()
+            }
+        };
+
         let (code, stdout, stderr) = invoke(&args, &env(field(case, "env")));
         assert_eq!(code, expected_code, "{id}: exit code");
         assert_eq!(
-            mask_times(&stdout),
-            text(field(case, "stdout")),
-            "{id}: stdout"
+            mask(&mask_times(&stdout)),
+            mask(text(field(case, "stdout"))),
+            "{id}: stdout was {stdout}"
         );
         assert_eq!(
-            mask_times(&stderr),
-            text(field(case, "stderr")),
-            "{id}: stderr"
+            mask(&mask_times(&stderr)),
+            mask(text(field(case, "stderr"))),
+            "{id}: stderr was {stderr}"
         );
         checked += 1;
     }
-    assert_eq!(checked, 16);
+    assert_eq!(checked, 17);
 }
 
 fn strings(args: &[&str]) -> Vec<String> {

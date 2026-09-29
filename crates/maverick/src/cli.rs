@@ -124,7 +124,8 @@ fn serve(
     })
 }
 
-/// `migrate` (§7.7): loads the FULL config (QUIRK), then runs the migrations.
+/// `migrate` (§7.7): loads the FULL config (QUIRK: only the database URL is used), then
+/// runs the engine and graphile_worker migrations (`maverick_store::migrate`).
 fn migrate(
     args: &[String],
     lookup: &dyn Fn(&str) -> Option<String>,
@@ -136,11 +137,30 @@ fn migrate(
         return EXIT_USAGE;
     }
     with_logger(stdout, || {
-        if load_config(lookup).is_err() {
+        let Ok(config) = load_config(lookup) else {
             return EXIT_FAILURE;
-        }
-        not_implemented("migrate", "model-maverick-rust-port-3hk.3.11")
+        };
+        let error: Box<dyn std::error::Error> =
+            match block_on(maverick_store::migrate::migrate(&config.database_url)) {
+                Ok(Ok(_)) => {
+                    tracing::info!("migrations complete");
+                    return 0;
+                }
+                Ok(Err(error)) => error.into(),
+                Err(error) => error.into(),
+            };
+        tracing::error!(error = %error, "migrate failed");
+        EXIT_FAILURE
     })
+}
+
+/// Runs `future` to completion on a runtime for this thread only, so its log events
+/// reach the logger that `with_logger` installed for this thread.
+fn block_on<F: Future>(future: F) -> std::io::Result<F::Output> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    Ok(runtime.block_on(future))
 }
 
 /// `demo-run [--seed path] [--fake-fixtures dir]` (§7.6), hidden from the usage.
