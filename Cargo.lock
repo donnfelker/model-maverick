@@ -2308,13 +2308,16 @@ name = "maverick-api"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "chrono",
  "futures-util",
+ "graphile_worker",
  "http-body-util",
  "maverick-alerts",
  "maverick-config",
  "maverick-domain",
  "maverick-runner",
  "maverick-store",
+ "maverick-testdb",
  "rmcp",
  "serde",
  "serde_json",

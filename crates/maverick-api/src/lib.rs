@@ -3,11 +3,15 @@
 //! This crate owns the wire contract and middleware. Endpoint handlers are kept
 //! deliberately small: business rules belong to the service crates.
 
+mod health;
+
+pub use health::HealthState;
+
 use axum::{
     Router,
     body::{Body, to_bytes},
     extract::{Request, State},
-    http::{HeaderValue, Method, Response, StatusCode, header},
+    http::{HeaderValue, Response, StatusCode, header},
     middleware::{self, Next},
     routing::any,
 };
@@ -777,13 +781,6 @@ fn insert_rate_limit_headers(response: &mut Response<Body>, decision: &RateLimit
     }
 }
 
-async fn up(request: Request) -> Response<Body> {
-    if request.method() != Method::GET {
-        return not_found();
-    }
-    response_with_json(StatusCode::OK, br#"{"status":"ok"}"#.to_vec())
-}
-
 async fn route_stub(_: Request) -> Response<Body> {
     not_found()
 }
@@ -850,8 +847,17 @@ pub fn public_router() -> Router {
     public_router_with_state(default_auth_state())
 }
 
-/// Build the public listener router with explicit auth state.
+/// Build the public listener router with explicit auth state and no database for
+/// `/up` (router tests).
 pub fn public_router_with_state(state: AuthState) -> Router {
+    public_router_with(state, HealthState::detached())
+}
+
+/// Build the public listener router with explicit auth and health state.
+pub fn public_router_with(state: AuthState, health: HealthState) -> Router {
+    let up = Router::new()
+        .route("/up", any(health::up))
+        .with_state(health);
     let mcp = Router::new()
         .route("/", any(route_stub))
         .fallback(route_stub)
@@ -861,7 +867,7 @@ pub fn public_router_with_state(state: AuthState) -> Router {
 
     with_outer_middleware(
         Router::new()
-            .route("/up", any(up))
+            .merge(up)
             .nest("/mcp", mcp)
             .nest("/v1", public_v1_router(state))
             .fallback(route_stub),
@@ -878,10 +884,17 @@ pub fn internal_router() -> Router {
     internal_router_with_state(default_auth_state())
 }
 
-/// Build the internal listener router with explicit auth state.
+/// Build the internal listener router with explicit auth state and no database for
+/// `/health/detail` (router tests).
 pub fn internal_router_with_state(state: AuthState) -> Router {
+    internal_router_with(state, HealthState::detached())
+}
+
+/// Build the internal listener router with explicit auth and health state.
+pub fn internal_router_with(state: AuthState, health_state: HealthState) -> Router {
     let health = Router::new()
-        .route("/", any(route_stub))
+        .route("/", any(health::detail))
+        .with_state(health_state)
         .layer(middleware::from_fn_with_state(state.clone(), internal_auth));
 
     with_outer_middleware(
@@ -900,7 +913,11 @@ pub fn internal_app() -> Router {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::{body::Body, extract::Extension, http::Request};
+    use axum::{
+        body::Body,
+        extract::Extension,
+        http::{Method, Request},
+    };
     use http_body_util::BodyExt;
     use serde::Deserialize;
     use std::sync::{

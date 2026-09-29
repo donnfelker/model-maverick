@@ -31,3 +31,9 @@ futures-util = "0.3"
 http-body-util = "0.1"
 ulid = { workspace = true }
 sqlx = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+maverick-testdb = { workspace = true }
+# Applies the real graphile_worker schema in the health tests.
+graphile_worker = { workspace = true }
