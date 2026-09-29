@@ -1,8 +1,8 @@
-//! The tenant debug-capture endpoints (bead 5.9; reference Part 4 §4.6, Part 5 §6.14 to
-//! §6.18, §13.9, §13.10), on real Postgres with a scripted classifier: windows, replay,
-//! the capture list, prompt reads, and the access log. Error bodies are the recorded Go
-//! bytes (`parity/blackbox/api-recorded.jsonl`); success bodies are checked field by field
-//! because their ids and times differ per run.
+//! The debug-capture endpoints (beads 5.9 and 5.11; reference Part 4 §4.6, Part 5 §6.14
+//! to §6.18, §7.11, §7.12, §13.9 to §13.11), on real Postgres with a scripted classifier:
+//! windows, replay, the tenant and operator capture lists, prompt reads, and the access
+//! log. Error bodies are the recorded Go bytes (`parity/blackbox/api-recorded.jsonl`);
+//! success bodies are checked field by field because their ids and times differ per run.
 
 use std::collections::VecDeque;
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
@@ -15,7 +15,7 @@ use maverick_api::capture::Capturer;
 use maverick_api::classify::{Classifier, Resolver, ResolverSettings};
 use maverick_api::{
     ApiState, AuthState, HealthState, Identity, RateLimiter, RecommendConfig, StaticAuthBackend,
-    public_router_with,
+    internal_router_with, public_router_with,
 };
 use maverick_domain::capture::KeyRing;
 use maverick_domain::gojson::{self, JsonValue};
@@ -40,6 +40,8 @@ const KEY: &str = "key_owner";
 const KEY2: &str = "key_owner_two";
 const INTRUDER: &str = "ten_intruder";
 const INTRUDER_KEY: &str = "key_intruder";
+/// The internal token `<label>:<secret>`; the access-log actor is the label.
+const OPS: &str = "ops:alpha";
 const CORPUS: &str = "2026-07-01";
 const MASTER_KEY: [u8; 32] = [0xC4; 32];
 const COLUMN: &str = "claude-haiku-4-5/direct";
@@ -128,6 +130,26 @@ impl Reply {
     }
 }
 
+async fn send(router: Router, request: Request<Body>) -> Reply {
+    let (method, uri) = (request.method().clone(), request.uri().clone());
+    let response = router.oneshot(request).await.unwrap();
+    let status = response.status();
+    let content_type = response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .map(|value| value.to_str().unwrap().to_owned());
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let body = String::from_utf8(bytes.to_vec()).unwrap();
+    eprintln!("{method} {uri} -> {status} {body}");
+    Reply {
+        status,
+        content_type,
+        body,
+    }
+}
+
 /// One test's database, classifiers, and capture hook.
 struct Env {
     _db: TestDatabase,
@@ -166,26 +188,35 @@ impl Env {
             request = request.header(header::AUTHORIZATION, "Bearer mk_live_test");
         }
         let (tenant, key) = who.unwrap_or((OWNER, KEY));
-        let response = self
-            .router(tenant, key)
-            .oneshot(request.body(Body::from(body.to_owned())).unwrap())
-            .await
-            .unwrap();
-        let status = response.status();
-        let content_type = response
-            .headers()
-            .get(header::CONTENT_TYPE)
-            .map(|value| value.to_str().unwrap().to_owned());
-        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let body = String::from_utf8(bytes.to_vec()).unwrap();
-        eprintln!("{method} {uri} -> {status} {body}");
-        Reply {
-            status,
-            content_type,
-            body,
+        send(
+            self.router(tenant, key),
+            request.body(Body::from(body.to_owned())).unwrap(),
+        )
+        .await
+    }
+
+    /// A `GET` on the internal listener with `token` (`None` sends no header).
+    async fn operator(&self, uri: &str, token: Option<&str>) -> Reply {
+        let auth = AuthState::new(
+            Arc::new(StaticAuthBackend::authenticated(Identity {
+                tenant_id: OWNER.to_owned(),
+                api_key_id: KEY.to_owned(),
+            })),
+            keys::parse_internal_tokens(OPS).unwrap(),
+            RateLimiter::new(10_000),
+        );
+        let health = HealthState::with_providers(self.pool.clone(), Vec::new());
+        let api = ApiState::with_health(self.pool.clone(), health)
+            .with_recommend_config(self.config.clone());
+        let mut request = Request::builder().method(Method::GET).uri(uri);
+        if let Some(token) = token {
+            request = request.header(header::AUTHORIZATION, format!("Bearer {token}"));
         }
+        send(
+            internal_router_with(auth, api),
+            request.body(Body::empty()).unwrap(),
+        )
+        .await
     }
 
     async fn owner(&self, method: Method, uri: &str, body: &str) -> Reply {
@@ -1151,7 +1182,292 @@ async fn a_zero_retention_tenant_has_no_captures() {
     assert_eq!(reply.body, NOT_FOUND);
 }
 
-// ---- internalv1_captures_test.go (public routes only) ----
+// ---- internalv1_captures_test.go ----
+
+const INTERNAL_UNAUTHORIZED: &str = "{\"error\":{\"code\":\"unauthorized\",\"message\":\"missing or invalid internal token\",\"details\":{}}}\n";
+
+// parity: api.TestOperatorCaptureEndpointsRequireAuth
+#[tokio::test]
+async fn operator_capture_reads_require_the_internal_token() {
+    let Some(env) = env(false).await else { return };
+    for uri in [
+        "/internal/v1/captures",
+        "/internal/v1/captures/cap_x/prompt",
+    ] {
+        for token in [None, Some("ops:wrong")] {
+            let reply = env.operator(uri, token).await;
+            assert_eq!(reply.status, StatusCode::UNAUTHORIZED, "{uri} {token:?}");
+            assert_eq!(reply.body, INTERNAL_UNAUTHORIZED);
+        }
+    }
+}
+
+// parity: api.TestOperatorListCapturesShape
+#[tokio::test]
+async fn the_operator_list_names_the_tenant_and_never_the_prompt() {
+    let Some(env) = env(false).await else { return };
+    let captured = env.captured().await;
+    let reply = env
+        .operator(
+            &format!("/internal/v1/captures?tenant_id={OWNER}"),
+            Some(OPS),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::OK);
+    assert!(!reply.body.contains(MARKER));
+    assert_eq!(
+        keys_of(&reply.body, &["captures", "0"]),
+        [
+            "id",
+            "window_id",
+            "tenant_id",
+            "recommendation_id",
+            "prompt_hash",
+            "classification",
+            "captured_at",
+            "expires_at",
+            "expired"
+        ]
+    );
+    let list = reply.json();
+    let entries = list["captures"].as_array().unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0]["id"], captured.id.as_str());
+    assert_eq!(entries[0]["tenant_id"], OWNER);
+    assert!(entries[0]["window_id"].as_str().unwrap().starts_with("cw_"));
+    assert_eq!(entries[0]["prompt_hash"], captured.prompt_hash.as_str());
+    assert!(
+        reply
+            .body
+            .contains(&format!(r#""classification":{ORIGINAL},"#))
+    );
+    assert_eq!(entries[0]["expired"], false);
+    assert!(list["next_cursor"].is_null());
+    // The list is not access-logged.
+    assert_eq!(env.count("capture_access_log").await, 0);
+}
+
+// parity: api.TestOperatorListCapturesFilters
+#[tokio::test]
+async fn the_operator_list_filters_by_tenant_and_window() {
+    let Some(env) = env(false).await else { return };
+    let owner = env.captured().await;
+    let intruder_window = env.open_window(INTRUDER, INTRUDER_KEY).await;
+    let intruder = env.recommend(INTRUDER, INTRUDER_KEY, PROMPT).await.unwrap();
+    let ids = |reply: &Reply| -> Vec<String> {
+        reply.json()["captures"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry["id"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    let reply = env.operator("/internal/v1/captures", Some(OPS)).await;
+    assert_eq!(ids(&reply), [intruder.id.clone(), owner.id.clone()]);
+    let reply = env
+        .operator(
+            &format!("/internal/v1/captures?tenant_id={OWNER}"),
+            Some(OPS),
+        )
+        .await;
+    assert_eq!(ids(&reply), [owner.id]);
+    let reply = env
+        .operator(
+            &format!("/internal/v1/captures?window_id={intruder_window}"),
+            Some(OPS),
+        )
+        .await;
+    assert_eq!(ids(&reply), [intruder.id]);
+    let reply = env
+        .operator("/internal/v1/captures?bogus=1", Some(OPS))
+        .await;
+    assert_eq!(reply.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(
+        reply.body,
+        invalid(
+            r#"unknown query parameter \"bogus\""#,
+            r#"{"parameter":"bogus"}"#
+        )
+    );
+}
+
+// parity: api.TestOperatorListCapturesPagination
+#[tokio::test]
+async fn the_operator_list_pages() {
+    let Some(env) = env(false).await else { return };
+    env.open_window(OWNER, KEY).await;
+    let mut made = Vec::new();
+    for suffix in [" A", " B", " C"] {
+        made.push(
+            env.recommend(OWNER, KEY, &format!("{PROMPT}{suffix}"))
+                .await
+                .unwrap()
+                .id,
+        );
+    }
+    let mut seen = Vec::new();
+    let mut uri = format!("/internal/v1/captures?tenant_id={OWNER}&limit=1");
+    loop {
+        let reply = env.operator(&uri, Some(OPS)).await;
+        assert_eq!(reply.status, StatusCode::OK);
+        let page = reply.json();
+        assert_eq!(page["captures"].as_array().unwrap().len(), 1);
+        seen.push(page["captures"][0]["id"].as_str().unwrap().to_owned());
+        match page["next_cursor"].as_str() {
+            Some(cursor) => {
+                uri = format!("/internal/v1/captures?tenant_id={OWNER}&limit=1&cursor={cursor}");
+            }
+            None => break,
+        }
+        assert!(seen.len() < 3, "a third page must not have a cursor");
+    }
+    made.reverse();
+    assert_eq!(seen, made);
+    let reply = env
+        .operator(
+            "/internal/v1/captures?cursor=not-valid-base64%20%20",
+            Some(OPS),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(
+        reply.body,
+        invalid(
+            r#"cursor \"not-valid-base64  \" must be an opaque pagination token"#,
+            r#"{"parameter":"cursor","value":"not-valid-base64  "}"#
+        )
+    );
+}
+
+// parity: api.TestOperatorReadCapturePromptRoundTrip
+#[tokio::test]
+async fn the_operator_reads_any_prompt_and_the_read_is_logged() {
+    let Some(env) = env(false).await else { return };
+    let captured = env.captured().await;
+    let reply = env
+        .operator(
+            &format!("/internal/v1/captures/{}/prompt", captured.id),
+            Some(OPS),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::OK);
+    assert_eq!(
+        keys_of(&reply.body, &[]),
+        [
+            "id",
+            "tenant_id",
+            "prompt",
+            "prompt_hash",
+            "recommendation_id",
+            "classification",
+            "captured_at",
+            "expires_at"
+        ]
+    );
+    let read = reply.json();
+    assert_eq!(read["id"], captured.id.as_str());
+    assert_eq!(read["tenant_id"], OWNER);
+    assert_eq!(read["prompt"], PROMPT);
+    assert_eq!(read["prompt_hash"], captured.prompt_hash.as_str());
+    assert_eq!(
+        read["recommendation_id"],
+        captured.recommendation_id.as_str()
+    );
+    assert!(
+        reply
+            .body
+            .contains(&format!(r#""classification":{ORIGINAL},"#))
+    );
+    assert_eq!(
+        env.log(&captured.id).await,
+        [(OWNER.to_owned(), "ops".to_owned(), "read".to_owned())]
+    );
+}
+
+// parity: api.TestOperatorReadCapturePromptExpiredButPresent410
+#[tokio::test]
+async fn an_expired_operator_read_is_410_and_logged() {
+    let Some(env) = env(false).await else { return };
+    let captured = env.captured().await;
+    env.expire(&captured.id).await;
+    let reply = env
+        .operator(
+            &format!("/internal/v1/captures/{}/prompt", captured.id),
+            Some(OPS),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::GONE);
+    assert_eq!(reply.body, EXPIRED);
+    assert_eq!(
+        env.log(&captured.id).await,
+        [(OWNER.to_owned(), "ops".to_owned(), "read".to_owned())]
+    );
+}
+
+// parity: api.TestOperatorReadCapturePromptHardDeleted410
+#[tokio::test]
+async fn a_hard_deleted_operator_read_is_410_under_the_captures_tenant() {
+    let Some(env) = env(false).await else { return };
+    let captured = env.captured().await;
+    env.hard_delete(&captured.id).await;
+    let reply = env
+        .operator(
+            &format!("/internal/v1/captures/{}/prompt", captured.id),
+            Some(OPS),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::GONE);
+    assert_eq!(reply.body, EXPIRED);
+    assert_eq!(
+        env.log(&captured.id).await,
+        [
+            (
+                OWNER.to_owned(),
+                "capture_expiry".to_owned(),
+                "delete".to_owned()
+            ),
+            (OWNER.to_owned(), "ops".to_owned(), "read".to_owned()),
+        ]
+    );
+}
+
+// parity: api.TestOperatorReadCapturePromptUnknown404
+#[tokio::test]
+async fn an_unknown_operator_read_is_404_and_logged_without_a_tenant() {
+    let Some(env) = env(false).await else { return };
+    let id = "cap_01UNKNOWNOPERATORREAD0000";
+    let reply = env
+        .operator(&format!("/internal/v1/captures/{id}/prompt"), Some(OPS))
+        .await;
+    assert_eq!(reply.status, StatusCode::NOT_FOUND);
+    assert_eq!(reply.body, NOT_FOUND);
+    assert_eq!(
+        env.log(id).await,
+        [(String::new(), "ops".to_owned(), "read".to_owned())]
+    );
+}
+
+// parity: api.TestOperatorListZeroRetentionTenantHasNoCaptures
+#[tokio::test]
+async fn the_operator_sees_no_captures_for_a_zero_retention_tenant() {
+    let Some(env) = env(true).await else { return };
+    // The window endpoint refuses, and a prompt recommend never captures.
+    let reply = env
+        .owner(
+            Method::POST,
+            "/v1/debug/capture-windows",
+            r#"{"duration_minutes":60}"#,
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::CONFLICT);
+    let reply = env
+        .operator(
+            &format!("/internal/v1/captures?tenant_id={OWNER}"),
+            Some(OPS),
+        )
+        .await;
+    assert_eq!(reply.body, "{\"captures\":[],\"next_cursor\":null}\n");
+}
 
 // parity: api.TestPublicListenerNeverLeaksForeignPromptText
 #[tokio::test]

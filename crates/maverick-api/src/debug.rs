@@ -1,5 +1,7 @@
-//! Tenant debug capture (spec §9.8, §10.4; reference Part 4 §4.6 and Part 5 §6.14 to
-//! §6.18; D18).
+//! Debug capture reads and windows (spec §9.8, §10.4; reference Part 4 §4.6 and Part 5
+//! §6.14 to §6.18, §7.11, §7.12; D18).
+//!
+//! Tenant endpoints (public listener):
 //!
 //! - `POST /v1/debug/capture-windows` opens a window: `duration_minutes` (1 to
 //!   `capture.max_window_minutes`), an optional `confidence_below` in (0, 1] that is
@@ -21,8 +23,14 @@
 //! hard-deleted capture answers 410 and one that never existed answers 404. The prompt is
 //! never logged.
 //!
-//! The operator capture reads (`/internal/v1/captures`) share [`read_tail`],
-//! [`log_access`], and the page helpers.
+//! Operator endpoints (internal listener, root access across tenants; actor = the internal
+//! token's label):
+//!
+//! - `GET /internal/v1/captures` lists every tenant's captures, optionally filtered by
+//!   `tenant_id` and `window_id`. It is not access-logged.
+//! - `GET /internal/v1/captures/{id}/prompt` reads any prompt. A miss is still logged: under
+//!   the tenant of the capture's `delete` row (410), or under tenant `""` when there is
+//!   none (404).
 
 use axum::body::Body;
 use axum::extract::{Extension, Path, Request, State};
@@ -34,7 +42,8 @@ use maverick_domain::gojson::{self, JsonValue, match_field};
 use maverick_domain::history::{base64url_decode, base64url_encode};
 use maverick_domain::ids;
 use maverick_store::capture::{
-    self as store, CaptureWindow, DebugCapture, TenantCapturePageQuery, TenantCaptureSummary,
+    self as store, CapturePageQuery, CaptureSummary, CaptureWindow, DebugCapture,
+    TenantCapturePageQuery, TenantCaptureSummary,
 };
 use maverick_store::decisions::{self, Recommendation};
 use maverick_store::{catalog, is_not_found, tenancy};
@@ -46,19 +55,19 @@ use crate::classify::{self, ResolveInput, Resolver};
 use crate::health::rfc3339_nano;
 use crate::strict::{self, invalid, malformed, required_field};
 use crate::{
-    ApiError, ApiState, ErrorCode, Identity, internal_error, not_found, read_body,
+    ApiError, ApiState, ErrorCode, Identity, InternalActor, internal_error, not_found, read_body,
     response_with_json,
 };
 
 /// The access-log action of a replay.
-pub(crate) const ACTION_REPLAY: &str = "replay";
+const ACTION_REPLAY: &str = "replay";
 /// The access-log action of a prompt read (and of an expired replay).
-pub(crate) const ACTION_READ: &str = "read";
+const ACTION_READ: &str = "read";
 
 /// The capture list's page size when `limit` is not given.
-pub(crate) const DEFAULT_LIMIT: i32 = 50;
+const DEFAULT_LIMIT: i32 = 50;
 /// The largest `limit`.
-pub(crate) const MAX_LIMIT: i32 = 200;
+const MAX_LIMIT: i32 = 200;
 
 const EXPIRED_MESSAGE: &str =
     "capture has expired and its ciphertext is deleted or pending deletion";
@@ -71,7 +80,7 @@ const REPLAY_STRUCT: &str = "replayRequest";
 
 /// Why a capture call did not succeed.
 #[derive(Debug)]
-pub(crate) enum Failure {
+enum Failure {
     /// 404 `resource not found`: unknown, another tenant's, or never existed.
     NotFound,
     /// 410 `capture_expired`.
@@ -95,11 +104,7 @@ impl Failure {
 }
 
 /// The response for a call's result. A 500 logs `capture handler failure`.
-pub(crate) fn respond(
-    method: &str,
-    path: &str,
-    result: Result<Response<Body>, Failure>,
-) -> Response<Body> {
+fn respond(method: &str, path: &str, result: Result<Response<Body>, Failure>) -> Response<Body> {
     match result {
         Ok(response) => response,
         Err(Failure::NotFound) => not_found(),
@@ -230,6 +235,41 @@ pub(crate) async fn prompt_handler(
     };
     let capturer = api.recommend().capture.as_deref();
     let result = read_prompt(pool, capturer, &identity, &id, Utc::now()).await;
+    respond("GET", &path, result)
+}
+
+/// `/internal/v1/captures`: `GET` lists every tenant's captures.
+pub(crate) async fn operator_captures_handler(
+    State(api): State<ApiState>,
+    request: Request,
+) -> Response<Body> {
+    if request.method() != Method::GET {
+        return not_found();
+    }
+    let path = request.uri().path().to_owned();
+    let query = request.uri().query().unwrap_or("").to_owned();
+    let Some(pool) = api.pool() else {
+        return internal_error();
+    };
+    respond("GET", &path, operator_list(pool, &query, Utc::now()).await)
+}
+
+/// `/internal/v1/captures/{id}/prompt`: `GET` reads any tenant's captured prompt.
+pub(crate) async fn operator_prompt_handler(
+    State(api): State<ApiState>,
+    Extension(actor): Extension<InternalActor>,
+    Path(id): Path<String>,
+    request: Request,
+) -> Response<Body> {
+    if request.method() != Method::GET {
+        return not_found();
+    }
+    let path = request.uri().path().to_owned();
+    let Some(pool) = api.pool() else {
+        return internal_error();
+    };
+    let capturer = api.recommend().capture.as_deref();
+    let result = operator_read_prompt(pool, capturer, &actor.0, &id, Utc::now()).await;
     respond("GET", &path, result)
 }
 
@@ -561,23 +601,35 @@ fn classification_block(
 
 // ---- list ----
 
-/// The list parameters (Part 5 §6.17).
+/// Who reads: a tenant sees only its own captures; the operator sees every tenant's, may
+/// filter by tenant, and gets `tenant_id` on each entry and prompt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Caller {
+    Tenant,
+    Operator,
+}
+
+/// The list parameters (Part 5 §6.17, §7.11). Empty strings mean no filter.
 #[derive(Debug, PartialEq, Eq)]
 struct ListParams {
     window_id: String,
+    tenant_id: String,
     limit: i32,
     cursor_id: String,
 }
 
-/// `window_id`, `limit`, and `cursor` only, checked in that order after the unknown-name
-/// check. A repeated name keeps its first value; an empty value means not supplied.
-fn parse_list(query: &str) -> Result<ListParams, Failure> {
+/// `window_id`, `limit`, `cursor`, and for the operator `tenant_id`; checked in that order
+/// after the unknown-name check. A repeated name keeps its first value; an empty value
+/// means not supplied.
+fn parse_list(query: &str, caller: Caller) -> Result<ListParams, Failure> {
     let mut window_id = None;
+    let mut tenant_id = None;
     let mut limit = None;
     let mut cursor = None;
     for (key, value) in crate::query::pairs(query) {
         let slot = match key.as_str() {
             "window_id" => &mut window_id,
+            "tenant_id" if caller == Caller::Operator => &mut tenant_id,
             "limit" => &mut limit,
             "cursor" => &mut cursor,
             other => {
@@ -592,11 +644,12 @@ fn parse_list(query: &str) -> Result<ListParams, Failure> {
         limit: parse_limit(limit.as_deref().unwrap_or(""))?,
         cursor_id: parse_cursor(cursor.as_deref().unwrap_or(""))?,
         window_id: window_id.unwrap_or_default(),
+        tenant_id: tenant_id.unwrap_or_default(),
     })
 }
 
 /// `limit`: 50 when not supplied, else a decimal int32 in 1..=200.
-pub(crate) fn parse_limit(raw: &str) -> Result<i32, ApiError> {
+fn parse_limit(raw: &str) -> Result<i32, ApiError> {
     if raw.is_empty() {
         return Ok(DEFAULT_LIMIT);
     }
@@ -609,7 +662,7 @@ pub(crate) fn parse_limit(raw: &str) -> Result<i32, ApiError> {
 /// `cursor`: unpadded base64url of the last capture id of the previous page. Empty is the
 /// first page. A value that does not decode, or decodes to nothing, is 422. Go passed the
 /// decoded bytes to Postgres as they were, which refused non-UTF-8 text (500).
-pub(crate) fn parse_cursor(raw: &str) -> Result<String, Failure> {
+fn parse_cursor(raw: &str) -> Result<String, Failure> {
     if raw.is_empty() {
         return Ok(String::new());
     }
@@ -628,11 +681,7 @@ fn invalid_param(parameter: &str, value: &str, want: &str) -> ApiError {
 
 /// A page from `limit + 1` rows: at most `limit` rows, and the cursor of the last one
 /// when more came back.
-pub(crate) fn page<T>(
-    mut rows: Vec<T>,
-    limit: i32,
-    id: impl Fn(&T) -> &str,
-) -> (Vec<T>, Option<String>) {
+fn page<T>(mut rows: Vec<T>, limit: i32, id: impl Fn(&T) -> &str) -> (Vec<T>, Option<String>) {
     let limit = usize::try_from(limit).unwrap_or(0);
     if rows.len() <= limit {
         return (rows, None);
@@ -642,13 +691,14 @@ pub(crate) fn page<T>(
     (rows, next)
 }
 
+/// `GET /v1/debug/captures`: the caller's captures only.
 async fn list(
     pool: &PgPool,
     identity: &Identity,
     query: &str,
     now: DateTime<Utc>,
 ) -> Result<Response<Body>, Failure> {
-    let params = parse_list(query)?;
+    let params = parse_list(query, Caller::Tenant)?;
     let rows = store::list_debug_captures_page_for_tenant(
         pool,
         &TenantCapturePageQuery {
@@ -661,9 +711,39 @@ async fn list(
     .await
     .map_err(Failure::store)?;
     let (rows, next) = page(rows, params.limit, |row| row.id.as_str());
+    list_body(rows.iter().map(Summary::from), next, now)
+}
+
+/// `GET /internal/v1/captures`: every tenant's captures. Not access-logged.
+async fn operator_list(
+    pool: &PgPool,
+    query: &str,
+    now: DateTime<Utc>,
+) -> Result<Response<Body>, Failure> {
+    let params = parse_list(query, Caller::Operator)?;
+    let rows = store::list_debug_captures_page(
+        pool,
+        &CapturePageQuery {
+            window_id: &params.window_id,
+            tenant_id: &params.tenant_id,
+            cursor_id: &params.cursor_id,
+            page_limit: params.limit + 1,
+        },
+    )
+    .await
+    .map_err(Failure::store)?;
+    let (rows, next) = page(rows, params.limit, |row| row.id.as_str());
+    list_body(rows.iter().map(Summary::from), next, now)
+}
+
+/// `{"captures":[...],"next_cursor"}`.
+fn list_body<'a>(
+    rows: impl Iterator<Item = Summary<'a>>,
+    next: Option<String>,
+    now: DateTime<Utc>,
+) -> Result<Response<Body>, Failure> {
     let captures = rows
-        .iter()
-        .map(|row| capture_entry(row, now))
+        .map(|row| row.entry(now))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(json(
         StatusCode::OK,
@@ -674,18 +754,70 @@ async fn list(
     ))
 }
 
-/// One list entry: no tenant id and no prompt text.
-fn capture_entry(row: &TenantCaptureSummary, now: DateTime<Utc>) -> Result<JsonValue, Failure> {
-    Ok(object(vec![
-        ("id", string(&row.id)),
-        ("window_id", optional(row.window_id.as_deref())),
-        ("recommendation_id", string(&row.recommendation_id)),
-        ("prompt_hash", optional(row.prompt_hash.as_deref())),
-        ("classification", jsonb(row.classification.get())?),
-        ("captured_at", time(row.captured_at)),
-        ("expires_at", time(row.expires_at)),
-        ("expired", JsonValue::Bool(row.expires_at <= now)),
-    ]))
+/// One row of either capture list. `tenant_id` is only on the operator's.
+struct Summary<'a> {
+    id: &'a str,
+    window_id: Option<&'a str>,
+    tenant_id: Option<&'a str>,
+    recommendation_id: &'a str,
+    prompt_hash: Option<&'a str>,
+    classification: &'a str,
+    captured_at: DateTime<Utc>,
+    expires_at: DateTime<Utc>,
+}
+
+impl<'a> From<&'a TenantCaptureSummary> for Summary<'a> {
+    fn from(row: &'a TenantCaptureSummary) -> Self {
+        Self {
+            id: &row.id,
+            window_id: row.window_id.as_deref(),
+            tenant_id: None,
+            recommendation_id: &row.recommendation_id,
+            prompt_hash: row.prompt_hash.as_deref(),
+            classification: row.classification.get(),
+            captured_at: row.captured_at,
+            expires_at: row.expires_at,
+        }
+    }
+}
+
+impl<'a> From<&'a CaptureSummary> for Summary<'a> {
+    fn from(row: &'a CaptureSummary) -> Self {
+        Self {
+            id: &row.id,
+            window_id: row.window_id.as_deref(),
+            tenant_id: Some(&row.tenant_id),
+            recommendation_id: &row.recommendation_id,
+            prompt_hash: row.prompt_hash.as_deref(),
+            classification: row.classification.get(),
+            captured_at: row.captured_at,
+            expires_at: row.expires_at,
+        }
+    }
+}
+
+impl Summary<'_> {
+    /// `{"id","window_id",["tenant_id"],"recommendation_id","prompt_hash",
+    /// "classification","captured_at","expires_at","expired"}`: never the prompt.
+    /// `expired` is `expires_at <= now`.
+    fn entry(&self, now: DateTime<Utc>) -> Result<JsonValue, Failure> {
+        let mut members = vec![
+            ("id", string(self.id)),
+            ("window_id", optional(self.window_id)),
+        ];
+        if let Some(tenant_id) = self.tenant_id {
+            members.push(("tenant_id", string(tenant_id)));
+        }
+        members.extend([
+            ("recommendation_id", string(self.recommendation_id)),
+            ("prompt_hash", optional(self.prompt_hash)),
+            ("classification", jsonb(self.classification)?),
+            ("captured_at", time(self.captured_at)),
+            ("expires_at", time(self.expires_at)),
+            ("expired", JsonValue::Bool(self.expires_at <= now)),
+        ]);
+        Ok(object(members))
+    }
 }
 
 // ---- prompt reads ----
@@ -715,37 +847,77 @@ async fn read_prompt(
         Err(error) => return Err(Failure::store(error)),
     };
     let read = read_tail(pool, capturer, capture, &identity.api_key_id, now).await?;
-    Ok(json(
-        StatusCode::OK,
-        &object(vec![
-            ("id", string(&read.capture.id)),
-            ("prompt", string(&read.prompt)),
-            (
-                "prompt_hash",
-                optional(read.recommendation.prompt_hash.as_deref()),
-            ),
-            ("recommendation_id", string(&read.capture.recommendation_id)),
-            (
-                "classification",
-                jsonb(read.recommendation.classification.get())?,
-            ),
-            ("captured_at", time(read.capture.captured_at)),
-            ("expires_at", time(read.capture.expires_at)),
-        ]),
-    ))
+    read.body(Caller::Tenant)
+}
+
+/// Part 4 §4.6 `ReadPrompt` (root): the lookup spans every tenant. A miss is logged
+/// under the tenant of the capture's `delete` row and answers 410; with no such row it is
+/// logged under tenant `""` and answers 404.
+async fn operator_read_prompt(
+    pool: &PgPool,
+    capturer: Option<&Capturer>,
+    actor: &str,
+    id: &str,
+    now: DateTime<Utc>,
+) -> Result<Response<Body>, Failure> {
+    let capture = match store::get_debug_capture_by_id(pool, id).await {
+        Ok(capture) => capture,
+        Err(error) if is_not_found(&error) => {
+            return Err(match store::find_capture_delete_log(pool, id).await {
+                Ok(deleted) => {
+                    log_access(pool, id, &deleted.tenant_id, actor, ACTION_READ).await?;
+                    Failure::Expired
+                }
+                Err(error) if is_not_found(&error) => {
+                    log_access(pool, id, "", actor, ACTION_READ).await?;
+                    Failure::NotFound
+                }
+                Err(error) => Failure::store(error),
+            });
+        }
+        Err(error) => return Err(Failure::store(error)),
+    };
+    let read = read_tail(pool, capturer, capture, actor, now).await?;
+    read.body(Caller::Operator)
 }
 
 /// A prompt read past its lookup. It holds the prompt, so it has no `Debug`.
-pub(crate) struct Read {
-    pub(crate) capture: DebugCapture,
-    pub(crate) prompt: String,
-    pub(crate) recommendation: Recommendation,
+struct Read {
+    capture: DebugCapture,
+    prompt: String,
+    recommendation: Recommendation,
+}
+
+impl Read {
+    /// `{"id",["tenant_id"],"prompt","prompt_hash","recommendation_id","classification",
+    /// "captured_at","expires_at"}`: `tenant_id` only for the operator.
+    fn body(&self, caller: Caller) -> Result<Response<Body>, Failure> {
+        let mut members = vec![("id", string(&self.capture.id))];
+        if caller == Caller::Operator {
+            members.push(("tenant_id", string(&self.capture.tenant_id)));
+        }
+        members.extend([
+            ("prompt", string(&self.prompt)),
+            (
+                "prompt_hash",
+                optional(self.recommendation.prompt_hash.as_deref()),
+            ),
+            ("recommendation_id", string(&self.capture.recommendation_id)),
+            (
+                "classification",
+                jsonb(self.recommendation.classification.get())?,
+            ),
+            ("captured_at", time(self.capture.captured_at)),
+            ("expires_at", time(self.capture.expires_at)),
+        ]);
+        Ok(json(StatusCode::OK, &object(members)))
+    }
 }
 
 /// The shared tail of the tenant and operator prompt reads (Part 4 §4.6): an expired
 /// capture logs `read` under its tenant and is 410. Otherwise the prompt is decrypted,
 /// the recommendation loaded, and `read` logged.
-pub(crate) async fn read_tail(
+async fn read_tail(
     pool: &PgPool,
     capturer: Option<&Capturer>,
     capture: DebugCapture,
@@ -769,7 +941,7 @@ pub(crate) async fn read_tail(
 // ---- shared ----
 
 /// Appends a `capture_access_log` row. A failed append fails the call.
-pub(crate) async fn log_access(
+async fn log_access(
     pool: &PgPool,
     capture_id: &str,
     tenant_id: &str,
@@ -816,7 +988,7 @@ async fn recommendation(pool: &PgPool, capture: &DebugCapture) -> Result<Recomme
 
 /// A jsonb pass-through value: Postgres's text with the whitespace removed (Part 5 §3
 /// rule 9). An empty stored value is `{}`.
-pub(crate) fn jsonb(text: &str) -> Result<JsonValue, Failure> {
+fn jsonb(text: &str) -> Result<JsonValue, Failure> {
     if text.trim().is_empty() {
         return Ok(JsonValue::Object(Vec::new()));
     }
@@ -844,7 +1016,7 @@ fn go_float(x: f64) -> Value {
         .unwrap_or(Value::Null)
 }
 
-pub(crate) fn object(members: Vec<(&str, JsonValue)>) -> JsonValue {
+fn object(members: Vec<(&str, JsonValue)>) -> JsonValue {
     JsonValue::Object(
         members
             .into_iter()
@@ -853,20 +1025,20 @@ pub(crate) fn object(members: Vec<(&str, JsonValue)>) -> JsonValue {
     )
 }
 
-pub(crate) fn string(text: &str) -> JsonValue {
+fn string(text: &str) -> JsonValue {
     JsonValue::String(text.to_owned())
 }
 
-pub(crate) fn optional(text: Option<&str>) -> JsonValue {
+fn optional(text: Option<&str>) -> JsonValue {
     text.map_or(JsonValue::Null, string)
 }
 
-pub(crate) fn time(at: DateTime<Utc>) -> JsonValue {
+fn time(at: DateTime<Utc>) -> JsonValue {
     JsonValue::String(rfc3339_nano(at))
 }
 
 /// The compact body and its one `\n`.
-pub(crate) fn json(status: StatusCode, body: &JsonValue) -> Response<Body> {
+fn json(status: StatusCode, body: &JsonValue) -> Response<Body> {
     let mut text = gojson::marshal(body);
     text.push('\n');
     response_with_json(status, text.into_bytes())
@@ -935,11 +1107,15 @@ mod tests {
         );
     }
 
-    fn params(query: &str) -> Result<ListParams, String> {
-        parse_list(query).map_err(|failure| match failure {
+    fn params_as(query: &str, caller: Caller) -> Result<ListParams, String> {
+        parse_list(query, caller).map_err(|failure| match failure {
             Failure::Api(error) => format!("{} {:?}", error.message, error.details),
             other => format!("{other:?}"),
         })
+    }
+
+    fn params(query: &str) -> Result<ListParams, String> {
+        params_as(query, Caller::Tenant)
     }
 
     #[test]
@@ -948,6 +1124,7 @@ mod tests {
             params(""),
             Ok(ListParams {
                 window_id: String::new(),
+                tenant_id: String::new(),
                 limit: 50,
                 cursor_id: String::new(),
             })
@@ -956,9 +1133,24 @@ mod tests {
             params("window_id=cw_1&limit=200&cursor=Y2FwXzE&limit=2"),
             Ok(ListParams {
                 window_id: "cw_1".to_owned(),
+                tenant_id: String::new(),
                 limit: 200,
                 cursor_id: "cap_1".to_owned(),
             })
+        );
+        // Only the operator may filter by tenant.
+        assert_eq!(
+            params_as("tenant_id=ten_a&tenant_id=ten_b", Caller::Operator),
+            Ok(ListParams {
+                window_id: String::new(),
+                tenant_id: "ten_a".to_owned(),
+                limit: 50,
+                cursor_id: String::new(),
+            })
+        );
+        assert_eq!(
+            params_as("bogus=1", Caller::Operator),
+            Err(r#"unknown query parameter "bogus" {"parameter": String("bogus")}"#.to_owned())
         );
         // Go `ParseInt` takes a sign; a raw `+` in a query is a space.
         assert_eq!(params("limit=%2B1").map(|p| p.limit), Ok(1));
