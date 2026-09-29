@@ -6,8 +6,15 @@
 //! (spec §7.2) and ranking (spec §7.4) build on the same types.
 
 mod evaluate;
+mod simulate;
+mod validate;
 
 pub use evaluate::{evaluate, resolve_pool};
+pub use simulate::{CellEwma, ColumnRetention, SimCell, SimulationState, simulate};
+pub use validate::{
+    ConfigError, ConfigErrorCode, WeightRow, validate_constraint_values, validate_pool_shapes,
+    validate_weights,
+};
 
 use std::collections::HashMap;
 
