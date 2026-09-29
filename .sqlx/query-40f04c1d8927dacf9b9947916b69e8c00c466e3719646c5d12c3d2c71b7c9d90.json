@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "insert into batches\n           (id, kind, batch_window, status, lease_owner, lease_expires_at, heartbeat_at, attempt)\n         values ($1, $2, $3, 'running', $4, now() + make_interval(secs => $5), now(), 1)\n         on conflict (kind, batch_window) do nothing\n         returning id, kind, batch_window, status, lease_owner, lease_expires_at,\n                   heartbeat_at, attempt, completed_at, created_at, updated_at",
+  "query": "insert into batches\n           (id, kind, batch_window, status, lease_owner, lease_expires_at, heartbeat_at, attempt)\n         values ($1, $2, $3, 'running', $4, now() + make_interval(secs => $5), now(), 1)\n         on conflict do nothing\n         returning id, kind, batch_window, status, lease_owner, lease_expires_at,\n                   heartbeat_at, attempt, completed_at, created_at, updated_at",
   "describe": {
     "columns": [
       {
@@ -148,5 +148,5 @@
       false
     ]
   },
-  "hash": "156bc72929f666858f64f9ce7f3616c723079ddb64bb05962745dcf799d6c85c"
+  "hash": "40f04c1d8927dacf9b9947916b69e8c00c466e3719646c5d12c3d2c71b7c9d90"
 }

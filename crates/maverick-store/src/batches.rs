@@ -80,12 +80,15 @@ pub async fn claim_batch(
     owner_is_gone: impl FnOnce(&Batch) -> bool,
 ) -> sqlx::Result<ClaimOutcome> {
     let mut tx = conn.begin().await?;
+    // No arbiter: the id is deterministic per (kind, window), so a concurrent first claim
+    // can collide on the primary key before the (kind, batch_window) key. Naming one
+    // arbiter would turn that race into a 23505 error; `do nothing` covers both.
     let inserted = sqlx::query_as!(
         Batch,
         "insert into batches
            (id, kind, batch_window, status, lease_owner, lease_expires_at, heartbeat_at, attempt)
          values ($1, $2, $3, 'running', $4, now() + make_interval(secs => $5), now(), 1)
-         on conflict (kind, batch_window) do nothing
+         on conflict do nothing
          returning id, kind, batch_window, status, lease_owner, lease_expires_at,
                    heartbeat_at, attempt, completed_at, created_at, updated_at",
         claim.id,
