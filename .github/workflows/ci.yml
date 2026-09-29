@@ -43,9 +43,16 @@ jobs:
 
       - name: Install fast-tier cargo tools
         if: matrix.tier == 'fast'
+        # The cache restores ~/.cargo/bin without cargo's install metadata, so a plain
+        # `cargo install` fails with "binary already exists". Skip a tool that is
+        # already at the pinned version; otherwise reinstall over it.
         run: |
-          cargo install cargo-deny --version 0.20.2 --locked
-          cargo install sqlx-cli --version 0.9.0 --locked --no-default-features --features rustls,postgres
+          if ! cargo deny --version 2>/dev/null | grep -qxF 'cargo-deny 0.20.2'; then
+            cargo install cargo-deny --version 0.20.2 --locked --force
+          fi
+          if ! sqlx --version 2>/dev/null | grep -qxF 'sqlx-cli 0.9.0'; then
+            cargo install sqlx-cli --version 0.9.0 --locked --force --no-default-features --features rustls,postgres
+          fi
 
       - name: Run tier
         run: scripts/ci.sh "${{ matrix.tier }}"
@@ -80,7 +87,11 @@ jobs:
             cargo-${{ runner.os }}-
 
       - name: Install cargo-mutants
-        run: cargo install cargo-mutants --version 27.1.0 --locked
+        # See the fast-tier install step: skip when the cached binary is already pinned.
+        run: |
+          if ! cargo mutants --version 2>/dev/null | grep -qxF 'cargo-mutants 27.1.0'; then
+            cargo install cargo-mutants --version 27.1.0 --locked --force
+          fi
 
       - name: Run mutants
         run: scripts/ci.sh mutants
