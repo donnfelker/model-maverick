@@ -28,5 +28,7 @@ rust_decimal = { workspace = true }
 maverick-testdb = { workspace = true }
 # Applies the real graphile_worker schema in the job health test.
 graphile_worker = { workspace = true }
+sha2 = { workspace = true }
+test-support = { path = "../test-support" }
 testcontainers = { workspace = true }
 insta = { workspace = true }

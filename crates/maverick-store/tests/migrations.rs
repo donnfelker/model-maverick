@@ -192,6 +192,8 @@ fn assert_same(label: &str, actual: &BTreeSet<String>, expected: &BTreeSet<Strin
     );
 }
 
+// parity: store.TestMigrationsUpDownUpClean
+// D37: migrations are up only. This test and the next replace the Go up/down/up test.
 #[tokio::test]
 async fn the_additive_migrations_add_exactly_the_spec_objects() {
     let Some(baseline) = maverick_testdb::database(&BASELINE).await else {
@@ -230,6 +232,7 @@ async fn history(pool: &PgPool) -> Vec<(i64, Vec<u8>)> {
         .expect("migration history")
 }
 
+// parity: store.TestMigrationsUpDownUpClean (D37, second half)
 #[tokio::test]
 async fn a_second_run_applies_nothing_and_changes_nothing() {
     let Some(db) = maverick_testdb::database(&ALL).await else {
