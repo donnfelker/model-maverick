@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "delete from debug_captures\n         where expires_at <= $1\n         returning id, tenant_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "debug_captures",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "tenant_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "debug_captures",
+            "name": "tenant_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "2391a5e567a27ed3f9a5d668c6b7b35ddf3be605e181e19f18fc593498bc6769"
+}

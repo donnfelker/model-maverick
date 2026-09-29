@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "insert into classifier_usage (usage_date, tenant_id, spend_usd)\n         values ($1, $2, $3)\n         on conflict (usage_date, tenant_id) do update\n           set spend_usd = classifier_usage.spend_usd + excluded.spend_usd,\n               updated_at = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Text",
+        "Numeric"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4babec09120b09cac10dc5fa44ecde5a5ce8f3e0b240fc22daec988edc780018"
+}

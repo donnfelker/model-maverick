@@ -1,0 +1,115 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select d.id, d.tenant_id, d.window_id, d.recommendation_id, d.captured_at,\n                  d.expires_at, r.prompt_hash, r.classification as \"classification: _\"\n           from debug_captures d\n           join recommendations r on r.id = d.recommendation_id\n           where ($1::text = '' or d.window_id = $1)\n             and ($2::text = '' or d.tenant_id = $2)\n             and ($3::text = '' or d.id < $3)\n           order by d.id desc\n           limit $4",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "debug_captures",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "tenant_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "debug_captures",
+            "name": "tenant_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "window_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "debug_captures",
+            "name": "window_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "recommendation_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "debug_captures",
+            "name": "recommendation_id"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "captured_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "debug_captures",
+            "name": "captured_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "expires_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "debug_captures",
+            "name": "expires_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "prompt_hash",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "recommendations",
+            "name": "prompt_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "classification: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "recommendations",
+            "name": "classification"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "871a051462527a0e1b0c4d750eb825260c75f20c54ff52c1ebc27cf7096d9a6b"
+}

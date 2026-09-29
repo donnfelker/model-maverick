@@ -1,0 +1,144 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "insert into recommendations (\n             id, tenant_id, api_key_id, prompt_hash, request, classification, candidates,\n             response, matrix_version\n           )\n           values ($1, $2, $3, $4, $5, $6, $7, $8, $9)\n           returning id, tenant_id, api_key_id, prompt_hash, request as \"request: _\",\n                     classification as \"classification: _\", candidates as \"candidates: _\",\n                     response as \"response: _\", matrix_version, created_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "recommendations",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "tenant_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "recommendations",
+            "name": "tenant_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "api_key_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "recommendations",
+            "name": "api_key_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "prompt_hash",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "recommendations",
+            "name": "prompt_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "request: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "recommendations",
+            "name": "request"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "classification: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "recommendations",
+            "name": "classification"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "candidates: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "recommendations",
+            "name": "candidates"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "response: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "recommendations",
+            "name": "response"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "matrix_version",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "recommendations",
+            "name": "matrix_version"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "recommendations",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb",
+        "Jsonb",
+        "Jsonb",
+        "Jsonb",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "a1722bd6ff7840a546b68671b9032c10cb0764b6155f4748718ae17b78983d8a"
+}
