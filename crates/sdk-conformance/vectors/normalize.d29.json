@@ -1,0 +1,51 @@
+{
+  "divergence": "D29",
+  "source": "spec v1 §8.1 'Trial proxy behavior'; parity/DIVERGENCES.md D29; crates/maverick-core/src/normalize.rs. Hand-written: every expect was worked out from the rule below, not generated. Replayed by crates/maverick-core/tests/normalize_vectors.rs and crates/maverick-proxy/tests/normalize_vectors.rs",
+  "wire_paths": {
+    "reasoning_effort": {"chat_completions": "reasoning_effort", "messages": "output_config.effort"}
+  },
+  "rule": [
+    "Read the entry's param_constraints member (absent or null means none). A field's constraint counts only when it is an object whose allowed member is a non-empty list; a missing or non-list order is an empty order. A malformed constraint counts as no constraint.",
+    "If the request does not carry the field at its wire path for the format, change nothing: never add a field.",
+    "With a constraint for the field: an accepted value (in allowed) is kept. A value in order but not accepted becomes the accepted value nearest to it by position in order; on a tie the higher value wins. Accepted values that are not in order are never picked as nearest. A value not in order, or with no accepted value in order, is kept as sent.",
+    "With no constraint for the field: Go's mappings apply. chat_completions reasoning_effort \"xhigh\" becomes \"high\"; messages output_config.effort \"xhigh\" becomes \"max\". Exact case, JSON strings only. Any other value is kept.",
+    "Values compare as JSON values."
+  ],
+  "how_to_run": "For each case, parse param_constraints (a case with no param_constraints key is an entry without the member), then normalize value for field and format. expect is the value to send. A case with no value key is a request that does not carry the field: the rewritten request must not carry it either.",
+  "cases": [
+    {"id": "exact_match", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["low", "medium", "high"], "order": ["minimal", "low", "medium", "high", "xhigh", "max"]}}, "value": "medium", "expect": "medium"},
+    {"id": "nearest_down", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["low", "medium", "high"], "order": ["minimal", "low", "medium", "high", "xhigh", "max"]}}, "value": "xhigh", "expect": "high"},
+    {"id": "nearest_down_two_steps", "format": "messages", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["low", "medium", "high"], "order": ["minimal", "low", "medium", "high", "xhigh", "max"]}}, "value": "max", "expect": "high"},
+    {"id": "nearest_up", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["low", "medium", "high"], "order": ["minimal", "low", "medium", "high", "xhigh", "max"]}}, "value": "minimal", "expect": "low"},
+    {"id": "nearest_up_two_steps", "format": "messages", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["high", "max"], "order": ["minimal", "low", "medium", "high", "xhigh", "max"]}}, "value": "low", "expect": "high"},
+    {"id": "tie_goes_to_the_higher_value", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["low", "high"], "order": ["minimal", "low", "medium", "high", "xhigh", "max"]}}, "value": "medium", "expect": "high"},
+    {"id": "tie_goes_to_the_higher_value_at_the_top", "format": "messages", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["high", "max"], "order": ["minimal", "low", "medium", "high", "xhigh", "max"]}}, "value": "xhigh", "expect": "max"},
+    {"id": "unknown_value_kept", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["low", "medium", "high"], "order": ["minimal", "low", "medium", "high", "xhigh", "max"]}}, "value": "turbo", "expect": "turbo"},
+    {"id": "other_case_is_an_unknown_value", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["low", "medium", "high"], "order": ["minimal", "low", "medium", "high", "xhigh", "max"]}}, "value": "XHIGH", "expect": "XHIGH"},
+    {"id": "non_string_value_kept", "format": "messages", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["low", "medium", "high"], "order": ["minimal", "low", "medium", "high", "xhigh", "max"]}}, "value": 3, "expect": 3},
+    {"id": "null_value_kept", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["low", "medium", "high"], "order": ["minimal", "low", "medium", "high", "xhigh", "max"]}}, "value": null, "expect": null},
+    {"id": "constraint_accepts_what_go_would_map", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["low", "medium", "high", "xhigh"], "order": ["minimal", "low", "medium", "high", "xhigh", "max"]}}, "value": "xhigh", "expect": "xhigh"},
+    {"id": "constraint_overrides_the_go_mapping", "format": "messages", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["low", "medium", "high"], "order": ["minimal", "low", "medium", "high", "xhigh", "max"]}}, "value": "xhigh", "expect": "high"},
+    {"id": "allowed_value_outside_order_is_kept", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["secret", "low"], "order": ["low", "medium", "high"]}}, "value": "secret", "expect": "secret"},
+    {"id": "allowed_value_outside_order_is_never_nearest", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["secret", "low"], "order": ["low", "medium", "high"]}}, "value": "high", "expect": "low"},
+    {"id": "no_accepted_value_in_order_keeps_the_value", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["secret"], "order": ["low", "high"]}}, "value": "high", "expect": "high"},
+    {"id": "missing_order_keeps_an_unaccepted_value", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["low"]}}, "value": "xhigh", "expect": "xhigh"},
+    {"id": "missing_order_keeps_an_accepted_value", "format": "messages", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["low"]}}, "value": "low", "expect": "low"},
+    {"id": "non_list_order_is_empty", "format": "messages", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["low", "high"], "order": "low,medium,high"}}, "value": "xhigh", "expect": "xhigh"},
+    {"id": "no_constraints_chat_go_mapping", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": {}, "value": "xhigh", "expect": "high"},
+    {"id": "no_constraints_messages_go_mapping", "format": "messages", "field": "reasoning_effort", "param_constraints": {}, "value": "xhigh", "expect": "max"},
+    {"id": "no_constraints_other_value_kept", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": {}, "value": "medium", "expect": "medium"},
+    {"id": "no_constraints_go_mapping_is_case_sensitive", "format": "messages", "field": "reasoning_effort", "param_constraints": {}, "value": "XHIGH", "expect": "XHIGH"},
+    {"id": "no_constraints_go_mapping_is_strings_only", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": {}, "value": ["xhigh"], "expect": ["xhigh"]},
+    {"id": "absent_member_go_mapping", "format": "messages", "field": "reasoning_effort", "value": "xhigh", "expect": "max"},
+    {"id": "null_member_go_mapping", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": null, "value": "xhigh", "expect": "high"},
+    {"id": "member_not_an_object_go_mapping", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": ["reasoning_effort"], "value": "xhigh", "expect": "high"},
+    {"id": "constraint_for_another_field_only_go_mapping", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": {"verbosity": {"allowed": ["low"], "order": ["low", "high"]}}, "value": "xhigh", "expect": "high"},
+    {"id": "empty_allowed_go_mapping", "format": "messages", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": [], "order": ["minimal", "low", "medium", "high", "xhigh", "max"]}}, "value": "xhigh", "expect": "max"},
+    {"id": "missing_allowed_go_mapping", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"order": ["minimal", "low", "medium", "high", "xhigh", "max"]}}, "value": "xhigh", "expect": "high"},
+    {"id": "non_list_allowed_go_mapping", "format": "messages", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": "high", "order": ["minimal", "low", "medium", "high", "xhigh", "max"]}}, "value": "xhigh", "expect": "max"},
+    {"id": "constraint_not_an_object_go_mapping", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": "high"}, "value": "xhigh", "expect": "high"},
+    {"id": "absent_field_not_added_with_constraints", "format": "chat_completions", "field": "reasoning_effort", "param_constraints": {"reasoning_effort": {"allowed": ["low", "medium", "high"], "order": ["minimal", "low", "medium", "high", "xhigh", "max"]}}},
+    {"id": "absent_field_not_added_without_constraints", "format": "messages", "field": "reasoning_effort", "param_constraints": {}}
+  ]
+}
