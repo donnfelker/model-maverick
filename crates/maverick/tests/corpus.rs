@@ -8,6 +8,7 @@ use maverick_cli::{Output, run};
 use maverick_store::MIGRATOR;
 use maverick_testdb::{Schema, database};
 
+// parity: main.TestMain (maverick-testdb boots Postgres 16 once per binary and migrates)
 static SCHEMA: LazyLock<Schema> = LazyLock::new(|| Schema::sqlx(&MIGRATOR));
 
 /// A minimal valid corpus, relative to the crate directory (the test working directory).
@@ -54,6 +55,8 @@ async fn cli(args: &[&str], env: Vec<(String, String)>) -> (i32, String, String)
     .expect("join")
 }
 
+// parity: main.TestRunCorpusCalibrateEmptyAggregatesPrintsNoData (the calibrate step: no
+// aggregates gives exit 0 and exactly `calibrate.json#report_empty`)
 #[tokio::test]
 async fn corpus_load_activate_status_calibrate_round_trip() {
     let Some(db) = database(&SCHEMA).await else {

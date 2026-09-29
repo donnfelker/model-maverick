@@ -153,7 +153,12 @@ fn mask_error_keeps_everything_but_the_error_text() {
 // parity: main.TestRunCorpusWithoutSubcommand
 // parity: main.TestRunCorpusUnknownSubcommand
 // parity: main.TestRunCorpusLoadRequiresVersionAndDir
+// parity: main.TestRunCorpusLoadRejectsInvalidCorpusListingEveryViolation
+// parity: main.TestRunCorpusLoadValidatesBeforeTouchingTheDatabase
+// parity: main.TestRunCorpusLoadValidCorpusFailsOnUnreachableDatabase
 // parity: main.TestRunCorpusActivateRequiresVersion
+// parity: main.TestRunCorpusActivateFailsOnUnreachableDatabase
+// parity: main.TestRunCorpusCalibrateFailsOnUnreachableDatabase
 // parity: main.TestRunMCPStdioRequiresAPIKey
 // parity: main.TestRunMCPStdioFailsFastNamingMissingVarsOnStderr
 // parity: main.TestRunMCPStdioFailsOnUnreachableDatabase
