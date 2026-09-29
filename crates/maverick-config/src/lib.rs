@@ -6,6 +6,7 @@
 //! process environment. Secret fields have redacted `Debug` implementations.
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::fmt;
 use std::time::Duration;
 
@@ -20,6 +21,8 @@ const COLUMN_LIST: &str =
     "must be a comma-separated list of column identifiers with no empty entries";
 const CRON: &str = "must be a 5-field cron expression like \"0 3 * * *\"";
 const DURATION: &str = "must be a positive duration like \"120s\"";
+const MODELS_DEV_PRICE_MAP: &str = "must be a JSON array of mapping objects with non-empty column_provider, column_model_id, column_endpoint, models_dev_provider, and models_dev_model_id";
+const DEFAULT_MODELS_DEV_PRICE_URL: &str = "https://models.dev/api.json";
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InternalToken {
@@ -65,6 +68,16 @@ pub struct ProviderLimits {
     pub openai: ProviderLimit,
     pub google: ProviderLimit,
     pub xai: ProviderLimit,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ModelsDevPriceMapEntry {
+    pub column_provider: String,
+    pub column_model_id: String,
+    pub column_endpoint: String,
+    pub models_dev_provider: String,
+    pub models_dev_model_id: String,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -122,6 +135,8 @@ pub struct Config {
     pub cron_catalog_sync: String,
     pub cron_capture_expiry: String,
     pub cron_history_prune: String,
+    pub models_dev_price_url: String,
+    pub models_dev_price_map: Vec<ModelsDevPriceMapEntry>,
     pub otel_exporter_endpoint: String,
     pub otel_service_name: String,
 }
@@ -255,6 +270,8 @@ impl fmt::Debug for Config {
             .field("cron_catalog_sync", &self.cron_catalog_sync)
             .field("cron_capture_expiry", &self.cron_capture_expiry)
             .field("cron_history_prune", &self.cron_history_prune)
+            .field("models_dev_price_url", &self.models_dev_price_url)
+            .field("models_dev_price_map", &self.models_dev_price_map)
             .field(
                 "otel_exporter_endpoint",
                 &redact_credentials(&self.otel_exporter_endpoint),
@@ -500,6 +517,12 @@ where
         Duration::from_secs(24 * 60 * 60),
         &mut issues,
     );
+    let models_dev_price_url = optional(
+        &lookup,
+        "MAVERICK_MODELS_DEV_PRICE_URL",
+        DEFAULT_MODELS_DEV_PRICE_URL,
+    );
+    let models_dev_price_map = models_dev_price_map(&lookup, &mut issues);
     let otel_exporter_endpoint = optional(&lookup, "MAVERICK_OTEL_EXPORTER_ENDPOINT", "");
     let otel_service_name = optional(&lookup, "MAVERICK_OTEL_SERVICE_NAME", "maverick");
 
@@ -563,6 +586,8 @@ where
             cron_catalog_sync,
             cron_capture_expiry,
             cron_history_prune,
+            models_dev_price_url,
+            models_dev_price_map,
             otel_exporter_endpoint,
             otel_service_name,
         })
@@ -984,6 +1009,47 @@ where
     value
 }
 
+fn models_dev_price_map<F>(lookup: &F, issues: &mut Vec<ConfigIssue>) -> Vec<ModelsDevPriceMapEntry>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let name = "MAVERICK_MODELS_DEV_PRICE_MAP";
+    let Some(value) = present(lookup, name) else {
+        return Vec::new();
+    };
+    let Ok(entries) = serde_json::from_str::<Vec<ModelsDevPriceMapEntry>>(&value) else {
+        issue(issues, name, MODELS_DEV_PRICE_MAP);
+        return Vec::new();
+    };
+    let valid_text = |value: &str| !value.is_empty() && value.trim() == value;
+    if entries.iter().any(|entry| {
+        !valid_text(&entry.column_provider)
+            || !valid_text(&entry.column_model_id)
+            || !valid_text(&entry.column_endpoint)
+            || !valid_text(&entry.models_dev_provider)
+            || !valid_text(&entry.models_dev_model_id)
+    }) {
+        issue(issues, name, MODELS_DEV_PRICE_MAP);
+        return Vec::new();
+    }
+    let mut seen = BTreeSet::new();
+    if entries.iter().any(|entry| {
+        !seen.insert((
+            entry.column_provider.as_str(),
+            entry.column_model_id.as_str(),
+            entry.column_endpoint.as_str(),
+        ))
+    }) {
+        issue(
+            issues,
+            name,
+            "must not map the same catalog column more than once",
+        );
+        return Vec::new();
+    }
+    entries
+}
+
 fn previous_key<F>(lookup: &F, name: &str, issues: &mut Vec<ConfigIssue>) -> Option<KeyRingEntry>
 where
     F: Fn(&str) -> Option<String>,
@@ -1188,6 +1254,114 @@ mod tests {
         );
         assert_eq!(config.classifier_daily_quota, 1000);
         assert_eq!(config.classifier_daily_spend_cap_usd, 5.0);
+        assert_eq!(config.models_dev_price_url, DEFAULT_MODELS_DEV_PRICE_URL);
+        assert!(config.models_dev_price_map.is_empty());
+    }
+
+    #[test]
+    fn models_dev_price_map_is_explicit_json() {
+        let map = serde_json::to_string(&json!([
+            {
+                "column_provider": "anthropic",
+                "column_model_id": "claude-opus",
+                "column_endpoint": "direct",
+                "models_dev_provider": "anthropic",
+                "models_dev_model_id": "claude-4-opus"
+            },
+            {
+                "column_provider": "anthropic",
+                "column_model_id": "claude-opus",
+                "column_endpoint": "openrouter",
+                "models_dev_provider": "openrouter",
+                "models_dev_model_id": "anthropic/claude-4-opus"
+            }
+        ]))
+        .expect("json");
+        let env = Map::from_iter([
+            ("MAVERICK_DATABASE_URL".to_string(), json!("postgres://db")),
+            (
+                "MAVERICK_INTERNAL_TOKENS".to_string(),
+                json!("rails:secret"),
+            ),
+            (
+                "MAVERICK_CAPTURE_MASTER_KEY".to_string(),
+                json!("ab".repeat(32)),
+            ),
+            (
+                "MAVERICK_MODELS_DEV_PRICE_URL".to_string(),
+                json!("https://example.test/models.dev.json"),
+            ),
+            ("MAVERICK_MODELS_DEV_PRICE_MAP".to_string(), json!(map)),
+        ]);
+
+        let config = load_with(|name| env.get(name).and_then(Value::as_str).map(str::to_string))
+            .expect("rust config");
+
+        assert_eq!(
+            config.models_dev_price_url,
+            "https://example.test/models.dev.json"
+        );
+        assert_eq!(
+            config.models_dev_price_map,
+            vec![
+                ModelsDevPriceMapEntry {
+                    column_provider: "anthropic".to_owned(),
+                    column_model_id: "claude-opus".to_owned(),
+                    column_endpoint: "direct".to_owned(),
+                    models_dev_provider: "anthropic".to_owned(),
+                    models_dev_model_id: "claude-4-opus".to_owned(),
+                },
+                ModelsDevPriceMapEntry {
+                    column_provider: "anthropic".to_owned(),
+                    column_model_id: "claude-opus".to_owned(),
+                    column_endpoint: "openrouter".to_owned(),
+                    models_dev_provider: "openrouter".to_owned(),
+                    models_dev_model_id: "anthropic/claude-4-opus".to_owned(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn models_dev_price_map_rejects_malformed_entries() {
+        for (value, reason) in [
+            ("{}", MODELS_DEV_PRICE_MAP),
+            (
+                r#"[{"column_provider":"","column_model_id":"m","column_endpoint":"direct","models_dev_provider":"p","models_dev_model_id":"m"}]"#,
+                MODELS_DEV_PRICE_MAP,
+            ),
+            (
+                r#"[
+                    {"column_provider":"p","column_model_id":"m","column_endpoint":"direct","models_dev_provider":"p","models_dev_model_id":"m1"},
+                    {"column_provider":"p","column_model_id":"m","column_endpoint":"direct","models_dev_provider":"p","models_dev_model_id":"m2"}
+                ]"#,
+                "must not map the same catalog column more than once",
+            ),
+        ] {
+            let env = Map::from_iter([
+                ("MAVERICK_DATABASE_URL".to_string(), json!("postgres://db")),
+                (
+                    "MAVERICK_INTERNAL_TOKENS".to_string(),
+                    json!("rails:secret"),
+                ),
+                (
+                    "MAVERICK_CAPTURE_MASTER_KEY".to_string(),
+                    json!("ab".repeat(32)),
+                ),
+                ("MAVERICK_MODELS_DEV_PRICE_MAP".to_string(), json!(value)),
+            ]);
+
+            let error = load_with(|name| env.get(name).and_then(Value::as_str).map(str::to_string))
+                .expect_err("invalid config");
+            assert!(
+                error
+                    .issues()
+                    .iter()
+                    .any(|issue| issue.var == "MAVERICK_MODELS_DEV_PRICE_MAP"
+                        && issue.reason == reason),
+                "{error}"
+            );
+        }
     }
 
     #[test]

@@ -7,7 +7,8 @@ use std::sync::LazyLock;
 use chrono::{DateTime, Duration, NaiveDate, TimeZone, Utc};
 use maverick_domain::pricing::{Pricing, parse_pricing};
 use maverick_jobs::catalog::{
-    self, CatalogDeps, CatalogError, CatalogSyncOutput, PriceKey, PriceSyncOutput, StaticPrices,
+    self, CatalogDeps, CatalogError, CatalogSyncOutput, ModelsDevPriceMapping,
+    ModelsDevPriceSource, PriceKey, PriceSource, PriceSyncOutput, StaticPrices,
 };
 use maverick_jobs::{DayArgs, JobsError};
 use maverick_store::alerts::{Alert, list_alerts_by_kind};
@@ -38,6 +39,7 @@ struct Column {
     id: &'static str,
     provider: &'static str,
     model_id: &'static str,
+    endpoint: &'static str,
     status: &'static str,
     pricing: &'static str,
     cold_start_until: Option<NaiveDate>,
@@ -53,6 +55,7 @@ impl Column {
             id,
             provider: "anthropic",
             model_id: id,
+            endpoint: "direct",
             status,
             pricing: "{}",
             cold_start_until: None,
@@ -73,7 +76,7 @@ impl Column {
                 id: self.id,
                 provider: self.provider,
                 model_id: self.model_id,
-                endpoint: "direct",
+                endpoint: self.endpoint,
                 settings: &settings,
                 status: self.status,
                 pricing: &pricing,
@@ -162,11 +165,11 @@ fn subject(alert: &Alert) -> Value {
     serde_json::from_str(alert.subject.get()).expect("subject")
 }
 
-fn deps<'a>(pool: &'a PgPool, source: Option<&'a StaticPrices>) -> CatalogDeps<'a> {
+fn deps<'a>(pool: &'a PgPool, source: Option<&'a dyn PriceSource>) -> CatalogDeps<'a> {
     CatalogDeps {
         pool,
         notifier: None,
-        price_source: source.map(|s| s as &dyn catalog::PriceSource),
+        price_source: source,
     }
 }
 
@@ -301,6 +304,276 @@ async fn price_sync_fills_as_of_and_replaces_unreadable_pricing() {
     );
     let retired = get_model_column(pool, "col_retired").await.unwrap();
     assert_eq!(retired.pricing.get(), "{}");
+}
+
+#[test]
+fn models_dev_payload_uses_explicit_mapping_and_validation() {
+    let source = ModelsDevPriceSource::new(
+        "https://models.dev/api.json",
+        [
+            ModelsDevPriceMapping::new(
+                "anthropic",
+                "internal-sonnet",
+                "direct",
+                "anthropic",
+                "claude-sonnet-4-5",
+            ),
+            ModelsDevPriceMapping::new(
+                "anthropic",
+                "internal-sonnet",
+                "openrouter",
+                "openrouter",
+                "anthropic/claude-sonnet-4.5",
+            ),
+            ModelsDevPriceMapping::new("openai", "chat-default", "direct", "openai", "gpt-4.1"),
+            ModelsDevPriceMapping::new(
+                "anthropic",
+                "invalid-negative",
+                "direct",
+                "anthropic",
+                "negative-price",
+            ),
+            ModelsDevPriceMapping::new(
+                "anthropic",
+                "missing-source-model",
+                "direct",
+                "anthropic",
+                "not-present",
+            ),
+        ],
+    );
+
+    let prices = source
+        .parse_payload(include_str!("fixtures/models_dev_api.json"))
+        .expect("fixture payload");
+
+    assert_eq!(prices.len(), 3);
+    assert_eq!(
+        prices
+            .get(&PriceKey::new("anthropic", "internal-sonnet", "direct"))
+            .expect("direct"),
+        &Pricing {
+            input_per_mtok: 3.0,
+            output_per_mtok: 15.0,
+            currency: "USD".to_owned(),
+            as_of: String::new(),
+            source: "models.dev".to_owned(),
+        }
+    );
+    assert_eq!(
+        prices
+            .get(&PriceKey::new("anthropic", "internal-sonnet", "openrouter"))
+            .expect("openrouter")
+            .output_per_mtok,
+        17.0
+    );
+    assert_eq!(
+        prices
+            .get(&PriceKey::new("openai", "chat-default", "direct"))
+            .expect("openai")
+            .as_of,
+        "2031-07-01"
+    );
+    assert!(!prices.contains_key(&PriceKey::new("anthropic", "invalid-negative", "direct")));
+    assert!(!prices.contains_key(&PriceKey::new(
+        "anthropic",
+        "missing-source-model",
+        "direct"
+    )));
+}
+
+#[tokio::test]
+async fn price_sync_uses_models_dev_mapping_and_endpoint() {
+    let Some(db) = maverick_testdb::database(&SCHEMA).await else {
+        return;
+    };
+    let pool = &db.pool().await;
+    Column {
+        id: "col_direct",
+        model_id: "internal-sonnet",
+        pricing: r#"{"input_per_mtok":2,"output_per_mtok":10,"currency":"USD","as_of":"2031-07-09","source":"old"}"#,
+        ..Column::new("col_direct", "active")
+    }
+    .create(pool)
+    .await;
+    Column {
+        id: "col_openrouter",
+        model_id: "internal-sonnet",
+        endpoint: "openrouter",
+        pricing: r#"{"input_per_mtok":2,"output_per_mtok":10,"currency":"USD","as_of":"2031-07-09","source":"old"}"#,
+        ..Column::new("col_openrouter", "active")
+    }
+    .create(pool)
+    .await;
+    Column {
+        id: "col_unmapped",
+        model_id: "internal-unmapped",
+        pricing: r#"{"input_per_mtok":1,"output_per_mtok":1,"currency":"USD","as_of":"2031-07-09","source":"old"}"#,
+        ..Column::new("col_unmapped", "active")
+    }
+    .create(pool)
+    .await;
+    let source = ModelsDevPriceSource::new(
+        "https://models.dev/api.json",
+        [
+            ModelsDevPriceMapping::new(
+                "anthropic",
+                "internal-sonnet",
+                "direct",
+                "anthropic",
+                "claude-sonnet-4-5",
+            ),
+            ModelsDevPriceMapping::new(
+                "anthropic",
+                "internal-sonnet",
+                "openrouter",
+                "openrouter",
+                "anthropic/claude-sonnet-4.5",
+            ),
+        ],
+    );
+    let source = StaticPrices(
+        source
+            .parse_payload(include_str!("fixtures/models_dev_api.json"))
+            .expect("fixture payload"),
+    );
+
+    let output = catalog::price_sync(&deps(pool, Some(&source)), date("2031-07-10"))
+        .await
+        .expect("price_sync");
+
+    assert_eq!(
+        output,
+        PriceSyncOutput {
+            columns: 3,
+            updated: 2,
+            missing_from_source: 1,
+        }
+    );
+    let direct = get_model_column(pool, "col_direct").await.unwrap();
+    assert_eq!(
+        parse_pricing(direct.pricing.get()).unwrap(),
+        Pricing {
+            input_per_mtok: 3.0,
+            output_per_mtok: 15.0,
+            currency: "USD".to_owned(),
+            as_of: "2031-07-10".to_owned(),
+            source: "models.dev".to_owned(),
+        }
+    );
+    let openrouter = get_model_column(pool, "col_openrouter").await.unwrap();
+    assert_eq!(
+        parse_pricing(openrouter.pricing.get()).unwrap(),
+        Pricing {
+            input_per_mtok: 3.4,
+            output_per_mtok: 17.0,
+            currency: "USD".to_owned(),
+            as_of: "2031-07-10".to_owned(),
+            source: "models.dev".to_owned(),
+        }
+    );
+    let unmapped = get_model_column(pool, "col_unmapped").await.unwrap();
+    assert_eq!(
+        parse_pricing(unmapped.pricing.get()).unwrap(),
+        Pricing {
+            input_per_mtok: 1.0,
+            output_per_mtok: 1.0,
+            currency: "USD".to_owned(),
+            as_of: "2031-07-09".to_owned(),
+            source: "old".to_owned(),
+        }
+    );
+}
+
+#[tokio::test]
+async fn price_sync_rejects_absurd_daily_change() {
+    let Some(db) = maverick_testdb::database(&SCHEMA).await else {
+        return;
+    };
+    let pool = &db.pool().await;
+    Column {
+        id: "col_absurd",
+        model_id: "model_absurd",
+        pricing: r#"{"input_per_mtok":1,"output_per_mtok":2,"currency":"USD","as_of":"2031-07-09","source":"models.dev"}"#,
+        ..Column::new("col_absurd", "active")
+    }
+    .create(pool)
+    .await;
+    let before = get_model_column(pool, "col_absurd").await.unwrap();
+    let source = StaticPrices(HashMap::from([(
+        PriceKey::new("anthropic", "model_absurd", "direct"),
+        Pricing {
+            input_per_mtok: 10.01,
+            output_per_mtok: 2.0,
+            currency: "USD".to_owned(),
+            as_of: "2031-07-10".to_owned(),
+            source: "models.dev".to_owned(),
+        },
+    )]));
+
+    let output = catalog::price_sync(&deps(pool, Some(&source)), date("2031-07-10"))
+        .await
+        .expect("price_sync");
+
+    assert_eq!(
+        output,
+        PriceSyncOutput {
+            columns: 1,
+            updated: 0,
+            missing_from_source: 0,
+        }
+    );
+    let after = get_model_column(pool, "col_absurd").await.unwrap();
+    assert_eq!(after.pricing.get(), before.pricing.get());
+    assert_eq!(after.updated_at, before.updated_at);
+}
+
+#[tokio::test]
+#[ignore = "manual live models.dev smoke; not for CI"]
+async fn live_models_dev_price_source_updates_test_db() {
+    let Some(db) = maverick_testdb::database(&SCHEMA).await else {
+        return;
+    };
+    let pool = &db.pool().await;
+    Column {
+        id: "col_live_models_dev",
+        provider: "openai",
+        model_id: "internal-live-gpt-4-1",
+        pricing: "{}",
+        ..Column::new("col_live_models_dev", "active")
+    }
+    .create(pool)
+    .await;
+    let source = ModelsDevPriceSource::new(
+        "https://models.dev/api.json",
+        [ModelsDevPriceMapping::new(
+            "openai",
+            "internal-live-gpt-4-1",
+            "direct",
+            "openai",
+            "gpt-4.1",
+        )],
+    );
+
+    let output = catalog::price_sync(&deps(pool, Some(&source)), date("2031-07-10"))
+        .await
+        .expect("price_sync");
+
+    assert_eq!(
+        output,
+        PriceSyncOutput {
+            columns: 1,
+            updated: 1,
+            missing_from_source: 0,
+        }
+    );
+    let stored = get_model_column(pool, "col_live_models_dev").await.unwrap();
+    let pricing = parse_pricing(stored.pricing.get()).unwrap();
+    assert!(pricing.input_per_mtok >= 0.0, "{pricing:?}");
+    assert!(pricing.output_per_mtok >= 0.0, "{pricing:?}");
+    assert_eq!(pricing.currency, "USD");
+    assert!(!pricing.as_of.is_empty(), "{pricing:?}");
+    assert_eq!(pricing.source, "models.dev");
 }
 
 /// parity: jobs.TestRetirementGuardBlocksLastPoolMember

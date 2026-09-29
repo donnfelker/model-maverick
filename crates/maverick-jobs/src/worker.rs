@@ -25,7 +25,7 @@ use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
 use crate::batch::{BatchConfig, NightlySmokeJob, WeeklySweepJob};
-use crate::catalog::{self, CatalogDeps, PriceSource};
+use crate::catalog::{self, CatalogDeps, ModelsDevPriceSource, PriceSource};
 use crate::predictions::{
     CalibrationConfig, CalibrationScoreJob, PredictionLockConfig, PredictionLockJob,
 };
@@ -61,7 +61,7 @@ pub struct WorkerDeps {
     pub graders: Arc<Registry>,
     /// The process-wide alert delivery.
     pub notifier: Option<Arc<dyn AlertNotifier>>,
-    /// `None`: `price_sync` is a no-op (bead 7.15 adds models.dev).
+    /// `None`: `price_sync` is a no-op.
     pub price_source: Option<Arc<dyn PriceSource>>,
 }
 
@@ -156,9 +156,13 @@ pub fn worker_options(
         lease: lease.clone(),
         notifier: deps.notifier.clone(),
     };
+    let price_source = deps.price_source.or_else(|| {
+        ModelsDevPriceSource::from_config(config)
+            .map(|source| Arc::new(source) as Arc<dyn PriceSource>)
+    });
     let catalog = CatalogConfig {
         notifier: deps.notifier.clone(),
-        price_source: deps.price_source,
+        price_source,
     };
     let retention = RetentionConfig {
         notifier: deps.notifier,

@@ -20,6 +20,7 @@ maverick-runner = { workspace = true }
 maverick-alerts = { workspace = true }
 chrono = { workspace = true }
 graphile_worker = { workspace = true }
+reqwest = { workspace = true }
 sqlx = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
