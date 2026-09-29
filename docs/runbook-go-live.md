@@ -172,6 +172,10 @@ kamal setup
 
    `active_matrix_version` is `null` until section 6.
 
+3. The logs (`kamal app logs --roles=web` and `--roles=worker`) show
+   `classifier column unavailable` and `judge pool unavailable`. Both are expected: the
+   catalog is empty until section 5.
+
 The later examples use `INTERNAL=http://127.0.0.1:8081/internal/v1`, and
 `AUTH="Authorization: Bearer $MAVERICK_TOKEN"`.
 
@@ -256,24 +260,28 @@ these references name:
 If the launch list differs, set those variables in `env.clear` to `model_id/endpoint`
 references that exist.
 
-**Restart after the catalog.** Until bead `model-maverick-yl6` lands, the web role resolves
-the classifier column only at startup, and the worker role resolves the judge pool only at
-startup. Reboot both after the columns exist:
+**No restart is needed after the catalog (D41).** At boot in section 3 the catalog was empty,
+so both references were unresolved:
+- the web role logged `classifier column unavailable`;
+- the worker role logged `judge pool unavailable`.
+
+Each process retries every 30 s until its reference resolves, and then it refreshes every
+5 min. Within about 30 s of the last column, the logs show both INFO lines:
 
 ```sh
-kamal app boot
+kamal app logs --roles=web      # classifier column resolved; prompt-path requests use the classifier
+kamal app logs --roles=worker   # judge pool resolved; judge_rubric gradings resume
 ```
 
-Then check the logs. Neither line may appear:
-- `classifier column unavailable`;
-- `judge pool unavailable`.
+**The alert is expected here.** Suppose the classifier stays unresolved for 5 min, because
+this section comes more than 5 min after section 3. The engine then writes a critical
+`classifier_degraded` alert with `reason: "unresolved"`, and sends it to the alert channels.
+When it resolves, the engine writes an `info` `classifier_degraded` with
+`reason: "resolved"`. Both show in `GET $INTERNAL/alerts?kind=classifier_degraded`.
 
-```sh
-kamal app logs --roles=web
-kamal app logs --roles=worker
-```
-
-Reopen the tunnel after the reboot, because the web container has a new address.
+If an INFO line does not appear, a reference names no column, or its provider has no
+operator key. Fix the column, the key, or the variable. Apply a variable or key change with
+`kamal deploy`.
 
 ## 6. The corpus [owner]
 
