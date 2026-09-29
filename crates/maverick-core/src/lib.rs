@@ -9,3 +9,4 @@ pub mod alias;
 pub mod gojson;
 pub mod projection;
 pub mod recommend;
+pub mod telemetry;
