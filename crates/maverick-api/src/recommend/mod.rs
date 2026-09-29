@@ -801,7 +801,7 @@ fn effective_retention(column: &ModelColumn, now: DateTime<Utc>) -> RetentionMod
 }
 
 /// The API error for a policy refusal.
-fn policy_error(error: PolicyError) -> ApiError {
+pub(crate) fn policy_error(error: PolicyError) -> ApiError {
     let code = match error.code {
         PolicyErrorCode::UnknownPool => ErrorCode::UnknownPool,
         PolicyErrorCode::UnknownModel => ErrorCode::UnknownModel,
