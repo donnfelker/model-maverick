@@ -515,6 +515,10 @@ pub async fn run_batch(
     batches::finish_batch(&mut *tx, &batch_id, lease.worker_id(), BatchEnd::Completed)
         .await?
         .ok_or_else(|| BatchError::LeaseLost(batch_id.clone()))?;
+    // A duplicate enqueue on this batch's locked key, followed by the running worker dying,
+    // leaves a permanently failed orphan in the queue (m000019). This job is the duplicate
+    // that rescued the window, so it removes that orphan in the same transaction (spec 11.2).
+    batches::delete_orphaned_failed_jobs(&mut *tx, kind.as_str(), &night_text).await?;
     let mut alerts: Vec<Alert> = Vec::new();
     if output.completion_pct < COMPLETION_ALERT_THRESHOLD {
         let subject = json!({

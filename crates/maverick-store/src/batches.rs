@@ -231,6 +231,42 @@ pub async fn finish_batch<'e>(
     .await
 }
 
+/// Deletes the orphaned batch job that a duplicate enqueue on a locked key left behind.
+///
+/// graphile_worker's `add_jobs`, when a keyed job is enqueued while its running twin holds the
+/// key (migration m000019), clears the running row's key and sets `attempts = max_attempts`,
+/// then inserts a fresh keyed job. If that worker then dies, the recovery sweep unlocks the
+/// cleared row, but with `key IS NULL` and `attempts = max_attempts` it can never run again: a
+/// permanently failed orphan. The duplicate rescues the window, so on its completion this
+/// removes the orphan. It is bounded to this task and this night, and to unlocked, keyless,
+/// exhausted rows, so it never touches a running job or an ordinary keyed failure. Spec 11.2:
+/// no permanently failed jobs are left behind. Returns the number of rows deleted.
+pub async fn delete_orphaned_failed_jobs<'e>(
+    db: impl PgExecutor<'e>,
+    task_identifier: &str,
+    night: &str,
+) -> sqlx::Result<u64> {
+    // graphile_worker's internal jobs table names the key column `key` (not `job_key`) and
+    // joins `_private_tasks` for the task name. This schema is not in the sqlx offline cache,
+    // so it is a runtime query with literal SQL, like `rebuild::enqueue_in`.
+    let deleted = sqlx::query(
+        "delete from graphile_worker._private_jobs as j
+         using graphile_worker._private_tasks as t
+         where j.task_id = t.id
+           and t.identifier = $1
+           and j.key is null
+           and j.attempts >= j.max_attempts
+           and j.locked_at is null
+           and j.payload ->> 'night' = $2",
+    )
+    .bind(task_identifier)
+    .bind(night)
+    .execute(db)
+    .await?
+    .rows_affected();
+    Ok(deleted)
+}
+
 /// The batch of (kind, window).
 pub async fn get_batch<'e>(
     db: impl PgExecutor<'e>,
