@@ -30,6 +30,10 @@ struct GoTest {
     area: String,
     /// The full `go_test` string, e.g. `policy.TestValidateWeights`.
     name: String,
+    /// The manifest `where` pointer: a fixture path (`fixtures/...`), a reference-doc anchor
+    /// (`reference/...`), or a blackbox recording. It tells a closeout whether a missing row
+    /// is a pure fixture to own now or a reference or blackbox row a later package owns.
+    where_: String,
 }
 
 impl GoTest {
@@ -57,7 +61,9 @@ struct AreaCounts {
 }
 
 fn main() -> ExitCode {
-    let strict = std::env::args().skip(1).any(|arg| arg == "--strict");
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let strict = args.iter().any(|arg| arg == "--strict");
+    let list_missing = args.iter().any(|arg| arg == "--list-missing");
 
     let root = match repo_root() {
         Ok(root) => root.to_path_buf(),
@@ -67,7 +73,7 @@ fn main() -> ExitCode {
         }
     };
 
-    match run(&root, strict) {
+    match run(&root, strict, list_missing) {
         Ok(exit) => exit,
         Err(error) => {
             eprintln!("parity-coverage: {error}");
@@ -76,7 +82,7 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(root: &Path, strict: bool) -> Result<ExitCode, String> {
+fn run(root: &Path, strict: bool, list_missing: bool) -> Result<ExitCode, String> {
     let manifest_dir = parity_path("manifest").map_err(|error| error.to_string())?;
     let go_tests = load_manifest_go_tests(&manifest_dir)?;
 
@@ -95,7 +101,7 @@ fn run(root: &Path, strict: bool) -> Result<ExitCode, String> {
         .collect();
 
     let mut per_area: BTreeMap<String, AreaCounts> = BTreeMap::new();
-    let mut missing: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut missing: BTreeMap<String, Vec<GoTest>> = BTreeMap::new();
     for go_test in &go_tests {
         let counts = per_area.entry(go_test.area.clone()).or_default();
         counts.total += 1;
@@ -107,12 +113,16 @@ fn run(root: &Path, strict: bool) -> Result<ExitCode, String> {
                 missing
                     .entry(go_test.area.clone())
                     .or_default()
-                    .push(go_test.name.clone());
+                    .push(go_test.clone());
             }
         }
     }
 
     print_report(&per_area, &unknown_tags, strict);
+
+    if list_missing {
+        print_missing(&missing);
+    }
 
     let total_missing: usize = per_area.values().map(|counts| counts.missing).sum();
     if strict && (total_missing > 0 || !unknown_tags.is_empty()) {
@@ -177,9 +187,15 @@ fn load_manifest_go_tests(manifest_dir: &Path) -> Result<Vec<GoTest>, String> {
             .ok_or_else(|| format!("{}: missing array \"tests\"", file.display()))?;
         for test in tests {
             if let Some(name) = test.get("go_test").and_then(Value::as_str) {
+                let where_ = test
+                    .get("where")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string();
                 go_tests.push(GoTest {
                     area: area.clone(),
                     name: name.to_string(),
+                    where_,
                 });
             }
         }
@@ -317,6 +333,28 @@ fn print_report(
     }
 }
 
+/// List every uncovered Go test with its manifest `where` pointer, grouped by area. A closeout
+/// reads this to sort missing rows: a `fixtures/...` pointer is a pure-fixture gap to own now,
+/// while a `reference/...` or `blackbox/...` pointer is a row a later package owns.
+fn print_missing(missing: &BTreeMap<String, Vec<GoTest>>) {
+    if missing.is_empty() {
+        println!("\n== missing rows: none ==");
+        return;
+    }
+    println!("\n== missing rows (area: go_test -> where) ==");
+    for (area, rows) in missing {
+        println!("  [{area}] {} missing", rows.len());
+        for go_test in rows {
+            let where_ = if go_test.where_.is_empty() {
+                "(no where)"
+            } else {
+                go_test.where_.as_str()
+            };
+            println!("    {} -> {where_}", go_test.name);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -326,10 +364,12 @@ mod tests {
             GoTest {
                 area: "decision".into(),
                 name: "policy.TestValidateWeights".into(),
+                where_: "fixtures/decision/policy_validate.json#TestValidateWeights/*".into(),
             },
             GoTest {
                 area: "store".into(),
                 name: "store.TestMigrationsUpDownUpClean".into(),
+                where_: "reference/engine-reference.md (Part 4)#migrations".into(),
             },
         ]
     }

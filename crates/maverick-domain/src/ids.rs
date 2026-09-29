@@ -121,6 +121,7 @@ mod tests {
     }
 
     /// ids.TestNewFormat: `new("run")` is `run_` + 26 upper-case Crockford chars.
+    // parity: store/ids.TestNewFormat
     #[test]
     fn new_format() {
         let id = new(prefix::RUN);
@@ -134,6 +135,7 @@ mod tests {
     }
 
     /// ids.TestNewUnique: 8 threads * 200 mints are all distinct (1600 total).
+    // parity: store/ids.TestNewUnique
     #[test]
     fn new_unique_concurrent() {
         let threads = 8usize;

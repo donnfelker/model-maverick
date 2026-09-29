@@ -419,6 +419,7 @@ mod tests {
         }
     }
 
+    // parity: tracing.TestOpenRejectsTamperedCiphertext
     // parity: tracing.TestOpenRejectsWrongCaptureID
     #[test]
     fn open_rejects_tampered_ciphertext() {

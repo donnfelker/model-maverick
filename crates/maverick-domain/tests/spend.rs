@@ -49,9 +49,6 @@ fn estimate_input_tokens_rows() {
 /// overhead; the master plan's "600 output tokens per run" is not the Go behavior.
 ///
 /// parity: jobs.TestProjectSpendGolden
-/// parity: jobs.TestProjectSpendGolden/bare_prompt
-/// parity: jobs.TestProjectSpendGolden/prompt_with_attachment
-/// parity: jobs.TestProjectSpendGolden/sums_tasks_columns_and_repeats
 #[test]
 fn project_spend_rows() {
     let doc = fixture();

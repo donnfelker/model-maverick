@@ -143,7 +143,15 @@ fn ceiling_monotonicity_recorded_cases() {
     );
 }
 
+// parity: decision/recommend.TestBands
 // parity: decision/recommend.TestResolveBandsCheapestClearingColumn
+// parity: decision/recommend.TestResolveBandsCostAveragedOverBandTiers
+// parity: decision/recommend.TestResolveBandsFallbackWhenNothingClears
+// parity: decision/recommend.TestResolveBandsFallbackCeilingTieBreaksOnCost
+// parity: decision/recommend.TestResolveBandsKnownCostBeatsUnknown
+// parity: decision/recommend.TestResolveBandsTiesKeepPoolOrder
+// parity: decision/recommend.TestResolveBandsMissingPassRateAtTopTier
+// parity: decision/recommend.TestResolveBandsEmptyCandidates
 #[test]
 fn banded_policy_table() {
     let failures: Vec<String> = load_cases("bands.json")
