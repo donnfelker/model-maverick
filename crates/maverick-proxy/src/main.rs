@@ -8,8 +8,9 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use maverick_proxy::config::{Config, listen_addr, load_config};
+use maverick_proxy::reports::ProxyReports;
 use maverick_proxy::server::{Proxy, ServeSettings, serve, shutdown_signal};
-use maverick_proxy::surface::{ExecutorRunner, NoReports};
+use maverick_proxy::surface::ExecutorRunner;
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
@@ -55,8 +56,14 @@ async fn run(config: Config) -> ExitCode {
         }
     };
     let mode = config.mode.as_str();
-    // Bead 6.9 replaces `NoReports` with telemetry and OTel.
-    let runner = match ExecutorRunner::new(&config, Arc::new(NoReports)) {
+    let reports = match ProxyReports::from_config(&config) {
+        Ok(reports) => Arc::new(reports),
+        Err(error) => {
+            tracing::error!(error = %error, "maverick-proxy: cannot build the telemetry client");
+            return ExitCode::FAILURE;
+        }
+    };
+    let runner = match ExecutorRunner::new(&config, reports.clone()) {
         Ok(runner) => runner,
         Err(error) => {
             tracing::error!(error = %error, "maverick-proxy: cannot build the upstream client");
@@ -71,14 +78,16 @@ async fn run(config: Config) -> ExitCode {
         }
     };
     tracing::info!(addr = %addr, mode, "maverick-proxy: listening");
-    match serve(
+    let served = serve(
         listener,
         proxy.router(),
         ServeSettings::default(),
         shutdown_signal(),
     )
-    .await
-    {
+    .await;
+    // D27: flush queued telemetry, within the batcher's bound, before exiting.
+    reports.shutdown().await;
+    match served {
         Ok(()) => {
             tracing::info!("maverick-proxy: stopped");
             ExitCode::SUCCESS

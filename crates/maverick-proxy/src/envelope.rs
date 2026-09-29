@@ -52,6 +52,11 @@ pub const ZERO_RETENTION_REQUIRES_DECLARED: &str = "zero_retention_requires_decl
 /// `no_compliant_columns`, relayed from the engine (D17).
 pub const NO_COMPLIANT_COLUMNS: &str = "no_compliant_columns";
 
+/// `rate_limited` (D28).
+pub const RATE_LIMITED: &str = "rate_limited";
+/// The rate-limit message (the API's text).
+pub const RATE_LIMITED_MESSAGE: &str = "rate limit exceeded";
+
 /// The correlation header on relayed and `no_executable_candidates` responses.
 pub const RECOMMENDATION_ID_HEADER: HeaderName =
     HeaderName::from_static("x-maverick-recommendation-id");

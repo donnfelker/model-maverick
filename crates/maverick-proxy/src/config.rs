@@ -22,6 +22,12 @@ pub const MAX_BODY_BYTES_VAR: &str = "MAVERICK_PROXY_MAX_BODY_BYTES";
 /// The default body cap: 32 MiB (D38).
 pub const DEFAULT_MAX_BODY_BYTES: u64 = 32 * 1024 * 1024;
 
+/// The per-tenant rate limit variable, requests per minute (D28).
+pub const RATELIMIT_RPM_VAR: &str = "MAVERICK_PROXY_RATELIMIT_RPM";
+
+/// The default per-tenant rate limit: 60 requests per minute, below the API's 300 (D28).
+pub const DEFAULT_RATELIMIT_RPM: u32 = 60;
+
 /// The error when self-hosted mode has no key (exact Go text).
 pub const MISSING_API_KEY: &str = "MAVERICK_API_KEY: required but not set";
 
@@ -80,6 +86,8 @@ pub struct Config {
     pub xai_api_key: String,
     /// [`MAX_BODY_BYTES_VAR`] (D38).
     pub max_body_bytes: u64,
+    /// [`RATELIMIT_RPM_VAR`] (D28).
+    pub ratelimit_rpm: u32,
 }
 
 impl fmt::Debug for Config {
@@ -108,6 +116,7 @@ impl fmt::Debug for Config {
             .field("gemini_api_key", &key(&self.gemini_api_key))
             .field("xai_api_key", &key(&self.xai_api_key))
             .field("max_body_bytes", &self.max_body_bytes)
+            .field("ratelimit_rpm", &self.ratelimit_rpm)
             .finish()
     }
 }
@@ -124,6 +133,9 @@ pub enum ConfigError {
     /// [`MAX_BODY_BYTES_VAR`] is not a positive decimal integer.
     #[error("MAVERICK_PROXY_MAX_BODY_BYTES: must be a positive integer, got {0:?}")]
     InvalidMaxBodyBytes(String),
+    /// [`RATELIMIT_RPM_VAR`] is not a positive decimal integer that fits in 32 bits.
+    #[error("MAVERICK_PROXY_RATELIMIT_RPM: must be a positive integer, got {0:?}")]
+    InvalidRateLimitRpm(String),
 }
 
 /// Load the configuration through `lookup` (the process environment in production).
@@ -150,6 +162,12 @@ pub fn load_config(lookup: impl Fn(&str) -> Option<String>) -> Result<Config, Co
         None => DEFAULT_MAX_BODY_BYTES,
         Some(value) => parse_positive(&value).ok_or(ConfigError::InvalidMaxBodyBytes(value))?,
     };
+    let ratelimit_rpm = match get(RATELIMIT_RPM_VAR) {
+        None => DEFAULT_RATELIMIT_RPM,
+        Some(value) => parse_positive(&value)
+            .and_then(|rpm| u32::try_from(rpm).ok())
+            .ok_or(ConfigError::InvalidRateLimitRpm(value))?,
+    };
 
     Ok(Config {
         mode,
@@ -172,6 +190,7 @@ pub fn load_config(lookup: impl Fn(&str) -> Option<String>) -> Result<Config, Co
         gemini_api_key: provider_key("GEMINI_API_KEY"),
         xai_api_key: provider_key("XAI_API_KEY"),
         max_body_bytes,
+        ratelimit_rpm,
     })
 }
 
@@ -225,6 +244,34 @@ mod tests {
         }
         assert_eq!(listen_addr(":8090"), "0.0.0.0:8090");
         assert_eq!(listen_addr("127.0.0.1:1"), "127.0.0.1:1");
+    }
+
+    #[test]
+    fn rate_limit_setting() {
+        let load = |rpm: Option<&str>| {
+            load_config(|name| match name {
+                "MAVERICK_API_KEY" => Some("mk_live_x".to_owned()),
+                RATELIMIT_RPM_VAR => rpm.map(str::to_owned),
+                _ => None,
+            })
+        };
+        assert_eq!(
+            load(None).map(|c| c.ratelimit_rpm),
+            Ok(DEFAULT_RATELIMIT_RPM)
+        );
+        assert_eq!(load(Some("")).map(|c| c.ratelimit_rpm), Ok(60));
+        assert_eq!(load(Some("1")).map(|c| c.ratelimit_rpm), Ok(1));
+        assert_eq!(
+            load(Some("4294967295")).map(|c| c.ratelimit_rpm),
+            Ok(u32::MAX)
+        );
+        for bad in ["0", "-1", "4294967296", "60/min", " 60"] {
+            assert_eq!(
+                load(Some(bad)).map(|c| c.ratelimit_rpm),
+                Err(ConfigError::InvalidRateLimitRpm(bad.to_owned())),
+                "{bad:?}"
+            );
+        }
     }
 
     #[test]
