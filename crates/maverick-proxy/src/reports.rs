@@ -8,7 +8,10 @@
 //! the request is still routed.
 //!
 //! OTel (D31) records every settled request, including one that dispatched nothing, when
-//! `MAVERICK_PROXY_OTLP_ENDPOINT` is set ([`ProxyOtel`]).
+//! `MAVERICK_PROXY_OTLP_ENDPOINT` is set ([`ProxyOtel`]). The exception is an opted-out
+//! tenant's request (D43): it exports no `maverick.recommendation` log record and is not
+//! counted. A request that failed before the engine answered carries no opt-out flag and
+//! is recorded.
 
 use std::sync::Arc;
 
@@ -76,13 +79,14 @@ impl ProxyReports {
 
 impl ReportSink for ProxyReports {
     fn report(&self, report: ChainReport) {
+        // D39: zero telemetry bytes for an opted-out tenant. D43: no OTel record either.
+        if report.telemetry_opt_out {
+            return;
+        }
         if let Some(otel) = &self.otel {
             otel.record(&report);
         }
-        // D39: zero telemetry bytes for an opted-out tenant.
-        if !report.telemetry_opt_out {
-            self.telemetry
-                .record(report.tenant_key.expose(), report.items);
-        }
+        self.telemetry
+            .record(report.tenant_key.expose(), report.items);
     }
 }
