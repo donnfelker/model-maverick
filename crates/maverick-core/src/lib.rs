@@ -6,6 +6,7 @@
 //! credentials. Packages 2a and 2d fill this in, one module at a time.
 
 pub mod alias;
+pub mod chain;
 pub mod failopen;
 pub mod gojson;
 pub mod projection;

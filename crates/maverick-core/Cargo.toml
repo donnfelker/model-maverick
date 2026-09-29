@@ -19,7 +19,13 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+# D26: `Retry-After` as an HTTP date (already locked through hyper).
+httpdate = "1"
 
 [dev-dependencies]
 insta = { workspace = true }
 parity-support = { path = "../parity-support" }
+# Paused time for Retry-After and header-timeout tests.
+tokio = { workspace = true, features = ["test-util"] }
+# Captures the chain executor's attempt log in tests.
+tracing-subscriber = { workspace = true }
