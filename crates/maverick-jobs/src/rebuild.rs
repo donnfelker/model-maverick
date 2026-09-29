@@ -14,8 +14,9 @@ use chrono::NaiveDate;
 use graphile_worker::{IntoTaskHandlerResult, TaskHandler, WorkerContext};
 use maverick_domain::graders::{Envelope, parse_envelope};
 use maverick_domain::scoring::{
-    RunStats, TaskOutcome, ambiguity, ambiguity_penalty, apply_autofail, grader_observations,
-    high_stakes, observe, overlay_weights, run_quality, shared_dimension_spread, variance_penalty,
+    RunScore, RunStats, TaskOutcome, ambiguity, ambiguity_penalty, apply_autofail,
+    grader_observations, high_stakes, observe, overlay_weights, run_quality,
+    shared_dimension_spread, variance_penalty,
 };
 use maverick_store::batches;
 use maverick_store::corpus;
@@ -100,9 +101,33 @@ pub enum RebuildError {
     LeaseLost { batch_id: String },
 }
 
+impl From<TaskError> for RebuildError {
+    fn from(error: TaskError) -> Self {
+        match error {
+            TaskError::Load { task_id, source } => RebuildError::Task { task_id, source },
+            TaskError::DimensionWeights { task_id, message } => {
+                RebuildError::DimensionWeights { task_id, message }
+            }
+        }
+    }
+}
+
+/// Loading a run's task for scoring failed.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum TaskError {
+    #[error("task {task_id}: {source}")]
+    Load {
+        task_id: String,
+        #[source]
+        source: sqlx::Error,
+    },
+    #[error("task {task_id} dimension_weights: {message}")]
+    DimensionWeights { task_id: String, message: String },
+}
+
 /// One grader's persisted scores for a run.
 #[derive(Debug, Clone, PartialEq)]
-struct GraderEntry {
+pub(crate) struct GraderEntry {
     idx: i16,
     /// Widened from the stored float32 values.
     dims: BTreeMap<String, f64>,
@@ -112,7 +137,7 @@ struct GraderEntry {
 
 /// Groups `ListScoresByBatch` (ordered by run, grader index, dimension) into per-run
 /// grader entries in grader order.
-fn group_scores(scores: Vec<Score>) -> HashMap<String, Vec<GraderEntry>> {
+pub(crate) fn group_scores(scores: Vec<Score>) -> HashMap<String, Vec<GraderEntry>> {
     let mut by_run: HashMap<String, Vec<GraderEntry>> = HashMap::new();
     for score in scores {
         let entries = by_run.entry(score.run_id).or_default();
@@ -132,9 +157,9 @@ fn group_scores(scores: Vec<Score>) -> HashMap<String, Vec<GraderEntry>> {
 }
 
 /// What scoring needs from a task.
-struct TaskInfo {
-    capability: String,
-    tier: i16,
+pub(crate) struct TaskInfo {
+    pub(crate) capability: String,
+    pub(crate) tier: i16,
     weights: BTreeMap<String, f64>,
     high_stakes: bool,
     pass_threshold: f64,
@@ -142,15 +167,15 @@ struct TaskInfo {
     envelopes: Vec<Option<Envelope>>,
 }
 
-async fn load_task(pool: &PgPool, task_id: &str) -> Result<TaskInfo, RebuildError> {
+pub(crate) async fn load_task(pool: &PgPool, task_id: &str) -> Result<TaskInfo, TaskError> {
     let task = corpus::get_task(pool, task_id)
         .await
-        .map_err(|source| RebuildError::Task {
+        .map_err(|source| TaskError::Load {
             task_id: task_id.to_owned(),
             source,
         })?;
     let weights: BTreeMap<String, f64> = serde_json::from_str(task.dimension_weights.get())
-        .map_err(|e| RebuildError::DimensionWeights {
+        .map_err(|e| TaskError::DimensionWeights {
             task_id: task_id.to_owned(),
             message: e.to_string(),
         })?;
@@ -170,6 +195,25 @@ async fn load_task(pool: &PgPool, task_id: &str) -> Result<TaskInfo, RebuildErro
         pass_threshold: f64::from(task.pass_threshold),
         envelopes,
     })
+}
+
+/// The run-quality choke point (reference Part 3 §6.1): the task's weights (overlaid
+/// when high-stakes), `RunQuality`, then `ApplyAutofail` over each grader's detail when
+/// high-stakes. The rebuild and `calibration_score` both score runs here.
+pub(crate) fn score_run(task: &TaskInfo, entries: &[GraderEntry], status: &str) -> RunScore {
+    let grader_dims: Vec<Option<BTreeMap<String, f64>>> =
+        entries.iter().map(|e| Some(e.dims.clone())).collect();
+    let weights = if task.high_stakes {
+        overlay_weights(&task.weights)
+    } else {
+        task.weights.clone()
+    };
+    let mut score = run_quality(&weights, &grader_dims, status, task.pass_threshold);
+    if task.high_stakes {
+        let details: Vec<Option<&str>> = entries.iter().map(|e| e.detail.as_deref()).collect();
+        apply_autofail(&mut score, &details);
+    }
+    score
 }
 
 #[derive(Default)]
@@ -220,18 +264,7 @@ pub async fn plan_rebuild(
         }
         let task = &tasks[&run.task_id];
         let entries = scores.remove(&run.id).unwrap_or_default();
-        let grader_dims: Vec<Option<BTreeMap<String, f64>>> =
-            entries.iter().map(|e| Some(e.dims.clone())).collect();
-        let weights = if task.high_stakes {
-            overlay_weights(&task.weights)
-        } else {
-            task.weights.clone()
-        };
-        let mut score = run_quality(&weights, &grader_dims, &run.status, task.pass_threshold);
-        if task.high_stakes {
-            let details: Vec<Option<&str>> = entries.iter().map(|e| e.detail.as_deref()).collect();
-            apply_autofail(&mut score, &details);
-        }
+        let score = score_run(task, &entries, &run.status);
 
         let key = CellKey {
             model_column_id: run.model_column_id.clone(),
