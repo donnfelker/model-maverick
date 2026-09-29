@@ -1,0 +1,15 @@
+---
+source: crates/maverick-core/tests/projection.rs
+description: "messages: tool_use input in JCS; tool_result blocks become tool turns before the user text"
+---
+truncated: false
+---
+[tools]
+lookup_order: Look up an order by id.
+
+[conversation]
+user: Where is order A-17?
+assistant: Let me look that up.
+tool_call lookup_order {"order_id":"A-17","verbose":true}
+tool: status: shipped
+user: When will it arrive?

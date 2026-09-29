@@ -1,0 +1,10 @@
+---
+source: crates/maverick-core/tests/projection.rs
+description: "messages: image and document blocks and thinking blocks contribute nothing"
+---
+truncated: false
+---
+[conversation]
+user: Summarize the attached report.
+assistant: Here is a summary.
+user: Shorter, please.

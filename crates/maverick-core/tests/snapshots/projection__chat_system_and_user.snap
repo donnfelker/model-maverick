@@ -1,0 +1,11 @@
+---
+source: crates/maverick-core/tests/projection.rs
+description: "chat: system instructions go to [system]"
+---
+truncated: false
+---
+[system]
+You are a careful legal analyst. Cite clause numbers.
+
+[conversation]
+user: Is the indemnity clause mutual?

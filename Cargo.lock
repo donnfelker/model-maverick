@@ -2332,6 +2332,8 @@ dependencies = [
 name = "maverick-core"
 version = "0.1.0"
 dependencies = [
+ "insta",
+ "parity-support",
  "reqwest",
  "serde",
  "serde_json",

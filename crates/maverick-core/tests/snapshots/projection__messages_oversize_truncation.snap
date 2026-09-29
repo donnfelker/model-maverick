@@ -1,0 +1,10 @@
+---
+source: crates/maverick-core/tests/projection.rs
+description: "messages: one oversize user turn is kept in full, then cut to head + marker + tail"
+---
+truncated: true
+---
+[conversation]
+user: Q: ⟦b×79976⟧
+[...]
+⟦b×20000⟧

@@ -1,0 +1,15 @@
+---
+source: crates/maverick-core/tests/projection.rs
+description: "chat: json_schema response_format; the schema is written in JCS (sorted keys, ES numbers)"
+---
+truncated: false
+---
+[response_format]
+json_schema
+name: invoice
+description: Fields read from an invoice.
+schema: {"properties":{"currency":{"enum":["EUR","USD"],"type":"string"},"total":{"maximum":1500000,"minimum":0,"type":"number"}},"required":["total","currency"],"type":"object"}
+
+[conversation]
+user: Read the invoice below.
+Total: 1,200.00 EUR

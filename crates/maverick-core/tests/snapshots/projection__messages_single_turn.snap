@@ -1,0 +1,8 @@
+---
+source: crates/maverick-core/tests/projection.rs
+description: "messages: one user message"
+---
+truncated: false
+---
+[conversation]
+user: Translate to German: Good morning.

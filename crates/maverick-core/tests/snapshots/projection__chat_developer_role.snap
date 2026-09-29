@@ -1,0 +1,12 @@
+---
+source: crates/maverick-core/tests/projection.rs
+description: "chat: developer messages, and system messages anywhere, go to [system] in order"
+---
+truncated: false
+---
+[system]
+Answer in French.
+Keep it under 100 words.
+
+[conversation]
+user: Summarize the release notes.

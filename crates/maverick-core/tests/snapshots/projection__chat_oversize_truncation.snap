@@ -1,0 +1,13 @@
+---
+source: crates/maverick-core/tests/projection.rs
+description: "chat: a 110,000-character system prompt; the head keeps the system text, the tail keeps the question"
+---
+truncated: true
+---
+[system]
+⟦a×79991⟧
+[...]
+⟦a×19964⟧
+
+[conversation]
+user: What is this?

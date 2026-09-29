@@ -1,0 +1,10 @@
+---
+source: crates/maverick-core/tests/projection.rs
+description: "chat: earlier turns are kept, newest last"
+---
+truncated: false
+---
+[conversation]
+user: Write a Python function that parses ISO 8601 dates.
+assistant: Here is a version that uses datetime.fromisoformat.
+user: It fails on the Z suffix. Fix it and add tests.
