@@ -4,10 +4,11 @@
 use std::collections::BTreeMap;
 
 use maverick_domain::scoring::{
-    ambiguity, ambiguity_penalty, order_swap_observations, shared_dimension_spread,
-    variance_penalty,
+    LAMBDA_AMB, LAMBDA_VAR, ambiguity, ambiguity_penalty, order_swap_observations,
+    shared_dimension_spread, variance_penalty,
 };
 use parity_support::assert_f64_within;
+use proptest::prelude::*;
 use serde_json::Value;
 
 fn penalties() -> Value {
@@ -240,5 +241,57 @@ fn order_swap_observation_rows() {
         parity_support::fixture("measurement-core", "orderswap.json").expect("orderswap.json");
     for case in doc["cases"].as_array().expect("cases") {
         check_orderswap(case);
+    }
+}
+
+proptest! {
+    /// scoring.TestVariancePenaltySigmaMatchesDirectFormula (reference Part 3 §1.5): the
+    /// reported sigma equals the two-pass population standard deviation within 1e-12.
+    ///
+    /// parity: scoring.TestVariancePenaltySigmaMatchesDirectFormula
+    #[test]
+    fn variance_penalty_sigma_matches_direct_formula(
+        q_runs in prop::collection::vec(0.0f64..=1.0, 1..=20),
+    ) {
+        let got = variance_penalty(&q_runs, LAMBDA_VAR);
+        let n = q_runs.len() as f64;
+        let mean = q_runs.iter().sum::<f64>() / n;
+        let direct = (q_runs.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / n).sqrt();
+        prop_assert!((got.sigma - direct).abs() <= 1e-12);
+    }
+
+    /// scoring.TestSharedDimensionSpreadBoundsProperty (reference Part 3 §1.6): 2 to 4
+    /// graders scoring one shared dimension in [0, 1] give a spread in [0, 0.5].
+    ///
+    /// parity: scoring.TestSharedDimensionSpreadBoundsProperty
+    #[test]
+    fn shared_dimension_spread_is_bounded(
+        scores in prop::collection::vec(0.0f64..=1.0, 2..=4),
+    ) {
+        let grader_dims: Vec<Option<BTreeMap<String, f64>>> = scores
+            .iter()
+            .map(|&s| Some(BTreeMap::from([("dim".to_owned(), s)])))
+            .collect();
+        let spread = shared_dimension_spread(&grader_dims).expect("a shared dimension");
+        prop_assert!((0.0..=0.5 + 1e-12).contains(&spread));
+    }
+
+    /// scoring.TestPenaltyProperties (reference Part 3 §1.5, §1.6): sigma is non-negative,
+    /// the variance-penalized score is in [0, mu] (+1e-15), and the ambiguity-penalized
+    /// score is in [0, score].
+    ///
+    /// parity: scoring.TestPenaltyProperties
+    #[test]
+    fn penalties_stay_in_range(
+        q_runs in prop::collection::vec(0.0f64..=1.0, 1..=20),
+        ambiguity_value in 0.0f64..=1.0,
+    ) {
+        let v = variance_penalty(&q_runs, LAMBDA_VAR);
+        prop_assert!(v.sigma >= 0.0);
+        prop_assert!(v.score >= 0.0);
+        prop_assert!(v.score <= v.mu + 1e-15);
+        let penalized = ambiguity_penalty(v.score, ambiguity_value, LAMBDA_AMB);
+        prop_assert!(penalized >= 0.0);
+        prop_assert!(penalized <= v.score);
     }
 }

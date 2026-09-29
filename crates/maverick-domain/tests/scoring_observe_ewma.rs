@@ -321,3 +321,45 @@ proptest! {
         prop_assert!((stream.ewma() - tail).abs() <= bound);
     }
 }
+
+proptest! {
+    /// scoring.TestEWMABoundsProperty (reference Part 3 §1.8): observations in [0, 1] and
+    /// any alpha in (0, 1) keep the EWMA in [0, 1] and the variance non-negative over 50
+    /// folds.
+    ///
+    /// parity: scoring.TestEWMABoundsProperty
+    #[test]
+    fn ewma_stays_in_unit_interval_with_non_negative_variance(
+        alpha in 1e-9f64..1.0,
+        values in prop::collection::vec(0.0f64..=1.0, 50),
+    ) {
+        let mut stream = Stream::new(alpha);
+        for &x in &values {
+            stream.fold(x);
+        }
+        prop_assert!((-1e-12..=1.0 + 1e-12).contains(&stream.ewma()));
+        prop_assert!(stream.variance() >= 0.0);
+    }
+
+    /// scoring.TestResumeMatchesDirectFoldProperty (reference Part 3 §1.8): for alpha in
+    /// [0.05, 1) and 1 to 20 folds, resuming from the smoothed series reproduces the direct
+    /// fold: the count matches exactly, and the EWMA and variance match within 1e-9.
+    ///
+    /// parity: scoring.TestResumeMatchesDirectFoldProperty
+    #[test]
+    fn resume_reproduces_the_direct_fold(
+        alpha in 0.05f64..1.0,
+        values in prop::collection::vec(0.0f64..=1.0, 1..=20),
+    ) {
+        let mut direct = Stream::new(alpha);
+        let mut smoothed = Vec::with_capacity(values.len());
+        for &x in &values {
+            direct.fold(x);
+            smoothed.push(direct.ewma());
+        }
+        let resumed = Stream::resume(alpha, &smoothed);
+        prop_assert_eq!(resumed.n(), direct.n());
+        prop_assert!((resumed.ewma() - direct.ewma()).abs() <= 1e-9);
+        prop_assert!((resumed.variance() - direct.variance()).abs() <= 1e-9);
+    }
+}

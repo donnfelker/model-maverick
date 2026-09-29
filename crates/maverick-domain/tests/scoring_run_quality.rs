@@ -4,8 +4,9 @@
 use std::collections::BTreeMap;
 
 use maverick_domain::scoring::{
-    RunScore, apply_autofail, autofail, high_stakes, overlay_weights, run_quality,
+    RunScore, apply_autofail, autofail, high_stakes, overlay_weights, run_quality, status,
 };
+use proptest::prelude::*;
 use serde_json::Value;
 
 fn fixture(file: &str) -> Value {
@@ -278,5 +279,54 @@ fn overlay_golden_pair() {
     let recorded = weights(&cases[1]["weights"]);
     for (dim, w) in &recorded {
         parity_support::assert_f64_within(overlaid[dim], *w, tolerance);
+    }
+}
+
+proptest! {
+    /// scoring.TestRunQualityBoundsProperty (reference Part 3 §1.3): random weights in
+    /// (0.01, 1.01] over 1 to 5 dimensions, graded by 1 to 3 graders (one in five errored)
+    /// that each emit a dimension with probability 2/3, give Q = 0 when ungradable and
+    /// Q in [0, 1] when gradable.
+    ///
+    /// parity: scoring.TestRunQualityBoundsProperty
+    #[test]
+    fn run_quality_stays_in_the_unit_interval(
+        weight_values in prop::collection::vec(0.01f64..=1.01, 1..=5),
+        grader_seeds in prop::collection::vec(
+            (
+                prop::bool::weighted(0.2),
+                prop::collection::vec((prop::bool::weighted(2.0 / 3.0), 0.0f64..=1.0), 5),
+            ),
+            1..=3,
+        ),
+    ) {
+        let weights: BTreeMap<String, f64> = weight_values
+            .iter()
+            .enumerate()
+            .map(|(i, &w)| (format!("d{i}"), w))
+            .collect();
+        let dim_count = weight_values.len();
+        let grader_dims: Vec<Option<BTreeMap<String, f64>>> = grader_seeds
+            .iter()
+            .map(|(errored, presence)| {
+                if *errored {
+                    return None;
+                }
+                let mut dims = BTreeMap::new();
+                for (d, &(present, score)) in presence.iter().take(dim_count).enumerate() {
+                    if present {
+                        dims.insert(format!("d{d}"), score);
+                    }
+                }
+                Some(dims)
+            })
+            .collect();
+        let got = run_quality(&weights, &grader_dims, status::OK, 0.5);
+        if got.gradable {
+            let q = got.q.expect("gradable runs have q");
+            prop_assert!((-1e-12..=1.0 + 1e-12).contains(&q));
+        } else {
+            prop_assert_eq!(got.q, Some(0.0));
+        }
     }
 }
