@@ -32,3 +32,5 @@ ulid = { workspace = true }
 [dev-dependencies]
 maverick-testdb = { workspace = true }
 parity-support = { path = "../parity-support" }
+# The fake provider answers the latency probes in tests.
+maverick-providers = { workspace = true }
