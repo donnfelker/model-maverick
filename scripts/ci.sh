@@ -102,7 +102,7 @@ run_parity() {
     # collector, checked against the reviewed D-row allowlist; plus the unit.json rows in
     # maverick-core and maverick-proxy. Each scenario writes its outcome under
     # target/ci/parity/proxy-replay/. The other parity fixture tests still run in the
-    # fast tier's `cargo test --workspace`; the API replay (bead 5.15) joins this tier.
+    # fast tier's `cargo test --workspace`.
     rm -rf target/ci/parity/proxy-replay
     run_logged parity proxy-replay cargo test -p maverick-proxy -p maverick-core
     local replayed
@@ -115,6 +115,13 @@ run_parity() {
         echo "Step failed: parity/proxy-replay reported ${replayed} of 54 scenarios"
         exit 1
     fi
+
+    # The black-box API replay (bead 5.15): every recorded Go exchange and seed statement
+    # in parity/blackbox/ against one database, compared byte for byte after masking.
+    # Each remaining difference must match parity/blackbox/replay-allowlist.json, which
+    # names its DIVERGENCES row; the JSON report lists every explained difference.
+    run_logged parity api-replay env MAVERICK_REPLAY_REPORT=target/ci/parity/api-replay.json \
+        cargo test -p maverick-api --test replay -- --nocapture
 
     # The frozen SDK conformance scenarios (bead 8.3) through the real proxy on
     # maverick-core: groups 1 to 4 and 7 to 9. The fail-open, exhaustion, and OpenRouter
