@@ -56,7 +56,9 @@ EOF
 }
 
 run_sqlx_check() {
-    if ! rg -q 'sqlx::query(_as|_scalar)?!|query(_as|_scalar|_file|_file_as|_file_scalar)?!' crates; then
+    # Plain grep: CI runners have no ripgrep, and a missing tool must not read as "no queries".
+    if ! grep -rqE --include='*.rs' \
+        'sqlx::query(_as|_scalar)?!|query(_as|_scalar|_file|_file_as|_file_scalar)?!' crates; then
         log_dir fast
         echo "no sqlx checked queries registered yet" | tee "target/ci/fast/sqlx.log"
         return
