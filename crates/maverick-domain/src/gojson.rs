@@ -94,6 +94,7 @@ const MAX_DEPTH: usize = 128;
 /// `unexpected EOF`.
 pub fn decode_one(input: &str) -> Result<(JsonValue, &str), SyntaxError> {
     let mut parser = Parser {
+        text: input,
         bytes: input.as_bytes(),
         pos: 0,
         depth: 0,
@@ -157,6 +158,7 @@ pub fn is_blank(rest: &str) -> bool {
 }
 
 struct Parser<'a> {
+    text: &'a str,
     bytes: &'a [u8],
     pos: usize,
     depth: usize,
@@ -177,9 +179,16 @@ impl Parser<'_> {
         SyntaxError("unexpected EOF".to_owned())
     }
 
+    /// The character at `pos`, in constant time. `pos` only moves by whole characters,
+    /// so it is always a char boundary of `text`.
+    fn current_char(&self) -> Option<char> {
+        self.text
+            .get(self.pos..)
+            .and_then(|rest| rest.chars().next())
+    }
+
     fn invalid(&self, context: &str) -> SyntaxError {
-        let rest = std::str::from_utf8(&self.bytes[self.pos..]).unwrap_or("");
-        let c = rest.chars().next().unwrap_or('\u{fffd}');
+        let c = self.current_char().unwrap_or('\u{fffd}');
         SyntaxError(format!("invalid character {} {context}", quote_char(c)))
     }
 
@@ -336,8 +345,7 @@ impl Parser<'_> {
         self.pos += 1; // opening quote
         let mut out = String::new();
         loop {
-            let rest = std::str::from_utf8(&self.bytes[self.pos..]).unwrap_or("");
-            let Some(c) = rest.chars().next() else {
+            let Some(c) = self.current_char() else {
                 return Err(Self::eof());
             };
             match c {
@@ -609,6 +617,23 @@ mod tests {
 
     fn num(lit: &str) -> JsonValue {
         JsonValue::Number(lit.to_owned())
+    }
+
+    #[test]
+    fn long_strings_decode_in_linear_time() {
+        // Revalidating the rest of the input per character made this quadratic: a 2 MiB
+        // request body or model reply took hours in a debug build.
+        let text = "é".repeat(1 << 20);
+        let input = format!("\"{text}\" x");
+        let (value, rest) = decode_one(&input).unwrap();
+        assert_eq!(value, JsonValue::String(text.clone()));
+        assert_eq!(rest, " x");
+        let error = decode_one(&format!("\"{text}\u{1}\"")).unwrap_err();
+        assert_eq!(error.0, "invalid character '\\x01' in string literal");
+        assert_eq!(
+            decode_one(&format!("\"{text}")).unwrap_err().0,
+            "unexpected EOF"
+        );
     }
 
     #[test]

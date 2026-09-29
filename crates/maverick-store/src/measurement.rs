@@ -656,6 +656,45 @@ pub async fn list_latest_cell_aggregates<'e>(
     .await
 }
 
+/// One column's mean availability over a window of nights (D8).
+#[derive(Debug, Clone, PartialEq)]
+pub struct TrailingAvailability {
+    pub model_column_id: String,
+    pub availability: f64,
+}
+
+/// D8 (Rust only): for each column, the mean of its nightly `availability` rows for one
+/// workload cell with `as_of` on or after `since`, ascending by column. A column with no
+/// row in the window is absent. Each night's row holds that night's folded value, so this
+/// is the mean over the trailing nights (spec §7.3).
+pub async fn list_trailing_availability<'e>(
+    db: impl PgExecutor<'e>,
+    column_ids: &[String],
+    capability: &str,
+    difficulty_tier: i16,
+    since: NaiveDate,
+) -> sqlx::Result<Vec<TrailingAvailability>> {
+    sqlx::query_as!(
+        TrailingAvailability,
+        r#"select model_column_id as "model_column_id!",
+                  avg(ewma)::float8 as "availability!"
+           from aggregates
+           where model_column_id = any($1::text[])
+             and capability = $2
+             and difficulty_tier = $3
+             and dimension = 'availability'
+             and as_of >= $4
+           group by model_column_id
+           order by model_column_id"#,
+        column_ids,
+        capability,
+        difficulty_tier,
+        since
+    )
+    .fetch_all(db)
+    .await
+}
+
 // ---- predictions.sql ----
 
 /// `InsertPredictionLock`: returns 1 when inserted, 0 when the key exists. The first lock

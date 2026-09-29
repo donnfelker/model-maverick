@@ -1,0 +1,839 @@
+//! `POST /v1/recommend` on the declared path, and `GET /v1/checks/{ref...}` (spec §9.2;
+//! reference Part 5 §6.5, §6.6; Part 4 §2.6).
+//!
+//! The declared path: validate, load the tenant's pools, weights, constraints, and the
+//! catalog, read the workload cell's aggregates, apply policy (pool, allowlist, standing
+//! constraints including D1, preferences), rank, persist one `recommendations` trace
+//! row, and answer. No provider call. Every successful call writes exactly one trace
+//! row; a failed call writes none. [`recommend`] is the one service that both the HTTP
+//! handler and MCP call.
+//!
+//! The Rust response adds D8 and D9 to the Go shape: each entry carries `settings` and
+//! `retention_mode` after `execution_aliases` and `low_availability` after
+//! `clears_difficulty`, and the response ends with `zero_retention` (spec §9.2).
+
+mod request;
+
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt;
+use std::sync::Arc;
+
+use axum::body::Body;
+use axum::extract::{Extension, Path, Request, State};
+use axum::http::{Method, Response, StatusCode};
+use chrono::{DateTime, Duration, Utc};
+use maverick_alerts::{AlertKind, AlertNotifier, Severity};
+use maverick_config::Config;
+use maverick_domain::gofmt::quote;
+use maverick_domain::gojson::{self, JsonValue};
+use maverick_domain::policy::{
+    self, CatalogColumn, CellAggregate, CellAggregates, ColumnStatus, PolicyError, PolicyErrorCode,
+    PolicyRequest, RequestConstraints, RetentionMode, StandingConstraints, TenantConfig,
+};
+use maverick_domain::ranking::{self, RankParams, ScoredSurvivor, Weights};
+use maverick_domain::scoring::observe::dimension;
+use maverick_domain::trace::{self, ColumnInfo, SurvivorMetrics, TraceCandidate};
+use maverick_domain::{ceilings, checks, entries, ids};
+use maverick_store::catalog::{self, ModelColumn};
+use maverick_store::decisions::{self, NewRecommendation};
+use maverick_store::measurement::{self, Aggregate};
+use maverick_store::{JsonRawValue, corpus, is_not_found, numeric_to_f64, tenancy};
+use sqlx::PgPool;
+
+use crate::observe::RequestLog;
+use crate::{ApiError, ApiState, ErrorCode, Identity, internal_error, not_found, read_body};
+
+use request::Form;
+
+/// The difficulty of a declared workload that names none.
+const DEFAULT_DIFFICULTY: i64 = 3;
+/// The quality bar of a tenant without a `tenant_weights` row for the capability: the Go
+/// float32 `0.80` widened to `0.800000011920929` (reference Part 4 §2.4).
+const DEFAULT_QUALITY_BAR: f32 = 0.80;
+/// D8: availability is averaged over this many trailing nights, today included.
+const AVAILABILITY_NIGHTS: i64 = 7;
+
+/// The recommend knobs: ranking bands, the ceiling buffer, and where alerts go.
+#[derive(Clone)]
+pub struct RecommendConfig {
+    pub rank: RankParams,
+    pub ceiling_buffer: f64,
+    /// Notified after a `pool_would_be_empty` alert row is written. `None` writes the row
+    /// only.
+    pub alerts: Option<Arc<dyn AlertNotifier>>,
+}
+
+impl Default for RecommendConfig {
+    fn default() -> Self {
+        Self {
+            rank: RankParams::default(),
+            ceiling_buffer: ceilings::DEFAULT_CEILING_BUFFER,
+            alerts: None,
+        }
+    }
+}
+
+impl fmt::Debug for RecommendConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RecommendConfig")
+            .field("rank", &self.rank)
+            .field("ceiling_buffer", &self.ceiling_buffer)
+            .field("alerts", &self.alerts.is_some())
+            .finish()
+    }
+}
+
+impl RecommendConfig {
+    /// The knobs from the configuration (spec §14.1). Alerts start without a notifier.
+    pub fn from_config(config: &Config) -> Self {
+        Self {
+            rank: RankParams {
+                band_quality: config.ranking_band_quality,
+                band_balanced: config.ranking_band_balanced,
+                band_cost: config.ranking_band_cost,
+                noise_band: config.ranking_noise_band,
+                availability_floor: config.ranking_availability_floor,
+            },
+            ceiling_buffer: config.ceiling_buffer,
+            alerts: None,
+        }
+    }
+}
+
+/// A recommendation that was made and persisted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Recommended {
+    /// The `rec_<ULID>` id of the trace row.
+    pub id: String,
+    /// The response body: compact JSON and one `\n`.
+    pub body: String,
+}
+
+/// Why a recommendation failed.
+#[derive(Debug)]
+pub enum RecommendError {
+    /// A request the API refuses, with its envelope.
+    Api(ApiError),
+    /// Anything else: logged, answered `500 internal_error`.
+    Internal(String),
+}
+
+impl From<ApiError> for RecommendError {
+    fn from(error: ApiError) -> Self {
+        Self::Api(error)
+    }
+}
+
+impl From<sqlx::Error> for RecommendError {
+    fn from(error: sqlx::Error) -> Self {
+        Self::Internal(error.to_string())
+    }
+}
+
+/// `POST /v1/recommend`.
+pub(crate) async fn recommend_handler(
+    State(api): State<ApiState>,
+    Extension(identity): Extension<Identity>,
+    log: Option<Extension<RequestLog>>,
+    request: Request,
+) -> Response<Body> {
+    if request.method() != Method::POST {
+        return not_found();
+    }
+    let method = request.method().clone();
+    let path = request.uri().path().to_owned();
+    let body = match read_body(request.into_body()).await {
+        Ok(body) => body,
+        Err(response) => return response,
+    };
+    let Some(pool) = api.pool() else {
+        return internal_error();
+    };
+    match recommend(pool, api.recommend(), &identity, &body).await {
+        Ok(recommended) => {
+            if let Some(Extension(log)) = log {
+                log.set_recommendation_id(&recommended.id);
+            }
+            crate::response_with_json(StatusCode::OK, recommended.body.into_bytes())
+        }
+        Err(RecommendError::Api(error)) => error.into_response(),
+        Err(RecommendError::Internal(error)) => {
+            tracing::error!(
+                method = %method,
+                path = %path,
+                error = %error,
+                "recommend handler failure"
+            );
+            internal_error()
+        }
+    }
+}
+
+/// `GET /v1/checks/{ref...}`: the check spec document, or 404 for an unknown ref.
+pub(crate) async fn checks_handler(Path(path): Path<String>, request: Request) -> Response<Body> {
+    if request.method() != Method::GET {
+        return not_found();
+    }
+    let reference = format!("checks/{path}");
+    match checks::lookup_check(&reference) {
+        Some(definition) => {
+            let mut body = definition.document();
+            body.push('\n');
+            crate::response_with_json(StatusCode::OK, body.into_bytes())
+        }
+        None => ApiError::new(
+            StatusCode::NOT_FOUND,
+            ErrorCode::NotFound,
+            format!("check spec {} is not registered", quote(&reference)),
+        )
+        .detail("ref", reference)
+        .into_response(),
+    }
+}
+
+/// Makes and persists one recommendation for `identity` from a request body.
+pub async fn recommend(
+    pool: &PgPool,
+    config: &RecommendConfig,
+    identity: &Identity,
+    body: &[u8],
+) -> Result<Recommended, RecommendError> {
+    let request = request::decode(body)?;
+    let workload = match request::validate(&request)? {
+        Form::Declared {
+            capability,
+            difficulty,
+            domain_tags,
+        } => Declared {
+            defaulted: difficulty.is_none(),
+            difficulty: difficulty.unwrap_or(DEFAULT_DIFFICULTY),
+            capability,
+            domain_tags,
+        },
+        Form::Prompt(_) => {
+            return Err(RecommendError::Internal(
+                "the prompt path is not implemented yet (model-maverick-rust-port-3hk.5.6)"
+                    .to_owned(),
+            ));
+        }
+    };
+    let mode = if request.mode.is_empty() {
+        "balanced"
+    } else {
+        request.mode.as_str()
+    };
+    let difficulty = i32::try_from(workload.difficulty).expect("validated 1..=5");
+    let tier = i16::try_from(workload.difficulty).expect("validated 1..=5");
+    let now = Utc::now();
+    let tenant = identity.tenant_id.as_str();
+
+    // Step 3: the tenant's configuration and the whole catalog.
+    let pools = tenancy::list_pools_by_tenant(pool, tenant).await?;
+    let weights = tenancy::list_tenant_weights_by_tenant(pool, tenant).await?;
+    let standing = match tenancy::get_tenant_constraints(pool, tenant).await {
+        Ok(row) => StandingConstraints {
+            max_cost_per_run: row.max_cost_per_run.map(numeric_to_f64),
+            max_latency_ms: row.max_latency_ms,
+            zero_retention: row.zero_retention,
+        },
+        Err(error) if is_not_found(&error) => StandingConstraints::default(),
+        Err(error) => return Err(error.into()),
+    };
+    let zero_retention = standing.zero_retention;
+    let cfg = TenantConfig {
+        tenant_id: tenant.to_owned(),
+        pools: pools
+            .into_iter()
+            .map(|p| policy::Pool {
+                name: p.name,
+                model_column_ids: p.model_column_ids,
+                is_default: p.is_default,
+            })
+            .collect(),
+        constraints: standing,
+    };
+    let columns = catalog::list_model_columns(pool).await?;
+    let by_id: HashMap<&str, &ModelColumn> = columns.iter().map(|c| (c.id.as_str(), c)).collect();
+    let resolved = policy::resolve_pool(&cfg, &request.pool).map_err(policy_error)?;
+
+    // Step 4: the cell aggregates of the pool's columns and their quality sources.
+    let pool_columns: Vec<&ModelColumn> = resolved
+        .model_column_ids
+        .iter()
+        .filter_map(|id| by_id.get(id.as_str()).copied())
+        .collect();
+    let mut wanted: Vec<String> = Vec::new();
+    let mut seen = HashSet::new();
+    for column in &pool_columns {
+        for id in [column.id.as_str(), quality_source(column)] {
+            if seen.insert(id) {
+                wanted.push(id.to_owned());
+            }
+        }
+    }
+    let dimensions = [
+        dimension::QUALITY,
+        dimension::PASS_RATE,
+        dimension::COST_PER_RUN_USD,
+        dimension::LATENCY_P95_MS,
+    ]
+    .map(str::to_owned);
+    let rows =
+        measurement::list_latest_cell_aggregates(pool, &wanted, &workload.capability, &dimensions)
+            .await?;
+    let cells = Cells::new(&rows);
+    let aggregates: CellAggregates = pool_columns
+        .iter()
+        .map(|column| {
+            (
+                column.id.clone(),
+                CellAggregate {
+                    cost_per_run_usd: cells.ewma(&column.id, tier, dimension::COST_PER_RUN_USD),
+                    latency_p95_ms: cells.ewma(&column.id, tier, dimension::LATENCY_P95_MS),
+                },
+            )
+        })
+        .collect();
+
+    // Step 5: policy.
+    let catalog: Vec<CatalogColumn> = columns.iter().map(catalog_column).collect();
+    let policy_request = PolicyRequest {
+        pool: request.pool.clone(),
+        allowed_models: request.allowed_models.clone(),
+        capability: workload.capability.clone(),
+        difficulty_tier: difficulty,
+        constraints: RequestConstraints {
+            max_cost_per_run: request.constraints.max_cost_per_run,
+            max_latency_ms: request.constraints.max_latency_ms,
+        },
+    };
+    let decision = match policy::evaluate(&cfg, &catalog, &aggregates, &policy_request, now) {
+        Ok(decision) => decision,
+        Err(error) => {
+            // D1: a pool emptied by zero retention raises its alert, then answers 409.
+            if let Some(alert) = &error.alert {
+                write_alert(pool, config, alert).await?;
+            }
+            return Err(policy_error(error).into());
+        }
+    };
+    // Step 6: the G1 drift fallback's alert.
+    if let Some(alert) = &decision.drift_alert {
+        write_alert(pool, config, alert).await?;
+    }
+    // Step 7.
+    if decision.survivors.is_empty() {
+        return Err(RecommendError::Internal(format!(
+            "pool {} has no usable columns for {} tier {}",
+            quote(&decision.pool),
+            workload.capability,
+            difficulty
+        )));
+    }
+
+    // Step 8: ceilings, score inputs, and the ranking.
+    let bar = f64::from(
+        weights
+            .iter()
+            .find(|w| w.capability == workload.capability)
+            .map_or(DEFAULT_QUALITY_BAR, |w| w.quality_bar),
+    );
+    let tenant_weights = weights
+        .iter()
+        .find(|w| w.capability == workload.capability)
+        .map(|w| Weights {
+            quality: f64::from(w.w_quality),
+            cost: f64::from(w.w_cost),
+            latency: f64::from(w.w_latency),
+        });
+    let survivor_ids: Vec<String> = decision
+        .survivors
+        .iter()
+        .map(|s| s.column_id.clone())
+        .collect();
+    let since = (now - Duration::days(AVAILABILITY_NIGHTS - 1)).date_naive();
+    let availability: HashMap<String, f64> = measurement::list_trailing_availability(
+        pool,
+        &survivor_ids,
+        &workload.capability,
+        tier,
+        since,
+    )
+    .await?
+    .into_iter()
+    .map(|row| (row.model_column_id, row.availability))
+    .collect();
+
+    let mut scored = Vec::with_capacity(decision.survivors.len());
+    let mut metrics = HashMap::with_capacity(decision.survivors.len());
+    for survivor in &decision.survivors {
+        let column = by_id
+            .get(survivor.column_id.as_str())
+            .copied()
+            .ok_or_else(|| {
+                RecommendError::Internal(format!(
+                    "survivor {} is not in the catalog",
+                    survivor.column_id
+                ))
+            })?;
+        let source = quality_source(column);
+        let quality = cells.get(source, tier, dimension::QUALITY);
+        let pass_rate = cells.ewma(source, tier, dimension::PASS_RATE);
+        let cost = cells.ewma(&column.id, tier, dimension::COST_PER_RUN_USD);
+        let latency = cells.ewma(&column.id, tier, dimension::LATENCY_P95_MS);
+        let ceiling = ceilings::ceiling(&cells.pass_rates(source), bar, config.ceiling_buffer);
+        let quality_x100 = quality.map(|cell| f64::from(cell.ewma) * 100.0);
+        let column_availability = availability.get(&column.id).copied();
+        scored.push(ScoredSurvivor {
+            column_id: column.id.clone(),
+            quality: quality_x100,
+            cost_per_run: cost,
+            latency_p95: latency,
+            availability: column_availability,
+            family: column.provider.clone(),
+            has_data: quality.is_some()
+                || pass_rate.is_some()
+                || cost.is_some()
+                || latency.is_some(),
+            measured: quality.is_some_and(|cell| cell.measured),
+            clears_difficulty: ceilings::clears(
+                ceiling,
+                u8::try_from(difficulty).unwrap_or(u8::MAX),
+            ),
+            prefs_satisfied: survivor.prefs_satisfied,
+            settings: serde_json::Value::Null,
+            retention_mode: effective_retention(column, now),
+        });
+        metrics.insert(
+            column.id.clone(),
+            SurvivorMetrics {
+                quality: quality_x100,
+                pass_rate,
+                cost_per_run_usd: cost,
+                latency_p95_ms: latency,
+                availability: column_availability,
+            },
+        );
+    }
+    let ranking = ranking::rank(&scored, mode, tenant_weights, &config.rank);
+    let Some(pick) = ranking.ranked.first() else {
+        return Err(RecommendError::Internal(
+            "ranking kept no candidate".to_owned(),
+        ));
+    };
+
+    // Step 9 and 10: the response.
+    let matrix_version = match corpus::get_active_corpus_version(pool).await {
+        Ok(version) => version.version,
+        Err(error) if is_not_found(&error) => String::new(),
+        Err(error) => return Err(error.into()),
+    };
+    let scored_by_id: HashMap<&str, &ScoredSurvivor> =
+        scored.iter().map(|s| (s.column_id.as_str(), s)).collect();
+    let ranked_columns: Vec<entries::RankedColumn> = ranking
+        .ranked
+        .iter()
+        .map(|entry| {
+            let survivor = scored_by_id[entry.column_id.as_str()];
+            entries::RankedColumn {
+                column_id: entry.column_id.clone(),
+                family: survivor.family.clone(),
+                quality: survivor.quality,
+                clears_difficulty: entry.flags.clears_difficulty,
+                low_availability: entry.flags.low_availability,
+                settings: serde_json::Value::Null,
+                retention_mode: survivor.retention_mode,
+            }
+        })
+        .collect();
+    let entry_columns: Vec<entries::EntryColumn> = pool_columns
+        .iter()
+        .map(|column| entries::EntryColumn {
+            id: column.id.clone(),
+            model_id: column.model_id.clone(),
+            provider: column.provider.clone(),
+            endpoint: column.endpoint.clone(),
+            execution_aliases: serde_json::Value::Null,
+        })
+        .collect();
+    let recommendations = entries::recommendations(
+        &entry_columns,
+        &ranked_columns,
+        mode,
+        &workload.capability,
+        difficulty,
+    );
+    let violations = decision
+        .survivors
+        .iter()
+        .find(|s| s.column_id == pick.column_id)
+        .map(|s| s.violations.clone())
+        .unwrap_or_default();
+
+    let id = ids::new(ids::prefix::RECOMMENDATION);
+    let classification = workload.classification();
+    let mut items = Vec::with_capacity(recommendations.len());
+    for entry in &recommendations {
+        let column = by_id[entry.column_id.as_str()];
+        items.push(entry_json(entry, column)?);
+    }
+    let mut violation_items = Vec::with_capacity(violations.len());
+    for violation in &violations {
+        violation_items.push(object(vec![
+            ("constraint", string(violation.constraint.as_str())),
+            ("limit", number(violation.limit)?),
+            ("estimated", number(violation.estimated)?),
+        ]));
+    }
+    let check = checks::check_spec_for(&workload.capability);
+    let response = object(vec![
+        ("classification", classification.clone()),
+        ("recommendations", JsonValue::Array(items)),
+        ("pool", string(&decision.pool)),
+        ("mode", string(mode)),
+        (
+            "check_spec",
+            object(vec![
+                ("type", string(check.kind)),
+                ("ref", string(check.reference)),
+            ]),
+        ),
+        (
+            "constraints_met",
+            JsonValue::Bool(decision.constraints_met && pick.flags.prefs_satisfied),
+        ),
+        ("violations", JsonValue::Array(violation_items)),
+        ("recommendation_id", string(&id)),
+        ("matrix_version", string(&matrix_version)),
+        ("measured", JsonValue::Bool(pick.flags.measured)),
+        // D9.
+        ("zero_retention", JsonValue::Bool(zero_retention)),
+    ]);
+    let response_text = gojson::marshal(&response);
+
+    // Step 11: the trace row. Survivors in rank order, then the policy exclusions, then
+    // the ranking's `no_data` exclusions.
+    let info = |column_id: &str| {
+        by_id
+            .get(column_id)
+            .map(|c| ColumnInfo {
+                provider: c.provider.clone(),
+                model: c.model_id.clone(),
+                endpoint: c.endpoint.clone(),
+            })
+            .unwrap_or_default()
+    };
+    let candidates = trace::candidates(
+        ranking.ranked.iter().map(|entry| {
+            TraceCandidate::survivor(
+                entry,
+                &info(&entry.column_id),
+                &metrics[entry.column_id.as_str()],
+            )
+        }),
+        decision
+            .exclusions
+            .iter()
+            .chain(&ranking.exclusions)
+            .map(|exclusion| TraceCandidate::exclusion(exclusion, &info(&exclusion.column_id))),
+    );
+    let candidates = trace::candidates_json(&candidates).map_err(RecommendError::Internal)?;
+    let stored_request = raw(String::from_utf8_lossy(body)
+        .trim_matches([' ', '\t', '\n', '\r'])
+        .to_owned())?;
+    decisions::create_recommendation(
+        pool,
+        &NewRecommendation {
+            id: &id,
+            tenant_id: tenant,
+            api_key_id: &identity.api_key_id,
+            prompt_hash: None,
+            request: &stored_request,
+            classification: &raw(gojson::marshal(&classification))?,
+            candidates: &raw(candidates)?,
+            response: &raw(response_text.clone())?,
+            matrix_version: &matrix_version,
+        },
+    )
+    .await?;
+
+    let mut body = response_text;
+    body.push('\n');
+    Ok(Recommended { id, body })
+}
+
+/// A resolved declared workload.
+struct Declared {
+    capability: String,
+    difficulty: i64,
+    /// True when the request named no difficulty.
+    defaulted: bool,
+    domain_tags: Vec<String>,
+}
+
+impl Declared {
+    /// The classification block: confidence 1, method `declared`, and
+    /// `difficulty_source: "default"` only when the difficulty was defaulted.
+    fn classification(&self) -> JsonValue {
+        let mut members = vec![
+            ("capability", string(&self.capability)),
+            ("difficulty", JsonValue::Number(self.difficulty.to_string())),
+            (
+                "domain_tags",
+                JsonValue::Array(self.domain_tags.iter().map(|t| string(t)).collect()),
+            ),
+            (
+                "high_stakes",
+                JsonValue::Bool(ranking::high_stakes(&self.domain_tags)),
+            ),
+            ("confidence", JsonValue::Number("1".to_owned())),
+            ("method", string("declared")),
+        ];
+        if self.defaulted {
+            members.push(("difficulty_source", string("default")));
+        }
+        object(members)
+    }
+}
+
+/// The newest aggregate rows of the workload's capability, by (column, tier, dimension).
+struct Cells<'a>(HashMap<(&'a str, i16, &'a str), &'a Aggregate>);
+
+impl<'a> Cells<'a> {
+    fn new(rows: &'a [Aggregate]) -> Self {
+        Self(
+            rows.iter()
+                .map(|row| {
+                    (
+                        (
+                            row.model_column_id.as_str(),
+                            row.difficulty_tier,
+                            row.dimension.as_str(),
+                        ),
+                        row,
+                    )
+                })
+                .collect(),
+        )
+    }
+
+    fn get(&self, column: &str, tier: i16, dimension: &str) -> Option<&'a Aggregate> {
+        self.0.get(&(column, tier, dimension)).copied()
+    }
+
+    /// The cell's EWMA widened from `real`.
+    fn ewma(&self, column: &str, tier: i16, dimension: &str) -> Option<f64> {
+        self.get(column, tier, dimension)
+            .map(|cell| f64::from(cell.ewma))
+    }
+
+    /// The column's pass-rate cells, tiers 1 to 5, for its ceiling.
+    fn pass_rates(&self, column: &str) -> Vec<ceilings::PassRate> {
+        (1..=5u8)
+            .filter_map(|tier| {
+                self.get(column, i16::from(tier), dimension::PASS_RATE)
+                    .map(|cell| ceilings::PassRate {
+                        tier,
+                        ewma: f64::from(cell.ewma),
+                        measured: cell.measured,
+                    })
+            })
+            .collect()
+    }
+}
+
+/// Where a column's quality and pass-rate cells come from (spec §4.2).
+fn quality_source(column: &ModelColumn) -> &str {
+    column
+        .quality_source_column_id
+        .as_deref()
+        .filter(|id| !id.is_empty())
+        .unwrap_or(&column.id)
+}
+
+fn catalog_column(column: &ModelColumn) -> CatalogColumn {
+    CatalogColumn {
+        id: column.id.clone(),
+        model_id: column.model_id.clone(),
+        status: match column.status.as_str() {
+            "cold_start" => ColumnStatus::ColdStart,
+            "active" => ColumnStatus::Active,
+            "deprecated" => ColumnStatus::Deprecated,
+            // The CHECK constraint allows nothing else; an unknown status is not runnable.
+            _ => ColumnStatus::Retired,
+        },
+        retention_mode: retention_mode(&column.retention_mode),
+        retention_valid_until: column.retention_valid_until,
+    }
+}
+
+/// A stored retention mode; anything unrecognized reads as `unknown` (fail closed).
+fn retention_mode(stored: &str) -> RetentionMode {
+    match stored {
+        "standard" => RetentionMode::Standard,
+        "zero" => RetentionMode::Zero,
+        _ => RetentionMode::Unknown,
+    }
+}
+
+fn effective_retention(column: &ModelColumn, now: DateTime<Utc>) -> RetentionMode {
+    retention_mode(&column.retention_mode).effective(column.retention_valid_until, now)
+}
+
+/// The API error for a policy refusal.
+fn policy_error(error: PolicyError) -> ApiError {
+    let code = match error.code {
+        PolicyErrorCode::UnknownPool => ErrorCode::UnknownPool,
+        PolicyErrorCode::UnknownModel => ErrorCode::UnknownModel,
+        PolicyErrorCode::ModelNotInPool => ErrorCode::ModelNotInPool,
+        PolicyErrorCode::NoCompliantColumns => ErrorCode::NoCompliantColumns,
+    };
+    let status =
+        StatusCode::from_u16(error.code.http_status()).unwrap_or(StatusCode::UNPROCESSABLE_ENTITY);
+    let mut api = ApiError::new(status, code, error.message);
+    if let serde_json::Value::Object(details) = error.details {
+        api.details = details.into_iter().collect::<BTreeMap<_, _>>();
+    }
+    api
+}
+
+/// Writes a request-time `pool_would_be_empty` alert; a failed write fails the request.
+async fn write_alert(
+    pool: &PgPool,
+    config: &RecommendConfig,
+    alert: &policy::Alert,
+) -> Result<(), RecommendError> {
+    let severity = match alert.severity {
+        "info" => Severity::Info,
+        "warning" => Severity::Warning,
+        _ => Severity::Critical,
+    };
+    maverick_alerts::insert_alert(
+        pool,
+        config.alerts.as_deref(),
+        AlertKind::PoolWouldBeEmpty,
+        severity,
+        &alert.subject,
+        &alert.message,
+    )
+    .await
+    .map(|_| ())
+    .map_err(|error| RecommendError::Internal(error.to_string()))
+}
+
+/// One `recommendations` entry on the wire. `execution_aliases` and `settings` are the
+/// stored jsonb text, compacted, with its key order and number spelling.
+fn entry_json(
+    entry: &entries::RecommendationEntry,
+    column: &ModelColumn,
+) -> Result<JsonValue, RecommendError> {
+    let score = match entry.score {
+        Some(score) => number(score)?,
+        None => JsonValue::Null,
+    };
+    Ok(object(vec![
+        ("provider", string(&entry.provider)),
+        ("model", string(&entry.model)),
+        ("endpoint", string(&entry.endpoint)),
+        ("column_id", string(&entry.column_id)),
+        ("execution_aliases", jsonb(column.execution_aliases.get())?),
+        // D9.
+        ("settings", jsonb(column.settings.get())?),
+        ("retention_mode", string(entry.retention_mode.as_str())),
+        ("score", score),
+        (
+            "clears_difficulty",
+            JsonValue::Bool(entry.clears_difficulty),
+        ),
+        // D8.
+        ("low_availability", JsonValue::Bool(entry.low_availability)),
+        ("reason", string(&entry.reason)),
+    ]))
+}
+
+/// A stored jsonb value; SQL `null` or a JSON `null` is `{}`.
+fn jsonb(text: &str) -> Result<JsonValue, RecommendError> {
+    match gojson::unmarshal(text) {
+        Ok(JsonValue::Null) => Ok(JsonValue::Object(Vec::new())),
+        Ok(value) => Ok(value),
+        Err(error) => Err(RecommendError::Internal(format!(
+            "stored jsonb does not parse: {error}"
+        ))),
+    }
+}
+
+fn raw(text: String) -> Result<Box<JsonRawValue>, RecommendError> {
+    JsonRawValue::from_string(text)
+        .map_err(|error| RecommendError::Internal(format!("trace JSON: {error}")))
+}
+
+fn object(members: Vec<(&str, JsonValue)>) -> JsonValue {
+    JsonValue::Object(
+        members
+            .into_iter()
+            .map(|(key, value)| (key.to_owned(), value))
+            .collect(),
+    )
+}
+
+fn string(value: &str) -> JsonValue {
+    JsonValue::String(value.to_owned())
+}
+
+/// A Go `float64` on the wire; NaN and infinities fail as Go's encoder does.
+fn number(value: f64) -> Result<JsonValue, RecommendError> {
+    gojson::encode_f64(value)
+        .map(JsonValue::Number)
+        .map_err(RecommendError::Internal)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn declared_classification_block() {
+        let declared = Declared {
+            capability: "factual_qa".to_owned(),
+            difficulty: 3,
+            defaulted: true,
+            domain_tags: Vec::new(),
+        };
+        assert_eq!(
+            gojson::marshal(&declared.classification()),
+            r#"{"capability":"factual_qa","difficulty":3,"domain_tags":[],"high_stakes":false,"confidence":1,"method":"declared","difficulty_source":"default"}"#
+        );
+        let declared = Declared {
+            capability: "structured_extraction".to_owned(),
+            difficulty: 3,
+            defaulted: false,
+            domain_tags: vec!["legal".to_owned()],
+        };
+        assert_eq!(
+            gojson::marshal(&declared.classification()),
+            r#"{"capability":"structured_extraction","difficulty":3,"domain_tags":["legal"],"high_stakes":true,"confidence":1,"method":"declared"}"#
+        );
+    }
+
+    #[test]
+    fn jsonb_keeps_order_and_number_spelling() {
+        let value = jsonb(r#"{"vertex": "a", "openrouter": "b", "n": 3.0}"#).unwrap();
+        assert_eq!(
+            gojson::marshal(&value),
+            r#"{"vertex":"a","openrouter":"b","n":3.0}"#
+        );
+        assert_eq!(gojson::marshal(&jsonb("null").unwrap()), "{}");
+    }
+
+    #[test]
+    fn default_quality_bar_is_the_widened_float32() {
+        assert_eq!(f64::from(DEFAULT_QUALITY_BAR), 0.800_000_011_920_929);
+    }
+
+    #[test]
+    fn unknown_stored_values_fail_closed() {
+        assert_eq!(retention_mode("zero"), RetentionMode::Zero);
+        assert_eq!(retention_mode("standard"), RetentionMode::Standard);
+        assert_eq!(retention_mode("bogus"), RetentionMode::Unknown);
+    }
+}
