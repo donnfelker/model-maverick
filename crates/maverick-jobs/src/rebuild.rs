@@ -335,7 +335,7 @@ pub async fn enqueue_in(conn: &mut PgConnection, args: &JobArgs) -> Result<(), R
 }
 
 /// Runs `work` while renewing the lease every heartbeat interval.
-async fn with_heartbeat<T>(
+pub(crate) async fn with_heartbeat<T>(
     pool: &PgPool,
     lease: &mut BatchLease,
     interval: Duration,
