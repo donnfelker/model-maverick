@@ -21,6 +21,7 @@ const COLUMN_LIST: &str =
     "must be a comma-separated list of column identifiers with no empty entries";
 const CRON: &str = "must be a 5-field cron expression like \"0 3 * * *\"";
 const DURATION: &str = "must be a positive duration like \"120s\"";
+const HTTP_URL: &str = "must be an http:// or https:// URL";
 const MODELS_DEV_PRICE_MAP: &str = "must be a JSON array of mapping objects with non-empty column_provider, column_model_id, column_endpoint, models_dev_provider, and models_dev_model_id";
 const DEFAULT_MODELS_DEV_PRICE_URL: &str = "https://models.dev/api.json";
 
@@ -92,6 +93,13 @@ pub struct Config {
     pub openai_api_key: String,
     pub google_api_key: String,
     pub xai_api_key: String,
+    /// Provider API base URLs. D23: the engine reads no ambient SDK variables, so these are
+    /// the only way to move a provider (a gateway, or the e2e fake provider). Empty is the
+    /// provider's default.
+    pub anthropic_base_url: String,
+    pub openai_base_url: String,
+    pub google_base_url: String,
+    pub xai_base_url: String,
     pub classifier_column: String,
     pub classifier_zero_retention_column: Option<String>,
     pub classifier_deadline: Duration,
@@ -209,6 +217,19 @@ impl fmt::Debug for Config {
             .field("openai_api_key", &"<redacted>")
             .field("google_api_key", &"<redacted>")
             .field("xai_api_key", &"<redacted>")
+            .field(
+                "anthropic_base_url",
+                &redact_credentials(&self.anthropic_base_url),
+            )
+            .field(
+                "openai_base_url",
+                &redact_credentials(&self.openai_base_url),
+            )
+            .field(
+                "google_base_url",
+                &redact_credentials(&self.google_base_url),
+            )
+            .field("xai_base_url", &redact_credentials(&self.xai_base_url))
             .field("classifier_column", &self.classifier_column)
             .field(
                 "classifier_zero_retention_column",
@@ -348,6 +369,10 @@ where
     let openai_api_key = optional(&lookup, "MAVERICK_OPENAI_API_KEY", "");
     let google_api_key = optional(&lookup, "MAVERICK_GOOGLE_API_KEY", "");
     let xai_api_key = optional(&lookup, "MAVERICK_XAI_API_KEY", "");
+    let anthropic_base_url = http_url(&lookup, "MAVERICK_ANTHROPIC_BASE_URL", &mut issues);
+    let openai_base_url = http_url(&lookup, "MAVERICK_OPENAI_BASE_URL", &mut issues);
+    let google_base_url = http_url(&lookup, "MAVERICK_GOOGLE_BASE_URL", &mut issues);
+    let xai_base_url = http_url(&lookup, "MAVERICK_XAI_BASE_URL", &mut issues);
     let classifier_column = optional(
         &lookup,
         "MAVERICK_CLASSIFIER_COLUMN",
@@ -538,6 +563,10 @@ where
             openai_api_key,
             google_api_key,
             xai_api_key,
+            anthropic_base_url,
+            openai_base_url,
+            google_base_url,
+            xai_base_url,
             classifier_column,
             classifier_zero_retention_column,
             classifier_deadline,
@@ -627,6 +656,25 @@ where
             issue(issues, name, "required but not set");
             String::new()
         }
+    }
+}
+
+/// An optional `http://` or `https://` URL; unset or empty is `""`.
+fn http_url<F>(lookup: &F, name: &str, issues: &mut Vec<ConfigIssue>) -> String
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let Some(value) = present(lookup, name) else {
+        return String::new();
+    };
+    let host = value
+        .strip_prefix("http://")
+        .or_else(|| value.strip_prefix("https://"));
+    if host.is_some_and(|host| !host.is_empty()) {
+        value
+    } else {
+        issue(issues, name, HTTP_URL);
+        String::new()
     }
 }
 
@@ -1106,6 +1154,10 @@ mod tests {
                 "https://otel:otelhunter2@collector:4318",
             ),
             ("MAVERICK_ANTHROPIC_API_KEY", "keyhunter2"),
+            (
+                "MAVERICK_OPENAI_BASE_URL",
+                "https://gw:gwhunter2@gateway.example.com/v1",
+            ),
         ];
         let config = Config::load_with(|name| {
             vars.iter()
@@ -1128,6 +1180,57 @@ mod tests {
             debug.contains("https://otel:<redacted>@collector:4318"),
             "{debug}"
         );
+        assert!(
+            debug.contains("https://gw:<redacted>@gateway.example.com/v1"),
+            "{debug}"
+        );
+    }
+
+    #[test]
+    fn provider_base_urls_are_optional_http_urls() {
+        let base = [
+            ("MAVERICK_DATABASE_URL", "postgres://db"),
+            ("MAVERICK_INTERNAL_TOKENS", "ops:alpha"),
+            ("MAVERICK_CAPTURE_MASTER_KEY", "ab".repeat(32).leak()),
+        ];
+        let load = |extra: &[(&'static str, &'static str)]| {
+            load_with(|name| {
+                base.iter()
+                    .chain(extra)
+                    .find(|(key, _)| *key == name)
+                    .map(|(_, value)| (*value).to_owned())
+            })
+        };
+        let config = load(&[]).expect("defaults");
+        assert_eq!(
+            [
+                config.anthropic_base_url.as_str(),
+                config.openai_base_url.as_str(),
+                config.google_base_url.as_str(),
+                config.xai_base_url.as_str(),
+            ],
+            ["", "", "", ""],
+            "empty is the provider default"
+        );
+        let config = load(&[
+            ("MAVERICK_ANTHROPIC_BASE_URL", "http://127.0.0.1:9000"),
+            ("MAVERICK_OPENAI_BASE_URL", "https://gateway.example.com/v1"),
+            ("MAVERICK_GOOGLE_BASE_URL", "http://fake:1/v1beta"),
+            ("MAVERICK_XAI_BASE_URL", ""),
+        ])
+        .expect("urls");
+        assert_eq!(config.anthropic_base_url, "http://127.0.0.1:9000");
+        assert_eq!(config.openai_base_url, "https://gateway.example.com/v1");
+        assert_eq!(config.google_base_url, "http://fake:1/v1beta");
+        assert_eq!(config.xai_base_url, "");
+        for bad in ["ftp://x", "localhost:9000", "http://", "https://"] {
+            let error = load(&[("MAVERICK_XAI_BASE_URL", bad)]).expect_err(bad);
+            assert!(
+                error.to_string().contains("MAVERICK_XAI_BASE_URL")
+                    && error.to_string().contains(HTTP_URL),
+                "{bad}: {error}"
+            );
+        }
     }
 
     #[test]
