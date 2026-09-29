@@ -11,10 +11,10 @@
 //! from Go's santhosh-tekuri library. Parity is the prefix and the pass/fail decision
 //! (D24, D36).
 //!
-//! Extra rules: golden_answer ([`super::golden`]) and judge_rubric (duplicate
-//! dimension, blank criterion) are ported. The json_schema, rule_scan, and key_facts
-//! extra rules (path parsing, regex compilation, duplicate fact ids) arrive with their
-//! grader beads, which register a validator that runs [`check_schema`] first.
+//! Extra rules: golden_answer ([`super::golden`]), key_facts ([`super::keyfacts`]),
+//! and judge_rubric (duplicate dimension, blank criterion) are ported. The json_schema
+//! and rule_scan extra rules (path parsing, regex compilation) arrive with their grader
+//! beads, which register a validator that runs [`check_schema`] first.
 
 use std::collections::{BTreeMap, HashSet};
 use std::sync::LazyLock;
@@ -23,6 +23,7 @@ use serde::Deserialize;
 
 use super::envelope::{Envelope, EnvelopeError, EnvelopeErrorKind, GraderKind};
 use super::golden::GoldenAnswer;
+use super::keyfacts::KeyFacts;
 use crate::gofmt;
 use crate::gojson::{self, JsonValue};
 
@@ -69,14 +70,11 @@ impl ValidationRegistry {
     /// judge validator.
     pub fn v1() -> Self {
         let mut registry = Self::new();
-        for kind in [
-            GraderKind::JsonSchema,
-            GraderKind::RuleScan,
-            GraderKind::KeyFacts,
-        ] {
+        for kind in [GraderKind::JsonSchema, GraderKind::RuleScan] {
             registry.register(Box::new(SchemaOnly(kind)));
         }
         registry.register(Box::new(GoldenAnswer));
+        registry.register(Box::new(KeyFacts));
         registry.register(Box::new(JudgeRubricValidator));
         registry
     }
@@ -258,7 +256,6 @@ mod tests {
         for (kind, bad) in [
             ("json_schema", r#"{"schema":1}"#),
             ("rule_scan", r#"{"rules":[]}"#),
-            ("key_facts", r#"{}"#),
         ] {
             let validator = registry.get(kind).expect("registered");
             let error = validator.validate_spec(&spec(bad)).unwrap_err();

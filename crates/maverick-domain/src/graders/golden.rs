@@ -14,7 +14,7 @@ use super::goregex;
 use super::registry::{BoxError, BoxFuture, GradeInput, GradeResult, Grader};
 use super::spec::{SpecValidator, check_schema};
 use crate::gojson::{self, JsonValue};
-use crate::gostrconv;
+use crate::{gostrconv, gostrings};
 
 /// The emitted dimension.
 pub const DIMENSION: &str = "answer_correctness";
@@ -183,24 +183,13 @@ fn matches(mode: &Mode<'_>, output: &str) -> Result<bool, String> {
     })
 }
 
-/// Go `strings.ToLower`: per-rune simple lowercase mapping. The only rune whose Rust
-/// lowercase is more than one char is U+0130 (İ), whose simple mapping is `i`.
-fn go_to_lower(s: &str) -> String {
-    s.chars()
-        .map(|c| match c {
-            '\u{130}' => 'i',
-            c => c.to_lowercase().next().unwrap_or(c),
-        })
-        .collect()
-}
-
 /// `normalize(s)`: collapse Unicode whitespace to single spaces, strip one trailing run
 /// of `.!?`, trim, and lowercase per rune. (Rust's whitespace set equals Go's
 /// `unicode.IsSpace`.)
 pub fn normalize(s: &str) -> String {
-    let collapsed = s.split_whitespace().collect::<Vec<_>>().join(" ");
+    let collapsed = gostrings::collapse_fields(s);
     let stripped = collapsed.trim_end_matches(['.', '!', '?']);
-    go_to_lower(stripped.trim())
+    gostrings::to_lower(stripped.trim())
 }
 
 /// `parseNumber(output)`: trim whitespace, strip trailing `.!?`, trim again, drop each
@@ -258,14 +247,6 @@ fn strip_bullet(part: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn go_lowercase_is_per_rune_simple() {
-        assert_eq!(go_to_lower("İSTANBUL"), "istanbul");
-        assert_eq!(go_to_lower("ΟΔΟΣ"), "οδοσ");
-        assert_eq!(go_to_lower("ß"), "ß");
-        assert_eq!(go_to_lower("Ǆ"), "ǆ");
-    }
 
     #[test]
     fn thousands_comma_rule() {
