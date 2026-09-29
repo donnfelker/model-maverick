@@ -8,10 +8,18 @@
 //! row; a failed call writes none. [`recommend`] is the one service that both the HTTP
 //! handler and MCP call.
 //!
+//! The prompt path classifies first ([`crate::classify::Resolver`]: cache, classifier
+//! call, D2 zero-retention refusal, D3 deadline, D4 budget), then continues as the declared
+//! path with the classified workload. The response adds `prompt_hash` (and, D4,
+//! `classification_quota_exceeded: true` when the budget stopped the classifier). The
+//! trace row stores the prompt hash and the request without the prompt. After the trace
+//! row, the capture hook may seal the prompt into a debug capture.
+//!
 //! The Rust response adds D8 and D9 to the Go shape: each entry carries `settings` and
 //! `retention_mode` after `execution_aliases` and `low_availability` after
 //! `clears_difficulty`, and the response ends with `zero_retention` (spec §9.2).
 
+mod prompt;
 mod request;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -40,6 +48,8 @@ use maverick_store::measurement::{self, Aggregate};
 use maverick_store::{JsonRawValue, corpus, is_not_found, numeric_to_f64, tenancy};
 use sqlx::PgPool;
 
+use crate::capture::{CaptureRequest, Capturer};
+use crate::classify::{ResolveInput, Resolver, ResolverSettings};
 use crate::observe::RequestLog;
 use crate::{ApiError, ApiState, ErrorCode, Identity, internal_error, not_found, read_body};
 
@@ -53,7 +63,8 @@ const DEFAULT_QUALITY_BAR: f32 = 0.80;
 /// D8: availability is averaged over this many trailing nights, today included.
 const AVAILABILITY_NIGHTS: i64 = 7;
 
-/// The recommend knobs: ranking bands, the ceiling buffer, and where alerts go.
+/// The recommend knobs: ranking bands, the ceiling buffer, where alerts go, the prompt
+/// path's classifier resolver, and the debug-capture hook.
 #[derive(Clone)]
 pub struct RecommendConfig {
     pub rank: RankParams,
@@ -61,6 +72,11 @@ pub struct RecommendConfig {
     /// Notified after a `pool_would_be_empty` alert row is written. `None` writes the row
     /// only.
     pub alerts: Option<Arc<dyn AlertNotifier>>,
+    /// The prompt path's classifier. Without classifier clients (see
+    /// [`Resolver::connect`]) every cache miss answers the fallback classification.
+    pub classifier: Arc<Resolver>,
+    /// The debug-capture hook. `None` never captures.
+    pub capture: Option<Arc<Capturer>>,
 }
 
 impl Default for RecommendConfig {
@@ -69,6 +85,8 @@ impl Default for RecommendConfig {
             rank: RankParams::default(),
             ceiling_buffer: ceilings::DEFAULT_CEILING_BUFFER,
             alerts: None,
+            classifier: Arc::new(Resolver::default()),
+            capture: None,
         }
     }
 }
@@ -79,12 +97,15 @@ impl fmt::Debug for RecommendConfig {
             .field("rank", &self.rank)
             .field("ceiling_buffer", &self.ceiling_buffer)
             .field("alerts", &self.alerts.is_some())
+            .field("classifier", &self.classifier)
+            .field("capture", &self.capture)
             .finish()
     }
 }
 
 impl RecommendConfig {
-    /// The knobs from the configuration (spec §14.1). Alerts start without a notifier.
+    /// The knobs from the configuration (spec §14.1). Alerts start without a notifier and
+    /// the classifier without clients; serve connects them.
     pub fn from_config(config: &Config) -> Self {
         Self {
             rank: RankParams {
@@ -96,6 +117,8 @@ impl RecommendConfig {
             },
             ceiling_buffer: config.ceiling_buffer,
             alerts: None,
+            classifier: Arc::new(Resolver::new(ResolverSettings::from_config(config))),
+            capture: Some(Arc::new(Capturer::from_config(config))),
         }
     }
 }
@@ -199,35 +222,17 @@ pub async fn recommend(
     body: &[u8],
 ) -> Result<Recommended, RecommendError> {
     let request = request::decode(body)?;
-    let workload = match request::validate(&request)? {
-        Form::Declared {
-            capability,
-            difficulty,
-            domain_tags,
-        } => Declared {
-            defaulted: difficulty.is_none(),
-            difficulty: difficulty.unwrap_or(DEFAULT_DIFFICULTY),
-            capability,
-            domain_tags,
-        },
-        Form::Prompt(_) => {
-            return Err(RecommendError::Internal(
-                "the prompt path is not implemented yet (model-maverick-rust-port-3hk.5.6)"
-                    .to_owned(),
-            ));
-        }
-    };
+    let form = request::validate(&request)?;
     let mode = if request.mode.is_empty() {
         "balanced"
     } else {
         request.mode.as_str()
     };
-    let difficulty = i32::try_from(workload.difficulty).expect("validated 1..=5");
-    let tier = i16::try_from(workload.difficulty).expect("validated 1..=5");
     let now = Utc::now();
     let tenant = identity.tenant_id.as_str();
 
-    // Step 3: the tenant's configuration and the whole catalog.
+    // Step 3: the tenant's configuration and the whole catalog. The prompt path needs the
+    // zero-retention constraint (D2) and the catalog before it classifies.
     let pools = tenancy::list_pools_by_tenant(pool, tenant).await?;
     let weights = tenancy::list_tenant_weights_by_tenant(pool, tenant).await?;
     let standing = match tenancy::get_tenant_constraints(pool, tenant).await {
@@ -240,6 +245,70 @@ pub async fn recommend(
         Err(error) => return Err(error.into()),
     };
     let zero_retention = standing.zero_retention;
+    let columns = catalog::list_model_columns(pool).await?;
+
+    // Step 2: the workload, declared or classified.
+    let (workload, prompt_path) = match form {
+        Form::Declared {
+            capability,
+            difficulty,
+            domain_tags,
+        } => {
+            let declared = Declared {
+                defaulted: difficulty.is_none(),
+                difficulty: difficulty.unwrap_or(DEFAULT_DIFFICULTY),
+                capability,
+                domain_tags,
+            };
+            (declared.resolved(), None)
+        }
+        Form::Prompt {
+            prompt,
+            projection_version,
+        } => {
+            let row = tenancy::get_tenant(pool, tenant).await?;
+            let resolution = config
+                .classifier
+                .resolve(
+                    pool,
+                    &ResolveInput {
+                        tenant_id: tenant,
+                        prompt_hmac_key: &row.prompt_hmac_key,
+                        quota_override: row.classification_quota_override,
+                        zero_retention,
+                        prompt: &prompt,
+                        projection_version: projection_version.as_deref(),
+                        columns: &columns,
+                        now,
+                    },
+                )
+                .await
+                .map_err(|refused| {
+                    ApiError::new(
+                        StatusCode::UNPROCESSABLE_ENTITY,
+                        ErrorCode::ZeroRetentionRequiresDeclared,
+                        refused.to_string(),
+                    )
+                    .detail("field", "workload.prompt")
+                })?;
+            let workload = Resolved {
+                capability: resolution.classification.capability.clone(),
+                difficulty: resolution.classification.difficulty,
+                classification: prompt::classification_block(&resolution),
+            };
+            (workload, Some((prompt, resolution)))
+        }
+    };
+    let difficulty = i32::try_from(workload.difficulty)
+        .ok()
+        .filter(|d| (1..=5).contains(d))
+        .ok_or_else(|| {
+            RecommendError::Internal(format!(
+                "difficulty {} is out of range",
+                workload.difficulty
+            ))
+        })?;
+    let tier = i16::try_from(difficulty).expect("1..=5");
     let cfg = TenantConfig {
         tenant_id: tenant.to_owned(),
         pools: pools
@@ -252,7 +321,6 @@ pub async fn recommend(
             .collect(),
         constraints: standing,
     };
-    let columns = catalog::list_model_columns(pool).await?;
     let by_id: HashMap<&str, &ModelColumn> = columns.iter().map(|c| (c.id.as_str(), c)).collect();
     let resolved = policy::resolve_pool(&cfg, &request.pool).map_err(policy_error)?;
 
@@ -471,7 +539,10 @@ pub async fn recommend(
         .unwrap_or_default();
 
     let id = ids::new(ids::prefix::RECOMMENDATION);
-    let classification = workload.classification();
+    let classification = workload.classification.clone();
+    let prompt_hash = prompt_path
+        .as_ref()
+        .map(|(_, resolution)| resolution.prompt_hash.clone());
     let mut items = Vec::with_capacity(recommendations.len());
     for entry in &recommendations {
         let column = by_id[entry.column_id.as_str()];
@@ -486,7 +557,7 @@ pub async fn recommend(
         ]));
     }
     let check = checks::check_spec_for(&workload.capability);
-    let response = object(vec![
+    let mut members = vec![
         ("classification", classification.clone()),
         ("recommendations", JsonValue::Array(items)),
         ("pool", string(&decision.pool)),
@@ -503,12 +574,25 @@ pub async fn recommend(
             JsonValue::Bool(decision.constraints_met && pick.flags.prefs_satisfied),
         ),
         ("violations", JsonValue::Array(violation_items)),
+    ];
+    if let Some(hash) = &prompt_hash {
+        members.push(("prompt_hash", string(hash)));
+    }
+    members.extend([
         ("recommendation_id", string(&id)),
         ("matrix_version", string(&matrix_version)),
         ("measured", JsonValue::Bool(pick.flags.measured)),
         // D9.
         ("zero_retention", JsonValue::Bool(zero_retention)),
     ]);
+    // D4: only when the budget stopped the classifier.
+    if prompt_path
+        .as_ref()
+        .is_some_and(|(_, resolution)| resolution.quota_exceeded)
+    {
+        members.push(("classification_quota_exceeded", JsonValue::Bool(true)));
+    }
+    let response = object(members);
     let response_text = gojson::marshal(&response);
 
     // Step 11: the trace row. Survivors in rank order, then the policy exclusions, then
@@ -538,16 +622,19 @@ pub async fn recommend(
             .map(|exclusion| TraceCandidate::exclusion(exclusion, &info(&exclusion.column_id))),
     );
     let candidates = trace::candidates_json(&candidates).map_err(RecommendError::Internal)?;
-    let stored_request = raw(String::from_utf8_lossy(body)
-        .trim_matches([' ', '\t', '\n', '\r'])
-        .to_owned())?;
+    let body_text = String::from_utf8_lossy(body);
+    let stored_request = match &prompt_path {
+        // The prompt is never stored (spec §10).
+        Some(_) => raw(prompt::exclude_prompt(&body_text).map_err(RecommendError::Internal)?)?,
+        None => raw(body_text.trim_matches([' ', '\t', '\n', '\r']).to_owned())?,
+    };
     decisions::create_recommendation(
         pool,
         &NewRecommendation {
             id: &id,
             tenant_id: tenant,
             api_key_id: &identity.api_key_id,
-            prompt_hash: None,
+            prompt_hash: prompt_hash.as_deref(),
             request: &stored_request,
             classification: &raw(gojson::marshal(&classification))?,
             candidates: &raw(candidates)?,
@@ -557,9 +644,34 @@ pub async fn recommend(
     )
     .await?;
 
+    // The capture hook runs after the trace row and never fails the request.
+    if let (Some((prompt, resolution)), Some(capturer)) = (&prompt_path, &config.capture) {
+        capturer
+            .maybe(
+                pool,
+                &CaptureRequest {
+                    tenant_id: tenant,
+                    api_key_id: &identity.api_key_id,
+                    zero_retention,
+                    recommendation_id: &id,
+                    prompt,
+                    confidence: resolution.classification.confidence,
+                    now,
+                },
+            )
+            .await;
+    }
+
     let mut body = response_text;
     body.push('\n');
     Ok(Recommended { id, body })
+}
+
+/// The workload the rest of the pipeline uses, with its response `classification` block.
+struct Resolved {
+    capability: String,
+    difficulty: i64,
+    classification: JsonValue,
 }
 
 /// A resolved declared workload.
@@ -572,6 +684,14 @@ struct Declared {
 }
 
 impl Declared {
+    fn resolved(&self) -> Resolved {
+        Resolved {
+            capability: self.capability.clone(),
+            difficulty: self.difficulty,
+            classification: self.classification(),
+        }
+    }
+
     /// The classification block: confidence 1, method `declared`, and
     /// `difficulty_source: "default"` only when the difficulty was defaulted.
     fn classification(&self) -> JsonValue {

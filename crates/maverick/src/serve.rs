@@ -17,6 +17,7 @@ use hyper_util::server::graceful::GracefulShutdown;
 use hyper_util::service::TowerToHyperService;
 use maverick_alerts::{AlertNotifier, Fanout};
 use maverick_api::audit::JsonField;
+use maverick_api::classify::{Resolver, ResolverSettings};
 use maverick_api::{
     ApiState, AuthState, RecommendConfig, internal_router_with, public_router_with,
 };
@@ -193,10 +194,12 @@ async fn run(config: &Config, api_only: bool, worker_only: bool) -> i32 {
 
     let mut recommend = RecommendConfig::from_config(config);
     recommend.alerts = Some(Arc::clone(&notifier));
-    // Step 10, the classifier resolver (unless --worker-only), hooks in here with the
-    // prompt path (bead 5.6): list the catalog, connect the classifier columns' clients,
-    // and on failure log `classifier column unavailable; prompt-path requests will
-    // receive the fallback classification` and continue.
+    // Step 10: the classifier resolver (unless --worker-only). A column that does not
+    // resolve logs `classifier column unavailable; ...` and serving continues.
+    if !worker_only {
+        recommend.classifier =
+            Arc::new(classifier_resolver(config, &pool, &providers, Arc::clone(&notifier)).await);
+    }
     let auth = match AuthState::from_config(pool.clone(), config) {
         Ok(auth) => auth,
         Err(error) => {
@@ -268,6 +271,36 @@ fn listen_addr(addr: &str) -> String {
 }
 
 /// A built provider client, or why it could not be built.
+/// Step 10: the prompt path's resolver, its classifier columns connected to the provider
+/// clients through the catalog. Without the catalog, every prompt request gets the
+/// fallback classification.
+async fn classifier_resolver(
+    config: &Config,
+    pool: &PgPool,
+    providers: &[(&'static str, Arc<dyn ProviderClient>)],
+    notifier: Arc<dyn AlertNotifier>,
+) -> Resolver {
+    let resolver = Resolver::new(ResolverSettings::from_config(config)).with_alerts(notifier);
+    match maverick_store::catalog::list_model_columns(pool).await {
+        Ok(columns) => {
+            let clients: HashMap<String, Arc<dyn ProviderClient>> = providers
+                .iter()
+                .map(|(name, client)| ((*name).to_owned(), Arc::clone(client)))
+                .collect();
+            resolver.connect(&columns, &clients)
+        }
+        Err(error) => {
+            tracing::error!(
+                column = %config.classifier_column,
+                error = %error,
+                "classifier column unavailable; prompt-path requests will receive the \
+                 fallback classification"
+            );
+            resolver
+        }
+    }
+}
+
 type Built = Result<Arc<dyn ProviderClient>, String>;
 /// A provider's name, its API key, and how to build its client.
 type Candidate<'a> = (&'static str, &'a str, fn(&str) -> Built);

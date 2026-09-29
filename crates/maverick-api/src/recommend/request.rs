@@ -27,12 +27,15 @@ pub(crate) struct RecommendRequest {
 }
 
 /// The `workload` object. `prompt` keeps its presence: `""` is a present, empty prompt.
+/// `projection_version` is the version of the chat projection a component built the prompt
+/// with (D5); it joins the classification cache key.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct Workload {
     pub capability: String,
     pub difficulty: Option<i64>,
     pub domain_tags: Option<Vec<String>>,
     pub prompt: Option<String>,
+    pub projection_version: String,
 }
 
 /// The request `constraints` (preferences).
@@ -51,8 +54,12 @@ pub(crate) enum Form {
         difficulty: Option<i64>,
         domain_tags: Vec<String>,
     },
-    /// A non-empty prompt within the length limit.
-    Prompt(String),
+    /// A non-empty prompt within the length limit, and its projection version when the
+    /// request names one (D5).
+    Prompt {
+        prompt: String,
+        projection_version: Option<String>,
+    },
 }
 
 fn invalid(message: impl Into<String>) -> ApiError {
@@ -149,7 +156,16 @@ fn workload(value: &JsonValue, existing: Option<Workload>) -> Result<Option<Work
     };
     let mut out = existing.unwrap_or_default();
     for (key, value) in members {
-        match match_field(key, &["capability", "difficulty", "domain_tags", "prompt"]) {
+        match match_field(
+            key,
+            &[
+                "capability",
+                "difficulty",
+                "domain_tags",
+                "prompt",
+                "projection_version",
+            ],
+        ) {
             Some("capability") => {
                 string(value, STRUCT, "workload.capability", &mut out.capability)?;
             }
@@ -171,6 +187,14 @@ fn workload(value: &JsonValue, existing: Option<Workload>) -> Result<Option<Work
                 JsonValue::String(s) => out.prompt = Some(s.clone()),
                 other => return Err(type_error(other, STRUCT, "workload.prompt", "string")),
             },
+            Some("projection_version") => {
+                string(
+                    value,
+                    STRUCT,
+                    "workload.projection_version",
+                    &mut out.projection_version,
+                )?;
+            }
             _ => return Err(unknown(key)),
         }
     }
@@ -300,9 +324,19 @@ pub(crate) fn validate(request: &RecommendRequest) -> Result<Form, ApiError> {
                     "workload.prompt exceeds {MAX_PROMPT_CHARS} characters (spec §8.1)"
                 )));
             }
-            Form::Prompt(prompt.clone())
+            Form::Prompt {
+                prompt: prompt.clone(),
+                projection_version: Some(workload.projection_version.clone())
+                    .filter(|version| !version.is_empty()),
+            }
         }
         None => {
+            if !workload.projection_version.is_empty() {
+                return Err(invalid(
+                    "workload.projection_version applies only to the prompt form (spec §8.1)",
+                )
+                .detail("field", "workload.projection_version"));
+            }
             let capability = &workload.capability;
             if !CAPABILITIES.contains(&capability.as_str()) {
                 return Err(invalid(format!(

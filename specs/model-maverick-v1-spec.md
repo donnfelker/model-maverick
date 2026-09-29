@@ -718,7 +718,7 @@ Index 0 is the pick; the array is the pool-constrained fallback chain (G2).
 `POST /v1/recommend` accepts exactly one of:
 
 - **Declared:** `workload.capability` (+ optional `workload.difficulty` 1–5, `workload.domain_tags[]`). No classifier call, nothing leaves the engine (plan's privacy note). Missing difficulty defaults to 3 with `classification.difficulty_source: "default"`.
-- **Prompt:** `workload.prompt` (string, ≤ 500,000 chars). Classifier path below. For a zero-retention tenant with no usable zero-retention classifier column, the prompt form is refused with `422 zero_retention_requires_declared` and the prompt never leaves the engine (§8.3).
+- **Prompt:** `workload.prompt` (string, ≤ 500,000 chars). Classifier path below. For a zero-retention tenant with no usable zero-retention classifier column, the prompt form is refused with `422 zero_retention_requires_declared` and the prompt never leaves the engine (§8.3). The error has `details: {"field": "workload.prompt"}`. The optional `workload.projection_version` (string, D5) belongs to the prompt form: on a declared workload it is `422 invalid_request` with `details: {"field": "workload.projection_version"}`.
 
 Both present or both absent → `422 invalid_request`.
 
@@ -847,7 +847,7 @@ Response `200`:
 }
 ```
 
-`score` is the absolute displayed quality (§6.7). `prompt_hash` present only on prompt-form requests. Every entry carries its column's `settings` and effective `retention_mode` (§4.5, §7.4), and `low_availability` (§7.4 step 6). `zero_retention` is always present; when true, SDK cores switch to declared mode and treat the tenant as zero-retention for their fail-open ladder (G14). `classification_quota_exceeded: true` appears only when the classifier budget was hit (§8.3). The prompt form also accepts `workload.projection_version` (string, §8.1). (changed 2026-09-28 for the Rust port; the Go engine implements the prior rule: entries carry no `settings`, `retention_mode`, or `low_availability`, and responses carry no `zero_retention`) `violations` entries: `{"constraint": "max_latency_ms", "limit": 2000, "estimated": 3400}`.
+`score` is the absolute displayed quality (§6.7). `prompt_hash` present only on prompt-form requests. Every entry carries its column's `settings` and effective `retention_mode` (§4.5, §7.4), and `low_availability` (§7.4 step 6). `zero_retention` is always present; when true, SDK cores switch to declared mode and treat the tenant as zero-retention for their fail-open ladder (G14). `classification_quota_exceeded: true` appears only when the classifier budget was hit (§8.3), as the last key of the response. The prompt form also accepts `workload.projection_version` (string, §8.1). (changed 2026-09-28 for the Rust port; the Go engine implements the prior rule: entries carry no `settings`, `retention_mode`, or `low_availability`, and responses carry no `zero_retention`) `violations` entries: `{"constraint": "max_latency_ms", "limit": 2000, "estimated": 3400}`.
 
 ### 9.3 GET /v1/policies
 
@@ -964,7 +964,7 @@ Exact bytes, no normalization — a one-character edit produces an unrelated has
 ]
 ```
 
-Exclusion reasons (closed enum): `not_in_pool`, `not_in_allowlist`, `standing_constraint:max_cost_per_run`, `standing_constraint:max_latency_ms`, `standing_constraint:zero_retention` (added 2026-09-28, §7.1 step 3), `status_retired`, `no_data`. Survivors also record `availability` and `low_availability`. The trace plus `classification`, `request` (prompt excluded), tenant weights used, mode, and band settle Haiku-instead-of-Opus directly: Opus is either a ranked survivor with the numbers that placed it behind, or in the exclusion list with the reason it never competed.
+Exclusion reasons (closed enum): `not_in_pool`, `not_in_allowlist`, `standing_constraint:max_cost_per_run`, `standing_constraint:max_latency_ms`, `standing_constraint:zero_retention` (added 2026-09-28, §7.1 step 3), `status_retired`, `no_data`. Survivors also record `availability` and `low_availability`. The trace plus `classification`, `request` (prompt excluded: every key of `workload` that names the prompt, in any letter case, is deleted), tenant weights used, mode, and band settle Haiku-instead-of-Opus directly: Opus is either a ranked survivor with the numbers that placed it behind, or in the exclusion list with the reason it never competed.
 
 ### 10.3 Retention
 
