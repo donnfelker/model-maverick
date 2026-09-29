@@ -3,8 +3,7 @@
 
 use maverick_domain::gojson::{self, JsonValue};
 use maverick_domain::graders::{
-    EnvelopeErrorKind, GraderKind, SpecValidator, ValidationRegistry, parse_envelope,
-    parse_envelope_value,
+    EnvelopeErrorKind, SpecValidator, ValidationRegistry, parse_envelope, parse_envelope_value,
 };
 use serde_json::Value;
 
@@ -121,8 +120,8 @@ struct Stub {
 }
 
 impl SpecValidator for Stub {
-    fn kind(&self) -> GraderKind {
-        GraderKind::RuleScan
+    fn kind(&self) -> &str {
+        "rule_scan"
     }
 
     fn validate_spec(&self, spec: &JsonValue) -> Result<(), String> {
@@ -163,7 +162,7 @@ fn validate_spec_delegates() {
     });
     struct Shared(std::sync::Arc<Stub>);
     impl SpecValidator for Shared {
-        fn kind(&self) -> GraderKind {
+        fn kind(&self) -> &str {
             self.0.kind()
         }
         fn validate_spec(&self, spec: &JsonValue) -> Result<(), String> {

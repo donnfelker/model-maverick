@@ -27,7 +27,8 @@ use crate::gojson::JsonValue;
 
 /// Validates one kind's `spec` payload.
 pub trait SpecValidator: Send + Sync {
-    fn kind(&self) -> GraderKind;
+    /// The envelope `type` this validator checks (`"golden_answer"`, ...).
+    fn kind(&self) -> &str;
 
     /// `Ok` when the spec is valid. The error text starts with `<kind> spec: `.
     fn validate_spec(&self, spec: &JsonValue) -> Result<(), String>;
@@ -36,7 +37,7 @@ pub trait SpecValidator: Send + Sync {
 /// The validators the corpus loader uses, one per kind.
 #[derive(Default)]
 pub struct ValidationRegistry {
-    validators: BTreeMap<GraderKind, Box<dyn SpecValidator>>,
+    validators: BTreeMap<String, Box<dyn SpecValidator>>,
 }
 
 impl ValidationRegistry {
@@ -62,25 +63,24 @@ impl ValidationRegistry {
 
     /// Adds or replaces the validator for its kind.
     pub fn register(&mut self, validator: Box<dyn SpecValidator>) {
-        self.validators.insert(validator.kind(), validator);
+        self.validators
+            .insert(validator.kind().to_owned(), validator);
     }
 
-    pub fn get(&self, kind: GraderKind) -> Option<&dyn SpecValidator> {
-        self.validators.get(&kind).map(|v| v.as_ref())
+    pub fn get(&self, kind: &str) -> Option<&dyn SpecValidator> {
+        self.validators.get(kind).map(|v| v.as_ref())
     }
 
-    /// The registered kinds in ascending order of their type names.
-    pub fn kinds(&self) -> Vec<&'static str> {
-        let mut kinds: Vec<_> = self.validators.keys().map(|k| k.as_str()).collect();
-        kinds.sort_unstable();
-        kinds
+    /// The registered kinds in ascending order.
+    pub fn kinds(&self) -> Vec<&str> {
+        self.validators.keys().map(String::as_str).collect()
     }
 }
 
 impl Envelope {
     /// `Envelope.ValidateSpec(reg)`.
     pub fn validate_spec(&self, registry: &ValidationRegistry) -> Result<(), EnvelopeError> {
-        let Some(validator) = registry.get(self.kind) else {
+        let Some(validator) = registry.get(self.kind.as_str()) else {
             return Err(spec_error(
                 EnvelopeErrorKind::NotRegistered,
                 format!(
@@ -149,8 +149,8 @@ pub fn check_schema(kind: GraderKind, spec: &JsonValue) -> Result<serde_json::Va
 struct SchemaOnly(GraderKind);
 
 impl SpecValidator for SchemaOnly {
-    fn kind(&self) -> GraderKind {
-        self.0
+    fn kind(&self) -> &str {
+        self.0.as_str()
     }
 
     fn validate_spec(&self, spec: &JsonValue) -> Result<(), String> {
@@ -179,8 +179,8 @@ pub struct RubricItem {
 pub struct JudgeRubricValidator;
 
 impl SpecValidator for JudgeRubricValidator {
-    fn kind(&self) -> GraderKind {
-        GraderKind::JudgeRubric
+    fn kind(&self) -> &str {
+        GraderKind::JudgeRubric.as_str()
     }
 
     fn validate_spec(&self, spec: &JsonValue) -> Result<(), String> {

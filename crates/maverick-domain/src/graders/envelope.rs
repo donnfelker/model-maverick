@@ -101,6 +101,8 @@ pub enum EnvelopeErrorKind {
     NotRegistered,
     /// The kind's validator rejected the spec.
     SpecInvalid,
+    /// [`Envelope::map_dimensions`] could not pair emitted and task dimensions.
+    AmbiguousMapping,
 }
 
 /// An envelope error. `to_string()` is the exact Go text, starting with
@@ -321,6 +323,72 @@ fn check(decoded: Decoded) -> Result<Envelope, EnvelopeError> {
     })
 }
 
+impl Envelope {
+    /// `MapDimensions(emitted)`: maps a grader's emitted dimensions onto the task's
+    /// dimension names (reference Part 2 §6.2).
+    ///
+    /// A task dimension that the grader emitted under the same name gets
+    /// `clamp01(emitted * multiplier)`. When exactly one task dimension is left open and
+    /// exactly one emitted dimension is unclaimed, the emitted one is renamed onto it.
+    /// Other unclaimed emitted dimensions are dropped and unemitted task dimensions
+    /// stay absent, unless both sides have leftovers that cannot be paired: that is an
+    /// error.
+    pub fn map_dimensions(
+        &self,
+        emitted: Option<&BTreeMap<String, f64>>,
+    ) -> Result<BTreeMap<String, f64>, EnvelopeError> {
+        let empty = BTreeMap::new();
+        let emitted = emitted.unwrap_or(&empty);
+        let mut mapped = BTreeMap::new();
+        let mut open = Vec::new();
+        for (task_dim, &multiplier) in &self.weight_dimensions {
+            match emitted.get(task_dim) {
+                Some(&score) => {
+                    mapped.insert(task_dim.clone(), clamp01(score * multiplier));
+                }
+                None => open.push(task_dim.as_str()),
+            }
+        }
+        let leftover: Vec<&str> = emitted
+            .keys()
+            .filter(|d| !self.weight_dimensions.contains_key(*d))
+            .map(String::as_str)
+            .collect();
+        if open.is_empty() || leftover.is_empty() {
+            return Ok(mapped);
+        }
+        if let ([task_dim], [emitted_dim]) = (open.as_slice(), leftover.as_slice()) {
+            let multiplier = self.weight_dimensions[*task_dim];
+            mapped.insert(
+                (*task_dim).to_owned(),
+                clamp01(emitted[*emitted_dim] * multiplier),
+            );
+            return Ok(mapped);
+        }
+        // Both lists are already sorted (BTreeMap order). The dash is an em dash.
+        Err(EnvelopeError::new(
+            EnvelopeErrorKind::AmbiguousMapping,
+            format!(
+                "ambiguous weight_dimensions mapping for type {}: task dimensions [{}] vs emitted [{}] \u{2014} align the names",
+                gofmt::quote(self.kind.as_str()),
+                open.join(" "),
+                leftover.join(" ")
+            ),
+        ))
+    }
+}
+
+/// Go `math.Min(1, math.Max(0, x))`: NaN stays NaN and `-0` becomes `0`.
+fn clamp01(x: f64) -> f64 {
+    if x.is_nan() {
+        x
+    } else if x > 0.0 {
+        x.min(1.0)
+    } else {
+        0.0
+    }
+}
+
 /// The `type` string as the corpus validator reads it when it classifies an envelope
 /// error: the last string-valued `type` field (matched like Go struct fields), or ""
 /// when there is none.
@@ -454,6 +522,17 @@ mod tests {
             )
             .is_ok()
         );
+    }
+
+    #[test]
+    fn clamp01_follows_go_min_max() {
+        assert!(clamp01(f64::NAN).is_nan());
+        assert_eq!(clamp01(-0.0).to_bits(), 0.0f64.to_bits());
+        assert_eq!(clamp01(-2.0), 0.0);
+        assert_eq!(clamp01(0.25), 0.25);
+        assert_eq!(clamp01(1.0), 1.0);
+        assert_eq!(clamp01(1.5), 1.0);
+        assert_eq!(clamp01(f64::INFINITY), 1.0);
     }
 
     #[test]
