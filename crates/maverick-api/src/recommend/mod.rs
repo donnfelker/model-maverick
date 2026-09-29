@@ -546,7 +546,7 @@ pub async fn recommend(
     let mut items = Vec::with_capacity(recommendations.len());
     for entry in &recommendations {
         let column = by_id[entry.column_id.as_str()];
-        items.push(entry_json(entry, column)?);
+        items.push(entry_json(entry, column, now)?);
     }
     let mut violation_items = Vec::with_capacity(violations.len());
     for violation in &violations {
@@ -846,6 +846,7 @@ async fn write_alert(
 fn entry_json(
     entry: &entries::RecommendationEntry,
     column: &ModelColumn,
+    now: DateTime<Utc>,
 ) -> Result<JsonValue, RecommendError> {
     let score = match entry.score {
         Some(score) => number(score)?,
@@ -857,6 +858,11 @@ fn entry_json(
         ("endpoint", string(&entry.endpoint)),
         ("column_id", string(&entry.column_id)),
         ("execution_aliases", jsonb(column.execution_aliases.get())?),
+        // D15: each alias's effective retention mode (openrouter spec §2.3).
+        (
+            "execution_alias_retention",
+            crate::models::alias_retention(column, now).map_err(RecommendError::Internal)?,
+        ),
         // D9.
         ("settings", jsonb(column.settings.get())?),
         ("retention_mode", string(entry.retention_mode.as_str())),

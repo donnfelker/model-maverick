@@ -211,7 +211,7 @@ fn with_rust_fields(go: &str, retention: &str) -> String {
     go.replace(
         "\"execution_aliases\":{},",
         &format!(
-            "\"execution_aliases\":{{}},\"settings\":{{}},\"retention_mode\":\"{retention}\","
+            "\"execution_aliases\":{{}},\"execution_alias_retention\":{{}},\"settings\":{{}},\"retention_mode\":\"{retention}\","
         ),
     )
     .replace(
@@ -377,7 +377,48 @@ async fn entries_carry_execution_aliases_and_settings_verbatim() {
     // jsonb order (shorter keys first) and number spelling, compacted (reference §3.9).
     assert!(
         body.contains(
-            r#""execution_aliases":{"vertex":"a","openrouter":"anthropic/claude-recommend-alias"},"settings":{"effort":3.0,"thinking":true},"retention_mode":"unknown","#
+            r#""execution_aliases":{"vertex":"a","openrouter":"anthropic/claude-recommend-alias"},"execution_alias_retention":{"vertex":"unknown","openrouter":"unknown"},"settings":{"effort":3.0,"thinking":true},"retention_mode":"unknown","#
+        ),
+        "{body}"
+    );
+    db.close().await;
+}
+
+/// DIVERGENCE: D15. Each entry carries `execution_alias_retention`: every alias key with its
+/// effective mode (openrouter spec §2.3). Valid zero evidence reads `zero`; expired
+/// evidence and a key without evidence read `unknown`.
+#[tokio::test]
+async fn entries_carry_effective_alias_retention() {
+    let d15 = parity_support::divergence!("D15");
+    assert_eq!(d15.id(), "D15");
+    let Some((db, pool)) = database().await else {
+        return;
+    };
+    column(
+        &pool,
+        "col_a",
+        "anthropic",
+        "claude-a",
+        Some(r#"{"openrouter":"anthropic/claude-a","azure":"a","bedrock":"b"}"#),
+        None,
+    )
+    .await;
+    let future = (Utc::now() + Duration::days(30)).to_rfc3339();
+    let past = (Utc::now() - Duration::days(1)).to_rfc3339();
+    sqlx::query("UPDATE model_columns SET execution_alias_retention = $1::jsonb")
+        .bind(format!(
+            r#"{{"openrouter": {{"retention_mode": "zero", "retention_valid_until": "{future}"}},
+                "azure": {{"retention_mode": "zero", "retention_valid_until": "{past}"}}}}"#
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
+    pool_of(&pool, "default", &["col_a"], true).await;
+    let (status, body) = recommend(&pool, r#"{"workload":{"capability":"factual_qa"}}"#).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        body.contains(
+            r#""execution_alias_retention":{"azure":"unknown","bedrock":"unknown","openrouter":"zero"},"#
         ),
         "{body}"
     );
