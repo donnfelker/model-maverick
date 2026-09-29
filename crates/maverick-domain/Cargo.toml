@@ -33,5 +33,6 @@ rand = { workspace = true }
 
 [dev-dependencies]
 parity-support = { path = "../parity-support" }
+test-support = { path = "../test-support" }
 insta = { workspace = true }
 proptest = { workspace = true }
