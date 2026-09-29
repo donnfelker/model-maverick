@@ -126,11 +126,65 @@ pub struct Config {
     pub otel_service_name: String,
 }
 
+/// A URL for Debug output (G5): the userinfo password and any `password=` query value
+/// become `<redacted>`. `postgres://`, `smtp://`, and OTLP URLs can carry credentials.
+fn redact_credentials(url: &str) -> String {
+    let Some((scheme, rest)) = url.split_once("://") else {
+        return url.to_owned();
+    };
+    let authority_end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let (authority, tail) = rest.split_at(authority_end);
+    let authority = match authority.rsplit_once('@') {
+        Some((userinfo, host)) => match userinfo.split_once(':') {
+            Some((user, _)) => format!("{user}:<redacted>@{host}"),
+            None => format!("{userinfo}@{host}"),
+        },
+        None => authority.to_owned(),
+    };
+    let tail = match tail.split_once('?') {
+        Some((path, query)) => {
+            let query: Vec<String> = query
+                .split('&')
+                .map(|pair| match pair.split_once('=') {
+                    Some((key, _)) if key.eq_ignore_ascii_case("password") => {
+                        format!("{key}=<redacted>")
+                    }
+                    _ => pair.to_owned(),
+                })
+                .collect();
+            format!("{path}?{}", query.join("&"))
+        }
+        None => tail.to_owned(),
+    };
+    format!("{scheme}://{authority}{tail}")
+}
+
+/// Only the scheme and host of a URL, for Debug output (G5). Webhook URLs often carry
+/// their secret in the path or the query.
+fn origin_only(url: &str) -> String {
+    let Some((scheme, rest)) = url.split_once("://") else {
+        return if url.is_empty() {
+            String::new()
+        } else {
+            "<redacted>".to_owned()
+        };
+    };
+    let authority_end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let host = rest[..authority_end]
+        .rsplit_once('@')
+        .map_or(&rest[..authority_end], |(_, h)| h);
+    if authority_end == rest.len() {
+        format!("{scheme}://{host}")
+    } else {
+        format!("{scheme}://{host}/<redacted>")
+    }
+}
+
 impl fmt::Debug for Config {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Config")
-            .field("database_url", &self.database_url)
+            .field("database_url", &redact_credentials(&self.database_url))
             .field("public_addr", &self.public_addr)
             .field("internal_addr", &self.internal_addr)
             .field("internal_tokens", &self.internal_tokens)
@@ -190,8 +244,8 @@ impl fmt::Debug for Config {
                 "capture_previous_master_key",
                 &self.capture_previous_master_key,
             )
-            .field("smtp_url", &self.smtp_url)
-            .field("alerts_webhook_url", &self.alerts_webhook_url)
+            .field("smtp_url", &redact_credentials(&self.smtp_url))
+            .field("alerts_webhook_url", &origin_only(&self.alerts_webhook_url))
             .field("alerts_webhook_secret", &"<redacted>")
             .field("cron_prediction_lock", &self.cron_prediction_lock)
             .field("cron_nightly", &self.cron_nightly)
@@ -201,7 +255,10 @@ impl fmt::Debug for Config {
             .field("cron_catalog_sync", &self.cron_catalog_sync)
             .field("cron_capture_expiry", &self.cron_capture_expiry)
             .field("cron_history_prune", &self.cron_history_prune)
-            .field("otel_exporter_endpoint", &self.otel_exporter_endpoint)
+            .field(
+                "otel_exporter_endpoint",
+                &redact_credentials(&self.otel_exporter_endpoint),
+            )
             .field("otel_service_name", &self.otel_service_name)
             .finish()
     }
@@ -959,6 +1016,69 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn debug_output_never_prints_credentials() {
+        let vars = [
+            (
+                "MAVERICK_DATABASE_URL",
+                "postgres://maverick:dbhunter2@db:5432/maverick?sslmode=disable&password=qhunter2",
+            ),
+            ("MAVERICK_INTERNAL_TOKENS", "ops:tokhunter2"),
+            ("MAVERICK_CAPTURE_MASTER_KEY", "ab".repeat(32).leak()),
+            (
+                "MAVERICK_SMTP_URL",
+                "smtp://alerts:smtphunter2@mail.example.com:587/?from=a@x&to=b@x",
+            ),
+            (
+                "MAVERICK_ALERTS_WEBHOOK_URL",
+                "https://hooks.example.com/services/T0/B0/hookhunter2",
+            ),
+            ("MAVERICK_ALERTS_WEBHOOK_SECRET", "sechunter2"),
+            (
+                "MAVERICK_OTEL_EXPORTER_ENDPOINT",
+                "https://otel:otelhunter2@collector:4318",
+            ),
+            ("MAVERICK_ANTHROPIC_API_KEY", "keyhunter2"),
+        ];
+        let config = Config::load_with(|name| {
+            vars.iter()
+                .find(|(key, _)| *key == name)
+                .map(|(_, value)| (*value).to_owned())
+        })
+        .expect("valid config");
+        let debug = format!("{config:?}");
+        assert!(!debug.contains("hunter2"), "{debug}");
+        assert!(debug.contains("postgres://maverick:<redacted>@db:5432/maverick?sslmode=disable&password=<redacted>"), "{debug}");
+        assert!(
+            debug.contains("smtp://alerts:<redacted>@mail.example.com:587/?from=a@x&to=b@x"),
+            "{debug}"
+        );
+        assert!(
+            debug.contains("https://hooks.example.com/<redacted>"),
+            "{debug}"
+        );
+        assert!(
+            debug.contains("https://otel:<redacted>@collector:4318"),
+            "{debug}"
+        );
+    }
+
+    #[test]
+    fn redaction_keeps_urls_without_credentials() {
+        assert_eq!(redact_credentials(""), "");
+        assert_eq!(
+            redact_credentials("http://collector:4318"),
+            "http://collector:4318"
+        );
+        assert_eq!(redact_credentials("postgres://u@h/db"), "postgres://u@h/db");
+        assert_eq!(origin_only(""), "");
+        assert_eq!(
+            origin_only("https://h.example.com"),
+            "https://h.example.com"
+        );
+        assert_eq!(origin_only("not a url"), "<redacted>");
+    }
     use parity_support::fixture;
     use serde_json::{Map, Value, json};
 
