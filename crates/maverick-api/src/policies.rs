@@ -13,16 +13,22 @@
 //! is the tenant's bar only when one capability is asked for and has a weights row; for
 //! the full table it is always the default 0.8, though each capability's ceilings still use
 //! its own bar.
+//!
+//! D42: for a tenant with the zero-retention constraint, a column is a candidate only when
+//! its effective retention mode is `zero` (valid, unexpired evidence; spec §4.5), the same
+//! rule `/v1/recommend` applies. A band with no such column has `column: null` and
+//! `clears_band: false`.
 
 use std::collections::{BTreeMap, HashMap};
 
 use axum::body::Body;
 use axum::extract::{Extension, Request, State};
 use axum::http::{Method, Response, StatusCode};
+use chrono::Utc;
 use maverick_domain::ceilings::{self, BandCandidate, PassRate};
 use maverick_domain::gofmt::quote;
 use maverick_domain::gojson::{self, JsonValue};
-use maverick_domain::policy::{self, StandingConstraints, TenantConfig};
+use maverick_domain::policy::{self, RetentionMode, StandingConstraints, TenantConfig};
 use maverick_domain::scoring::observe::dimension;
 use maverick_domain::tasks::CAPABILITIES;
 use maverick_store::catalog::{self, ModelColumn};
@@ -30,7 +36,7 @@ use maverick_store::measurement::{self, Aggregate};
 use maverick_store::{corpus, is_not_found, tenancy};
 use sqlx::PgPool;
 
-use crate::recommend::policy_error;
+use crate::recommend::{effective_retention, policy_error};
 use crate::{ApiError, ApiState, ErrorCode, Identity, internal_error, not_found};
 
 /// The bar of a tenant without a weights row for the capability: Go's float32 `0.80`.
@@ -127,6 +133,14 @@ pub(crate) async fn policies(
         .map(|w| (w.capability.as_str(), w.quality_bar))
         .collect();
 
+    // D42: a zero-retention tenant's candidates need valid zero-retention evidence.
+    let zero_retention = match tenancy::get_tenant_constraints(pool, tenant).await {
+        Ok(row) => row.zero_retention,
+        Err(error) if is_not_found(&error) => false,
+        Err(error) => return Err(error.into()),
+    };
+    let now = Utc::now();
+
     // The candidates: pool order, known and not retired.
     let columns = catalog::list_model_columns(pool).await?;
     let by_id: HashMap<&str, &ModelColumn> = columns.iter().map(|c| (c.id.as_str(), c)).collect();
@@ -135,6 +149,7 @@ pub(crate) async fn policies(
         .iter()
         .filter_map(|id| by_id.get(id.as_str()).copied())
         .filter(|column| column.status != "retired")
+        .filter(|column| !zero_retention || effective_retention(column, now) == RetentionMode::Zero)
         .collect();
     let mut wanted: Vec<String> = Vec::new();
     for column in &candidates {

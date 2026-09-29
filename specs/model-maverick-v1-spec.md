@@ -873,6 +873,8 @@ Response `200`:
 }
 ```
 
+For a tenant with the `zero_retention` constraint, a column is a candidate only when its effective `retention_mode` is `zero` (valid, unexpired evidence; §4.5), the rule that `/v1/recommend` applies. A band with no such column has `"column": null` and `"clears_band": false`. MCP `get_policy` returns the same table. (changed 2026-09-29 by owner decision, `parity/DIVERGENCES.md` D42; the Go engine lists every known, non-retired pool column for every tenant)
+
 ### 9.4 GET /v1/models
 
 Returns the column catalog visible to the tenant (all non-retired columns): provider, model_id, endpoint, settings, status, pricing snapshot, `deprecation_date`, `measured` (any measured cells), `quality_source_column_id`, and the retention fields (`retention_mode` as effective after expiry, `retention_verified_at`, `retention_valid_until`, `retention_source`; §4.5), then `execution_alias_retention` (each alias's effective mode; openrouter spec §2.3) and `param_constraints` (§3, D29; the stored value verbatim, `{}` when none) as the last key. No scores here — scores are per-cell and live in policies/history.

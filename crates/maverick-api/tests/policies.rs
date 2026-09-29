@@ -448,6 +448,75 @@ async fn retired_columns_are_never_candidates() {
     db.close().await;
 }
 
+/// Sets a column's stored retention evidence.
+async fn retention(pool: &PgPool, column: &str, mode: &str, valid_for_days: i64) {
+    sqlx::query(
+        "UPDATE model_columns SET retention_mode = $2, retention_verified_at = now(),
+                retention_valid_until = now() + make_interval(days => $3) WHERE id = $1",
+    )
+    .bind(column)
+    .bind(mode)
+    .bind(i32::try_from(valid_for_days).unwrap())
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+/// DIVERGENCE: D42. For a zero-retention tenant, only columns with valid zero-retention
+/// evidence are candidates, as `/v1/recommend` routes: a cheaper standard column, an
+/// expired zero column, and a column with no evidence never name a band. Another tenant
+/// with the same pool still sees every column (Go's behavior).
+#[tokio::test]
+async fn a_zero_retention_tenant_sees_only_zero_retention_columns() {
+    let d42 = parity_support::divergence!("D42");
+    assert_eq!(d42.id(), "D42");
+    let Some((db, pool)) = database().await else {
+        return;
+    };
+    for id in ["col_zero", "col_standard", "col_expired", "col_unknown"] {
+        column(&pool, id, "direct", "active", None).await;
+    }
+    retention(&pool, "col_zero", "zero", 30).await;
+    retention(&pool, "col_standard", "standard", 30).await;
+    retention(&pool, "col_expired", "zero", -1).await;
+    // The non-compliant columns are cheaper and clear more, so without the filter they win.
+    cells(&pool, "col_zero", "factual_qa", &[0.9; 5], Some(0.05)).await;
+    for id in ["col_standard", "col_expired", "col_unknown"] {
+        cells(&pool, id, "factual_qa", &[0.99; 5], Some(0.001)).await;
+    }
+    let ids = ["col_standard", "col_expired", "col_unknown", "col_zero"];
+    pool_of(&pool, TENANT, "default", &ids, true).await;
+    pool_of(&pool, OTHER, "default", &ids, true).await;
+    tenancy::upsert_tenant_constraints(&pool, TENANT, None, None, true, false)
+        .await
+        .unwrap();
+
+    let (status, body) = policies(&pool, "?capability=factual_qa").await;
+    assert_eq!(status, StatusCode::OK);
+    for band in bands(&parse(&body)["policies"][0]) {
+        assert_eq!(band.0, "col_zero", "{body}");
+    }
+    // Go's behavior for a tenant without the constraint.
+    let (_, other) = get(
+        router(Some(&pool), OTHER, None),
+        "/v1/policies?capability=factual_qa",
+    )
+    .await;
+    for band in bands(&parse(&other)["policies"][0]) {
+        assert_ne!(band.0, "col_zero", "{other}");
+    }
+
+    // With no compliant column left, every band names none and clears nothing.
+    retention(&pool, "col_zero", "zero", -1).await;
+    let (status, body) = policies(&pool, "?capability=factual_qa").await;
+    assert_eq!(status, StatusCode::OK);
+    for band in parse(&body)["policies"][0]["bands"].as_array().unwrap() {
+        assert_eq!(band["column"], Value::Null, "{body}");
+        assert_eq!(band["clears_band"], false, "{body}");
+    }
+    db.close().await;
+}
+
 // parity: api.TestPoliciesNamedPoolSelection
 #[tokio::test]
 async fn a_named_pool_is_used() {
