@@ -76,6 +76,9 @@ pub struct Config {
     pub upstream_google: String,
     /// `MAVERICK_UPSTREAM_XAI`, one trailing `/` stripped.
     pub upstream_xai: String,
+    /// `MAVERICK_UPSTREAM_OPENROUTER`, one trailing `/` stripped: the OpenAI-compatible
+    /// base of OpenRouter execution (hosted mode with an `sk-or-` key; D15).
+    pub upstream_openrouter: String,
     /// `ANTHROPIC_API_KEY`. Always empty in hosted mode.
     pub anthropic_api_key: String,
     /// `OPENAI_API_KEY`. Always empty in hosted mode.
@@ -111,6 +114,7 @@ impl fmt::Debug for Config {
             .field("upstream_anthropic", &self.upstream_anthropic)
             .field("upstream_google", &self.upstream_google)
             .field("upstream_xai", &self.upstream_xai)
+            .field("upstream_openrouter", &self.upstream_openrouter)
             .field("anthropic_api_key", &key(&self.anthropic_api_key))
             .field("openai_api_key", &key(&self.openai_api_key))
             .field("gemini_api_key", &key(&self.gemini_api_key))
@@ -185,6 +189,10 @@ pub fn load_config(lookup: impl Fn(&str) -> Option<String>) -> Result<Config, Co
             "https://generativelanguage.googleapis.com/v1beta/openai",
         ),
         upstream_xai: url("MAVERICK_UPSTREAM_XAI", "https://api.x.ai"),
+        upstream_openrouter: url(
+            "MAVERICK_UPSTREAM_OPENROUTER",
+            "https://openrouter.ai/api/v1",
+        ),
         anthropic_api_key: provider_key("ANTHROPIC_API_KEY"),
         openai_api_key: provider_key("OPENAI_API_KEY"),
         gemini_api_key: provider_key("GEMINI_API_KEY"),

@@ -56,11 +56,12 @@ use tokio::sync::oneshot;
 const TRANSPORT_HEADERS: [&str; 3] = ["Accept", "Accept-Encoding", "User-Agent"];
 
 /// The upstream base URL variables and the mock each one points at.
-const UPSTREAM_VARS: [(&str, &str); 4] = [
+const UPSTREAM_VARS: [(&str, &str); 5] = [
     ("MAVERICK_UPSTREAM_OPENAI", "openai"),
     ("MAVERICK_UPSTREAM_ANTHROPIC", "anthropic"),
     ("MAVERICK_UPSTREAM_GOOGLE", "google"),
     ("MAVERICK_UPSTREAM_XAI", "xai"),
+    ("MAVERICK_UPSTREAM_OPENROUTER", "openrouter"),
 ];
 
 /// A closed local port (the fixture's `dead_upstreams_connection_refused`).
@@ -641,6 +642,7 @@ async fn replay_noting(id: &str, extra: &[&'static str]) -> Vec<ChainReport> {
         &config.upstream_anthropic,
         &config.upstream_google,
         &config.upstream_xai,
+        &config.upstream_openrouter,
     ] {
         assert!(url.starts_with("http://127.0.0.1:"), "{id}: upstream {url}");
     }

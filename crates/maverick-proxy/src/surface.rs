@@ -13,6 +13,13 @@
 //!   exactly `anthropic` (no schema translation), then skip when there is no key. The URL
 //!   is `{anthropic}/v1/messages`. The credential goes in `X-Api-Key`.
 //!
+//! - **OpenRouter** (D15; hosted mode, chat surface, an `sk-or-` caller key): every entry
+//!   goes to `{openrouter}/chat/completions` with its `execution_aliases.openrouter` slug as
+//!   the model and `endpoint_used: openrouter`; an entry without the alias is skipped. For a
+//!   zero-retention tenant each attempt forces `provider.zdr: true`, an alias that is not
+//!   verified `zero` is skipped, and a chain with none left answers `409
+//!   no_compliant_columns` before any upstream request. There is never a direct fallback.
+//!
 //! Both append `?` and the inbound raw query when it is not empty, rewrite the body per
 //! attempt ([`rewrite_attempt`]: the model, the entry's settings (D14), and parameter
 //! normalization (D29); a body that is not an object skips the entry), and send the base
@@ -30,16 +37,19 @@
 use std::sync::Arc;
 use std::time::Instant;
 
+use axum::http::StatusCode;
 use axum::response::Response;
 use maverick_core::alias::{Mode, SettingsMode};
 use maverick_core::chain::{ChainExecutor, ChainResult, PreparedAttempt};
+use maverick_core::openrouter::{self, Eligibility, Verdict};
 use maverick_core::recommend::{ChainEntry, TenantKey};
 use maverick_core::telemetry::TelemetryItem;
 use tokio::sync::oneshot;
 
 use crate::chain::{BoxFuture, ChainRequest, ChainRunner, Surface, exhausted};
 use crate::config::Config;
-use crate::credentials::{attempt_headers, resolve_key};
+use crate::credentials::{CallerCredential, attempt_headers, resolve_key};
+use crate::envelope;
 use crate::relay::{Done, relay};
 use crate::rewrite::{AttemptParams, rewrite_attempt, wire_format};
 
@@ -57,6 +67,8 @@ pub struct Upstreams {
     pub google: String,
     /// `MAVERICK_UPSTREAM_XAI`.
     pub xai: String,
+    /// `MAVERICK_UPSTREAM_OPENROUTER` (D15).
+    pub openrouter: String,
 }
 
 impl Upstreams {
@@ -68,7 +80,19 @@ impl Upstreams {
             anthropic: config.upstream_anthropic.clone(),
             google: config.upstream_google.clone(),
             xai: config.upstream_xai.clone(),
+            openrouter: config.upstream_openrouter.clone(),
         }
+    }
+
+    /// The OpenRouter chat completions URL (D15), with the inbound raw query.
+    #[must_use]
+    pub fn openrouter_url(&self, raw_query: &str) -> String {
+        let mut url = format!("{}/chat/completions", self.openrouter);
+        if !raw_query.is_empty() {
+            url.push('?');
+            url.push_str(raw_query);
+        }
+        url
     }
 
     /// The upstream URL for one entry, or `None` when the surface cannot call the provider.
@@ -220,12 +244,51 @@ async fn walk(
         ..
     } = request;
     let format = wire_format(surface);
+    // D15: an OpenRouter key on the chat surface runs every entry on OpenRouter.
+    let openrouter_key = match (&credential, surface) {
+        (CallerCredential::OpenRouter(key), Surface::Chat) => Some(key.as_str()),
+        _ => None,
+    };
+    let zero_retention = recommendation.zero_retention;
+    if openrouter_key.is_some()
+        && openrouter::verdict(&recommendation.chain, zero_retention) == Verdict::NoCompliantColumns
+    {
+        tracing::warn!("maverick-proxy: no OpenRouter alias with zero-retention evidence; refused");
+        return envelope::error(
+            StatusCode::CONFLICT,
+            envelope::NO_COMPLIANT_COLUMNS,
+            envelope::NO_COMPLIANT_OPENROUTER_ALIAS_MESSAGE,
+        );
+    }
     let prepare = |_index: usize, entry: &ChainEntry| -> Option<PreparedAttempt> {
-        if surface == Surface::Messages && entry.provider != "anthropic" {
-            return None;
-        }
-        let key = resolve_key(&entry.provider, surface, &credential, &env_keys)?;
-        let url = runner.upstreams.url(surface, &entry.provider, &raw_query)?;
+        // The model, the key, the URL, and the telemetry endpoint of this attempt.
+        let (model, key, url, endpoint_used, zdr) = if let Some(key) = openrouter_key {
+            let slug = match openrouter::eligibility(entry, zero_retention) {
+                Eligibility::Slug(slug) => slug,
+                skipped => {
+                    tracing::debug!(
+                        provider = %entry.provider,
+                        reason = ?skipped,
+                        "maverick-proxy: entry skipped in OpenRouter mode"
+                    );
+                    return None;
+                }
+            };
+            (
+                slug,
+                key,
+                runner.upstreams.openrouter_url(&raw_query),
+                openrouter::ENDPOINT_USED,
+                zero_retention,
+            )
+        } else {
+            if surface == Surface::Messages && entry.provider != "anthropic" {
+                return None;
+            }
+            let key = resolve_key(&entry.provider, surface, &credential, &env_keys)?;
+            let url = runner.upstreams.url(surface, &entry.provider, &raw_query)?;
+            (entry.model.as_str(), key, url, "direct", false)
+        };
         // D14: the entry's settings unless the alias opted out; D29: its constraints.
         let settings = match alias.settings_mode {
             SettingsMode::Apply => Some(&entry.settings),
@@ -233,11 +296,12 @@ async fn walk(
         };
         let rewritten = rewrite_attempt(
             &body,
-            &entry.model,
+            model,
             &AttemptParams {
                 format,
                 settings,
                 constraints: &entry.param_constraints,
+                zdr,
             },
         )
         .ok()?;
@@ -255,7 +319,7 @@ async fn walk(
         Some(PreparedAttempt {
             request: upstream,
             settings_applied: rewritten.settings_applied,
-            endpoint_used: "direct".to_owned(),
+            endpoint_used: endpoint_used.to_owned(),
         })
     };
 
@@ -350,11 +414,20 @@ mod tests {
 
     fn upstreams() -> Upstreams {
         Upstreams {
+            openrouter: "http://or".to_owned(),
             openai: "http://o".to_owned(),
             anthropic: "http://a".to_owned(),
             google: "http://g/v1beta/openai".to_owned(),
             xai: "http://x".to_owned(),
         }
+    }
+
+    /// D15: OpenRouter's OpenAI-compatible endpoint, with the inbound query.
+    #[test]
+    fn the_openrouter_url_is_its_chat_completions_endpoint() {
+        let up = upstreams();
+        assert_eq!(up.openrouter_url(""), "http://or/chat/completions");
+        assert_eq!(up.openrouter_url("a=1"), "http://or/chat/completions?a=1");
     }
 
     #[test]

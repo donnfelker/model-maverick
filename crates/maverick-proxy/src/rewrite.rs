@@ -21,6 +21,7 @@ use maverick_core::gojson::{quote, write_string};
 use maverick_core::normalize::{
     self, FIELDS, ParamConstraints, WireFormat, WirePath, go_fallback, wire_path,
 };
+use maverick_core::openrouter;
 use maverick_core::settings::wire_settings;
 use serde_json::value::RawValue;
 use serde_json::{Map, Value};
@@ -77,6 +78,9 @@ pub struct AttemptParams<'a> {
     pub settings: Option<&'a Map<String, Value>>,
     /// The entry's parameter constraints (D29).
     pub constraints: &'a ParamConstraints,
+    /// OpenRouter execution for a zero-retention tenant (D15): force the Zero Data
+    /// Retention routing option on this attempt.
+    pub zdr: bool,
 }
 
 /// An attempt's upstream body.
@@ -107,6 +111,7 @@ pub fn rewrite_model(
         normalizer.format(),
         None,
         &ParamConstraints::new(),
+        false,
     )
     .map(|rewritten| rewritten.body)
 }
@@ -124,6 +129,7 @@ pub fn rewrite_attempt(
         Some(params.format),
         params.settings,
         params.constraints,
+        params.zdr,
     )
 }
 
@@ -133,6 +139,7 @@ fn rewrite(
     format: Option<WireFormat>,
     settings: Option<&Map<String, Value>>,
     constraints: &ParamConstraints,
+    zdr: bool,
 ) -> Result<Rewritten, NotAnObject> {
     let text = String::from_utf8_lossy(body);
     let mut members: Members = serde_json::from_str(&text).map_err(|_| NotAnObject)?;
@@ -180,10 +187,30 @@ fn rewrite(
             }
         }
     }
+    if zdr {
+        force_zdr(&mut members);
+    }
     Ok(Rewritten {
         body: encode_object(&members).into_bytes(),
         settings_applied,
     })
+}
+
+/// D15: `provider.zdr = true`, whatever the caller sent. It runs last, so no setting or
+/// normalization can undo it. A `provider` object keeps its other options (re-encoded
+/// with sorted keys); a `provider` that is not an object is replaced, because the option
+/// must be there (fail closed).
+fn force_zdr(members: &mut Members) {
+    let path = WirePath::Nested {
+        object: openrouter::ZDR_OBJECT,
+        field: openrouter::ZDR_FIELD,
+    };
+    if !write_path(members, path, &Value::Bool(true)) {
+        members.insert(
+            openrouter::ZDR_OBJECT.to_owned(),
+            raw(format!("{{\"{}\":true}}", openrouter::ZDR_FIELD)),
+        );
+    }
 }
 
 /// The value at `path`, when present. A nested field needs its parent to decode as an
