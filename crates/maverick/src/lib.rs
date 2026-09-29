@@ -8,6 +8,7 @@
 //! loading with an explicit "not implemented yet" error.
 
 mod cli;
+mod corpus;
 pub mod flags;
 pub mod logging;
 pub mod otel;

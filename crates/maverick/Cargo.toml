@@ -49,3 +49,4 @@ opentelemetry-otlp = { workspace = true }
 [dev-dependencies]
 maverick-testdb = { workspace = true }
 reqwest = { workspace = true }
+chrono = { workspace = true }

@@ -16,14 +16,13 @@ use maverick_domain::gojson::{self, JsonValue};
 const FIXTURE: &str = include_str!("../../../parity/fixtures/store/cli.json");
 
 /// Rows whose command body is another bead's.
-const OTHER_BEADS: [(&str, &str); 6] = [
-    ("corpus-load-invalid-tier-range", "3.10 corpus load"),
-    ("corpus-load-invalid-test-suite", "3.10 corpus load"),
-    ("corpus-load-valid-unreachable-db", "3.10 corpus load"),
-    ("corpus-activate-unreachable-db", "3.10 corpus activate"),
-    ("corpus-calibrate-unreachable-db", "3.10 corpus calibrate"),
-    ("probe-corpus-status-unreachable-db", "3.10 corpus status"),
-];
+const OTHER_BEADS: [(&str, &str); 0] = [];
+
+/// The Go `corpus load` cases point `--dir` at the Go task testdata; the Rust tree keeps that
+/// testdata under `parity/fixtures/measurement-io/testdata/`. Rewrite the path in both the args
+/// and the expected output so the `rejected <dir>` line still matches.
+const GO_TESTDATA: &str = "../../internal/tasks/testdata";
+const RUST_TESTDATA: &str = "../../parity/fixtures/measurement-io/testdata/internal/tasks/testdata";
 
 fn field<'a>(value: &'a JsonValue, key: &str) -> &'a JsonValue {
     match value {
@@ -183,7 +182,7 @@ fn cli_rows_match_go() {
         }
         let args: Vec<String> = items(field(case, "args"))
             .iter()
-            .map(|arg| text(arg).to_owned())
+            .map(|arg| text(arg).replace(GO_TESTDATA, RUST_TESTDATA))
             .collect();
         let expected_code: i32 = match field(case, "exit_code") {
             JsonValue::Number(n) => n.parse().expect("exit code"),
@@ -203,17 +202,17 @@ fn cli_rows_match_go() {
         assert_eq!(code, expected_code, "{id}: exit code");
         assert_eq!(
             mask(&mask_times(&stdout)),
-            mask(text(field(case, "stdout"))),
+            mask(&text(field(case, "stdout")).replace(GO_TESTDATA, RUST_TESTDATA)),
             "{id}: stdout was {stdout}"
         );
         assert_eq!(
             mask(&mask_times(&stderr)),
-            mask(text(field(case, "stderr"))),
+            mask(&text(field(case, "stderr")).replace(GO_TESTDATA, RUST_TESTDATA)),
             "{id}: stderr was {stderr}"
         );
         checked += 1;
     }
-    assert_eq!(checked, 18);
+    assert_eq!(checked, 24);
 }
 
 fn strings(args: &[&str]) -> Vec<String> {

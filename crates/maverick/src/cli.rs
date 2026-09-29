@@ -76,7 +76,7 @@ fn parse_flags(set: &FlagSet, args: &[String], stderr: &mut Output) -> Option<Pa
 }
 
 /// Loads the configuration, logging one ERROR line per issue on failure (§7.2).
-fn load_config(lookup: &dyn Fn(&str) -> Option<String>) -> Result<Config, ConfigError> {
+pub(crate) fn load_config(lookup: &dyn Fn(&str) -> Option<String>) -> Result<Config, ConfigError> {
     let loaded = maverick_config::load_with(lookup);
     if let Err(error) = &loaded {
         for issue in error.issues() {
@@ -158,7 +158,7 @@ fn migrate(
 
 /// Runs `future` to completion on a runtime for this thread only, so its log events
 /// reach the logger that `with_logger` installed for this thread.
-fn block_on<F: Future>(future: F) -> std::io::Result<F::Output> {
+pub(crate) fn block_on<F: Future>(future: F) -> std::io::Result<F::Output> {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
@@ -226,7 +226,15 @@ fn corpus(
                 );
                 return EXIT_USAGE;
             }
-            corpus_body("corpus load", lookup, stdout)
+            crate::corpus::load(
+                flags.string("version"),
+                flags.string("dir"),
+                flags.string("description"),
+                flags.bool("strict"),
+                lookup,
+                stdout,
+                stderr,
+            )
         }
         "activate" => {
             let set = FlagSet::new("corpus activate").string(
@@ -241,15 +249,21 @@ fn corpus(
                 let _ = writeln!(stderr, "maverick corpus activate: --version is required");
                 return EXIT_USAGE;
             }
-            corpus_body("corpus activate", lookup, stdout)
+            crate::corpus::activate(flags.string("version"), lookup, stdout, stderr)
         }
-        "status" | "calibrate" => {
-            let name = format!("corpus {sub}");
-            let set = FlagSet::new(name.clone());
+        "status" => {
+            let set = FlagSet::new("corpus status");
             if parse_flags(&set, rest, &mut stderr).is_none() {
                 return EXIT_USAGE;
             }
-            corpus_body(&name, lookup, stdout)
+            crate::corpus::status(lookup, stdout, stderr)
+        }
+        "calibrate" => {
+            let set = FlagSet::new("corpus calibrate");
+            if parse_flags(&set, rest, &mut stderr).is_none() {
+                return EXIT_USAGE;
+            }
+            crate::corpus::calibrate(lookup, stdout, stderr)
         }
         other => {
             let _ = write!(
@@ -260,16 +274,6 @@ fn corpus(
             EXIT_USAGE
         }
     }
-}
-
-/// The corpus bodies (bead 3.10). Their database helper logs to stdout.
-fn corpus_body(command: &str, lookup: &dyn Fn(&str) -> Option<String>, stdout: Output) -> i32 {
-    with_logger(stdout, || {
-        if load_config(lookup).is_err() {
-            return EXIT_FAILURE;
-        }
-        not_implemented(command, "model-maverick-rust-port-3hk.3.10")
-    })
 }
 
 /// `mcp-stdio --api-key <key>` (§7.4). Logs to STDERR: stdout is the MCP channel.
