@@ -193,3 +193,23 @@ Each truncated record keeps `len`, `sha256`, and the first 256 bytes, so a rebui
 - Server-side log lines (audit entries, `catalog_changes`) are asserted by the internal tests but are not part of this corpus; their exact shape is in `reference/engine-reference.md (Part 5)`.
 - Side effects inside the server (trace rows, access-log rows, alerts) are checked by the tests through the assertion reads in `api-seed-sql.jsonl` and the catalog in `reference/engine-reference.md (Part 5)`.
 - The recording ran against Homebrew Postgres 16.4, not the `postgres:16-alpine` container, because Docker Desktop failed to start (privileged-helper prompt). The schema and SQL are identical; no test depends on the Postgres build.
+
+## 8. The Rust replay
+
+`crates/maverick-api/tests/replay.rs` (bead 5.15) replays this corpus against the Rust engine. It runs in the CI parity tier (`scripts/ci.sh parity`) and in `cargo test --workspace`.
+
+- **One database.** It uses one database with the engine migrations and graphile_worker's schema. Every seed statement and exchange runs in `gseq` order. Seeds run on one connection, so `begin` and `commit` pair up. Each statement is prepared, and its arguments are bound by the parameter types that Postgres infers.
+- **Adaptations.**
+  - River statements are skipped.
+  - `CreateAPIKey` stores the hash of a key minted by the harness. A request that carries a Go key's hash sends that key. A key the server mints maps by the Go key's hash.
+  - `CreateDebugCapture` gains `capture_key_version` 1 (D18).
+  - Seed timestamps move from the recording's clock to the harness clock at the same `gseq`.
+- **Id order.** Every seeded id maps to a fresh id from the engine's own monotonic generator when its seed runs. Seeded ids and server-minted ids therefore sort in the same order as in the Go run.
+- **Masking and mapping (section 5).** Ids, raw keys, `last4`, prompt hashes, cursors, timestamps, and MCP session ids pair by position in each compared response. Later requests carry our values.
+  - Two kinds of value come from the database rather than a response: ids the test read back, and `since=` values from rows its seeds returned. The harness takes both from our run's identical statements.
+- **Environments.** Each test gets the environment its Go file's constructor built (section 4.2): the ranking knobs, the rate limit, and the classifier stub (section 4.3).
+- **Skipped test.** `TestPhase2ExitEndToEndRecommend` builds its own database and runs the jobs system, so it is not replayed. `crates/maverick/tests/e2e.rs` covers it.
+- **Allowed differences.** Every other difference must match `replay-allowlist.json`, which names the DIVERGENCES row for each.
+  - Rules strip Rust-only members, rewrite a value a row changes, or mask library text.
+  - Entries exempt named parts of one exchange.
+  - Set `MAVERICK_REPLAY_REPORT=<file>` to write every difference, explained or not, as JSON.

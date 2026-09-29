@@ -1,0 +1,305 @@
+{
+  "about": "Reviewed differences between the recorded Go API responses (parity/blackbox/api-recorded.jsonl) and the Rust engine, for crates/maverick-api/tests/replay.rs (bead 5.15). Every rule and entry names its DIVERGENCES row. A rule turns an approved difference into an exact comparison: strip removes Rust-only members from our body, recorded_replace rewrites the recorded body where a row changes a value, mask rewrites both where a row leaves text to a library. An entry exempts named parts of one recorded exchange. Anything not covered here must match byte for byte after the README section 5 masking.",
+  "rules": [
+    {
+      "divergences": [
+        "D8",
+        "D9",
+        "D14",
+        "D15",
+        "D29",
+        "D39"
+      ],
+      "reason": "Recommend entries gain low_availability (D8), retention_mode (D9), settings (D14), execution_alias_retention (D15), and param_constraints (D29); the response gains zero_retention (D9) and telemetry (D39). Additive: the Go members are unchanged.",
+      "match": [
+        {
+          "method": "POST",
+          "path": "/v1/recommend",
+          "status": 200
+        }
+      ],
+      "strip": [
+        "execution_alias_retention",
+        "settings",
+        "param_constraints",
+        "retention_mode",
+        "low_availability",
+        "zero_retention",
+        "telemetry"
+      ]
+    },
+    {
+      "divergences": [
+        "D1",
+        "D15",
+        "D29"
+      ],
+      "reason": "Catalog entries gain the retention fields (D1), execution_alias_retention (D15), and param_constraints (D29) after Go's eleven keys. Additive.",
+      "match": [
+        {
+          "method": "GET",
+          "path": "/v1/models",
+          "status": 200
+        }
+      ],
+      "strip": [
+        "retention_mode",
+        "retention_verified_at",
+        "retention_valid_until",
+        "retention_source",
+        "execution_alias_retention",
+        "param_constraints"
+      ]
+    },
+    {
+      "divergences": [
+        "D8",
+        "D9",
+        "D14",
+        "D15",
+        "D29",
+        "D39"
+      ],
+      "reason": "An MCP recommend_model result carries the POST /v1/recommend body (text and structuredContent), so it gains the same additive members.",
+      "match": [
+        {
+          "method": "POST",
+          "path": "/mcp",
+          "status": 200
+        }
+      ],
+      "when": "recommendation_id",
+      "strip": [
+        "execution_alias_retention",
+        "settings",
+        "param_constraints",
+        "retention_mode",
+        "low_availability",
+        "zero_retention",
+        "telemetry"
+      ],
+      "nested_text": true
+    },
+    {
+      "divergences": [
+        "D1",
+        "D15",
+        "D29"
+      ],
+      "reason": "An MCP list_models result carries the GET /v1/models body, so its entries gain the same additive members.",
+      "match": [
+        {
+          "method": "POST",
+          "path": "/mcp",
+          "status": 200
+        }
+      ],
+      "when": "\\\\\"models\\\\\":\\[",
+      "strip": [
+        "retention_mode",
+        "retention_verified_at",
+        "retention_valid_until",
+        "retention_source",
+        "execution_alias_retention",
+        "param_constraints"
+      ],
+      "nested_text": true
+    },
+    {
+      "divergences": [
+        "D34"
+      ],
+      "reason": "A tool-argument validation error keeps the isError shape and the 'validating \"arguments\": ' prefix; the validator's own text after it comes from the jsonschema crate. crates/maverick-api/tests/mcp.rs checks that it names the offending property.",
+      "match": [
+        {
+          "method": "POST",
+          "path": "/mcp",
+          "status": 200
+        }
+      ],
+      "when": "\"isError\":true",
+      "mask": [
+        [
+          "(\"text\":\"validating \\\\\"arguments\\\\\": )(?:[^\"\\\\]|\\\\.)*\"",
+          "${1}<validator text>\""
+        ]
+      ]
+    },
+    {
+      "divergences": [
+        "D39"
+      ],
+      "reason": "The tenant's constraints gain telemetry_opt_out (default false) as their last member. Additive.",
+      "match": [
+        {
+          "method": "GET",
+          "path": "/v1/config/constraints",
+          "status": 200
+        },
+        {
+          "method": "PUT",
+          "path": "/v1/config/constraints",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "path": "/internal/v1/tenants",
+          "status": 201
+        },
+        {
+          "method": "GET",
+          "path": "/internal/v1/tenants/{id}",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "path": "/internal/v1/tenants/{id}/suspend",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "path": "/internal/v1/tenants/{id}/activate",
+          "status": 200
+        },
+        {
+          "method": "PUT",
+          "path": "/internal/v1/tenants/{id}/constraints",
+          "status": 200
+        }
+      ],
+      "strip": [
+        "telemetry_opt_out"
+      ]
+    },
+    {
+      "divergences": [
+        "D16"
+      ],
+      "reason": "A 2xx item with no check_pass derives completed_unchecked, not success. Items with check_pass keep Go's outcome.",
+      "match": [
+        {
+          "method": "GET",
+          "path": "/v1/history/outcomes",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/history/recommendations/{id}",
+          "status": 200
+        }
+      ],
+      "recorded_replace": [
+        [
+          "\"outcome\":\"success\"(,\"escalated_to\":(?:null|\"[^\"]*\"),\"details\":\\{\"status\":2[0-9]{2}\\})",
+          "\"outcome\":\"completed_unchecked\"$1"
+        ]
+      ]
+    },
+    {
+      "divergences": [
+        "D16"
+      ],
+      "reason": "The outcome filter accepts completed_unchecked, so its error lists it among the outcomes.",
+      "match": [
+        {
+          "method": "GET",
+          "path": "/v1/history/outcomes",
+          "status": 422
+        }
+      ],
+      "recorded_replace": [
+        [
+          "provider_error other\\]",
+          "provider_error completed_unchecked other]"
+        ]
+      ]
+    },
+    {
+      "divergences": [
+        "D36"
+      ],
+      "reason": "The engine-authored prefix 'malformed request body: ' is kept; the decoder's own text after it is Rust's (serde_json), not Go's encoding/json.",
+      "match": [
+        {
+          "method": "POST",
+          "path": "/v1/telemetry",
+          "status": 422
+        }
+      ],
+      "mask": [
+        [
+          "(\"message\":\"malformed request body: )(?:[^\"\\\\]|\\\\.)*\"",
+          "${1}<decoder text>\""
+        ]
+      ]
+    },
+    {
+      "divergences": [
+        "D35"
+      ],
+      "reason": "The job-queue component is job_queue (graphile_worker), not river_queues; with no worker registered it reads no_workers with graphile_worker wording. Component keys stay sorted.",
+      "match": [
+        {
+          "method": "GET",
+          "path": "/health/detail",
+          "status": 200
+        }
+      ],
+      "recorded_replace": [
+        [
+          "\"provider_client_config\":(\\{[^{}]*\\}),\"river_queues\":\\{\"status\":\"no_workers\",\"detail\":\"no River worker has registered a queue\"\\}",
+          "\"job_queue\":{\"status\":\"no_workers\",\"detail\":\"no graphile_worker worker is registered\"},\"provider_client_config\":$1"
+        ]
+      ]
+    }
+  ],
+  "entries": [
+    {
+      "test": "TestTenantCaptureReadZeroRetention",
+      "seq": 1,
+      "parts": [
+        "status",
+        "body"
+      ],
+      "divergences": [
+        "D2"
+      ],
+      "reason": "A zero-retention tenant's prompt-form recommend with no zero-retention classifier column configured is 422 zero_retention_requires_declared; the prompt never leaves the engine. Go classified it with the global column. The test's later assertion (no capture for the tenant) still holds."
+    },
+    {
+      "test": "TestCaptureZeroRetentionBeltAndSuspenders",
+      "seq": 1,
+      "parts": [
+        "status",
+        "body"
+      ],
+      "divergences": [
+        "D2"
+      ],
+      "reason": "A zero-retention tenant's prompt-form recommend with no zero-retention classifier column configured is 422 zero_retention_requires_declared; the prompt never leaves the engine. Go classified it with the global column. The test's later assertion (no capture for the tenant) still holds."
+    },
+    {
+      "test": "TestOperatorListZeroRetentionTenantHasNoCaptures",
+      "seq": 1,
+      "parts": [
+        "status",
+        "body"
+      ],
+      "divergences": [
+        "D2"
+      ],
+      "reason": "A zero-retention tenant's prompt-form recommend with no zero-retention classifier column configured is 422 zero_retention_requires_declared; the prompt never leaves the engine. Go classified it with the global column. The test's later assertion (no capture for the tenant) still holds."
+    },
+    {
+      "test": "TestHistoryOutcomesListAndFilters",
+      "seq": 7,
+      "parts": [
+        "body"
+      ],
+      "divergences": [
+        "D16"
+      ],
+      "reason": "outcome=success: the Go item (a 2xx with no check) was success; in Rust it is completed_unchecked, so the success filter returns no rows."
+    }
+  ]
+}

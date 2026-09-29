@@ -50,3 +50,6 @@ tracing-subscriber = { workspace = true }
 opentelemetry_sdk = { workspace = true, features = ["testing"] }
 # Applies the real graphile_worker schema in the health tests.
 graphile_worker = { workspace = true }
+# The black-box replay: token masking and the recorded key hashes.
+regex = { workspace = true }
+sha2 = { workspace = true }
