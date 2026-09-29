@@ -9,7 +9,8 @@
 //! # Pipeline (the first failing step decides)
 //!
 //! 0. Hosted mode only (D13): the tenant key from `X-Maverick-API-Key` (it must start with
-//!    `mk_live_`), else `401 unauthorized`.
+//!    `mk_live_`), else `401 unauthorized`. Then the per-tenant rate limit (D28): over the
+//!    limit is `429 rate_limited`, and neither the engine nor a provider is called.
 //! 1. Read the body. Over the D38 cap (declared `Content-Length`, or bytes read): `413
 //!    payload_too_large`. Read error: `400 invalid_request`.
 //! 2. Decode `{model: string}` with Go's rules: `400 invalid_request` on error.
@@ -51,6 +52,7 @@ use crate::chain::{ChainRequest, ChainRunner, Surface};
 use crate::config::{Config, DeploymentMode};
 use crate::credentials::{self, CallerCredential, EnvKeys};
 use crate::envelope;
+use crate::ratelimit::{self, RateLimiter};
 
 /// The engine client's total timeout per call (Go constant).
 pub const ENGINE_TIMEOUT: Duration = Duration::from_secs(10);
@@ -64,11 +66,12 @@ pub const TENANT_KEY_HEADER: HeaderName = HeaderName::from_static("x-maverick-ap
 /// Every Maverick API key starts with this prefix (spec §9.1).
 pub const TENANT_KEY_PREFIX: &str = "mk_live_";
 
-/// The proxy: configuration, the engine client, and the chain runner.
+/// The proxy: configuration, the engine client, the chain runner, and the rate limiter.
 pub struct Proxy {
     config: Config,
     engine: RecommendClient,
     chain: Arc<dyn ChainRunner>,
+    limiter: RateLimiter,
 }
 
 impl Proxy {
@@ -82,18 +85,28 @@ impl Proxy {
         Ok(Self::with_engine(config, engine, chain))
     }
 
-    /// A proxy on an existing engine client.
+    /// A proxy on an existing engine client, limited to `config.ratelimit_rpm` requests per
+    /// minute per tenant key.
     #[must_use]
     pub fn with_engine(
         config: Config,
         engine: RecommendClient,
         chain: Arc<dyn ChainRunner>,
     ) -> Self {
+        let limiter = RateLimiter::new(config.ratelimit_rpm);
         Self {
             config,
             engine,
             chain,
+            limiter,
         }
+    }
+
+    /// The same proxy with another rate limiter (tests pass one on a fixed clock).
+    #[must_use]
+    pub fn with_limiter(mut self, limiter: RateLimiter) -> Self {
+        self.limiter = limiter;
+        self
     }
 
     /// The router for this proxy.
@@ -136,6 +149,15 @@ impl Proxy {
                 }
             },
         };
+        let decision = self.limiter.check(tenant_key.expose());
+        if !decision.allowed {
+            tracing::debug!(
+                limit = decision.limit,
+                retry_after = decision.retry_after,
+                "maverick-proxy: rate limited"
+            );
+            return ratelimit::rejection(&decision);
+        }
 
         // 1. Body, with the D38 cap on the declared length and on the bytes read.
         let cap = self.config.max_body_bytes;

@@ -315,6 +315,7 @@ fn hosted_mode_reads_no_provider_or_tenant_keys() {
         match name {
             config::MODE_VAR => Some("hosted".to_owned()),
             config::MAX_BODY_BYTES_VAR => Some("1024".to_owned()),
+            config::RATELIMIT_RPM_VAR => Some("5".to_owned()),
             _ => Some(format!("value-of-{name}")),
         }
     })
@@ -339,6 +340,7 @@ fn hosted_mode_reads_no_provider_or_tenant_keys() {
             && loaded.xai_api_key.is_empty()
     );
     assert_eq!(loaded.engine_url, "value-of-MAVERICK_ENGINE_URL");
+    assert_eq!(loaded.ratelimit_rpm, 5);
 }
 
 #[test]

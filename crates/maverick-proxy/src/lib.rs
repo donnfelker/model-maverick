@@ -16,12 +16,16 @@
 //! - [`surface`]: the chat and messages surfaces on the `maverick-core` chain executor.
 //! - [`rewrite`]: Go `rewriteModel`, the per-attempt upstream body.
 //! - [`relay`]: the relay of the settled attempt (streaming or buffered).
+//! - [`reports`]: each settled request's report to telemetry (D27).
+//! - [`ratelimit`]: the per-tenant fixed-window rate limit (D28).
 
 pub mod chain;
 pub mod config;
 pub mod credentials;
 pub mod envelope;
+pub mod ratelimit;
 pub mod relay;
+pub mod reports;
 pub mod rewrite;
 pub mod server;
 pub mod surface;

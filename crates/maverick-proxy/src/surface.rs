@@ -24,12 +24,13 @@
 //! signal.
 //!
 //! After the relay ends (the whole stream for SSE), the walk hands one [`ChainReport`] to
-//! the [`ReportSink`] (telemetry and OTel, bead 6.9).
+//! the [`ReportSink`]: [`crate::reports::ProxyReports`] in the binary (telemetry, D27).
 
 use std::sync::Arc;
 use std::time::Instant;
 
 use axum::response::Response;
+use maverick_core::alias::Mode;
 use maverick_core::chain::{ChainExecutor, ChainResult, PreparedAttempt};
 use maverick_core::recommend::{ChainEntry, TenantKey};
 use maverick_core::telemetry::TelemetryItem;
@@ -101,6 +102,12 @@ pub struct ChainReport {
     pub measured: bool,
     /// The engine's `classification.method`.
     pub classification_method: String,
+    /// The engine mode the alias asked for: `balanced`, `quality`, or `cost`.
+    pub mode: String,
+    /// The relayed entry's model, or `""` when the chain was exhausted.
+    pub model_used: String,
+    /// The relayed status, or 502 when the chain was exhausted.
+    pub final_status: u16,
     /// One item per dispatched attempt, in chain order. The relayed attempt's buffered 2xx
     /// body gives it token counts. Empty when nothing was dispatched.
     pub items: Vec<TelemetryItem>,
@@ -205,6 +212,7 @@ async fn walk(
         env_keys,
         body,
         raw_query,
+        alias,
         recommendation,
         tenant_key,
         received_at,
@@ -254,23 +262,26 @@ async fn walk(
         recommendation_id: recommendation_id.clone(),
         measured: recommendation.measured,
         classification_method: recommendation.classification_method.clone(),
+        mode: engine_mode(alias.mode).to_owned(),
         received_at,
     };
 
     match outcome.result {
         ChainResult::Relayed { index, response } => {
             let model_used = chain[index].model.clone();
+            let final_status = response.status().as_u16();
+            let settled_model = model_used.clone();
             let done: Done = Box::new(move |(tokens_in, tokens_out)| {
                 if let Some(settled) = items.last_mut() {
                     settled.tokens_in = tokens_in;
                     settled.tokens_out = tokens_out;
                 }
-                reports.report(report.with_items(items));
+                reports.report(report.finish(settled_model, final_status, items));
             });
             relay(surface, &recommendation_id, &model_used, response, done).await
         }
         ChainResult::Exhausted { .. } => {
-            reports.report(report.with_items(items));
+            reports.report(report.finish(String::new(), 502, items));
             exhausted(surface, &recommendation_id)
         }
     }
@@ -283,20 +294,38 @@ struct ReportParts {
     recommendation_id: String,
     measured: bool,
     classification_method: String,
+    mode: String,
     received_at: Instant,
 }
 
 impl ReportParts {
-    fn with_items(self, items: Vec<TelemetryItem>) -> ChainReport {
+    fn finish(
+        self,
+        model_used: String,
+        final_status: u16,
+        items: Vec<TelemetryItem>,
+    ) -> ChainReport {
         ChainReport {
             tenant_key: self.tenant_key,
             surface: self.surface,
             recommendation_id: self.recommendation_id,
             measured: self.measured,
             classification_method: self.classification_method,
+            mode: self.mode,
+            model_used,
+            final_status,
             items,
             received_at: self.received_at,
         }
+    }
+}
+
+/// The engine's name for an alias mode.
+fn engine_mode(mode: Mode) -> &'static str {
+    match mode {
+        Mode::Balanced => "balanced",
+        Mode::Quality => "quality",
+        Mode::Cost => "cost",
     }
 }
 

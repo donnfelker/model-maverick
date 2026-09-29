@@ -1,19 +1,21 @@
-//! The chat and messages surfaces (bead 6.7): every scenario in
-//! `parity/fixtures/proxy/scenarios.json`, replayed through the real proxy with a scripted
-//! mock engine and scripted mock upstreams over real TCP.
+//! The proxy (beads 6.7 and 6.9): every scenario in `parity/fixtures/proxy/scenarios.json`,
+//! replayed through the real proxy with a scripted mock engine and scripted mock upstreams
+//! over real TCP.
 //!
 //! Each scenario checks:
 //! - the client response: status, headers (`Date` and framing aside), and body bytes;
 //! - the upstream attempts: their order, and each request's method, path, query, headers,
 //!   and body bytes;
-//! - every recommend request: method, path, headers, and body bytes;
-//! - the telemetry items the proxy reports for the request. D14 adds `settings_applied`,
-//!   which is left out here; delivery and batching (D27) are bead 6.9's.
+//! - every recommend request: method, path, headers, and body bytes (D5);
+//! - the telemetry POSTs the engine receives through the production sink, after a flush:
+//!   none when telemetry is off or nothing was attempted, else one per request with Go's
+//!   items. D14 adds `settings_applied`, which is left out of the comparison; D27 batches
+//!   per tenant key, which for one replayed request is one POST.
 //!
 //! D32: the transport headers Go's client added (`Accept-Encoding: gzip`,
 //! `User-Agent: Go-http-client/1.1`) and the one reqwest adds (`Accept: */*`) are ignored,
 //! unless the client sent that header; then it must reach the upstream unchanged. OTLP
-//! payloads (bead 6.9) are not compared.
+//! payloads (bead `model-maverick-7sa`) are not compared.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -24,8 +26,9 @@ use maverick_core::chain::{ChainExecutor, RESPONSE_HEADER_TIMEOUT};
 use maverick_core::recommend::{
     RecommendClient, RecommendClientConfig, RecommendRequest, Workload,
 };
-use maverick_core::telemetry::encode_batch;
+use maverick_core::telemetry::{BatcherConfig, HttpSink, Telemetry};
 use maverick_proxy::config::{Config, load_config};
+use maverick_proxy::reports::ProxyReports;
 use maverick_proxy::server::{Proxy, ServeSettings, serve};
 use maverick_proxy::surface::{ChainReport, ExecutorRunner, ReportSink, Upstreams};
 use serde_json::Value;
@@ -335,11 +338,23 @@ async fn answer(socket: &mut TcpStream, step: &Value) -> bool {
     if socket.write_all(head.as_bytes()).await.is_err() {
         return false;
     }
-    for chunk in step["body_chunks"].as_array().expect("body_chunks") {
+    let pause = step
+        .get("pause_after_first_chunk_ms")
+        .and_then(Value::as_u64)
+        .map(Duration::from_millis);
+    for (index, chunk) in step["body_chunks"]
+        .as_array()
+        .expect("body_chunks")
+        .iter()
+        .enumerate()
+    {
         let chunk = text(chunk);
         let framed = format!("{:x}\r\n{chunk}\r\n", chunk.len());
         if socket.write_all(framed.as_bytes()).await.is_err() || socket.flush().await.is_err() {
             return false;
+        }
+        if let (0, Some(pause)) = (index, pause) {
+            tokio::time::sleep(pause).await;
         }
     }
     if step
@@ -356,11 +371,16 @@ async fn answer(socket: &mut TcpStream, step: &Value) -> bool {
 // Replay
 // ---------------------------------------------------------------------------------------
 
-struct Recorder(Arc<Mutex<Vec<ChainReport>>>);
+/// Keeps every report for the test and hands it to the proxy's real sink (telemetry).
+struct Recorder {
+    reports: Arc<Mutex<Vec<ChainReport>>>,
+    sink: ProxyReports,
+}
 
 impl ReportSink for Recorder {
     fn report(&self, report: ChainReport) {
-        lock(&self.0).push(report);
+        lock(&self.reports).push(report.clone());
+        self.sink.report(report);
     }
 }
 
@@ -425,11 +445,17 @@ fn check_d5_recommend_body(
 struct RunningProxy {
     addr: std::net::SocketAddr,
     reports: Arc<Mutex<Vec<ChainReport>>>,
+    sink: ProxyReports,
     stop: oneshot::Sender<()>,
     server: tokio::task::JoinHandle<std::io::Result<()>>,
 }
 
 impl RunningProxy {
+    /// Send every queued telemetry item now, as shutdown does (D27).
+    async fn flush_telemetry(&self) {
+        self.sink.shutdown().await;
+    }
+
     async fn stop(self) {
         let _ = self.stop.send(());
         self.server
@@ -442,6 +468,19 @@ impl RunningProxy {
 /// The real proxy on `config`, with the executor's response-header timeout set.
 async fn start_proxy(config: Config, header_timeout: Duration) -> RunningProxy {
     let reports = Arc::new(Mutex::new(Vec::new()));
+    // The production sink, with an interval long enough that batches go out only at the
+    // test's flush: one POST per replayed request, as Go sent.
+    let sink = ProxyReports::new(if config.telemetry {
+        Telemetry::start(
+            Arc::new(HttpSink::new(&config.engine_url).expect("telemetry client")),
+            BatcherConfig {
+                interval: Duration::from_secs(3600),
+                ..BatcherConfig::default()
+            },
+        )
+    } else {
+        Telemetry::off()
+    });
     let upstream_http = reqwest::Client::builder()
         .no_proxy()
         .build()
@@ -449,7 +488,10 @@ async fn start_proxy(config: Config, header_timeout: Duration) -> RunningProxy {
     let runner = ExecutorRunner::with_executor(
         ChainExecutor::new(upstream_http).with_header_timeout(header_timeout),
         Upstreams::from_config(&config),
-        Arc::new(Recorder(Arc::clone(&reports))),
+        Arc::new(Recorder {
+            reports: Arc::clone(&reports),
+            sink: sink.clone(),
+        }),
     );
     let engine = RecommendClient::with_http(
         reqwest::Client::builder()
@@ -473,9 +515,30 @@ async fn start_proxy(config: Config, header_timeout: Duration) -> RunningProxy {
     RunningProxy {
         addr,
         reports,
+        sink,
         stop,
         server,
     }
+}
+
+/// A telemetry body with every `latency_ms` set to 0 and the D14 `settings_applied` field
+/// removed, in its original key order.
+fn normalize_telemetry(body: &str) -> String {
+    let body = body
+        .replace(",\"settings_applied\":false", "")
+        .replace(",\"settings_applied\":true", "");
+    let mut out = String::new();
+    let mut rest = body.as_str();
+    let key = "\"latency_ms\":";
+    while let Some(at) = rest.find(key) {
+        let (head, tail) = rest.split_at(at + key.len());
+        out.push_str(head);
+        out.push('0');
+        let digits = tail.bytes().take_while(u8::is_ascii_digit).count();
+        rest = &tail[digits..];
+    }
+    out.push_str(rest);
+    out
 }
 
 /// Replay one scenario and check it. Returns the reports for extra checks.
@@ -695,40 +758,52 @@ async fn replay(id: &str) -> Vec<ChainReport> {
         );
     }
 
-    // Telemetry items (D14 `settings_applied` aside; D27 delivery is bead 6.9's).
+    // Telemetry: the reported items, then the POSTs the engine received after a flush.
+    // D14 adds `settings_applied` to each item; D27 batches per tenant key, which for one
+    // replayed request is one POST, as Go sent.
     let d14 = parity_support::divergence!("D14");
-    assert_eq!(d14.id(), "D14");
+    let d27 = parity_support::divergence!("D27");
+    assert_eq!((d14.id(), d27.id()), ("D14", "D27"));
     let reports = lock(&reports).clone();
-    let items: Vec<_> = reports
+    let no_items = reports.iter().all(|report| report.items.is_empty());
+    running.flush_telemetry().await;
+    let telemetry: Vec<Message> = lock(&engine_log)
         .iter()
-        .flat_map(|report| report.items.iter().cloned())
-        .map(|mut item| {
-            assert!(item.latency_ms >= 0, "{context}");
-            item.latency_ms = 0;
-            item.settings_applied = None;
-            item
-        })
+        .filter(|request| request.target().1 == "/v1/telemetry")
+        .cloned()
         .collect();
-    let telemetry_off = env
-        .get("MAVERICK_PROXY_TELEMETRY")
-        .is_some_and(|value| value.eq_ignore_ascii_case("off"));
-    match expected["telemetry_requests"]
+    let want_telemetry = expected["telemetry_requests"]
         .as_array()
-        .expect("telemetry")
-    {
-        want if want.is_empty() => {
-            if !telemetry_off {
-                assert!(items.is_empty(), "{context}: no attempt, no telemetry item");
-            }
-        }
-        want => {
-            assert_eq!(want.len(), 1, "{context}: one Go batch per request");
-            assert_eq!(
-                encode_batch(&items),
-                text(&want[0]["body_template"]).replace("<LATENCY_MS>", "0"),
-                "{context}: telemetry items"
-            );
-        }
+        .expect("telemetry_requests");
+    if want_telemetry.is_empty() && !env.contains_key("MAVERICK_PROXY_TELEMETRY") {
+        assert!(no_items, "{context}: no attempt, no telemetry item");
+    }
+    assert_eq!(
+        telemetry.len(),
+        want_telemetry.len(),
+        "{context}: telemetry POSTs {:?}",
+        telemetry.iter().map(Message::body_text).collect::<Vec<_>>()
+    );
+    for (got, want) in telemetry.iter().zip(want_telemetry) {
+        let (method, path, _) = got.target();
+        assert_eq!(method, want["method"], "{context}");
+        assert_eq!(path, want["path"], "{context}");
+        assert_eq!(
+            normalize_telemetry(&got.body_text()),
+            text(&want["body_template"]).replace("<LATENCY_MS>", "0"),
+            "{context}: telemetry body"
+        );
+        let mut got_headers = header_map(&got.headers);
+        got_headers.remove("Host");
+        got_headers.remove("Content-Length");
+        let mut want_headers = expected_headers(&want["headers"]);
+        want_headers.remove("Content-Length");
+        let none = HeaderValues::new();
+        assert_eq!(
+            without_transport(got_headers, &none),
+            without_transport(want_headers, &none),
+            "{context}: telemetry headers"
+        );
     }
 
     running.stop().await;
@@ -747,13 +822,14 @@ macro_rules! scenarios {
 }
 
 // Every Go test below is one of these scenarios, checked in full: the client response, the
-// upstream requests, the recommend request (D5), and the telemetry items (D14). The OTel
-// tests and the telemetry-off test also need bead 6.9's delivery, so they are tagged there.
+// upstream requests, the recommend request (D5), and the telemetry POSTs (D14, D27). The
+// three OTel tests are tagged with bead model-maverick-7sa, which emits OTel.
 // parity: proxy.TestUp
 // parity: proxy.TestChatCompletions_EngineErrorIs502
 // parity: proxy.TestChatCompletions_ConcreteModelRejected
 // parity: proxy.TestChatCompletions_MalformedAliasRejected
 // parity: proxy.TestChatCompletions_HappyPath
+// parity: proxy.TestChatCompletions_TelemetryOffMeansZeroTelemetryCalls
 // parity: proxy.TestChatCompletions_FirstEntry503SecondEntryUsed
 // parity: proxy.TestChatCompletions_Semantic400NoFallback
 // parity: proxy.TestChatCompletions_BYOKVsEnvKey
@@ -985,6 +1061,60 @@ async fn a_buffered_read_error_relays_an_empty_body() {
     assert_eq!(
         (item.status, item.tokens_in, item.tokens_out),
         (200, None, None)
+    );
+    proxy.stop().await;
+}
+
+/// Telemetry for a streamed relay is reported only when the stream has ended (reference
+/// part 6 §11): mid-stream there is no report; after the last chunk there is one, with no
+/// token counts (the stream is not parsed).
+#[tokio::test]
+async fn a_streamed_relay_reports_after_the_stream_ends() {
+    let (proxy, _, _) = custom_proxy(
+        serde_json::json!([{"provider": "openai", "model": "gpt-a"}]),
+        vec![serde_json::json!({
+            "status": 200,
+            "headers": [["Content-Type", "text/event-stream"]],
+            "body_chunks": ["data: 1\n\n", "data: [DONE]\n\n"],
+            "pause_after_first_chunk_ms": 300,
+        })],
+    )
+    .await;
+    let mut socket = TcpStream::connect(proxy.addr).await.expect("connect");
+    let body = r#"{"model":"maverick/auto","messages":[{"role":"user","content":"hi"}]}"#;
+    socket
+        .write_all(chat_request(body).as_bytes())
+        .await
+        .expect("send");
+    let mut buffer = Vec::new();
+    while find(&buffer, b"data: 1").is_none() {
+        assert!(fill(&mut socket, &mut buffer).await, "the first chunk");
+    }
+    assert!(
+        lock(&proxy.reports).is_empty(),
+        "no report while the stream is open"
+    );
+    while find(&buffer, b"0\r\n\r\n").is_none() {
+        assert!(
+            fill(&mut socket, &mut buffer).await,
+            "the end of the stream"
+        );
+    }
+    let reports = Arc::clone(&proxy.reports);
+    eventually("the report", || !lock(&reports).is_empty()).await;
+    let report = lock(&reports)[0].clone();
+    assert_eq!(report.items.len(), 1);
+    assert_eq!(
+        (
+            report.items[0].status,
+            report.items[0].tokens_in,
+            report.items[0].tokens_out
+        ),
+        (200, None, None)
+    );
+    assert_eq!(
+        (report.model_used.as_str(), report.final_status),
+        ("gpt-a", 200)
     );
     proxy.stop().await;
 }
