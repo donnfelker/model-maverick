@@ -9,7 +9,10 @@ pub mod classify;
 pub mod config;
 mod health;
 mod internal;
+mod models;
 pub mod observe;
+mod policies;
+mod query;
 mod recommend;
 mod strict;
 mod telemetry;
@@ -892,13 +895,19 @@ fn public_v1_router(state: AuthState, api: ApiState) -> Router {
             "/config/constraints",
             any(config::constraints_handler).with_state(api.clone()),
         )
-        .route("/policies", any(route_stub))
+        .route(
+            "/policies",
+            any(policies::policies_handler).with_state(api.clone()),
+        )
         .route(
             "/recommend",
             any(recommend::recommend_handler).with_state(api.clone()),
         )
         .route("/checks/{*path}", any(recommend::checks_handler))
-        .route("/models", any(route_stub))
+        .route(
+            "/models",
+            any(models::models_handler).with_state(api.clone()),
+        )
         .route("/telemetry", any(telemetry::telemetry).with_state(api))
         .route("/history/models/{column_id}", any(route_stub))
         .route("/history/recommendations", any(route_stub))
