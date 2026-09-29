@@ -2355,6 +2355,7 @@ dependencies = [
  "parity-support",
  "proptest",
  "rand 0.10.3",
+ "regex",
  "serde",
  "serde_json",
  "serde_norway",

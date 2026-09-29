@@ -11,6 +11,7 @@
 pub mod capture;
 pub mod gofmt;
 pub mod gojson;
+pub mod gostrconv;
 pub mod graders;
 pub mod ids;
 pub mod keys;
