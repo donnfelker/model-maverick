@@ -4,8 +4,45 @@
 //! deliberately small: business rules belong to the service crates.
 
 mod health;
+mod telemetry;
 
 pub use health::HealthState;
+
+/// What the endpoint handlers read: the engine pool and the health inputs. Handlers that
+/// need the database answer `500 internal_error` on a detached state (router tests).
+#[derive(Clone)]
+pub struct ApiState {
+    pool: Option<PgPool>,
+    health: HealthState,
+}
+
+impl ApiState {
+    /// The production state.
+    pub fn new(pool: PgPool, config: &Config) -> Self {
+        Self::with_health(pool.clone(), HealthState::new(pool, config))
+    }
+
+    /// A state with an explicit health configuration.
+    pub fn with_health(pool: PgPool, health: HealthState) -> Self {
+        Self {
+            pool: Some(pool),
+            health,
+        }
+    }
+
+    /// No database.
+    pub fn detached() -> Self {
+        Self {
+            pool: None,
+            health: HealthState::detached(),
+        }
+    }
+
+    /// The engine pool, when there is one.
+    pub fn pool(&self) -> Option<&PgPool> {
+        self.pool.as_ref()
+    }
+}
 
 use axum::{
     Router,
@@ -785,7 +822,7 @@ async fn route_stub(_: Request) -> Response<Body> {
     not_found()
 }
 
-fn public_v1_router(state: AuthState) -> Router {
+fn public_v1_router(state: AuthState, api: ApiState) -> Router {
     Router::new()
         .route("/config/pools", any(route_stub))
         .route("/config/weights", any(route_stub))
@@ -794,7 +831,7 @@ fn public_v1_router(state: AuthState) -> Router {
         .route("/recommend", any(route_stub))
         .route("/checks/{*path}", any(route_stub))
         .route("/models", any(route_stub))
-        .route("/telemetry", any(route_stub))
+        .route("/telemetry", any(telemetry::telemetry).with_state(api))
         .route("/history/models/{column_id}", any(route_stub))
         .route("/history/recommendations", any(route_stub))
         .route("/history/recommendations/{id}", any(route_stub))
@@ -847,17 +884,17 @@ pub fn public_router() -> Router {
     public_router_with_state(default_auth_state())
 }
 
-/// Build the public listener router with explicit auth state and no database for
-/// `/up` (router tests).
+/// Build the public listener router with explicit auth state and no database
+/// (router tests).
 pub fn public_router_with_state(state: AuthState) -> Router {
-    public_router_with(state, HealthState::detached())
+    public_router_with(state, ApiState::detached())
 }
 
-/// Build the public listener router with explicit auth and health state.
-pub fn public_router_with(state: AuthState, health: HealthState) -> Router {
+/// Build the public listener router with explicit auth and endpoint state.
+pub fn public_router_with(state: AuthState, api: ApiState) -> Router {
     let up = Router::new()
         .route("/up", any(health::up))
-        .with_state(health);
+        .with_state(api.health.clone());
     let mcp = Router::new()
         .route("/", any(route_stub))
         .fallback(route_stub)
@@ -869,7 +906,7 @@ pub fn public_router_with(state: AuthState, health: HealthState) -> Router {
         Router::new()
             .merge(up)
             .nest("/mcp", mcp)
-            .nest("/v1", public_v1_router(state))
+            .nest("/v1", public_v1_router(state, api))
             .fallback(route_stub),
     )
 }
@@ -884,17 +921,17 @@ pub fn internal_router() -> Router {
     internal_router_with_state(default_auth_state())
 }
 
-/// Build the internal listener router with explicit auth state and no database for
-/// `/health/detail` (router tests).
+/// Build the internal listener router with explicit auth state and no database
+/// (router tests).
 pub fn internal_router_with_state(state: AuthState) -> Router {
-    internal_router_with(state, HealthState::detached())
+    internal_router_with(state, ApiState::detached())
 }
 
-/// Build the internal listener router with explicit auth and health state.
-pub fn internal_router_with(state: AuthState, health_state: HealthState) -> Router {
+/// Build the internal listener router with explicit auth and endpoint state.
+pub fn internal_router_with(state: AuthState, api: ApiState) -> Router {
     let health = Router::new()
         .route("/", any(health::detail))
-        .with_state(health_state)
+        .with_state(api.health.clone())
         .layer(middleware::from_fn_with_state(state.clone(), internal_auth));
 
     with_outer_middleware(
