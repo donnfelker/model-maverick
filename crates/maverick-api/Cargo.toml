@@ -27,6 +27,9 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+# W3C trace context for the request span (spec §14.3, D19).
+opentelemetry = { workspace = true }
+tracing-opentelemetry = { workspace = true }
 futures-util = "0.3"
 http-body-util = "0.1"
 ulid = { workspace = true }
@@ -35,5 +38,8 @@ chrono = { workspace = true }
 
 [dev-dependencies]
 maverick-testdb = { workspace = true }
+tracing-subscriber = { workspace = true }
+# The in-memory span exporter for the request-span tests.
+opentelemetry_sdk = { workspace = true, features = ["testing"] }
 # Applies the real graphile_worker schema in the health tests.
 graphile_worker = { workspace = true }

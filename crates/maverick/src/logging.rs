@@ -6,6 +6,10 @@
 //! the `tracing` macro call. Durations should be logged as integer nanoseconds, as Go
 //! did.
 //!
+//! A [`maverick_api::audit::JsonField`] attribute (a list or an object) is written as
+//! raw JSON, as `slog` wrote a slice or struct. [`dispatch_with`] adds the OpenTelemetry
+//! layer (spec §14.3) under the same engine-target filter.
+//!
 //! Time: Go stamped `time.Now()` in the local zone. The engine runs with `TZ=UTC` (the
 //! container default), so this writes UTC with a `Z` suffix; the fixtures mask the value.
 
@@ -14,6 +18,8 @@ use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use maverick_api::audit::JSON_FIELD_MARK;
+use maverick_domain::gojson;
 use tracing::field::{Field, Visit};
 use tracing::{Dispatch, Event, Level, Subscriber};
 use tracing_subscriber::filter::{FilterFn, LevelFilter};
@@ -78,12 +84,26 @@ impl<S: Subscriber> Layer<S> for GoJsonLayer {
 
 /// A dispatcher that writes the engine's INFO-and-above events to `out`.
 pub fn dispatch(out: Output) -> Dispatch {
-    let layer = GoJsonLayer { out }
+    dispatch_with(out, None)
+}
+
+/// [`dispatch`], plus export of the engine's spans and events through `otel` when set.
+/// Both layers see only the engine's own targets at INFO and above, so no dependency's
+/// span (a SQL statement, an HTTP client call) is exported.
+pub fn dispatch_with(out: Output, otel: Option<&crate::otel::Otel>) -> Dispatch {
+    let slog = GoJsonLayer { out }
         .with_filter(LevelFilter::INFO)
-        .with_filter(FilterFn::new(|metadata| {
-            metadata.target().starts_with("maverick")
-        }));
-    Dispatch::new(tracing_subscriber::registry().with(layer))
+        .with_filter(engine_targets());
+    let otel = otel.map(|otel| {
+        otel.layer()
+            .with_filter(LevelFilter::INFO)
+            .with_filter(engine_targets())
+    });
+    Dispatch::new(tracing_subscriber::registry().with(slog).with(otel))
+}
+
+fn engine_targets() -> FilterFn<impl Fn(&tracing::Metadata<'_>) -> bool> {
+    FilterFn::new(|metadata: &tracing::Metadata<'_>| metadata.target().starts_with("maverick"))
 }
 
 /// Runs `body` with a Go-shaped JSON logger writing to `out` as the current thread's
@@ -163,8 +183,9 @@ impl Visit for AttrVisitor {
     }
 
     fn record_f64(&mut self, field: &Field, value: f64) {
-        let text = if value.is_finite() {
-            value.to_string()
+        // `slog` writes a float with `json.Marshal` (`1e+21`, `1e-7`).
+        let text = if let Ok(json) = gojson::encode_f64(value) {
+            json
         } else {
             // Go's JSON handler cannot encode these either; it logs them as strings.
             let mut json = String::new();
@@ -182,6 +203,8 @@ impl Visit for AttrVisitor {
         let text = format!("{value:?}");
         if field.name() == "message" {
             self.message = text;
+        } else if let Some(json) = text.strip_prefix(JSON_FIELD_MARK) {
+            self.attrs.push((field.name().to_owned(), json.to_owned()));
         } else {
             self.push_string(field, &text);
         }
@@ -304,6 +327,108 @@ mod tests {
                 r#"{"time":"<TS>","level":"INFO","msg":"done","elapsed_ns":1500}"#,
             ]
         );
+    }
+
+    /// The exact Go line for both listeners (the field capture is in maverick-api).
+    #[test]
+    fn request_line_has_go_order_and_float_ms() {
+        let out = capture(|| {
+            let log = maverick_api::observe::RequestLog::default();
+            log.set_identity("ten_42", "key_42");
+            log.set_recommendation_id("rec_7");
+            maverick_api::observe::log_request(
+                "POST",
+                "/v1/recommend",
+                201,
+                std::time::Duration::from_micros(1_234),
+                "01J00000000000000000000000",
+                &log,
+            );
+            let internal = maverick_api::observe::RequestLog::default();
+            internal.set_actor("ops");
+            maverick_api::observe::log_request(
+                "GET",
+                "/internal/v1/alerts",
+                200,
+                std::time::Duration::from_micros(500),
+                "rid",
+                &internal,
+            );
+        });
+        let lines: Vec<String> = out.lines().map(mask_time).collect();
+        assert_eq!(
+            lines,
+            [
+                r#"{"time":"<TS>","level":"INFO","msg":"request","method":"POST","path":"/v1/recommend","status":201,"ms":1.234,"request_id":"01J00000000000000000000000","tenant_id":"ten_42","key_id":"key_42","recommendation_id":"rec_7"}"#,
+                r#"{"time":"<TS>","level":"INFO","msg":"request","method":"GET","path":"/internal/v1/alerts","status":200,"ms":0.5,"request_id":"rid","actor":"ops"}"#,
+            ]
+        );
+    }
+
+    #[test]
+    fn audit_lines_carry_lists_and_objects_as_json() {
+        use std::collections::BTreeMap;
+        let out = capture(|| {
+            maverick_api::audit::tenant_create(
+                "ops",
+                "ten_1",
+                "Acme",
+                &["col_a".to_owned(), "col_b".to_owned()],
+            );
+            maverick_api::audit::weights_replace(
+                "rails",
+                "ten_1",
+                &[BTreeMap::from([
+                    ("capability", "coding"),
+                    ("mode", "quality"),
+                ])],
+            );
+            maverick_api::audit::tenant_suspend("ops", "ten_1", "suspended");
+        });
+        let lines: Vec<String> = out.lines().map(mask_time).collect();
+        assert_eq!(
+            lines,
+            [
+                r#"{"time":"<TS>","level":"INFO","msg":"internal provisioning write","audit":true,"actor":"ops","action":"tenant.create","tenant_id":"ten_1","name":"Acme","default_pool_columns":["col_a","col_b"]}"#,
+                r#"{"time":"<TS>","level":"INFO","msg":"internal provisioning write","audit":true,"actor":"rails","action":"tenant.weights.replace","tenant_id":"ten_1","weights":[{"capability":"coding","mode":"quality"}]}"#,
+                r#"{"time":"<TS>","level":"INFO","msg":"internal provisioning write","audit":true,"actor":"ops","action":"tenant.suspend","tenant_id":"ten_1","status":"suspended"}"#,
+            ]
+        );
+    }
+
+    #[test]
+    fn catalog_change_lines() {
+        use maverick_store::catalog::{CatalogChange, log_change};
+        let out = capture(|| {
+            log_change(CatalogChange::Status, "col_1", "cold_start", "active");
+            log_change(
+                CatalogChange::Pricing,
+                "col_1",
+                r#"{"input_per_mtok":1}"#,
+                r#"{"input_per_mtok":2}"#,
+            );
+            log_change(
+                CatalogChange::ExecutionAliases,
+                "col_1",
+                "{}",
+                r#"{"a":"b"}"#,
+            );
+        });
+        let lines: Vec<String> = out.lines().map(mask_time).collect();
+        assert_eq!(
+            lines,
+            [
+                r#"{"time":"<TS>","level":"INFO","msg":"catalog_changes","change":"status","column_id":"col_1","old":"cold_start","new":"active"}"#,
+                r#"{"time":"<TS>","level":"INFO","msg":"catalog_changes","change":"pricing","column_id":"col_1","old":"{\"input_per_mtok\":1}","new":"{\"input_per_mtok\":2}"}"#,
+                r#"{"time":"<TS>","level":"INFO","msg":"catalog_changes","change":"execution_aliases","column_id":"col_1","old":"{}","new":"{\"a\":\"b\"}"}"#,
+            ]
+        );
+    }
+
+    #[test]
+    fn floats_use_go_json_form() {
+        let out = capture(|| tracing::info!(big = 1e21f64, small = 1e-7f64, "floats"));
+        assert!(out.contains(r#""big":1e+21,"small":1e-7}"#), "{out}");
     }
 
     #[test]

@@ -2318,6 +2318,8 @@ dependencies = [
  "maverick-runner",
  "maverick-store",
  "maverick-testdb",
+ "opentelemetry",
+ "opentelemetry_sdk",
  "rmcp",
  "serde",
  "serde_json",
@@ -2327,6 +2329,8 @@ dependencies = [
  "tower",
  "tower-http 0.7.1",
  "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
  "ulid",
 ]
 
