@@ -130,6 +130,7 @@ fn attempt(
             format,
             settings,
             constraints,
+            zdr: false,
         },
     )
     .unwrap_or_else(|e| panic!("rewrite of {body}: {e}"));
@@ -421,4 +422,41 @@ impl Rng {
     fn body(&mut self) -> String {
         self.object(0, true)
     }
+}
+
+/// D15: the Zero Data Retention option is forced last: a `provider` object keeps its other
+/// options (sorted keys, raw bytes), a missing or non-object `provider` becomes
+/// `{"zdr":true}`, and a caller's `"zdr": false` is overridden.
+#[test]
+fn zero_data_retention_is_forced_on_openrouter_attempts() {
+    let zdr = |body: &str| {
+        let out = rewrite_attempt(
+            body.as_bytes(),
+            "anthropic/claude",
+            &AttemptParams {
+                format: WireFormat::ChatCompletions,
+                settings: None,
+                constraints: &ParamConstraints::new(),
+                zdr: true,
+            },
+        )
+        .expect("rewrite");
+        String::from_utf8(out.body).expect("utf-8")
+    };
+    assert_eq!(
+        zdr(r#"{"messages":[]}"#),
+        r#"{"messages":[],"model":"anthropic/claude","provider":{"zdr":true}}"#
+    );
+    assert_eq!(
+        zdr(r#"{"provider":{"zdr":false,"order":[ "a" ],"b":0.50}}"#),
+        r#"{"model":"anthropic/claude","provider":{"b":0.50,"order":["a"],"zdr":true}}"#
+    );
+    assert_eq!(
+        zdr(r#"{"provider":"x"}"#),
+        r#"{"model":"anthropic/claude","provider":{"zdr":true}}"#
+    );
+    assert_eq!(
+        zdr(r#"{"provider":null}"#),
+        r#"{"model":"anthropic/claude","provider":{"zdr":true}}"#
+    );
 }

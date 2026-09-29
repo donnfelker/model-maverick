@@ -51,6 +51,11 @@ pub const TENANT_SUSPENDED_MESSAGE: &str = "tenant is suspended";
 pub const ZERO_RETENTION_REQUIRES_DECLARED: &str = "zero_retention_requires_declared";
 /// `no_compliant_columns`, relayed from the engine (D17).
 pub const NO_COMPLIANT_COLUMNS: &str = "no_compliant_columns";
+/// The proxy's own `409 no_compliant_columns` for OpenRouter execution (D15): a
+/// zero-retention tenant, and no chain entry has an OpenRouter alias with valid
+/// zero-retention evidence.
+pub const NO_COMPLIANT_OPENROUTER_ALIAS_MESSAGE: &str =
+    "no chain entry has an OpenRouter alias with valid zero-retention evidence";
 
 /// `rate_limited` (D28).
 pub const RATE_LIMITED: &str = "rate_limited";
