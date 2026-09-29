@@ -26,12 +26,12 @@ The producer batches items per tenant key and sends them fire-and-forget, so tel
 
 - It flushes on an interval (default 10 s) or when a batch reaches its size (default 20 items), and it flushes once more at shutdown.
 - A request that dispatched no attempt has no items and sends nothing.
-- A tenant that opted out (D39, the engine's `telemetry: false` on the recommendation) sends nothing, and the request is still routed.
+- A tenant that opted out (D39, the engine's `telemetry: false` on the recommendation) sends nothing, and the request is still routed. The proxy's OTel record skips that request too (D43).
 - Telemetry off (`MAVERICK_PROXY_TELEMETRY=off`) means the producer has no task and no connection: zero bytes.
 
 ## What the engine does with it
 
-The engine records the outcomes and uses them for its production-signal views and alerting. The nightly rankings themselves come from the benchmark grades, not from telemetry; telemetry is the live-traffic signal that sits alongside the benchmark. See [Nightly benchmark](nightly-benchmark.md).
+The engine records the outcomes and uses them for its production-signal views and alerting. A tenant reads its outcomes through `GET /v1/history/outcomes`. Its `outcome` filter accepts Go's six values plus `completed_unchecked`, the stored outcome of a 2xx with no check (D16), so a caller can filter on it (D40). The nightly rankings themselves come from the benchmark grades, not from telemetry; telemetry is the live-traffic signal that sits alongside the benchmark. See [Nightly benchmark](nightly-benchmark.md).
 
 ## Where this is verified
 

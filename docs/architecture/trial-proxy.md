@@ -45,6 +45,8 @@ A caller key that starts with `sk-or-` is an OpenRouter credential, recognized i
 
 After the relay ends, the proxy reports one item per dispatched attempt to the engine's `/v1/telemetry`, batched per tenant key. A tenant that opted out (D39) or a request that dispatched nothing sends nothing. Telemetry off means zero bytes. See [Telemetry and outcomes](telemetry-and-outcomes.md).
 
+The proxy's OTel record follows the same opt-out: an opted-out tenant's request exports no `maverick.recommendation` log record and is not counted (D43). See [Observability](observability.md).
+
 ## Configuration
 
-The proxy reads its configuration once at startup from `maverick-proxy/src/config.rs`. Key variables: `MAVERICK_PROXY_MODE`, `MAVERICK_ENGINE_URL`, `MAVERICK_API_KEY` (self-hosted), `MAVERICK_UPSTREAM_{OPENAI,ANTHROPIC,GOOGLE,XAI,OPENROUTER}`, `MAVERICK_PROXY_ADDR` (default `:8090`), `MAVERICK_PROXY_MAX_BODY_BYTES`, `MAVERICK_PROXY_RATELIMIT_RPM`, and `MAVERICK_PROXY_TELEMETRY`.
+The proxy reads its configuration once at startup from `maverick-proxy/src/config.rs`. Key variables: `MAVERICK_PROXY_MODE`, `MAVERICK_ENGINE_URL`, `MAVERICK_API_KEY` (self-hosted), `MAVERICK_UPSTREAM_{OPENAI,ANTHROPIC,GOOGLE,XAI,OPENROUTER}`, `MAVERICK_PROXY_ADDR` (default `:8090`), `MAVERICK_PROXY_MAX_BODY_BYTES`, `MAVERICK_PROXY_RATELIMIT_RPM`, `MAVERICK_PROXY_TELEMETRY`, and `MAVERICK_PROXY_OTLP_ENDPOINT`.

@@ -33,11 +33,15 @@ sequenceDiagram
 
 The model field selects behavior through the alias grammar (`maverick-core::alias`). `maverick/auto`, `maverick/quality`, and `maverick/cost` map to the balanced, quality, and cost ranking modes. `maverick/<pool>:<mode>` selects a pool. A suffix `?settings=caller` (D14) tells the proxy to keep the caller's parameters instead of applying the entry's settings. A concrete model name (no `maverick/` prefix) is not routed: the proxy answers `400 invalid_model_alias`, and an SDK core passes it straight through to the provider.
 
-The workload (D5) is either declared or projected. A present `X-Maverick-Workload` header (`capability:tier`) selects the declared form, and nothing about the prompt leaves the process. Without the header, the body is projected into a short classification text (`projection_version` `p1`). A zero-retention tenant never projects: it sends the declared fallback so the prompt stays local.
+The workload (D5) is either declared or projected. A present `X-Maverick-Workload` header (`capability:tier`) selects the declared form, and nothing about the prompt leaves the process. Without the header, the body is projected into a short classification text (`projection_version` `p1`).
+
+An SDK core that knows a tenant is zero retention never projects. It sends the declared fallback, so the prompt stays local. The proxy keeps no such memory and sends the projection. The engine then classifies a zero-retention tenant's prompt only on a classifier column with valid zero-retention evidence (D2). Without one, it answers `422 zero_retention_requires_declared` before the prompt is hashed, and the proxy relays that error.
 
 ## Recommend
 
 The proxy calls `POST /v1/recommend` with the tenant key, the mode, and the workload. The engine classifies the workload, applies the tenant's policy and pools (a pool can only shrink, never grow, G2), ranks the eligible models, and returns a recommendation: a `recommendation_id`, a `chain` of entries, and flags such as `zero_retention` and `telemetry` (the D39 opt-out). Each entry carries a provider, a model, an endpoint, the entry's settings, parameter constraints (D29), and any execution aliases (D15 OpenRouter).
+
+The prompt form needs a classifier column that resolves against the catalog. While it does not resolve, a prompt-form request is still served on the default workload (classification method `fallback_default`, G1), and a zero-retention tenant's prompt still fails closed. The engine retries the resolution in the background every 30 s and refreshes a resolved one every 5 min, so a catalog change takes effect without a restart (D41). An unresolved classifier raises an alert; see [Observability](observability.md).
 
 ## Chain execution
 

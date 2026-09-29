@@ -50,6 +50,8 @@ The nightly and weekly batches are long, and more than one worker can pick up th
 
 A batch resumes where it left off: a resumed batch skips runs already done (D10), and the rebuild is idempotent per batch.
 
+One `graphile_worker` behavior needs cleanup. On a duplicate enqueue while the keyed job is locked (running), `graphile_worker` clears that job's key, marks its attempts exhausted, and inserts a fresh keyed job (its migration m000019). If the running worker then dies, the recovery sweep unlocks the old row, but that row can never run again. The batch completion transaction deletes such rows for its task and night (`batches::delete_orphaned_failed_jobs`), so no permanently failed job is left behind (spec §11.2).
+
 ## Graceful shutdown
 
 The engine owns the signals, so the workers are told not to listen for OS signals themselves. On SIGINT or SIGTERM there is one ten-second deadline:
