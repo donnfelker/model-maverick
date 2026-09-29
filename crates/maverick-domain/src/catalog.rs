@@ -136,7 +136,8 @@ pub fn simulate_retirement(
 }
 
 /// Map one `pool_would_be_empty` simulation error to a [`BlockedPool`] for a tenant. The
-/// `status_retired` constraint (the whole pool retired) carries no cell.
+/// `status_retired` constraint (the whole pool retired) is kept and carries no cell, as
+/// Go wrote it (`"constraint":"status_retired"` in the recorded 422 details).
 fn blocked_pool(tenant_id: &str, error: &ConfigError) -> BlockedPool {
     let details = &error.details;
     let string_field = |key: &str| {
@@ -145,7 +146,7 @@ fn blocked_pool(tenant_id: &str, error: &ConfigError) -> BlockedPool {
             .and_then(serde_json::Value::as_str)
             .map(str::to_string)
     };
-    let constraint = string_field("constraint").filter(|c| c != "status_retired");
+    let constraint = string_field("constraint");
     BlockedPool {
         tenant_id: tenant_id.to_string(),
         pool: string_field("pool").unwrap_or_default(),
@@ -288,8 +289,15 @@ mod tests {
         assert_eq!(blocked[0].tenant_id, "ten_a");
         assert_eq!(blocked[0].pool, "default");
         assert_eq!(
-            blocked[0].constraint, None,
-            "a wholly retired pool names no constraint"
+            blocked[0].constraint.as_deref(),
+            Some("status_retired"),
+            "a wholly retired pool names the status_retired constraint"
+        );
+        assert_eq!(blocked[0].capability, None);
+        assert_eq!(blocked[0].difficulty_tier, None);
+        assert_eq!(
+            serde_json::to_string(&blocked[0]).unwrap(),
+            r#"{"tenant_id":"ten_a","pool":"default","constraint":"status_retired"}"#
         );
     }
 }

@@ -8,12 +8,14 @@ pub mod capture;
 pub mod classify;
 pub mod config;
 mod health;
+mod internal;
 pub mod observe;
 mod recommend;
 mod strict;
 mod telemetry;
 
 pub use health::HealthState;
+pub use internal::InternalSettings;
 pub use recommend::{RecommendConfig, RecommendError, Recommended, recommend};
 
 /// What the endpoint handlers read: the engine pool and the health inputs. Handlers that
@@ -23,6 +25,7 @@ pub struct ApiState {
     pool: Option<PgPool>,
     health: HealthState,
     recommend: RecommendConfig,
+    internal: InternalSettings,
 }
 
 impl ApiState {
@@ -30,6 +33,7 @@ impl ApiState {
     pub fn new(pool: PgPool, config: &Config) -> Self {
         Self::with_health(pool.clone(), HealthState::new(pool, config))
             .with_recommend_config(RecommendConfig::from_config(config))
+            .with_internal(InternalSettings::from_config(config))
     }
 
     /// A state with an explicit health configuration and the default recommend knobs.
@@ -38,6 +42,7 @@ impl ApiState {
             pool: Some(pool),
             health,
             recommend: RecommendConfig::default(),
+            internal: InternalSettings::default(),
         }
     }
 
@@ -47,6 +52,7 @@ impl ApiState {
             pool: None,
             health: HealthState::detached(),
             recommend: RecommendConfig::default(),
+            internal: InternalSettings::default(),
         }
     }
 
@@ -64,6 +70,17 @@ impl ApiState {
     /// The recommend knobs.
     pub fn recommend(&self) -> &RecommendConfig {
         &self.recommend
+    }
+
+    /// Replaces the internal seam's settings (cold-start window, default quota, clock).
+    pub fn with_internal(mut self, internal: InternalSettings) -> Self {
+        self.internal = internal;
+        self
+    }
+
+    /// The internal seam's settings.
+    pub fn internal(&self) -> &InternalSettings {
+        &self.internal
     }
 }
 
@@ -899,24 +916,26 @@ fn public_v1_router(state: AuthState, api: ApiState) -> Router {
         .layer(middleware::from_fn_with_state(state, public_auth))
 }
 
-fn internal_v1_router(state: AuthState) -> Router {
+fn internal_v1_router(state: AuthState, api: ApiState) -> Router {
     Router::new()
-        .route("/tenants", any(route_stub))
-        .route("/tenants/{id}", any(route_stub))
-        .route("/tenants/{id}/suspend", any(route_stub))
-        .route("/tenants/{id}/activate", any(route_stub))
-        .route("/tenants/{id}/api-keys", any(route_stub))
-        .route("/api-keys/{id}", any(route_stub))
-        .route("/tenants/{id}/pools", any(route_stub))
-        .route("/tenants/{id}/weights", any(route_stub))
-        .route("/tenants/{id}/constraints", any(route_stub))
-        .route("/alerts", any(route_stub))
-        .route("/columns", any(route_stub))
-        .route("/columns/{id}", any(route_stub))
-        .route("/corpus/activate", any(route_stub))
+        .route("/tenants", any(internal::tenants))
+        .route("/tenants/{id}", any(internal::tenant))
+        .route("/tenants/{id}/suspend", any(internal::suspend))
+        .route("/tenants/{id}/activate", any(internal::activate))
+        .route("/tenants/{id}/api-keys", any(internal::issue_key))
+        .route("/api-keys/{id}", any(internal::revoke_key))
+        .route("/tenants/{id}/pools", any(internal::pools))
+        .route("/tenants/{id}/weights", any(internal::weights))
+        .route("/tenants/{id}/constraints", any(internal::constraints))
+        .route("/tenants/{id}/limits", any(internal::limits))
+        .route("/alerts", any(internal::alerts))
+        .route("/columns", any(internal::create_column))
+        .route("/columns/{id}", any(internal::update_column))
+        .route("/corpus/activate", any(internal::activate_corpus))
         .route("/captures", any(route_stub))
         .route("/captures/{id}/prompt", any(route_stub))
         .fallback(route_stub)
+        .with_state(api)
         .layer(middleware::from_fn(body_limit))
         .layer(middleware::from_fn_with_state(state, internal_auth))
 }
@@ -989,7 +1008,7 @@ pub fn internal_router_with(state: AuthState, api: ApiState) -> Router {
     with_outer_middleware(
         Router::new()
             .nest("/health/detail", health)
-            .nest("/internal/v1", internal_v1_router(state))
+            .nest("/internal/v1", internal_v1_router(state, api))
             .fallback(route_stub),
     )
 }

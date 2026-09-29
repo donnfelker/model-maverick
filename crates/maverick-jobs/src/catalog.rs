@@ -14,20 +14,18 @@ use std::pin::Pin;
 
 use chrono::{DateTime, Duration, NaiveDate, SecondsFormat, Utc};
 use maverick_alerts::{AlertError, AlertKind, AlertNotifier, Severity, insert_alert};
-use maverick_domain::catalog::{self as lifecycle, RetirementBlocked, TenantPools};
+use maverick_domain::catalog::{self as lifecycle, RetirementBlocked};
 use maverick_domain::gofmt::quote;
 use maverick_domain::gojson;
-use maverick_domain::policy::{self, Pool, SimulationState, StandingConstraints};
+use maverick_domain::policy;
 use maverick_domain::pricing::{Pricing, parse_pricing};
 use maverick_store::catalog::{
     CatalogChange, ModelColumn, ModelColumnUpdate, list_model_columns,
     list_model_columns_by_statuses, log_change, update_model_column,
 };
-use maverick_store::{
-    JsonRawValue, is_not_found, measurement, numeric_to_f64, simulation, tenancy,
-};
+use maverick_store::{JsonRawValue, measurement, simulation, tenancy};
 use serde::Serialize;
-use sqlx::{PgConnection, PgPool};
+use sqlx::PgPool;
 
 use crate::{DayArgs, JobArgs, JobKind, JobsError};
 
@@ -271,60 +269,6 @@ async fn set_status(pool: &PgPool, column: &ModelColumn, status: &str) -> Result
     Ok(())
 }
 
-/// One tenant's pools, constraints, and simulation state.
-struct TenantSurvey {
-    tenant_id: String,
-    pools: Vec<Pool>,
-    constraints: StandingConstraints,
-    state: SimulationState,
-}
-
-/// Groups stored pools by tenant in first-seen order and loads each tenant's standing
-/// constraints (no row: unconstrained) and the simulation state for its pools' columns.
-async fn survey(
-    conn: &mut PgConnection,
-    pools: Vec<tenancy::Pool>,
-) -> sqlx::Result<Vec<TenantSurvey>> {
-    let mut tenants: Vec<TenantSurvey> = Vec::new();
-    for pool in pools {
-        let entry = policy::Pool {
-            name: pool.name,
-            model_column_ids: pool.model_column_ids,
-            is_default: pool.is_default,
-        };
-        match tenants.iter_mut().find(|t| t.tenant_id == pool.tenant_id) {
-            Some(tenant) => tenant.pools.push(entry),
-            None => tenants.push(TenantSurvey {
-                tenant_id: pool.tenant_id,
-                pools: vec![entry],
-                constraints: StandingConstraints::default(),
-                state: SimulationState::default(),
-            }),
-        }
-    }
-    for tenant in &mut tenants {
-        tenant.constraints =
-            match tenancy::get_tenant_constraints(&mut *conn, &tenant.tenant_id).await {
-                Ok(row) => StandingConstraints {
-                    max_cost_per_run: row.max_cost_per_run.map(numeric_to_f64),
-                    max_latency_ms: row.max_latency_ms,
-                    zero_retention: row.zero_retention,
-                },
-                Err(error) if is_not_found(&error) => StandingConstraints::default(),
-                Err(error) => return Err(error),
-            };
-        let mut ids: Vec<String> = tenant
-            .pools
-            .iter()
-            .flat_map(|pool| pool.model_column_ids.iter().cloned())
-            .collect();
-        ids.sort();
-        ids.dedup();
-        tenant.state = simulation::load_state(&mut *conn, &ids).await?;
-    }
-    Ok(tenants)
-}
-
 /// The retirement guard (reference §5.2): re-simulates every stored pool that contains
 /// `column_id`, per tenant, with the column forced `retired`. `Ok(None)` allows the
 /// retirement. `Ok(Some(_))` blocks it, after writing one critical `pool_would_be_empty`
@@ -339,20 +283,10 @@ pub async fn guard_retirement(
         source,
     };
     let mut conn = deps.pool.acquire().await.map_err(guard_error)?;
-    let pools = tenancy::list_pools_by_column(&mut *conn, column_id)
+    let blocked = simulation::retirement_blockers(&mut conn, column_id, now)
         .await
         .map_err(guard_error)?;
-    let tenants = survey(&mut conn, pools).await.map_err(guard_error)?;
-    let views: Vec<TenantPools<'_>> = tenants
-        .iter()
-        .map(|tenant| TenantPools {
-            tenant_id: &tenant.tenant_id,
-            pools: &tenant.pools,
-            constraints: &tenant.constraints,
-            state: &tenant.state,
-        })
-        .collect();
-    let blocked = lifecycle::simulate_retirement(column_id, &views, now);
+    drop(conn);
     if blocked.is_empty() {
         return Ok(None);
     }
@@ -443,7 +377,7 @@ async fn drift_check(
     let pools = tenancy::list_pools(&mut *conn)
         .await
         .map_err(store_error(job, "drift check"))?;
-    let tenants = survey(&mut conn, pools)
+    let tenants = simulation::survey(&mut conn, pools)
         .await
         .map_err(store_error(job, "drift check"))?;
     drop(conn);
