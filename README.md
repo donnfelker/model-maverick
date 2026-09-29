@@ -86,7 +86,7 @@ Other top-level directories:
 | `reference/` | The exact Go behavior (strings, constants, order, quirks) for points the specs do not fix. |
 | `plans/` | The design summary, decisions, and build order. |
 | `docs/` | Product and operator documentation, plus `docs/architecture/`. |
-| `scripts/` | `ci.sh` (the test tiers), `sqlx-prepare.sh`, the demo, and the live smoke script. |
+| `scripts/` | `ci.sh` (the test tiers), `e2e.sh`, `latency.sh`, `docker-smoke.sh`, `backup.sh` and `restore-test.sh`, `sqlx-prepare.sh`, the demo, and the live smoke script. |
 
 ## Getting started
 
@@ -168,11 +168,11 @@ All tests run through the tiers in [`scripts/ci.sh`](scripts/ci.sh):
 
 | Tier | What it runs |
 |---|---|
-| `fast` | `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test --workspace`, `cargo deny`, and the sqlx offline check. |
-| `db` | The store and job tests against a real Postgres (testcontainers). |
+| `fast` | `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test --workspace`, `cargo deny`, the sqlx offline check, the strict manifest audit (`parity_coverage --strict`), and the `#[instrument]` lint (`scripts/check-instrumentation.sh`). The store and job tests on a real Postgres (testcontainers) run here, inside `cargo test --workspace`. |
+| `db` | A placeholder. It has no separate suite, because the store and job tests already run in `fast`. |
 | `parity` | The proxy replay, the API replay, and the SDK conformance scenarios (proxy and core-direct), each checked against the reviewed `DIVERGENCES.md` allowlist. |
-| `e2e` | The full-stack script: the real binaries on Postgres against the fake provider. |
-| `mutants` / `mutants-diff` | `cargo-mutants` on the domain crates (a full shard run, or only the changed lines). |
+| `e2e` | The full-stack script (`scripts/e2e.sh`): the real binaries on Postgres against the fake provider. |
+| `mutants` / `mutants-diff` | `cargo-mutants` on `maverick-domain` (a full run or one shard, or only the changed lines). CI runs the changed lines on each push and the full run in eight nightly shards. |
 
 ```bash
 scripts/ci.sh            # every tier except mutants
@@ -181,6 +181,8 @@ scripts/ci.sh parity
 ```
 
 CI runs with `SQLX_OFFLINE=true` and the query cache that `scripts/sqlx-prepare.sh` writes, so it needs no database to compile. CI never calls a real provider. Every test uses the deterministic fake provider. The one live smoke test is opt-in and has a spend cap.
+
+Outside the tiers, `scripts/latency.sh` measures the hot-path latency targets and `scripts/docker-smoke.sh` checks the deploy images. See [`docs/architecture/testing-and-parity.md`](docs/architecture/testing-and-parity.md) for every suite and harness.
 
 ## Contributing
 
