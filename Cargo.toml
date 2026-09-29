@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "crates/acceptance",
+    "crates/e2e",
     "crates/instrument-lint",
     "crates/maverick",
     "crates/maverick-alerts",
