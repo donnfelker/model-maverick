@@ -2289,6 +2289,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "maverick-acceptance"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "maverick",
+ "maverick-api",
+ "maverick-config",
+ "maverick-domain",
+ "maverick-providers",
+ "maverick-proxy",
+ "maverick-store",
+ "maverick-testdb",
+ "reqwest",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "maverick-alerts"
 version = "0.1.0"
 dependencies = [
@@ -2332,9 +2354,11 @@ dependencies = [
  "opentelemetry_sdk",
  "parity-support",
  "rand 0.10.3",
+ "regex",
  "rmcp",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
  "sqlx",
  "thiserror",
  "tokio",
@@ -2449,10 +2473,15 @@ name = "maverick-proxy"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "chrono",
  "http-body-util",
  "hyper",
  "hyper-util",
+ "maverick-api",
  "maverick-core",
+ "maverick-domain",
+ "maverick-store",
+ "maverick-testdb",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-proto",
@@ -2462,6 +2491,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sqlx",
  "test-support",
  "thiserror",
  "tokio",
@@ -3624,6 +3654,7 @@ dependencies = [
  "chrono",
  "maverick-core",
  "maverick-domain",
+ "maverick-proxy",
  "reqwest",
  "serde",
  "serde_json",

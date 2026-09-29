@@ -1,0 +1,32 @@
+[package]
+name = "maverick-acceptance"
+description = "Cross-cutting acceptance suites: the real engine and the real trial proxy in one process, on Postgres, with recording fakes for every provider and a mock OTLP collector."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# The engine binary's library: its log pipeline and OTLP export (the canary suite).
+maverick = { path = "../maverick" }
+maverick-api = { workspace = true }
+maverick-config = { workspace = true }
+maverick-domain = { workspace = true }
+maverick-providers = { workspace = true }
+maverick-proxy = { path = "../maverick-proxy" }
+maverick-store = { workspace = true }
+maverick-testdb = { workspace = true }
+axum = { workspace = true }
+chrono = { workspace = true }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
