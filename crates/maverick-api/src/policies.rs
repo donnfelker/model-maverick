@@ -36,7 +36,7 @@ use crate::{ApiError, ApiState, ErrorCode, Identity, internal_error, not_found};
 /// The bar of a tenant without a weights row for the capability: Go's float32 `0.80`.
 const DEFAULT_QUALITY_BAR: f32 = 0.80;
 
-enum Failure {
+pub(crate) enum Failure {
     Api(ApiError),
     Internal(String),
 }
@@ -88,8 +88,9 @@ pub(crate) async fn policies_handler(
     }
 }
 
-/// The response body for one tenant and query: compact JSON and one `\n`.
-async fn policies(
+/// The response body for one tenant and query: compact JSON and one `\n` (also the MCP
+/// `get_policy` tool).
+pub(crate) async fn policies(
     pool: &PgPool,
     buffer: f64,
     tenant: &str,

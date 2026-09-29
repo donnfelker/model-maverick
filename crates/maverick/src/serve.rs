@@ -19,7 +19,8 @@ use maverick_alerts::{AlertNotifier, Fanout};
 use maverick_api::audit::JsonField;
 use maverick_api::classify::{Resolver, ResolverSettings};
 use maverick_api::{
-    ApiState, AuthState, RecommendConfig, internal_router_with, public_router_with,
+    ApiState, AuthState, PgAuthBackend, PublicAuthBackend, PublicAuthDecision, RecommendConfig,
+    internal_router_with, mcp, public_router_with,
 };
 use maverick_config::Config;
 use maverick_domain::graders::judge_rubric::{
@@ -35,8 +36,8 @@ use maverick_providers::google::GoogleClient;
 use maverick_providers::openai::OpenAiClient;
 use maverick_providers::{CompletionRequest, ProviderClient};
 use maverick_runner::Clients;
-use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
+use sqlx::{Connection, PgConnection, PgPool};
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
@@ -44,6 +45,120 @@ use tokio::time::Instant;
 
 use crate::logging::{self, Output};
 use crate::otel::Otel;
+
+/// `mcp-stdio --api-key <key>` after the flags and the config (reference Part 1 §7.4).
+/// The key is authenticated once, and the whole session acts as it. stdout is the MCP
+/// channel and carries nothing else; logs go to stderr.
+pub fn mcp_stdio(config: Config, api_key: &str, stderr: Output) -> i32 {
+    let runtime = match tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(error) => {
+            return logging::with_logger(stderr, || {
+                tracing::error!(error = %error, "starting the runtime");
+                EXIT_FAILURE
+            });
+        }
+    };
+    runtime.block_on(async move {
+        let dispatch = logging::dispatch(stderr);
+        let _ = tracing::dispatcher::set_global_default(dispatch.clone());
+        let _guard = tracing::dispatcher::set_default(&dispatch);
+        stdio_session(&config, api_key).await
+    })
+}
+
+async fn stdio_session(config: &Config, api_key: &str) -> i32 {
+    let pool = match PgPoolOptions::new()
+        .max_connections(4)
+        .connect_lazy(&config.database_url)
+    {
+        Ok(pool) => pool,
+        Err(error) => {
+            tracing::error!(error = %error, "creating database pool");
+            return EXIT_FAILURE;
+        }
+    };
+    // One direct connection first: an unreachable database fails at once, as Go's did,
+    // instead of after the pool's connect retries.
+    if let Err(error) = PgConnection::connect(&config.database_url).await {
+        tracing::error!(
+            error = %format!("looking up api key: {error}"),
+            "mcp-stdio: authenticating --api-key"
+        );
+        return EXIT_FAILURE;
+    }
+    let identity = match PgAuthBackend::new(pool.clone()).authenticate(api_key).await {
+        Ok(PublicAuthDecision::Authenticated(identity)) => identity,
+        Ok(PublicAuthDecision::Missing) => {
+            tracing::error!(
+                error = "missing or invalid API key",
+                "mcp-stdio: authenticating --api-key"
+            );
+            return EXIT_FAILURE;
+        }
+        Ok(PublicAuthDecision::Suspended) => {
+            tracing::error!(
+                error = "tenant is suspended",
+                "mcp-stdio: authenticating --api-key"
+            );
+            return EXIT_FAILURE;
+        }
+        Err(error) => {
+            let error = match &error {
+                maverick_api::AuthBackendError::Store(source) => {
+                    format!("looking up api key: {source}")
+                }
+            };
+            tracing::error!(error = %error, "mcp-stdio: authenticating --api-key");
+            return EXIT_FAILURE;
+        }
+    };
+    let fanout = match Fanout::new(
+        &config.smtp_url,
+        &config.alerts_webhook_url,
+        &config.alerts_webhook_secret,
+    ) {
+        Ok(fanout) => Arc::new(fanout),
+        Err(error) => {
+            tracing::error!(error = %error, "configuring alert delivery");
+            return EXIT_FAILURE;
+        }
+    };
+    let notifier: Arc<dyn AlertNotifier> = fanout.clone();
+    let providers = provider_clients(config);
+    let mut recommend = RecommendConfig::from_config(config);
+    recommend.alerts = Some(Arc::clone(&notifier));
+    recommend.classifier =
+        Arc::new(classifier_resolver(config, &pool, &providers, Arc::clone(&notifier)).await);
+    let api = ApiState::new(pool.clone(), config).with_recommend_config(recommend);
+
+    tracing::info!(
+        tenant_id = identity.tenant_id.as_str(),
+        "mcp-stdio session starting"
+    );
+    let session = mcp::serve_lines(
+        &api,
+        &identity,
+        tokio::io::BufReader::new(tokio::io::stdin()),
+        tokio::io::stdout(),
+    )
+    .await;
+    fanout.wait().await;
+    pool.close().await;
+    match session {
+        Ok(()) => {
+            tracing::info!("mcp-stdio session ended");
+            0
+        }
+        Err(error) => {
+            tracing::error!(error = %error, "mcp-stdio session failed");
+            EXIT_FAILURE
+        }
+    }
+}
 
 /// The one deadline for every shutdown step.
 pub const SHUTDOWN_DEADLINE: Duration = Duration::from_secs(10);

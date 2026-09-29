@@ -282,14 +282,16 @@ fn mcp_stdio(args: &[String], lookup: &dyn Fn(&str) -> Option<String>, mut stder
     let Some(flags) = parse_flags(&set, args, &mut stderr) else {
         return EXIT_USAGE;
     };
-    with_logger(stderr, || {
-        if flags.string("api-key").is_empty() {
+    let api_key = flags.string("api-key").to_owned();
+    let loaded = with_logger(stderr.clone(), || {
+        if api_key.is_empty() {
             tracing::error!("mcp-stdio: --api-key is required (spec §12)");
-            return EXIT_USAGE;
+            return Err(EXIT_USAGE);
         }
-        if load_config(lookup).is_err() {
-            return EXIT_FAILURE;
-        }
-        not_implemented("mcp-stdio", "the MCP stdio transport bead")
-    })
+        load_config(lookup).map_err(|_| EXIT_FAILURE)
+    });
+    match loaded {
+        Ok(config) => crate::serve::mcp_stdio(config, &api_key, stderr),
+        Err(code) => code,
+    }
 }

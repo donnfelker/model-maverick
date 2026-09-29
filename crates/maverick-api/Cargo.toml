@@ -37,6 +37,8 @@ http-body-util = "0.1"
 ulid = { workspace = true }
 # The internal seam mints tenant HMAC keys.
 rand = { workspace = true }
+# MCP tool arguments are validated against the tool input schemas (D34).
+jsonschema = { workspace = true }
 sqlx = { workspace = true }
 chrono = { workspace = true }
 
