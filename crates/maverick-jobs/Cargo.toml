@@ -31,3 +31,4 @@ ulid = { workspace = true }
 
 [dev-dependencies]
 maverick-testdb = { workspace = true }
+parity-support = { path = "../parity-support" }
