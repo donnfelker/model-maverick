@@ -9,14 +9,18 @@
 //! shared `openrouter` rules for the per-attempt request, and it makes the SDK's own
 //! decisions that the proxy does not:
 //!
+//! - On an MM outage it runs the fail-open ladder (G14, group 6): the last-known-good chain
+//!   for the workload, then the configured default model, then the caller's own model, with
+//!   the zero-retention rules that override G14. The proxy is exempt from fail-open by
+//!   position (an engine failure is its `502 engine_error`).
 //! - On chain exhaustion it relays the last upstream error unchanged (group 5), where the
 //!   proxy answers `502 no_executable_candidates`.
 //! - It runs OpenRouter execution (D15) from an `sk-or-` caller key without the proxy's
 //!   hosted-mode gating, so the tenant key stays `mk_test_conformance` (groups 10 to 12).
 //! - A concrete model name passes through untouched, with no recommend call (S09a).
 //!
-//! This phase covers groups 5, 10, 11, and 12 and S09a. The fail-open ladder (group 6) is
-//! the next phase on this bead.
+//! This covers groups 5, 6, 10, 11, and 12 and S09a. S06j (the zero-retention workload-form
+//! switch) is deferred; see `CORE_DEFER`.
 
 mod common;
 
@@ -26,10 +30,11 @@ use std::time::Duration;
 use common::{Loaded, assert_recorded, config_ms, load_scenarios, refused_url, upstream_for};
 use maverick_core::alias::{Alias, AliasError, SettingsMode, parse_alias};
 use maverick_core::chain::{ChainExecutor, ChainResult, LastFailure, PreparedAttempt};
+use maverick_core::failopen::{FailOpen, FailOpenConfig, LadderError, Plan, Privacy};
 use maverick_core::openrouter::{self, Eligibility, Verdict};
 use maverick_core::recommend::{
     ChainEntry, RecommendClient, RecommendClientConfig, RecommendError, RecommendRequest,
-    Recommendation, TenantKey, TraceHeaders, Workload,
+    TenantKey, TraceHeaders, Workload,
 };
 use maverick_core::telemetry::{
     BatcherConfig, HttpSink, Telemetry, TelemetryItem, UsageShape, parse_usage,
@@ -46,22 +51,30 @@ use serde_json::{Value, json};
 /// The tenant key every scenario uses unless it overrides `config.api_key`.
 const DEFAULT_TENANT_KEY: &str = "mk_test_conformance";
 
-/// The groups this phase serves. Group 6 (fail-open) is the next phase.
-const CORE_GROUPS: [u64; 4] = [5, 10, 11, 12];
+/// The groups this runner serves: the fail-open ladder (6), exhaustion relay (5), and
+/// OpenRouter (10 to 12).
+const CORE_GROUPS: [u64; 5] = [5, 6, 10, 11, 12];
 
 /// Scenarios in other groups that are core only and covered here. S09a is a concrete-model
 /// passthrough (group 9).
 const CORE_EXTRA: [&str; 1] = ["S09a"];
+
+/// Group 6 scenarios not yet covered. S06j switches the workload to the declared form once
+/// the tenant is known zero retention, which reuses the engine's cached classification; that
+/// is the next phase on this bead.
+const CORE_DEFER: [&str; 1] = ["S06j"];
 
 /// Per-scenario wiring shared by every step.
 struct Ctx {
     tenant: String,
     caller_key: &'static str,
     openrouter_mode: bool,
+    privacy: Privacy,
     upstreams: Upstreams,
     env_keys: EnvKeys,
     executor: ChainExecutor,
     recommend: RecommendClient,
+    failopen: FailOpen,
     telemetry: Telemetry,
     http: reqwest::Client,
 }
@@ -173,14 +186,39 @@ async fn run_scenario_core(loaded: &Loaded) -> Result<(), String> {
     let recommend = RecommendClient::new(RecommendClientConfig::new(engine_url.clone()))
         .map_err(|e| format!("recommend client: {e}"))?;
 
+    let privacy = match config.get("privacy").and_then(Value::as_str) {
+        Some("off") => Privacy::Off,
+        Some("prompt") => Privacy::Prompt,
+        _ => Privacy::Declared,
+    };
+    let failopen = FailOpen::new(FailOpenConfig {
+        default_model: config
+            .get("default_model")
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        zero_retention_verified: config
+            .get("zero_retention_verified")
+            .and_then(Value::as_array)
+            .map(|models| {
+                models
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_owned)
+                    .collect()
+            })
+            .unwrap_or_default(),
+    });
+
     let ctx = Ctx {
         tenant,
         caller_key,
         openrouter_mode,
+        privacy,
         upstreams: Upstreams::from_config(&proxy_config),
         env_keys: EnvKeys::from_config(&proxy_config),
         executor,
         recommend,
+        failopen,
         telemetry,
         http,
     };
@@ -233,40 +271,103 @@ async fn run_call(ctx: &Ctx, call: &Value, expect: &Value, where_: &str) -> Resu
         tracestate: None,
     };
 
-    // This phase has no fail-open, so a recommend failure other than a terminal privacy error
-    // is a runner error, not a fall-open.
-    let recommendation = match ctx
-        .recommend
-        .recommend_traced(&tenant_key, &request, &trace)
-        .await
-    {
-        Ok(recommendation) => recommendation,
-        Err(RecommendError::ZeroRetentionRequiresDeclared { .. }) => {
-            return assert_error(expect, "zero_retention_requires_declared", where_);
-        }
-        Err(RecommendError::NoCompliantColumns { .. }) => {
-            return assert_error(expect, "no_compliant_columns", where_);
-        }
-        Err(RecommendError::Engine(failure)) => {
-            return Err(format!("{where_}: engine recommend failed: {failure}"));
-        }
-    };
+    // The fail-open ladder (G14): the last-known-good chain for this workload, then the
+    // default model, then the caller's own concrete model. The cache key is stable per
+    // workload, so a later outage reuses the earlier chain.
+    let workload_key = call
+        .get("workload")
+        .and_then(Value::as_str)
+        .unwrap_or("prompt");
+    let original_model = call.get("original_model").and_then(Value::as_str);
+    let plan = ctx
+        .failopen
+        .plan(
+            &ctx.tenant,
+            workload_key,
+            ctx.privacy,
+            original_model,
+            || {
+                ctx.recommend
+                    .recommend_traced(&tenant_key, &request, &trace)
+            },
+        )
+        .await;
 
-    run_chain(ctx, &alias, &body, &recommendation, expect, where_).await
+    match plan {
+        Ok(Plan::Recommended(recommendation)) => {
+            run_chain(
+                ctx,
+                &alias,
+                &body,
+                &recommendation.chain,
+                recommendation.zero_retention,
+                &recommendation.recommendation_id,
+                recommendation.telemetry_opt_out,
+                expect,
+                where_,
+            )
+            .await
+        }
+        Ok(Plan::LastKnownGood(chain)) => {
+            let zero_retention = ctx.failopen.is_zero_retention(&ctx.tenant);
+            run_chain(
+                ctx,
+                &alias,
+                &body,
+                &chain,
+                zero_retention,
+                "",
+                false,
+                expect,
+                where_,
+            )
+            .await
+        }
+        Ok(Plan::DefaultModel(model) | Plan::OriginalModel(model)) => {
+            let chain = [synth_entry(&model)];
+            run_chain(ctx, &alias, &body, &chain, false, "", false, expect, where_).await
+        }
+        Err(LadderError::Terminal(RecommendError::ZeroRetentionRequiresDeclared { .. })) => {
+            assert_error(expect, "zero_retention_requires_declared", where_)
+        }
+        Err(LadderError::Terminal(RecommendError::NoCompliantColumns { .. })) => {
+            assert_error(expect, "no_compliant_columns", where_)
+        }
+        Err(LadderError::NoCompliantColumns) => {
+            assert_error(expect, "no_compliant_columns", where_)
+        }
+        Err(LadderError::Terminal(other)) => {
+            Err(format!("{where_}: terminal recommend error {other}"))
+        }
+        Err(LadderError::Unavailable(failure)) => Err(format!(
+            "{where_}: maverick unavailable and no fallback: {failure}"
+        )),
+        Err(LadderError::NoModel) => Err(format!("{where_}: no model to call")),
+    }
 }
 
+/// A single direct chain entry for a fall-open model: the native chat provider, that model,
+/// no settings or constraints.
+fn synth_entry(model: &str) -> ChainEntry {
+    ChainEntry {
+        provider: "openai".to_owned(),
+        model: model.to_owned(),
+        ..ChainEntry::default()
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 async fn run_chain(
     ctx: &Ctx,
     alias: &Alias,
     body: &[u8],
-    recommendation: &Recommendation,
+    chain: &[ChainEntry],
+    zero_retention: bool,
+    recommendation_id: &str,
+    telemetry_opt_out: bool,
     expect: &Value,
     where_: &str,
 ) -> Result<(), String> {
-    let zero_retention = recommendation.zero_retention;
-    let recommendation_id = recommendation.recommendation_id.clone();
-    let chain = &recommendation.chain;
-
     // D15: a zero-retention chain with no verified-zero alias is refused before any attempt.
     if ctx.openrouter_mode
         && openrouter::verdict(chain, zero_retention) == Verdict::NoCompliantColumns
@@ -334,7 +435,7 @@ async fn run_chain(
     let mut items: Vec<TelemetryItem> = outcome
         .attempts
         .iter()
-        .map(|record| record.telemetry_item(&recommendation_id))
+        .map(|record| record.telemetry_item(recommendation_id))
         .collect();
 
     let response = match outcome.result {
@@ -362,7 +463,9 @@ async fn run_chain(
         },
     };
 
-    if !recommendation.telemetry_opt_out {
+    // Privacy off never contacts MM, telemetry included (S06d). Otherwise a tenant that has
+    // not opted out (D39) reports every dispatched attempt.
+    if ctx.privacy != Privacy::Off && !telemetry_opt_out {
         ctx.telemetry.record(&ctx.tenant, items);
     }
 
@@ -449,10 +552,15 @@ async fn core_conformance_scenarios() {
 
     let mut ran = 0;
     let mut failures = Vec::new();
+    let mut deferred = Vec::new();
     for loaded in &scenarios {
         let covered =
             CORE_GROUPS.contains(&loaded.group) || CORE_EXTRA.contains(&loaded.id.as_str());
         if !covered {
+            continue;
+        }
+        if CORE_DEFER.contains(&loaded.id.as_str()) {
+            deferred.push(loaded.id.clone());
             continue;
         }
         match run_scenario_core(loaded).await {
@@ -466,7 +574,13 @@ async fn core_conformance_scenarios() {
             }
         }
     }
-    println!("core conformance (phase 1): {ran} passed");
+    println!(
+        "core conformance: {ran} passed, {} deferred",
+        deferred.len()
+    );
+    for id in &deferred {
+        println!("  DEFER {id}: workload-form switch (next phase)");
+    }
 
     assert!(
         failures.is_empty(),
