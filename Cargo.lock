@@ -2307,6 +2307,7 @@ dependencies = [
  "rmcp",
  "serde",
  "serde_json",
+ "sqlx",
  "thiserror",
  "tokio",
  "tower",
