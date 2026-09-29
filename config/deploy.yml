@@ -12,8 +12,10 @@
 #   address on the `kamal` network:
 #     scripts/internal-tunnel.sh <user>@<HOST>
 # - Postgres 16 is an accessory on the same host. The app reaches it as `maverick-postgres`
-#   on the `kamal` Docker network. Its data is on the named volume `postgres-data`, and its
-#   port is on the host loopback only. `kamal accessory remove postgres` DELETES the data.
+#   on the `kamal` Docker network. Its port is on the host loopback only. Its data is in the
+#   host directory ~/maverick-postgres/postgres-data: Kamal bind-mounts an accessory's
+#   `directories` from $PWD/<service>-<accessory>/ in the SSH user's home, not as named
+#   volumes. `kamal accessory remove postgres` DELETES that directory and the data.
 # - The `backup` accessory runs scripts/backup.sh every night (see the accessory below).
 # - The hosted trial proxy is its own service: config/deploy-proxy.yml.
 #
@@ -103,10 +105,11 @@ accessories:
       - postgres-data:/var/lib/postgresql/data
 
   # The nightly backup: scripts/backup.sh --daemon in a Postgres 16 client image. It dumps
-  # at 02:30 UTC into the `maverick-backups` volume, keeps 7 dumps, and copies each off the
-  # box with rclone when MAVERICK_BACKUP_TARGET is set (for example `offsite:maverick`,
-  # with the remote configured by RCLONE_CONFIG_OFFSITE_* secrets). Unset, it logs a
-  # warning every night. Restore test: docker/README.md.
+  # at 02:30 UTC into ~/maverick-backup/maverick-backups on the host (mounted at /backups),
+  # keeps 7 dumps, and copies each off the box with rclone when MAVERICK_BACKUP_TARGET is
+  # set (for example `offsite:maverick`, with the remote configured by
+  # RCLONE_CONFIG_OFFSITE_* secrets). Unset, it logs a warning every night. Restore test:
+  # docker/README.md.
   backup:
     image: postgres:16-alpine
     host: <HOST>
