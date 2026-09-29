@@ -7,6 +7,7 @@ pub mod audit;
 pub mod capture;
 pub mod classify;
 pub mod config;
+mod debug;
 mod health;
 mod internal;
 pub mod mcp;
@@ -917,17 +918,35 @@ fn public_v1_router(state: AuthState, api: ApiState) -> Router {
             "/models",
             any(models::models_handler).with_state(api.clone()),
         )
-        .route("/telemetry", any(telemetry::telemetry).with_state(api))
+        .route(
+            "/telemetry",
+            any(telemetry::telemetry).with_state(api.clone()),
+        )
         .route("/history/models/{column_id}", any(route_stub))
         .route("/history/recommendations", any(route_stub))
         .route("/history/recommendations/{id}", any(route_stub))
         .route("/history/outcomes", any(route_stub))
         .route("/history/calibration", any(route_stub))
-        .route("/debug/capture-windows", any(route_stub))
-        .route("/debug/capture-windows/{id}", any(route_stub))
-        .route("/debug/replay/{capture_id}", any(route_stub))
-        .route("/debug/captures", any(route_stub))
-        .route("/debug/captures/{id}/prompt", any(route_stub))
+        .route(
+            "/debug/capture-windows",
+            any(debug::windows_handler).with_state(api.clone()),
+        )
+        .route(
+            "/debug/capture-windows/{id}",
+            any(debug::window_handler).with_state(api.clone()),
+        )
+        .route(
+            "/debug/replay/{capture_id}",
+            any(debug::replay_handler).with_state(api.clone()),
+        )
+        .route(
+            "/debug/captures",
+            any(debug::captures_handler).with_state(api.clone()),
+        )
+        .route(
+            "/debug/captures/{id}/prompt",
+            any(debug::prompt_handler).with_state(api),
+        )
         .fallback(route_stub)
         .layer(middleware::from_fn(body_limit))
         .layer(middleware::from_fn_with_state(state.clone(), rate_limit))

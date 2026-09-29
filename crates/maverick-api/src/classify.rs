@@ -431,6 +431,13 @@ impl Resolver {
         &self.settings
     }
 
+    /// The classifier version an ordinary tenant's prompt is classified with,
+    /// `<classifier.column>/<prompt version>`: the only one `POST /v1/debug/replay` accepts.
+    #[must_use]
+    pub fn current_version(&self) -> String {
+        self.version_of(&self.settings.column, self.default.as_ref())
+    }
+
     /// Classify `input.prompt` (see the module documentation).
     pub async fn resolve(
         &self,
@@ -438,21 +445,8 @@ impl Resolver {
         input: &ResolveInput<'_>,
     ) -> Result<Resolution, ZeroRetentionRefused> {
         // D2 comes first: a refused prompt is not even hashed.
-        let (column, classifier) = if input.zero_retention {
-            let Some(column) = self.settings.zero_retention_column.as_deref() else {
-                return Err(ZeroRetentionRefused);
-            };
-            if !has_zero_evidence(input.columns, column, input.now) {
-                return Err(ZeroRetentionRefused);
-            }
-            (column, self.zero_retention.as_ref())
-        } else {
-            (self.settings.column.as_str(), self.default.as_ref())
-        };
-        let base_version = classifier.map_or_else(
-            || classify::classifier_version(column, &self.settings.prompt_version),
-            Classifier::version,
-        );
+        let (column, classifier) = self.select(input)?;
+        let base_version = self.version_of(column, classifier);
         let cache_version = match input.projection_version {
             Some(projection) => format!("{base_version}/{projection}"),
             None => base_version.clone(),
@@ -487,39 +481,11 @@ impl Resolver {
             }
         }
 
-        let Some(classifier) = classifier else {
-            return Ok(resolution(
-                Classification::fallback(),
-                Method::FallbackDefault,
-                false,
-            ));
-        };
-        match self.budget(pool, input).await {
-            Budget::Available => {}
-            Budget::Exceeded => {
-                return Ok(resolution(
-                    Classification::fallback(),
-                    Method::FallbackDefault,
-                    true,
-                ));
-            }
-            Budget::Unknown => {
-                return Ok(resolution(
-                    Classification::fallback(),
-                    Method::FallbackDefault,
-                    false,
-                ));
-            }
-        }
-
-        let attempts = classifier
-            .classify(input.prompt, Instant::now() + self.settings.deadline)
-            .await;
-        self.record_spend(pool, input, column, &attempts).await;
-        self.track(pool, &base_version, input.now, attempts.outcome.is_err())
-            .await;
-        match attempts.outcome {
-            Ok(classification) => {
+        match self
+            .call(pool, input, column, classifier, &base_version)
+            .await
+        {
+            Called::Classified(classification) => {
                 let cached = JsonRawValue::from_string(classification.cache_json())
                     .map_err(|error| error.to_string());
                 let stored = match cached {
@@ -539,17 +505,106 @@ impl Resolver {
                 }
                 Ok(resolution(classification, Method::Classified, false))
             }
+            Called::Fallback { quota_exceeded } => Ok(resolution(
+                Classification::fallback(),
+                Method::FallbackDefault,
+                quota_exceeded,
+            )),
+        }
+    }
+
+    /// Re-classify a captured prompt for `POST /v1/debug/replay/{capture_id}` (reference
+    /// Part 5 §6.16): [`Resolver::resolve`] without the cache, so the classifier is asked
+    /// again. D2 holds as on the prompt path: a zero-retention tenant's prompt goes only to
+    /// the zero-retention column while its evidence is valid, and otherwise to no column
+    /// at all, so the answer is the fallback. The call is paid for like any other, so D4,
+    /// the spend record, and the degraded tracker apply.
+    pub async fn replay(
+        &self,
+        pool: &PgPool,
+        input: &ResolveInput<'_>,
+    ) -> (Classification, Method) {
+        let Ok((column, classifier)) = self.select(input) else {
+            return (Classification::fallback(), Method::FallbackDefault);
+        };
+        let version = self.version_of(column, classifier);
+        match self.call(pool, input, column, classifier, &version).await {
+            Called::Classified(classification) => (classification, Method::Classified),
+            Called::Fallback { .. } => (Classification::fallback(), Method::FallbackDefault),
+        }
+    }
+
+    /// D2: the column and classifier for the tenant. A zero-retention tenant gets only the
+    /// zero-retention column, and only while its evidence is valid.
+    fn select(
+        &self,
+        input: &ResolveInput<'_>,
+    ) -> Result<(&str, Option<&Classifier>), ZeroRetentionRefused> {
+        if !input.zero_retention {
+            return Ok((self.settings.column.as_str(), self.default.as_ref()));
+        }
+        let Some(column) = self.settings.zero_retention_column.as_deref() else {
+            return Err(ZeroRetentionRefused);
+        };
+        if !has_zero_evidence(input.columns, column, input.now) {
+            return Err(ZeroRetentionRefused);
+        }
+        Ok((column, self.zero_retention.as_ref()))
+    }
+
+    /// `<column>/<prompt version>`, from the connected classifier when there is one.
+    fn version_of(&self, column: &str, classifier: Option<&Classifier>) -> String {
+        classifier.map_or_else(
+            || classify::classifier_version(column, &self.settings.prompt_version),
+            Classifier::version,
+        )
+    }
+
+    /// Steps 3 and 4: the D4 budget, then the call, its spend, and the degraded tracker.
+    async fn call(
+        &self,
+        pool: &PgPool,
+        input: &ResolveInput<'_>,
+        column: &str,
+        classifier: Option<&Classifier>,
+        version: &str,
+    ) -> Called {
+        let Some(classifier) = classifier else {
+            return Called::Fallback {
+                quota_exceeded: false,
+            };
+        };
+        match self.budget(pool, input).await {
+            Budget::Available => {}
+            Budget::Exceeded => {
+                return Called::Fallback {
+                    quota_exceeded: true,
+                };
+            }
+            Budget::Unknown => {
+                return Called::Fallback {
+                    quota_exceeded: false,
+                };
+            }
+        }
+
+        let attempts = classifier
+            .classify(input.prompt, Instant::now() + self.settings.deadline)
+            .await;
+        self.record_spend(pool, input, column, &attempts).await;
+        self.track(pool, version, input.now, attempts.outcome.is_err())
+            .await;
+        match attempts.outcome {
+            Ok(classification) => Called::Classified(classification),
             Err(error) => {
                 tracing::warn!(
                     error = %error,
                     calls = attempts.calls,
                     "classifier failed; answering the fallback classification"
                 );
-                Ok(resolution(
-                    Classification::fallback(),
-                    Method::FallbackDefault,
-                    false,
-                ))
+                Called::Fallback {
+                    quota_exceeded: false,
+                }
             }
         }
     }
@@ -686,6 +741,13 @@ enum Budget {
     Available,
     Exceeded,
     Unknown,
+}
+
+/// What [`Resolver::call`] got: a classification, or the fallback (with whether D4 stopped
+/// the call).
+enum Called {
+    Classified(Classification),
+    Fallback { quota_exceeded: bool },
 }
 
 /// True when a catalog column for `column_ref` has valid zero-retention evidence at `now`.

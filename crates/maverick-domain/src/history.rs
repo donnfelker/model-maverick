@@ -119,8 +119,9 @@ fn parse_go_date(text: &str) -> Option<NaiveDate> {
     NaiveDate::from_ymd_opt(year, month, day)
 }
 
-/// `base64.RawURLEncoding.EncodeToString`.
-fn base64url_encode(bytes: &[u8]) -> String {
+/// `base64.RawURLEncoding.EncodeToString`. The capture list cursor is this encoding of
+/// the last returned capture id.
+pub fn base64url_encode(bytes: &[u8]) -> String {
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
         let group = chunk
@@ -140,7 +141,7 @@ fn base64url_encode(bytes: &[u8]) -> String {
 /// `base64.RawURLEncoding.DecodeString` (not `Strict`): URL alphabet only, no padding,
 /// `\r` and `\n` skipped, unused trailing bits ignored, and a lone trailing character is an
 /// error.
-fn base64url_decode(token: &str) -> Option<Vec<u8>> {
+pub fn base64url_decode(token: &str) -> Option<Vec<u8>> {
     let mut out = Vec::with_capacity(token.len() * 3 / 4);
     let mut group = 0_u32;
     let mut bits = 0_u32;
