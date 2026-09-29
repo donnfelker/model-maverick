@@ -1,0 +1,7 @@
+#!/bin/sh
+# Kamal 2 pre-app-boot hook for config/deploy.yml (bead 9.4): run `maverick migrate` with
+# the new image, once, before the new app containers boot. The migrations are additive
+# (D37), so the old containers keep working until the new ones take over.
+set -eu
+echo "pre-app-boot: maverick migrate with version ${KAMAL_VERSION}"
+kamal app exec --roles=web --primary --version="${KAMAL_VERSION}" "migrate"
