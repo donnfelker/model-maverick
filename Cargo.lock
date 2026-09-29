@@ -2403,10 +2403,12 @@ dependencies = [
  "maverick-testdb",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
  "sqlx",
  "thiserror",
  "tokio",
  "tracing",
+ "ulid",
 ]
 
 [[package]]

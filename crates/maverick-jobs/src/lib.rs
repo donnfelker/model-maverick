@@ -12,10 +12,18 @@ use chrono::{
 use graphile_worker::{
     CronJobKeyMode, Crontab, CrontabTimer, CrontabValue, JobKeyMode, JobSpec, WorkerRecoveryConfig,
 };
+use maverick_store::{
+    batches::{self, BatchClaim, ClaimOutcome},
+    health::{self, GRAPHILE_WORKER_SCHEMA, WorkerHeartbeat},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::fmt;
 use std::time::Duration;
+use ulid::Ulid;
+
+pub use maverick_store::batches::{Batch, BatchEnd};
 
 pub const DEFAULT_QUEUE_NAME: &str = "default";
 pub const WORKER_CONCURRENCY: usize = 10;
@@ -25,6 +33,7 @@ pub const DEFAULT_BATCH_JOB_TIMEOUT: Duration = Duration::from_secs(6 * 60 * 60)
 pub const DEFAULT_BATCH_LEASE_TTL: Duration = Duration::from_secs(60);
 pub const DEFAULT_BATCH_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15);
 pub const GRAPHILE_RECOVERY_SWEEP_THRESHOLD: Duration = Duration::from_secs(5 * 60);
+const BATCH_ID_DOMAIN: &[u8] = b"model-maverick/batch-id/v1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum JobKind {
@@ -384,6 +393,262 @@ impl JobClient {
             })
             .collect()
     }
+}
+
+/// Runtime settings for the engine-owned `batches` lease.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BatchLeaseConfig {
+    pub lease_ttl: Duration,
+    pub heartbeat_interval: Duration,
+    pub owner_stale_after: Duration,
+    pub graphile_schema: String,
+}
+
+impl Default for BatchLeaseConfig {
+    fn default() -> Self {
+        Self {
+            lease_ttl: DEFAULT_BATCH_LEASE_TTL,
+            heartbeat_interval: DEFAULT_BATCH_HEARTBEAT_INTERVAL,
+            owner_stale_after: GRAPHILE_RECOVERY_SWEEP_THRESHOLD,
+            graphile_schema: GRAPHILE_WORKER_SCHEMA.to_string(),
+        }
+    }
+}
+
+impl From<&JobClientConfig> for BatchLeaseConfig {
+    fn from(config: &JobClientConfig) -> Self {
+        Self {
+            lease_ttl: config.batch_lease_ttl,
+            heartbeat_interval: config.batch_heartbeat_interval,
+            owner_stale_after: config.recovery_sweep_threshold,
+            graphile_schema: GRAPHILE_WORKER_SCHEMA.to_string(),
+        }
+    }
+}
+
+impl BatchLeaseConfig {
+    fn lease_ttl_secs(&self) -> f64 {
+        self.lease_ttl.as_secs_f64()
+    }
+}
+
+/// Graphile-aware wrapper around the store `batches` lease.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BatchLeaseManager {
+    config: BatchLeaseConfig,
+}
+
+impl BatchLeaseManager {
+    pub fn new(config: BatchLeaseConfig) -> Self {
+        Self { config }
+    }
+
+    pub fn from_job_client_config(config: &JobClientConfig) -> Self {
+        Self::new(BatchLeaseConfig::from(config))
+    }
+
+    pub fn config(&self) -> &BatchLeaseConfig {
+        &self.config
+    }
+
+    /// Interval a handler should use between heartbeat renewals.
+    pub fn heartbeat_interval(&self) -> Duration {
+        self.config.heartbeat_interval
+    }
+
+    /// Claims the lease for a job kind and window.
+    ///
+    /// The batch id is deterministic: `bat_` plus the Crockford base32 ULID text
+    /// for the first 128 bits of SHA-256 over
+    /// `model-maverick/batch-id/v1`, the job kind name, and the window. The
+    /// zero byte separators keep the derivation stable and unambiguous.
+    pub async fn claim(
+        &self,
+        pool: &sqlx::PgPool,
+        kind: JobKind,
+        window: &str,
+        worker_id: &str,
+    ) -> Result<BatchLeaseOutcome, BatchLeaseError> {
+        let id = deterministic_batch_id(kind, window);
+        // Registry read failures fail closed: live foreign owners stay no-op until
+        // expiry instead of burning graphile max_attempts.
+        let workers = health::list_worker_heartbeats(pool, &self.config.graphile_schema)
+            .await
+            .ok();
+        let request = BatchClaim {
+            id: &id,
+            kind: kind.as_str(),
+            batch_window: window,
+            worker_id,
+            lease_ttl_secs: self.config.lease_ttl_secs(),
+        };
+        let stale_after = self.config.owner_stale_after;
+        let mut conn = pool.acquire().await?;
+        let outcome = batches::claim_batch(&mut conn, &request, |batch| {
+            workers
+                .as_deref()
+                .is_some_and(|workers| batch_owner_is_gone(batch, workers, stale_after))
+        })
+        .await?;
+        Ok(BatchLeaseOutcome::from_store(
+            outcome,
+            kind,
+            worker_id,
+            self.config.lease_ttl_secs(),
+        ))
+    }
+}
+
+/// A held `batches` lease.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BatchLease {
+    batch: Batch,
+    kind: JobKind,
+    worker_id: String,
+    lease_ttl_secs: f64,
+}
+
+impl BatchLease {
+    fn new(batch: Batch, kind: JobKind, worker_id: &str, lease_ttl_secs: f64) -> Self {
+        Self {
+            batch,
+            kind,
+            worker_id: worker_id.to_string(),
+            lease_ttl_secs,
+        }
+    }
+
+    pub fn batch(&self) -> &Batch {
+        &self.batch
+    }
+
+    pub fn id(&self) -> &str {
+        &self.batch.id
+    }
+
+    pub fn kind(&self) -> JobKind {
+        self.kind
+    }
+
+    pub fn worker_id(&self) -> &str {
+        &self.worker_id
+    }
+
+    pub async fn heartbeat(&mut self, pool: &sqlx::PgPool) -> Result<&Batch, BatchLeaseError> {
+        let Some(batch) =
+            batches::heartbeat_batch(pool, &self.batch.id, &self.worker_id, self.lease_ttl_secs)
+                .await?
+        else {
+            return Err(self.lease_lost());
+        };
+        self.batch = batch;
+        Ok(&self.batch)
+    }
+
+    pub async fn finish(
+        self,
+        pool: &sqlx::PgPool,
+        end: BatchEnd,
+    ) -> Result<Batch, BatchLeaseError> {
+        let Some(batch) = batches::finish_batch(pool, &self.batch.id, &self.worker_id, end).await?
+        else {
+            return Err(self.lease_lost());
+        };
+        Ok(batch)
+    }
+
+    fn lease_lost(&self) -> BatchLeaseError {
+        BatchLeaseError::LeaseLost {
+            kind: self.kind,
+            batch_id: self.batch.id.clone(),
+            worker_id: self.worker_id.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum BatchLeaseOutcome {
+    Claimed(BatchLease),
+    TookOver(BatchLease),
+    Finished(Batch),
+    HeldByOther(Batch),
+}
+
+impl BatchLeaseOutcome {
+    pub fn batch(&self) -> &Batch {
+        match self {
+            Self::Claimed(lease) | Self::TookOver(lease) => lease.batch(),
+            Self::Finished(batch) | Self::HeldByOther(batch) => batch,
+        }
+    }
+
+    pub fn holds_lease(&self) -> bool {
+        matches!(self, Self::Claimed(_) | Self::TookOver(_))
+    }
+
+    pub fn lease(self) -> Option<BatchLease> {
+        match self {
+            Self::Claimed(lease) | Self::TookOver(lease) => Some(lease),
+            Self::Finished(_) | Self::HeldByOther(_) => None,
+        }
+    }
+
+    fn from_store(
+        outcome: ClaimOutcome,
+        kind: JobKind,
+        worker_id: &str,
+        lease_ttl_secs: f64,
+    ) -> Self {
+        match outcome {
+            ClaimOutcome::Claimed(batch) => {
+                Self::Claimed(BatchLease::new(batch, kind, worker_id, lease_ttl_secs))
+            }
+            ClaimOutcome::TookOver(batch) => {
+                Self::TookOver(BatchLease::new(batch, kind, worker_id, lease_ttl_secs))
+            }
+            ClaimOutcome::Finished(batch) => Self::Finished(batch),
+            ClaimOutcome::HeldByOther(batch) => Self::HeldByOther(batch),
+        }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum BatchLeaseError {
+    #[error(transparent)]
+    Store(#[from] sqlx::Error),
+    #[error("jobs: {kind}: batch lease {batch_id} was lost by worker {worker_id}")]
+    LeaseLost {
+        kind: JobKind,
+        batch_id: String,
+        worker_id: String,
+    },
+}
+
+pub fn deterministic_batch_id(kind: JobKind, window: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(BATCH_ID_DOMAIN);
+    hasher.update([0]);
+    hasher.update(kind.as_str().as_bytes());
+    hasher.update([0]);
+    hasher.update(window.as_bytes());
+    let digest = hasher.finalize();
+    let mut bytes = [0_u8; 16];
+    bytes.copy_from_slice(&digest[..16]);
+    format!("bat_{}", Ulid::from(bytes))
+}
+
+fn batch_owner_is_gone(
+    batch: &Batch,
+    workers: &[WorkerHeartbeat],
+    owner_stale_after: Duration,
+) -> bool {
+    let Some(owner) = batch.lease_owner.as_deref() else {
+        return true;
+    };
+    workers
+        .iter()
+        .find(|worker| worker.id == owner)
+        .is_none_or(|worker| worker.age_seconds > owner_stale_after.as_secs_f64())
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
