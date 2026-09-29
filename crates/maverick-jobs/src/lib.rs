@@ -6,6 +6,7 @@
 pub mod fold;
 pub mod rebuild;
 pub mod retention;
+pub mod spend_guard;
 
 use chrono::{
     DateTime, Datelike, Duration as ChronoDuration, Months, NaiveDate, NaiveDateTime, TimeZone,
