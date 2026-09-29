@@ -1,0 +1,184 @@
+{
+  "id": "S07a",
+  "name": "telemetry_batch_shape_and_exit_flush",
+  "group": 7,
+  "source": "sdk-v0 plan §2.3 scenario 7; D16, D27",
+  "summary": "One item per attempt, sent as one batch at shutdown with the tenant key. check_pass is absent when no check ran.",
+  "config": {
+    "telemetry_flush_interval_ms": 60000
+  },
+  "engine": {
+    "recommend": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "recommendation_id": "rec_s07a",
+          "recommendations": [
+            {
+              "provider": "openai",
+              "model": "gpt-a",
+              "endpoint": "direct",
+              "column_id": "col_gpt_a",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "standard",
+              "execution_aliases": {},
+              "execution_alias_retention": {}
+            }
+          ],
+          "classification": {
+            "method": "declared"
+          },
+          "measured": true,
+          "zero_retention": false,
+          "telemetry": true
+        }
+      }
+    ]
+  },
+  "provider": {
+    "responses": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s07a",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s07a"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    ]
+  },
+  "steps": [
+    {
+      "call": {
+        "surface": "chat_completions",
+        "model": "maverick/auto",
+        "workload": "structured_extraction:3",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a billing assistant."
+            },
+            {
+              "role": "user",
+              "content": "Extract the invoice total from: Total due $42.10"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": "response",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s07a",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s07a"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    },
+    {
+      "check_recorded": {
+        "telemetry": {
+          "count": 0
+        }
+      }
+    },
+    {
+      "shutdown": true
+    }
+  ],
+  "recorded": {
+    "telemetry": {
+      "count": 1,
+      "requests": [
+        {
+          "headers": {
+            "authorization": "Bearer mk_test_conformance"
+          },
+          "checks": [
+            {
+              "pointer": "/items",
+              "length": 1
+            },
+            {
+              "pointer": "/items/0/recommendation_id",
+              "equals": "rec_s07a"
+            },
+            {
+              "pointer": "/items/0/model_used",
+              "equals": "gpt-a"
+            },
+            {
+              "pointer": "/items/0/status",
+              "equals": 200
+            },
+            {
+              "pointer": "/items/0/tokens_in",
+              "equals": 21
+            },
+            {
+              "pointer": "/items/0/tokens_out",
+              "equals": 3
+            },
+            {
+              "pointer": "/items/0/error_class",
+              "absent": true
+            },
+            {
+              "pointer": "/items/0/check_pass",
+              "absent": true
+            },
+            {
+              "pointer": "/items/0/settings_applied",
+              "equals": false
+            },
+            {
+              "pointer": "/items/0/latency_ms",
+              "type": "integer",
+              "min": 0
+            },
+            {
+              "pointer": "/items/0/endpoint_used",
+              "absent_or_equals": "direct"
+            }
+          ],
+          "not_containing": [
+            "Total due $42.10",
+            "You are a billing assistant.",
+            "sk-caller-openai",
+            "sk-or-caller"
+          ]
+        }
+      ]
+    }
+  }
+}

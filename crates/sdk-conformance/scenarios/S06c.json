@@ -1,0 +1,132 @@
+{
+  "id": "S06c",
+  "name": "mm_down_no_default_uses_original_model",
+  "group": 6,
+  "source": "sdk-v0 plan §2.3 scenario 6; G14",
+  "summary": "MM fails with nothing cached and no default: the core calls the caller's own concrete model.",
+  "engine": {
+    "recommend": [
+      {
+        "kind": "respond",
+        "status": 503,
+        "body": {
+          "error": {
+            "code": "internal",
+            "message": "engine unavailable",
+            "details": {}
+          }
+        }
+      }
+    ]
+  },
+  "provider": {
+    "responses": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s06c",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s06c"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    ]
+  },
+  "steps": [
+    {
+      "call": {
+        "surface": "chat_completions",
+        "model": "maverick/auto",
+        "workload": "structured_extraction:3",
+        "original_model": "gpt-caller",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a billing assistant."
+            },
+            {
+              "role": "user",
+              "content": "Extract the invoice total from: Total due $42.10"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": "response",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s06c",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s06c"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    }
+  ],
+  "recorded": {
+    "recommend": {
+      "count": {
+        "min": 1,
+        "max": 2
+      }
+    },
+    "provider": {
+      "count": 1,
+      "requests": [
+        {
+          "headers": {
+            "authorization": "Bearer sk-caller-openai"
+          },
+          "checks": [
+            {
+              "pointer": "/model",
+              "equals": "gpt-caller"
+            },
+            {
+              "pointer": "/messages",
+              "equals": [
+                {
+                  "role": "system",
+                  "content": "You are a billing assistant."
+                },
+                {
+                  "role": "user",
+                  "content": "Extract the invoice total from: Total due $42.10"
+                }
+              ]
+            }
+          ],
+          "not_containing": [
+            "mk_test_conformance"
+          ]
+        }
+      ]
+    }
+  }
+}

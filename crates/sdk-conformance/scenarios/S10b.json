@@ -1,0 +1,224 @@
+{
+  "id": "S10b",
+  "name": "openrouter_zero_retention_skips_unverified_aliases",
+  "group": 10,
+  "source": "openrouter execution spec §6 scenario 10 (zero-retention case); D15",
+  "summary": "A zero-retention tenant in OpenRouter mode: every attempt carries provider.zdr true, and an alias not verified zero is skipped.",
+  "config": {
+    "execution": "openrouter"
+  },
+  "engine": {
+    "recommend": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "recommendation_id": "rec_s10b",
+          "recommendations": [
+            {
+              "provider": "openai",
+              "model": "gpt-a",
+              "endpoint": "direct",
+              "column_id": "col_gpt_a",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "standard",
+              "execution_aliases": {
+                "openrouter": "openai/gpt-a"
+              },
+              "execution_alias_retention": {
+                "openrouter": "zero"
+              }
+            },
+            {
+              "provider": "openai",
+              "model": "claude-b",
+              "endpoint": "direct",
+              "column_id": "col_claude_b",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "standard",
+              "execution_aliases": {
+                "openrouter": "anthropic/claude-b"
+              },
+              "execution_alias_retention": {
+                "openrouter": "standard"
+              }
+            },
+            {
+              "provider": "openai",
+              "model": "gemini-c",
+              "endpoint": "direct",
+              "column_id": "col_gemini_c",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "standard",
+              "execution_aliases": {
+                "openrouter": "google/gemini-c"
+              },
+              "execution_alias_retention": {
+                "openrouter": "zero"
+              }
+            }
+          ],
+          "classification": {
+            "method": "declared"
+          },
+          "measured": true,
+          "zero_retention": true,
+          "telemetry": true
+        }
+      }
+    ]
+  },
+  "provider": {
+    "responses": [
+      {
+        "kind": "respond",
+        "status": 500,
+        "body": {
+          "error": {
+            "message": "upstream error",
+            "type": "server_error"
+          }
+        }
+      },
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s10b",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s10b"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    ]
+  },
+  "steps": [
+    {
+      "call": {
+        "surface": "chat_completions",
+        "model": "maverick/auto",
+        "workload": "structured_extraction:3",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a billing assistant."
+            },
+            {
+              "role": "user",
+              "content": "Extract the invoice total from: Total due $42.10"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": "response",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s10b",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s10b"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    }
+  ],
+  "recorded": {
+    "provider": {
+      "count": 2,
+      "requests": [
+        {
+          "headers": {
+            "authorization": "Bearer sk-or-caller"
+          },
+          "checks": [
+            {
+              "pointer": "/model",
+              "equals": "openai/gpt-a"
+            },
+            {
+              "pointer": "/messages",
+              "equals": [
+                {
+                  "role": "system",
+                  "content": "You are a billing assistant."
+                },
+                {
+                  "role": "user",
+                  "content": "Extract the invoice total from: Total due $42.10"
+                }
+              ]
+            },
+            {
+              "pointer": "/provider/zdr",
+              "equals": true
+            }
+          ],
+          "not_containing": [
+            "mk_test_conformance",
+            "sk-caller-openai"
+          ]
+        },
+        {
+          "headers": {
+            "authorization": "Bearer sk-or-caller"
+          },
+          "checks": [
+            {
+              "pointer": "/model",
+              "equals": "google/gemini-c"
+            },
+            {
+              "pointer": "/messages",
+              "equals": [
+                {
+                  "role": "system",
+                  "content": "You are a billing assistant."
+                },
+                {
+                  "role": "user",
+                  "content": "Extract the invoice total from: Total due $42.10"
+                }
+              ]
+            },
+            {
+              "pointer": "/provider/zdr",
+              "equals": true
+            }
+          ],
+          "not_containing": [
+            "mk_test_conformance",
+            "sk-caller-openai"
+          ]
+        }
+      ]
+    }
+  }
+}

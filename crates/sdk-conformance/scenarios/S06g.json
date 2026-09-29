@@ -1,0 +1,246 @@
+{
+  "id": "S06g",
+  "name": "zero_retention_warm_outage_uses_zero_entries_only",
+  "group": 6,
+  "source": "sdk-v0 plan §2.3 scenario 6(b); G14",
+  "summary": "For a zero-retention tenant, an outage falls open only to cached entries stamped retention_mode zero.",
+  "config": {
+    "default_model": "gpt-default"
+  },
+  "engine": {
+    "recommend": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "recommendation_id": "rec_s06g",
+          "recommendations": [
+            {
+              "provider": "openai",
+              "model": "gpt-std",
+              "endpoint": "direct",
+              "column_id": "col_gpt_std",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "standard",
+              "execution_aliases": {},
+              "execution_alias_retention": {}
+            },
+            {
+              "provider": "openai",
+              "model": "gpt-z",
+              "endpoint": "direct",
+              "column_id": "col_gpt_z",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "zero",
+              "execution_aliases": {},
+              "execution_alias_retention": {}
+            },
+            {
+              "provider": "openai",
+              "model": "gpt-u",
+              "endpoint": "direct",
+              "column_id": "col_gpt_u",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "unknown",
+              "execution_aliases": {},
+              "execution_alias_retention": {}
+            }
+          ],
+          "classification": {
+            "method": "declared"
+          },
+          "measured": true,
+          "zero_retention": true,
+          "telemetry": true
+        }
+      },
+      {
+        "kind": "respond",
+        "status": 503,
+        "body": {
+          "error": {
+            "code": "internal",
+            "message": "engine unavailable",
+            "details": {}
+          }
+        }
+      }
+    ]
+  },
+  "provider": {
+    "responses": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s06g-1",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s06g-1"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      },
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s06g-2",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s06g-2"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    ]
+  },
+  "steps": [
+    {
+      "call": {
+        "surface": "chat_completions",
+        "model": "maverick/auto",
+        "workload": "structured_extraction:3",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a billing assistant."
+            },
+            {
+              "role": "user",
+              "content": "Extract the invoice total from: Total due $42.10"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": "response",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s06g-1",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s06g-1"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    },
+    {
+      "call": {
+        "surface": "chat_completions",
+        "model": "maverick/auto",
+        "workload": "structured_extraction:3",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a billing assistant."
+            },
+            {
+              "role": "user",
+              "content": "Extract the invoice total from: Total due $42.10"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": "response",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s06g-2",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s06g-2"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    }
+  ],
+  "recorded": {
+    "recommend": {
+      "count": {
+        "min": 2,
+        "max": 3
+      }
+    },
+    "provider": {
+      "count": 2,
+      "requests": [
+        {},
+        {
+          "headers": {
+            "authorization": "Bearer sk-caller-openai"
+          },
+          "checks": [
+            {
+              "pointer": "/model",
+              "equals": "gpt-z"
+            },
+            {
+              "pointer": "/messages",
+              "equals": [
+                {
+                  "role": "system",
+                  "content": "You are a billing assistant."
+                },
+                {
+                  "role": "user",
+                  "content": "Extract the invoice total from: Total due $42.10"
+                }
+              ]
+            }
+          ],
+          "not_containing": [
+            "mk_test_conformance"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,145 @@
+{
+  "id": "S09a",
+  "name": "concrete_model_passes_through",
+  "group": 9,
+  "source": "sdk-v0 plan §2.3 scenario 9; master plan §3.5 alias grammar",
+  "summary": "A concrete model name is not routed: MM is not contacted, and the body reaches the provider untouched.",
+  "engine": {
+    "recommend": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "recommendation_id": "rec_s09a",
+          "recommendations": [
+            {
+              "provider": "openai",
+              "model": "gpt-a",
+              "endpoint": "direct",
+              "column_id": "col_gpt_a",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "standard",
+              "execution_aliases": {},
+              "execution_alias_retention": {}
+            }
+          ],
+          "classification": {
+            "method": "declared"
+          },
+          "measured": true,
+          "zero_retention": false,
+          "telemetry": true
+        }
+      }
+    ]
+  },
+  "provider": {
+    "responses": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s09a",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s09a"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    ]
+  },
+  "steps": [
+    {
+      "call": {
+        "surface": "chat_completions",
+        "model": "gpt-4o",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a billing assistant."
+            },
+            {
+              "role": "user",
+              "content": "Extract the invoice total from: Total due $42.10"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": "response",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s09a",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s09a"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    }
+  ],
+  "recorded": {
+    "recommend": {
+      "count": 0
+    },
+    "provider": {
+      "count": 1,
+      "requests": [
+        {
+          "headers": {
+            "authorization": "Bearer sk-caller-openai"
+          },
+          "checks": [
+            {
+              "pointer": "/model",
+              "equals": "gpt-4o"
+            },
+            {
+              "pointer": "/messages",
+              "equals": [
+                {
+                  "role": "system",
+                  "content": "You are a billing assistant."
+                },
+                {
+                  "role": "user",
+                  "content": "Extract the invoice total from: Total due $42.10"
+                }
+              ]
+            }
+          ],
+          "not_containing": [
+            "mk_test_conformance"
+          ]
+        }
+      ]
+    },
+    "telemetry": {
+      "count": 0
+    }
+  }
+}

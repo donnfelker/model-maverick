@@ -1,0 +1,191 @@
+{
+  "id": "S09b",
+  "name": "entry_settings_override_caller_values",
+  "group": 9,
+  "source": "sdk-v0 plan §2.3 scenario 9; D14",
+  "summary": "Without the suffix, the entry's settings replace the caller's value.",
+  "engine": {
+    "recommend": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "recommendation_id": "rec_s09b",
+          "recommendations": [
+            {
+              "provider": "openai",
+              "model": "gpt-a",
+              "endpoint": "direct",
+              "column_id": "col_gpt_a",
+              "settings": {
+                "reasoning": "high"
+              },
+              "param_constraints": {},
+              "retention_mode": "standard",
+              "execution_aliases": {},
+              "execution_alias_retention": {}
+            }
+          ],
+          "classification": {
+            "method": "declared"
+          },
+          "measured": true,
+          "zero_retention": false,
+          "telemetry": true
+        }
+      }
+    ]
+  },
+  "provider": {
+    "responses": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s09b",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s09b"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    ]
+  },
+  "steps": [
+    {
+      "call": {
+        "surface": "chat_completions",
+        "model": "maverick/auto",
+        "workload": "structured_extraction:3",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a billing assistant."
+            },
+            {
+              "role": "user",
+              "content": "Extract the invoice total from: Total due $42.10"
+            }
+          ],
+          "reasoning_effort": "low"
+        }
+      },
+      "expect": {
+        "outcome": "response",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s09b",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s09b"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    }
+  ],
+  "recorded": {
+    "recommend": {
+      "count": 1,
+      "requests": [
+        {
+          "headers": {
+            "authorization": "Bearer mk_test_conformance"
+          },
+          "body": {
+            "mode": "balanced",
+            "workload": {
+              "capability": "structured_extraction",
+              "difficulty": 3
+            }
+          },
+          "not_containing": [
+            "Total due $42.10",
+            "You are a billing assistant.",
+            "sk-caller-openai"
+          ]
+        }
+      ]
+    },
+    "provider": {
+      "count": 1,
+      "requests": [
+        {
+          "headers": {
+            "authorization": "Bearer sk-caller-openai"
+          },
+          "checks": [
+            {
+              "pointer": "/model",
+              "equals": "gpt-a"
+            },
+            {
+              "pointer": "/messages",
+              "equals": [
+                {
+                  "role": "system",
+                  "content": "You are a billing assistant."
+                },
+                {
+                  "role": "user",
+                  "content": "Extract the invoice total from: Total due $42.10"
+                }
+              ]
+            },
+            {
+              "pointer": "/reasoning_effort",
+              "equals": "high"
+            }
+          ],
+          "not_containing": [
+            "mk_test_conformance"
+          ]
+        }
+      ]
+    },
+    "telemetry": {
+      "count": 1,
+      "requests": [
+        {
+          "headers": {
+            "authorization": "Bearer mk_test_conformance"
+          },
+          "checks": [
+            {
+              "pointer": "/items/0/settings_applied",
+              "equals": true
+            }
+          ],
+          "not_containing": [
+            "Total due $42.10",
+            "You are a billing assistant.",
+            "sk-caller-openai",
+            "sk-or-caller"
+          ]
+        }
+      ]
+    }
+  }
+}

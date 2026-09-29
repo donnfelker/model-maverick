@@ -1,0 +1,131 @@
+{
+  "id": "S09e",
+  "name": "pool_and_mode_alias",
+  "group": 9,
+  "source": "sdk-v0 plan §2.3 scenario 9; alias vectors",
+  "summary": "maverick/<pool>:<mode> sends the pool and the engine mode.",
+  "engine": {
+    "recommend": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "recommendation_id": "rec_s09e",
+          "recommendations": [
+            {
+              "provider": "openai",
+              "model": "gpt-a",
+              "endpoint": "direct",
+              "column_id": "col_gpt_a",
+              "settings": {},
+              "param_constraints": {},
+              "retention_mode": "standard",
+              "execution_aliases": {},
+              "execution_alias_retention": {}
+            }
+          ],
+          "classification": {
+            "method": "declared"
+          },
+          "measured": true,
+          "zero_retention": false,
+          "telemetry": true
+        }
+      }
+    ]
+  },
+  "provider": {
+    "responses": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s09e",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s09e"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    ]
+  },
+  "steps": [
+    {
+      "call": {
+        "surface": "chat_completions",
+        "model": "maverick/prod-pool:quality",
+        "workload": "structured_extraction:3",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a billing assistant."
+            },
+            {
+              "role": "user",
+              "content": "Extract the invoice total from: Total due $42.10"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": "response",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s09e",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s09e"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    }
+  ],
+  "recorded": {
+    "recommend": {
+      "count": 1,
+      "requests": [
+        {
+          "headers": {
+            "authorization": "Bearer mk_test_conformance"
+          },
+          "body": {
+            "mode": "quality",
+            "pool": "prod-pool",
+            "workload": {
+              "capability": "structured_extraction",
+              "difficulty": 3
+            }
+          },
+          "not_containing": [
+            "Total due $42.10",
+            "You are a billing assistant.",
+            "sk-caller-openai"
+          ]
+        }
+      ]
+    }
+  }
+}

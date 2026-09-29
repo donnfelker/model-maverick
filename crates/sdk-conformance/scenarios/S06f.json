@@ -1,0 +1,88 @@
+{
+  "id": "S06f",
+  "name": "zero_retention_409_is_terminal",
+  "group": 6,
+  "source": "sdk-v0 plan §2.3 scenario 6(a); G14; D17",
+  "summary": "A 409 no_compliant_columns is surfaced; the default model is not called even though it is configured and verified.",
+  "config": {
+    "default_model": "gpt-default",
+    "zero_retention_verified": [
+      "gpt-default"
+    ]
+  },
+  "engine": {
+    "recommend": [
+      {
+        "kind": "respond",
+        "status": 409,
+        "body": {
+          "error": {
+            "code": "no_compliant_columns",
+            "message": "pool \"default\" has no column with valid zero-retention evidence",
+            "details": {}
+          }
+        }
+      }
+    ]
+  },
+  "provider": {
+    "responses": [
+      {
+        "kind": "respond",
+        "status": 200,
+        "body": {
+          "id": "chatcmpl-s06f",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "answer s06f"
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 3
+          }
+        }
+      }
+    ]
+  },
+  "steps": [
+    {
+      "call": {
+        "surface": "chat_completions",
+        "model": "maverick/auto",
+        "workload": "structured_extraction:3",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a billing assistant."
+            },
+            {
+              "role": "user",
+              "content": "Extract the invoice total from: Total due $42.10"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": "error",
+        "code": "no_compliant_columns",
+        "status": 409
+      }
+    }
+  ],
+  "recorded": {
+    "recommend": {
+      "count": 1
+    },
+    "provider": {
+      "count": 0
+    }
+  }
+}
