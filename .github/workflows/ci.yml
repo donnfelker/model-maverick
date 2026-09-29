@@ -20,6 +20,10 @@ concurrency:
   group: ci-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Disk (bead model-maverick-vjt): every job first removes the SDKs and Docker images this
+# project never uses. The cargo cache holds dependencies only. The old cache restored the
+# whole `target` (28 to 29 GB of test binaries) before the build began, and the fast tier
+# ran out of disk pulling postgres:16-alpine for testcontainers.
 env:
   CARGO_TERM_COLOR: always
   SQLX_OFFLINE: "true"
@@ -44,10 +48,16 @@ jobs:
           - e2e
     steps:
       - name: Free runner disk space
-        # ubuntu-latest ships about 30 GB of SDKs this project never uses.
+        # ubuntu-latest ships about 45 GB of SDKs and Docker images this project never
+        # uses. Rust comes from rustup in the home directory, not the hosted tool cache,
+        # and the tests pull their own postgres image.
         run: |
+          df -h /
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
-            /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+            /opt/hostedtoolcache /usr/local/share/boost /usr/share/swift /usr/lib/jvm \
+            /usr/local/share/powershell /usr/local/share/chromium /usr/local/lib/node_modules \
+            /opt/az /opt/microsoft /opt/google
+          docker image prune --all --force > /dev/null
           df -h /
 
       - uses: actions/checkout@v4
@@ -56,25 +66,18 @@ jobs:
         run: rustup show
 
       - name: Cache cargo
-        uses: actions/cache@v4
+        # Dependencies, the registry, and ~/.cargo/bin only. The action removes the
+        # workspace crates' artifacts before it saves, so the restore is a few GB and the
+        # disk is left for this run's build.
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          # v2: artifacts built with the line-tables-only profile. Older full-debug
-          # targets are not restored.
-          key: cargo-v2-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-${{ matrix.tier }}
-          restore-keys: |
-            cargo-v2-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-
-            cargo-v2-${{ runner.os }}-
+          key: ${{ matrix.tier }}
 
       - name: Install fast-tier cargo tools
         if: matrix.tier == 'fast'
-        # The cache restores ~/.cargo/bin without cargo's install metadata, so a plain
-        # `cargo install` fails with "binary already exists". Skip a tool that is
-        # already at the pinned version; otherwise reinstall over it.
+        # The cache restores ~/.cargo/bin. Skip a tool that is already at the pinned
+        # version; otherwise reinstall over it (a binary without cargo's install
+        # metadata makes a plain `cargo install` fail with "binary already exists").
         run: |
           if ! cargo deny --version 2>/dev/null | grep -qxF 'cargo-deny 0.20.2'; then
             cargo install cargo-deny --version 0.20.2 --locked --force
@@ -108,9 +111,14 @@ jobs:
     steps:
       - name: Free runner disk space
         # cargo-mutants builds a second copy of the workspace, so disk matters here too.
+        # See the tiers job for the list.
         run: |
+          df -h /
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
-            /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+            /opt/hostedtoolcache /usr/local/share/boost /usr/share/swift /usr/lib/jvm \
+            /usr/local/share/powershell /usr/local/share/chromium /usr/local/lib/node_modules \
+            /opt/az /opt/microsoft /opt/google
+          docker image prune --all --force > /dev/null
           df -h /
 
       - uses: actions/checkout@v4
@@ -121,17 +129,11 @@ jobs:
         run: rustup show
 
       - name: Cache cargo
-        uses: actions/cache@v4
+        # Dependencies only (see the tiers job). The shared key replaces the job id, so
+        # the nightly shards restore this cache too.
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: cargo-v2-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-mutants
-          restore-keys: |
-            cargo-v2-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-
-            cargo-v2-${{ runner.os }}-
+          shared-key: mutants
 
       - name: Install cargo-mutants
         # See the fast-tier install step: skip when the cached binary is already pinned.
@@ -174,9 +176,14 @@ jobs:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     steps:
       - name: Free runner disk space
+        # See the tiers job for the list.
         run: |
+          df -h /
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
-            /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+            /opt/hostedtoolcache /usr/local/share/boost /usr/share/swift /usr/lib/jvm \
+            /usr/local/share/powershell /usr/local/share/chromium /usr/local/lib/node_modules \
+            /opt/az /opt/microsoft /opt/google
+          docker image prune --all --force > /dev/null
           df -h /
 
       - uses: actions/checkout@v4
@@ -185,17 +192,12 @@ jobs:
         run: rustup show
 
       - name: Cache cargo
-        uses: actions/cache@v4
+        # Dependencies only (see the tiers job). The shards share the mutants-diff cache,
+        # and one shard saves it.
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: cargo-v2-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-mutants
-          restore-keys: |
-            cargo-v2-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-
-            cargo-v2-${{ runner.os }}-
+          shared-key: mutants
+          save-if: ${{ matrix.shard == 0 }}
 
       - name: Install cargo-mutants
         run: |

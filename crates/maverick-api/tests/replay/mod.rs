@@ -545,7 +545,15 @@ pub async fn run(pool: &PgPool) -> Report {
             }
         }
     }
-    if let Some(path) = std::env::var_os("MAVERICK_REPLAY_REPORT") {
+    if let Some(report_path) = std::env::var_os("MAVERICK_REPLAY_REPORT") {
+        // A relative path is from the workspace root, as scripts/ci.sh writes it: cargo
+        // runs this test in the crate's directory. A fresh runner has no report directory.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join(report_path);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).expect("report directory");
+        }
         let doc = json!({
             "exchanges": report.exchanges,
             "matched": report.matched,
