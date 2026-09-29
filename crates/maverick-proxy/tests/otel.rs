@@ -58,6 +58,7 @@ fn report(
         model_used: model.into(),
         final_status: status,
         items: (0..attempts).map(|_| item(model, status)).collect(),
+        telemetry_opt_out: false,
         received_at: Instant::now(),
     }
 }

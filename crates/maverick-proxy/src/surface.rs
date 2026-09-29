@@ -136,6 +136,9 @@ pub struct ChainReport {
     /// One item per dispatched attempt, in chain order. The relayed attempt's buffered 2xx
     /// body gives it token counts. Empty when nothing was dispatched.
     pub items: Vec<TelemetryItem>,
+    /// The engine's `telemetry: false` (D39): the tenant opted out, so the items are not
+    /// sent.
+    pub telemetry_opt_out: bool,
     /// When the proxy received the request.
     pub received_at: Instant,
 }
@@ -343,6 +346,7 @@ async fn walk(
         classification_method: recommendation.classification_method.clone(),
         mode: engine_mode(alias.mode).to_owned(),
         received_at,
+        telemetry_opt_out: recommendation.telemetry_opt_out,
     };
 
     match outcome.result {
@@ -375,6 +379,7 @@ struct ReportParts {
     classification_method: String,
     mode: String,
     received_at: Instant,
+    telemetry_opt_out: bool,
 }
 
 impl ReportParts {
@@ -394,6 +399,7 @@ impl ReportParts {
             model_used,
             final_status,
             items,
+            telemetry_opt_out: self.telemetry_opt_out,
             received_at: self.received_at,
         }
     }

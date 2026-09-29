@@ -3,7 +3,9 @@
 //! The report's telemetry items go to the `maverick-core` producer: batched per tenant key
 //! (sent every 10 s or at 20 items, flushed at shutdown), fire-and-forget. With telemetry
 //! off (`MAVERICK_PROXY_TELEMETRY=off`) the producer has no task and sends nothing. A
-//! request that dispatched no attempt has no items and sends nothing.
+//! request that dispatched no attempt has no items and sends nothing. Neither does a
+//! request whose recommendation said `telemetry: false` (D39): the tenant opted out, and
+//! the request is still routed.
 //!
 //! OTel (D31) records every settled request, including one that dispatched nothing, when
 //! `MAVERICK_PROXY_OTLP_ENDPOINT` is set ([`ProxyOtel`]).
@@ -77,7 +79,10 @@ impl ReportSink for ProxyReports {
         if let Some(otel) = &self.otel {
             otel.record(&report);
         }
-        self.telemetry
-            .record(report.tenant_key.expose(), report.items);
+        // D39: zero telemetry bytes for an opted-out tenant.
+        if !report.telemetry_opt_out {
+            self.telemetry
+                .record(report.tenant_key.expose(), report.items);
+        }
     }
 }

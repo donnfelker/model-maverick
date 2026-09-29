@@ -138,6 +138,10 @@ pub(super) fn decode_response(body: &[u8]) -> Result<Recommendation, String> {
         "classification_quota_exceeded",
         &mut out.classification_quota_exceeded,
     )?;
+    // D39: absent or `null` reads as `true`.
+    let mut telemetry = true;
+    apply_bool(object, "telemetry", &mut telemetry)?;
+    out.telemetry_opt_out = !telemetry;
     for value in members(object, "classification") {
         match value {
             Value::Object(classification) => {
