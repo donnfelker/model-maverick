@@ -1,0 +1,44 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select\n             coalesce((select json_agg(json_build_object(\n                   'id', p.id, 'tenant_id', p.tenant_id, 'name', p.name,\n                   'model_column_ids', p.model_column_ids, 'is_default', p.is_default,\n                   'created_at', p.created_at, 'updated_at', p.updated_at) order by p.name)\n                from pools p where p.tenant_id = $1), '[]'::json)\n               as \"pools!: sqlx::types::Json<Vec<PoolJson>>\",\n             coalesce((select json_agg(json_build_object(\n                   'capability', w.capability, 'w_quality', w.w_quality::text,\n                   'w_cost', w.w_cost::text, 'w_latency', w.w_latency::text,\n                   'quality_bar', w.quality_bar::text) order by w.capability)\n                from tenant_weights w where w.tenant_id = $1), '[]'::json)\n               as \"weights!: sqlx::types::Json<Vec<WeightJson>>\",\n             (select json_build_object(\n                   'max_cost_per_run', c.max_cost_per_run::text,\n                   'max_latency_ms', c.max_latency_ms, 'zero_retention', c.zero_retention,\n                   'updated_at', c.updated_at, 'telemetry_opt_out', c.telemetry_opt_out)\n                from tenant_constraints c where c.tenant_id = $1)\n               as \"constraints: sqlx::types::Json<ConstraintJson>\",\n             (select v.version from corpus_versions v where v.active limit 1)\n               as \"active_corpus_version?\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "pools!: sqlx::types::Json<Vec<PoolJson>>",
+        "type_info": "Json",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "weights!: sqlx::types::Json<Vec<WeightJson>>",
+        "type_info": "Json",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "constraints: sqlx::types::Json<ConstraintJson>",
+        "type_info": "Json",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "active_corpus_version?",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "f8d5317ed5cc3761170aa91a98507ae7abbf4e05e02ca1142b43f9724eafd61e"
+}

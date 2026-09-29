@@ -46,7 +46,7 @@ use maverick_domain::{ceilings, checks, entries, ids};
 use maverick_store::catalog::{self, ModelColumn};
 use maverick_store::decisions::{self, NewRecommendation};
 use maverick_store::measurement::{self, Aggregate};
-use maverick_store::{JsonRawValue, corpus, is_not_found, numeric_to_f64, tenancy};
+use maverick_store::{JsonRawValue, numeric_to_f64, tenancy};
 use sqlx::PgPool;
 
 use crate::capture::{CaptureRequest, Capturer};
@@ -267,11 +267,18 @@ async fn recommend_uninstrumented(
     let tenant = identity.tenant_id.as_str();
 
     // Step 3: the tenant's configuration and the whole catalog. The prompt path needs the
-    // zero-retention constraint (D2) and the catalog before it classifies.
-    let pools = tenancy::list_pools_by_tenant(pool, tenant).await?;
-    let weights = tenancy::list_tenant_weights_by_tenant(pool, tenant).await?;
-    let (standing, telemetry_opt_out) = match tenancy::get_tenant_constraints(pool, tenant).await {
-        Ok(row) => (
+    // zero-retention constraint (D2) and the catalog before it classifies. The pools,
+    // weights, constraints, and active corpus version come in one round trip, concurrent
+    // with the catalog read (e3x).
+    let (context, columns) = tokio::try_join!(
+        tenancy::get_tenant_context(pool, tenant),
+        catalog::list_model_columns(pool),
+    )?;
+    let pools = context.pools;
+    let weights = context.weights;
+    let active_corpus_version = context.active_corpus_version;
+    let (standing, telemetry_opt_out) = match context.constraints {
+        Some(row) => (
             StandingConstraints {
                 max_cost_per_run: row.max_cost_per_run.map(numeric_to_f64),
                 max_latency_ms: row.max_latency_ms,
@@ -279,11 +286,9 @@ async fn recommend_uninstrumented(
             },
             row.telemetry_opt_out,
         ),
-        Err(error) if is_not_found(&error) => (StandingConstraints::default(), false),
-        Err(error) => return Err(error.into()),
+        None => (StandingConstraints::default(), false),
     };
     let zero_retention = standing.zero_retention;
-    let columns = catalog::list_model_columns(pool).await?;
 
     // Step 2: the workload, declared or classified.
     let (workload, prompt_path) = match form {
@@ -384,9 +389,14 @@ async fn recommend_uninstrumented(
         dimension::LATENCY_P95_MS,
     ]
     .map(str::to_owned);
-    let rows =
-        measurement::list_latest_cell_aggregates(pool, &wanted, &workload.capability, &dimensions)
-            .await?;
+    // D8's availability is per column, so it is read for the whole pool here, concurrently
+    // with the cells, and looked up for the survivors below (e3x).
+    let pool_ids: Vec<String> = pool_columns.iter().map(|c| c.id.clone()).collect();
+    let since = (now - Duration::days(AVAILABILITY_NIGHTS - 1)).date_naive();
+    let (rows, availability_rows) = tokio::try_join!(
+        measurement::list_latest_cell_aggregates(pool, &wanted, &workload.capability, &dimensions),
+        measurement::list_trailing_availability(pool, &pool_ids, &workload.capability, tier, since),
+    )?;
     let cells = Cells::new(&rows);
     let aggregates: CellAggregates = pool_columns
         .iter()
@@ -452,23 +462,10 @@ async fn recommend_uninstrumented(
             cost: f64::from(w.w_cost),
             latency: f64::from(w.w_latency),
         });
-    let survivor_ids: Vec<String> = decision
-        .survivors
-        .iter()
-        .map(|s| s.column_id.clone())
+    let availability: HashMap<String, f64> = availability_rows
+        .into_iter()
+        .map(|row| (row.model_column_id, row.availability))
         .collect();
-    let since = (now - Duration::days(AVAILABILITY_NIGHTS - 1)).date_naive();
-    let availability: HashMap<String, f64> = measurement::list_trailing_availability(
-        pool,
-        &survivor_ids,
-        &workload.capability,
-        tier,
-        since,
-    )
-    .await?
-    .into_iter()
-    .map(|row| (row.model_column_id, row.availability))
-    .collect();
 
     let mut scored = Vec::with_capacity(decision.survivors.len());
     let mut metrics = HashMap::with_capacity(decision.survivors.len());
@@ -529,11 +526,7 @@ async fn recommend_uninstrumented(
     };
 
     // Step 9 and 10: the response.
-    let matrix_version = match corpus::get_active_corpus_version(pool).await {
-        Ok(version) => version.version,
-        Err(error) if is_not_found(&error) => String::new(),
-        Err(error) => return Err(error.into()),
-    };
+    let matrix_version = active_corpus_version.unwrap_or_default();
     let scored_by_id: HashMap<&str, &ScoredSurvivor> =
         scored.iter().map(|s| (s.column_id.as_str(), s)).collect();
     let ranked_columns: Vec<entries::RankedColumn> = ranking

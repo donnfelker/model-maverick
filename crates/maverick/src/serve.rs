@@ -70,10 +70,7 @@ pub fn mcp_stdio(config: Config, api_key: &str, stderr: Output) -> i32 {
 }
 
 async fn stdio_session(config: &Config, api_key: &str) -> i32 {
-    let pool = match PgPoolOptions::new()
-        .max_connections(4)
-        .connect_lazy(&config.database_url)
-    {
+    let pool = match pool_options(4).connect_lazy(&config.database_url) {
         Ok(pool) => pool,
         Err(error) => {
             tracing::error!(error = %error, "creating database pool");
@@ -248,10 +245,7 @@ async fn run(config: &Config, api_only: bool, worker_only: bool) -> i32 {
     let max_connections = std::thread::available_parallelism()
         .map_or(4, |n| u32::try_from(n.get()).unwrap_or(4))
         .max(4);
-    let pool = match PgPoolOptions::new()
-        .max_connections(max_connections)
-        .connect_lazy(&config.database_url)
-    {
+    let pool = match pool_options(max_connections).connect_lazy(&config.database_url) {
         Ok(pool) => pool,
         Err(error) => {
             tracing::error!(error = %error, "creating database pool");
@@ -395,6 +389,36 @@ async fn run(config: &Config, api_only: bool, worker_only: bool) -> i32 {
     pool.close().await;
     tracing::info!("stopped");
     code
+}
+
+/// A pooled connection idle at least this long is pinged before use (e3x).
+///
+/// Not Go's 1 s (pgxpool's `ShouldPing`). pgxpool's idle list is a stack, so it hands back
+/// the connection used last. sqlx's idle queue is FIFO: every acquire takes the connection
+/// idle longest. With a 1 s threshold, light traffic would ping on nearly every acquire.
+/// 30 s keeps the ping off the request path at any traffic where latency counts. sqlx's
+/// own `before_acquire` example uses 60 s.
+const PING_IDLE: Duration = Duration::from_secs(30);
+
+/// The engine's database pool. sqlx's default `test_before_acquire` pings the connection on
+/// every acquire: one more round trip in front of every query, and most of the declared
+/// recommend path's cost (e3x). sqlx also pings each connection when it goes back to the
+/// pool, off the request path, and closes it if that ping fails. So only a connection
+/// idle for [`PING_IDLE`] is pinged here. A failed ping closes it, and the acquire opens
+/// another. A connection that dies while idle for less (a Postgres restart) fails its
+/// next query, and sqlx closes it on release.
+fn pool_options(max_connections: u32) -> PgPoolOptions {
+    PgPoolOptions::new()
+        .max_connections(max_connections)
+        .test_before_acquire(false)
+        .before_acquire(|conn, meta| {
+            Box::pin(async move {
+                if meta.idle_for >= PING_IDLE {
+                    conn.ping().await?;
+                }
+                Ok(true)
+            })
+        })
 }
 
 /// Go's `":8080"` (every interface) as a bindable address.

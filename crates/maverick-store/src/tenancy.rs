@@ -212,6 +212,178 @@ pub async fn get_api_key<'e>(db: impl PgExecutor<'e>, id: &str) -> sqlx::Result<
     .await
 }
 
+/// What the recommend path reads about a tenant, in one round trip (e3x).
+#[derive(Debug, Clone)]
+pub struct TenantContext {
+    /// `ListPoolsByTenant`: ordered by name.
+    pub pools: Vec<Pool>,
+    /// `ListTenantWeightsByTenant`: ordered by capability.
+    pub weights: Vec<TenantWeight>,
+    /// `GetTenantConstraints`, or `None` without a row.
+    pub constraints: Option<TenantConstraint>,
+    /// `GetActiveCorpusVersion`'s version, or `None` when no version is active.
+    pub active_corpus_version: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct PoolJson {
+    id: String,
+    tenant_id: String,
+    name: String,
+    model_column_ids: Vec<String>,
+    is_default: bool,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+/// `real` and `numeric` values travel as text, so they parse back exactly: sqlx sets
+/// `extra_float_digits = 2`, so `real::text` is the shortest text of the same `f32`.
+#[derive(Debug, serde::Deserialize)]
+struct WeightJson {
+    capability: String,
+    w_quality: String,
+    w_cost: String,
+    w_latency: String,
+    quality_bar: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct ConstraintJson {
+    max_cost_per_run: Option<String>,
+    max_latency_ms: Option<i32>,
+    zero_retention: bool,
+    updated_at: DateTime<Utc>,
+    telemetry_opt_out: bool,
+}
+
+fn decode_error(what: &str, error: impl std::fmt::Display) -> sqlx::Error {
+    sqlx::Error::Decode(format!("tenant context {what}: {error}").into())
+}
+
+fn real(what: &str, text: &str) -> sqlx::Result<f32> {
+    text.parse::<f32>()
+        .map_err(|error| decode_error(what, error))
+}
+
+/// The recommend path's tenant reads in one round trip (e3x): the rows and orders of
+/// `ListPoolsByTenant`, `ListTenantWeightsByTenant`, and `GetTenantConstraints`, and the
+/// version `GetActiveCorpusVersion` names. Those queries keep their own functions.
+pub async fn get_tenant_context<'e>(
+    db: impl PgExecutor<'e>,
+    tenant_id: &str,
+) -> sqlx::Result<TenantContext> {
+    let row = sqlx::query!(
+        r#"select
+             coalesce((select json_agg(json_build_object(
+                   'id', p.id, 'tenant_id', p.tenant_id, 'name', p.name,
+                   'model_column_ids', p.model_column_ids, 'is_default', p.is_default,
+                   'created_at', p.created_at, 'updated_at', p.updated_at) order by p.name)
+                from pools p where p.tenant_id = $1), '[]'::json)
+               as "pools!: sqlx::types::Json<Vec<PoolJson>>",
+             coalesce((select json_agg(json_build_object(
+                   'capability', w.capability, 'w_quality', w.w_quality::text,
+                   'w_cost', w.w_cost::text, 'w_latency', w.w_latency::text,
+                   'quality_bar', w.quality_bar::text) order by w.capability)
+                from tenant_weights w where w.tenant_id = $1), '[]'::json)
+               as "weights!: sqlx::types::Json<Vec<WeightJson>>",
+             (select json_build_object(
+                   'max_cost_per_run', c.max_cost_per_run::text,
+                   'max_latency_ms', c.max_latency_ms, 'zero_retention', c.zero_retention,
+                   'updated_at', c.updated_at, 'telemetry_opt_out', c.telemetry_opt_out)
+                from tenant_constraints c where c.tenant_id = $1)
+               as "constraints: sqlx::types::Json<ConstraintJson>",
+             (select v.version from corpus_versions v where v.active limit 1)
+               as "active_corpus_version?""#,
+        tenant_id
+    )
+    .fetch_one(db)
+    .await?;
+    let pools = row
+        .pools
+        .0
+        .into_iter()
+        .map(|p| Pool {
+            id: p.id,
+            tenant_id: p.tenant_id,
+            name: p.name,
+            model_column_ids: p.model_column_ids,
+            is_default: p.is_default,
+            created_at: p.created_at,
+            updated_at: p.updated_at,
+        })
+        .collect();
+    let weights = row
+        .weights
+        .0
+        .into_iter()
+        .map(|w| {
+            Ok(TenantWeight {
+                tenant_id: tenant_id.to_owned(),
+                w_quality: real("w_quality", &w.w_quality)?,
+                w_cost: real("w_cost", &w.w_cost)?,
+                w_latency: real("w_latency", &w.w_latency)?,
+                quality_bar: real("quality_bar", &w.quality_bar)?,
+                capability: w.capability,
+            })
+        })
+        .collect::<sqlx::Result<Vec<_>>>()?;
+    let constraints = row
+        .constraints
+        .map(|c| {
+            let c = c.0;
+            Ok::<_, sqlx::Error>(TenantConstraint {
+                tenant_id: tenant_id.to_owned(),
+                max_cost_per_run: c
+                    .max_cost_per_run
+                    .map(|text| {
+                        text.parse::<Decimal>()
+                            .map_err(|error| decode_error("max_cost_per_run", error))
+                    })
+                    .transpose()?,
+                max_latency_ms: c.max_latency_ms,
+                zero_retention: c.zero_retention,
+                updated_at: c.updated_at,
+                telemetry_opt_out: c.telemetry_opt_out,
+            })
+        })
+        .transpose()?;
+    Ok(TenantContext {
+        pools,
+        weights,
+        constraints,
+        active_corpus_version: row.active_corpus_version,
+    })
+}
+
+/// What public authentication needs about a key: its id and status, and its tenant's id
+/// and status (`None` when the tenant row is gone).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeyAuth {
+    pub key_id: String,
+    pub key_status: String,
+    pub tenant_id: String,
+    pub tenant_status: Option<String>,
+}
+
+/// Public authentication's reads in one round trip (e3x): the key of `GetAPIKeyByHash`
+/// and the status of its tenant (`GetTenant`). `None` when no key has the hash.
+pub async fn get_key_auth_by_hash<'e>(
+    db: impl PgExecutor<'e>,
+    key_hash: &[u8],
+) -> sqlx::Result<Option<KeyAuth>> {
+    sqlx::query_as!(
+        KeyAuth,
+        r#"select k.id as "key_id!", k.status as "key_status!", k.tenant_id as "tenant_id!",
+                  t.status as "tenant_status?"
+           from api_keys k
+           left join tenants t on t.id = k.tenant_id
+           where k.key_hash = $1"#,
+        key_hash
+    )
+    .fetch_optional(db)
+    .await
+}
+
 /// `GetAPIKeyByHash`: any status. The caller checks it.
 pub async fn get_api_key_by_hash<'e>(
     db: impl PgExecutor<'e>,
