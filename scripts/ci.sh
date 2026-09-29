@@ -137,11 +137,11 @@ run_parity() {
 }
 
 run_e2e() {
-    log_dir e2e
-    # Placeholder: the end-to-end script (bead 9.10) run today inside the fast tier's `cargo test --workspace`.
-    # This tier gets its own suite when one exists (API/proxy replay, e2e script).
-    echo "no separate e2e suite yet; its tests run in the fast tier (cargo test --workspace)" \
-        | tee "target/ci/e2e/placeholder.log"
+    # The full-stack end-to-end run (bead 9.10): the real maverick and maverick-proxy
+    # binaries as separate processes, on Postgres, against the fake provider over HTTP.
+    # Needs Docker. Process logs and the fake provider's request log land in
+    # target/e2e/<timestamp>/; a failure prints every process log's tail.
+    run_logged e2e full-stack scripts/e2e.sh
 }
 
 # The full maverick-domain run is about 1,900 mutants: hours on a CI runner, so CI

@@ -20,6 +20,10 @@
 //! miss for the test report.
 //!
 //! Every request is recorded ([`Served`]) with its prompt hash, never its prompt text.
+//!
+//! [`process`] runs the real binaries as OS processes for `tests/full_stack.rs`.
+
+pub mod process;
 
 use std::sync::{Arc, Mutex};
 
