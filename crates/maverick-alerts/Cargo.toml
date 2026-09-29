@@ -1,6 +1,6 @@
 [package]
 name = "maverick-alerts"
-description = "Alert derivation and delivery for the engine (spend, queue depth, job failure, provider status)."
+description = "Alert rows and their delivery: the insert helper and the process-wide SMTP and HMAC webhook fan-out."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -14,8 +14,21 @@ workspace = true
 
 [dependencies]
 maverick-domain = { workspace = true }
+maverick-store = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
+chrono = { workspace = true }
+sqlx = { workspace = true }
+reqwest = { workspace = true }
+hmac = { workspace = true }
+sha2 = { workspace = true }
+rustls = { workspace = true }
+tokio-rustls = { workspace = true }
+rustls-platform-verifier = { workspace = true }
+
+[dev-dependencies]
+maverick-testdb = { workspace = true }
+axum = { workspace = true }
