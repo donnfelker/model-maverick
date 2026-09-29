@@ -16,5 +16,7 @@ pub mod gostrings;
 pub mod graders;
 pub mod ids;
 pub mod keys;
+pub mod pricing;
 pub mod scoring;
+pub mod spend;
 pub mod tasks;
