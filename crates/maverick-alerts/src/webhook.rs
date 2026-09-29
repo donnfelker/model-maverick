@@ -22,10 +22,12 @@ pub struct Webhook {
 }
 
 impl std::fmt::Debug for Webhook {
-    /// Never prints the secret (G5).
+    /// Never prints the secret or the URL's path and query (G5): a webhook URL often
+    /// carries its token there. Only the origin is shown.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let url = format!("{}/<redacted>", self.url.origin().ascii_serialization());
         f.debug_struct("Webhook")
-            .field("url", &self.url.as_str())
+            .field("url", &url)
             .field("secret", &"<redacted>")
             .finish_non_exhaustive()
     }
@@ -67,7 +69,7 @@ impl Webhook {
             .body(body)
             .send()
             .await
-            .map_err(|err| err.to_string())?;
+            .map_err(transport_error)?;
         let status = response.status();
         drain(response).await;
         if status.is_success() {
@@ -76,6 +78,19 @@ impl Webhook {
             Err(format!("webhook responded {}", status.as_u16()))
         }
     }
+}
+
+/// A failed POST as log text, without the URL (G5). reqwest's `Display` ends with
+/// ` for url (<url>)`, and a webhook URL often carries its token in the path or the query.
+/// The cause chain (refused, DNS, TLS, timeout) has no URL, so it stays: it says why.
+fn transport_error(error: reqwest::Error) -> String {
+    let error = error.without_url();
+    let mut text = error.to_string();
+    for cause in std::iter::successors(std::error::Error::source(&error), |cause| cause.source()) {
+        text.push_str(": ");
+        text.push_str(&cause.to_string());
+    }
+    text
 }
 
 /// Reads and discards up to [`DRAIN_LIMIT`] bytes of the response body.

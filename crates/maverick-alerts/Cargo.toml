@@ -32,3 +32,4 @@ rustls-platform-verifier = { workspace = true }
 [dev-dependencies]
 maverick-testdb = { workspace = true }
 axum = { workspace = true }
+test-support = { path = "../test-support" }
