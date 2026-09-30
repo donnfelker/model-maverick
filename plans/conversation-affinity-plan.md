@@ -1,6 +1,6 @@
 # Conversation affinity (proposed D44)
 
-Status: proposed 2026-09-30. The owner asked for this plan. The owner confirms the open questions in §9 before the spec and `parity/DIVERGENCES.md` change. The beads for this work are under the epic "Conversation affinity (D44)".
+Status: proposed 2026-09-30. The owner asked for this plan. Revised 2026-09-30 by owner direction: the default is the best model for the turn, and cost-aware affinity is an opt-in setting (§4.3). The owner confirms the open questions in §9 before the spec and `parity/DIVERGENCES.md` change. The beads for this work are under the epic "Conversation affinity (D44)".
 
 ## 1. The problem
 
@@ -34,8 +34,9 @@ Today the engine compares $0.04 with $0.09. The real comparison is $0.10 with $1
 
 Goals:
 
-- A conversation stays on one column unless a switch is worth it.
-- A switch is worth it when the conversation needs a column that clears a harder tier, when a hard boundary removes the pinned column, or when another column is better by more than a set margin after the cost of the cold cache.
+- **By default, the engine returns the best model for the turn.** Affinity never changes the ranking unless the tenant or the request turns on cost-aware affinity. The owner's rule: the goal is the best model for the task at hand, and cost must not decide the pick unless a caller asks for it.
+- **With cost-aware affinity on**, a conversation stays on one column unless a switch is worth it. A switch is worth it when the conversation needs a column that clears a harder tier, when a hard boundary removes the pinned column, or when another column is better by more than the incumbent bonus after the cost of the cold cache.
+- In both settings the engine reports whether the pick stayed or moved, so a tenant can see how often switches happen before it turns the setting on.
 - Hard boundaries always win: pool (G2), allowlist (G3), standing constraints, zero retention (G5), retirement.
 - Every decision is in the trace (G6) and in the response.
 - A request without affinity behaves exactly as it does today. Parity is unchanged for it.
@@ -46,6 +47,7 @@ Non-goals:
 - The engine does not count tokens exactly. It takes an estimate from the caller.
 - No switch happens in the middle of a stream. The chain executor rules are unchanged.
 - No schema translation, no Redis, no prompt storage.
+- This plan does not change how the existing modes weigh cost. `balanced` (the default mode) already weighs cost at 0.35 and uses a 1.5-point band, and every mode breaks ties inside the 0.75-point noise band toward the cheaper column (spec §7.4). A caller that wants the highest-quality column without affinity sends `mode: "quality"` (band 0, weights 0.8/0.1/0.1). Changing the default mode or the tie rule is a separate owner decision (§9 question 7).
 
 ## 3. Design choice
 
@@ -53,7 +55,7 @@ Three options were considered.
 
 1. **Pin in the client only.** The docs tell callers to keep the first pick. This needs no engine change. It is rejected as the main fix: the logic would be written five times (proxy plus four SDKs), it cannot see the cache cost, and it never switches when it should (escalation, retirement).
 2. **Hard pin in the engine.** The first pick is kept for the life of the conversation unless a hard boundary removes it. It is rejected: a conversation that becomes harder stays on a column that no longer clears its tier.
-3. **Affinity in the engine with a cache-aware ranking (chosen).** The engine stores the last pick per conversation. On the next turn, the ranking adds the real cost of the context to each candidate, at the cache-read price for the warm pinned column and at the cache-write or input price for the others. The pinned column also gets a small quality bonus inside the ranking. The normal ranking rules then decide. The logic is written once, in the engine, and every component gets it by passing one key.
+3. **Affinity in the engine with a cache-aware ranking (chosen).** The engine stores the last pick per conversation. On the next turn, the ranking adds the real cost of the context to each candidate, at the cache-read price for the warm pinned column and at the cache-write or input price for the others. The pinned column also gets a small quality bonus inside the ranking. The normal ranking rules then decide. Both adjustments apply only when cost-aware affinity is on. The logic is written once, in the engine, and every component gets it by passing one key.
 
 ## 4. Engine contract
 
@@ -65,13 +67,14 @@ Three options were considered.
 {
   "workload": { "capability": "code_generation", "difficulty": 3 },
   "mode": "balanced",
-  "affinity": { "key": "conv_8f2a41", "context_tokens": 120000 }
+  "affinity": { "key": "conv_8f2a41", "context_tokens": 120000, "cost_aware": true }
 }
 ```
 
 - `affinity.key`: required when `affinity` is present. A string of 1 to 256 characters. The caller chooses it. It is opaque to the engine.
 - `affinity.context_tokens`: optional. An integer from 0 to 10,000,000. It is the caller's estimate of the input tokens that this turn resends. Without it, the turn-cost adjustment (§4.3 step 1) is skipped and only the incumbent bonus applies.
-- Validation errors are `422 invalid_request` with `details: {"field": "affinity.key"}` or `details: {"field": "affinity.context_tokens"}`. Unknown fields inside `affinity` are `422 invalid_request` (strict decoding, as for the rest of the body).
+- `affinity.cost_aware`: optional boolean. It overrides the tenant setting (§4.3) for this request. Absent means the tenant setting applies.
+- Validation errors are `422 invalid_request` with `details: {"field": "affinity.key"}`, `details: {"field": "affinity.context_tokens"}`, or `details: {"field": "affinity.cost_aware"}`. Unknown fields inside `affinity` are `422 invalid_request` (strict decoding, as for the rest of the body).
 
 ### 4.2 Stored state
 
@@ -96,6 +99,12 @@ create index conversation_affinity_expires_at on conversation_affinity (expires_
 
 ### 4.3 Ranking with affinity
 
+**The setting.** `tenant_constraints` gains `affinity_cost_aware` (boolean, default `false`), written through the constraints payload of `PUT /v1/config/constraints` and `PUT /internal/v1/tenants/{id}/constraints`, like `telemetry_opt_out`. A request's `affinity.cost_aware` overrides it for that request. The effective value is reported in the response.
+
+**Cost-aware off (the default).** The ranking is exactly the §7.4 ranking with no affinity input. No turn cost, no incumbent bonus. The pick is the best column for this turn under the request's mode. The engine still reads and writes the affinity row so the response can report `kept` or `switched` (§4.4). This is the owner's default: always the best model for the prompt at hand.
+
+**Cost-aware on.** The four steps below apply.
+
 Affinity runs inside §7.4. §7.1 (pool, allowlist, standing constraints, zero retention, preferences) and §7.3 (`no_data`) are unchanged. They use the unadjusted benchmark cost, so the G4 simulation stays valid.
 
 Let P be the stored column and n be `affinity.context_tokens`. The cache is **warm** when `now - last_used_at <= affinity.cache_warm_seconds` (default 300, the Anthropic default cache TTL).
@@ -117,10 +126,10 @@ Index 0 is the pick, as today. The chain after it is ordered by the same rules.
 |---|---|---|
 | `new` | No live row for the key | `null` |
 | `kept` | The pick is P | `null` |
-| `switched` | P is a survivor and the pick is another column | `escalation`, `outranked`, `preference`, or `low_availability` |
+| `switched` | P is a survivor and the pick is another column | `escalation`, `outranked`, `preference`, or `low_availability` when cost-aware is on; `best_model` when it is off |
 | `broken` | P did not survive §7.1 or §7.3 | the exclusion reason: `not_in_pool`, `not_in_allowlist`, `standing_constraint:<name>`, `status_retired`, or `no_data` |
 
-`outranked` covers both a quality gap larger than the bonus and a cost gap larger than the cache saving. The trace has the numbers.
+With cost-aware off, `switched` always has reason `best_model`: the normal ranking picked another column and affinity did not weigh in. `outranked` covers both a quality gap larger than the bonus and a cost gap larger than the cache saving. The trace has the numbers.
 
 ### 4.5 Response
 
@@ -131,11 +140,12 @@ The response carries `affinity` only when the request did. It comes after `telem
   "status": "kept",
   "previous_column_id": "col_01J...",
   "reason": null,
-  "cache_warm": true
+  "cache_warm": true,
+  "cost_aware": true
 }
 ```
 
-`previous_column_id` is P, or `null` for `new`. The pick's entry `reason` text says why it was kept or switched, for example `kept for conversation continuity; warm cache saves an estimated $1.49 this turn`.
+`previous_column_id` is P, or `null` for `new`. `cost_aware` is the effective setting for this request. The pick's entry `reason` text says why it was kept or switched, for example `kept for conversation continuity; warm cache saves an estimated $1.49 this turn`.
 
 ### 4.6 Writing the row
 
@@ -153,8 +163,8 @@ A tenant with telemetry opt-out (D39) sends no telemetry. Its row follows the en
 
 ### 4.8 Trace, metrics, logs
 
-- The decision trace (§10.2) gains an `affinity` block: `affinity_hash`, the previous column, `status`, `reason`, `cache_warm`, `context_tokens`, the bonus applied (or withheld and why), and `C'` per survivor.
-- A counter `maverick_affinity_decisions_total` by `status`. No key, hash, or column id in labels.
+- The decision trace (§10.2) gains an `affinity` block: `affinity_hash`, the previous column, `status`, `reason`, `cache_warm`, `context_tokens`, `cost_aware` and where it came from (tenant or request), the bonus applied (or withheld and why), and `C'` per survivor.
+- A counter `maverick_affinity_decisions_total` by `status` and `cost_aware`. No key, hash, or column id in labels.
 - The request log line gains nothing new. The hash is not logged.
 
 ### 4.9 Pricing
@@ -173,7 +183,7 @@ The pricing snapshot gains two optional fields: `cache_read_per_mtok` and `cache
 | `affinity.cache_warm_seconds` | `MAVERICK_AFFINITY_CACHE_WARM_SECONDS` | `300` |
 | `affinity.incumbent_bonus` | `MAVERICK_AFFINITY_INCUMBENT_BONUS` | `1.5` |
 
-With `affinity.enabled = false`, the engine still accepts and validates `affinity`, reads and writes no rows, and answers `status: "new"` with the normal ranking. A bonus of `0` turns off the bonus and keeps the turn cost.
+With `affinity.enabled = false`, the engine still accepts and validates `affinity`, reads and writes no rows, and answers `status: "new"` with the normal ranking. A bonus of `0` turns off the bonus and keeps the turn cost. `affinity.cache_warm_seconds` and `affinity.incumbent_bonus` matter only for requests where cost-aware affinity is on.
 
 ### 4.11 Latency
 
@@ -188,10 +198,11 @@ The declared path target stays p95 under 50 ms. Affinity adds one primary-key re
 - The header is stripped from every upstream request, like `X-Maverick-API-Key` (D30).
 - The proxy stamps `X-Maverick-Affinity: <status>` on the response next to `X-Maverick-Recommendation-Id`.
 - No header means no affinity. Behavior is unchanged.
+- The proxy has no per-request cost-aware switch. It uses the tenant setting.
 
 ### 5.2 SDK cores
 
-- The shared core gains a per-call `conversation_id` option. It maps to `affinity.key`. The core computes `context_tokens` the same way as the proxy, from the serialized request body.
+- The shared core gains a per-call `conversation_id` option and an optional `affinity_cost_aware` boolean that maps to `affinity.cost_aware` (absent means the tenant setting). It maps to `affinity.key`. The core computes `context_tokens` the same way as the proxy, from the serialized request body.
 - New conformance vectors, `crates/sdk-conformance/vectors/affinity.v1.json`: header and option validation, the token estimate, the recommend request body, and response parsing for each status.
 - The TypeScript, Ruby, Go, and Python SDKs live outside this repository. They pick up the vectors when they next update.
 
@@ -203,7 +214,7 @@ The `recommend_model` tool schema gains the same optional `affinity` object, mir
 
 | Guarantee | Effect |
 |---|---|
-| G1 always a model | Unchanged. Affinity only reorders survivors. |
+| G1 always a model | Unchanged. Affinity only reorders survivors, and only when cost-aware is on. |
 | G2 pools | Unchanged. P must survive the pool step. Affinity never adds a column. |
 | G3 allowlist | Unchanged. P must survive the allowlist step (`broken`, `not_in_allowlist`). |
 | G4 write-time validation | Unchanged. Filters use benchmark cost, not `C'`. |
@@ -216,17 +227,18 @@ The `recommend_model` tool schema gains the same optional `affinity` object, mir
 
 | # | Area | Go behavior (oracle) | Rust expected | Plan / spec ref |
 |---|---|---|---|---|
-| D44 | Recommend: conversation affinity | No affinity. Each request is ranked alone. `affinity` in the body is an unknown field, so `422 invalid_request`. `X-Maverick-Conversation` is forwarded upstream by the proxy like any other header. The pricing snapshot has no cache prices | `/v1/recommend` accepts optional `affinity {key, context_tokens?}`. The engine stores the last pick per conversation (table `conversation_affinity`, key hashed per tenant, TTL 24 h). Ranking adds the turn's context cost (cache-read price for the warm pinned column, else cache-write or input price) and a 1.5-point incumbent bonus, withheld on difficulty escalation. The response carries `affinity {status, previous_column_id, reason, cache_warm}`. Telemetry moves the row to the served column. The proxy maps `X-Maverick-Conversation` to the key, strips it upstream, and stamps `X-Maverick-Affinity`. Pricing gains `cache_read_per_mtok` and `cache_write_per_mtok`. A request without `affinity` is unchanged | `plans/conversation-affinity-plan.md`; spec §3, §4.3, §7.4, §8.1, §9.2, §9.10, §10.2, §11; owner decision 2026-09-30 |
+| D44 | Recommend: conversation affinity | No affinity. Each request is ranked alone. `affinity` in the body is an unknown field, so `422 invalid_request`. `X-Maverick-Conversation` is forwarded upstream by the proxy like any other header. The pricing snapshot has no cache prices | `/v1/recommend` accepts optional `affinity {key, context_tokens?, cost_aware?}`. The engine stores the last pick per conversation (table `conversation_affinity`, key hashed per tenant, TTL 24 h). `tenant_constraints.affinity_cost_aware` (default false) turns on cost-aware affinity; the request can override it. With it off, the ranking is unchanged and the response only reports `kept` or `switched` (`best_model`). With it on, ranking adds the turn's context cost (cache-read price for the warm pinned column, else cache-write or input price) and a 1.5-point incumbent bonus, withheld on difficulty escalation. The response carries `affinity {status, previous_column_id, reason, cache_warm, cost_aware}`. Telemetry moves the row to the served column. The proxy maps `X-Maverick-Conversation` to the key, strips it upstream, and stamps `X-Maverick-Affinity`. Pricing gains `cache_read_per_mtok` and `cache_write_per_mtok`. A request without `affinity` is unchanged | `plans/conversation-affinity-plan.md`; spec §3, §4.3, §7.4, §8.1, §9.2, §9.7, §9.10, §10.2, §11; owner decision 2026-09-30 |
 
 ## 8. Spec changes
 
 - §1.1: G5 notes that the affinity key is hashed like a prompt.
-- §3: add `conversation_affinity`. The table count becomes 23. The pricing comment lists the cache fields.
+- §3: add `conversation_affinity`. The table count becomes 23. `tenant_constraints` gains `affinity_cost_aware`. The pricing comment lists the cache fields.
 - §4.3: the cache price fields and their `price_sync` source.
 - §7.4: new "Conversation affinity" subsection with §4.3 and §4.4 of this plan.
 - §7.5: the `affinity` response block.
 - §8.1 "Trial proxy behavior": the `X-Maverick-Conversation` header rules.
 - §9.2: the request field, validation, and response placement.
+- §9.7: `affinity_cost_aware` in the constraints payload of `PUT /v1/config/constraints` (and the internal tenant constraints endpoint).
 - §9.10: the served-column follow rule.
 - §10.2: the trace block.
 - §11: the `affinity_prune` job.
@@ -242,8 +254,10 @@ Each has a recommendation. The beads assume the recommendation unless the owner 
 2. **Derived key.** Should the proxy derive a key when no header is sent, for example from a per-tenant hash of the system prompt plus the first user message? It makes affinity work with no caller change. Identical openings in unrelated conversations would share a row, which is harmless (same pick). Recommendation: not now. Add it later as an opt-in proxy setting.
 3. **Token estimate.** `ceil(body bytes / 4)` overcounts base64 images. Recommendation: accept for v1. A later version can exclude binary content the way the projection does.
 4. **Follow the served column.** Recommendation: yes (§4.7).
-5. **Per-tenant settings.** Should a tenant be able to set its own bonus or turn affinity off? Recommendation: not until a tenant asks. The request can already omit `affinity`.
+5. **Per-tenant settings.** Decided 2026-09-30 by the owner: cost-aware affinity is a tenant setting, `affinity_cost_aware`, default off, with a per-request override. The default is always the best model for the turn. A per-tenant bonus value is not added until a tenant asks.
 6. **Client fail-open.** During an engine outage, should the SDK core keep the last pick per conversation in memory and use it first? Recommendation: not in this change. The core keeps its current last-known-good ladder.
+
+7. **Cost in the default ranking.** The owner's goal is the best model for the task, with cost not deciding the pick. The default mode, `balanced`, weighs cost at 0.35, and all modes break near-ties toward the cheaper column. Should the default mode become `quality`, or should a tenant be able to set its default mode? Recommendation: decide separately from D44. Until then, callers who want pure quality send `mode: "quality"` or use the `maverick/quality` alias.
 
 ## 10. Build order
 
@@ -255,9 +269,9 @@ Each has a recommendation. The beads assume the recommendation unless the owner 
 
 ## 11. Tests
 
-- Domain (golden values calculated by hand): a warm pinned column is kept when the top pick is better by less than the bonus; switched when better by more; the turn cost flips a close cost-mode ranking; a cold cache charges P the write price; escalation withholds the bonus; a preference violation and the availability floor still win; a survivor with no price skips the turn cost for all; a request with no `affinity` is identical to today for every existing ranking fixture.
+- Domain (golden values calculated by hand): with cost-aware off, the order equals the no-affinity order for every fixture and a moved pick reports `switched` / `best_model`; with cost-aware on, a warm pinned column is kept when the top pick is better by less than the bonus; switched when better by more; the turn cost flips a close cost-mode ranking; a cold cache charges P the write price; escalation withholds the bonus; a preference violation and the availability floor still win; a survivor with no price skips the turn cost for all; a request with no `affinity` is identical to today for every existing ranking fixture.
 - Store (testcontainers): upsert, expiry, compare-and-set on the served column, prune.
-- API contract: each `422` field, strict decoding inside `affinity`, response key order with and without `classification_quota_exceeded`, `broken` for each exclusion reason, zero-retention tenant with a pinned column that loses its evidence (`broken`, `standing_constraint:zero_retention`).
+- API contract: the tenant setting default (off), set through `PUT /v1/config/constraints`, and the request override in both directions; each `422` field, strict decoding inside `affinity`, response key order with and without `classification_quota_exceeded`, `broken` for each exclusion reason, zero-retention tenant with a pinned column that loses its evidence (`broken`, `standing_constraint:zero_retention`).
 - Privacy: the §14.3 canary test extended with a canary in `affinity.key`. The canary appears in no span, log line, or metric label.
 - Proxy and core: header validation, stripping upstream, the response header, and the conformance vectors.
 - End to end: a ten-turn conversation with the fake provider where the fake aggregates move under it, checking `kept`, `switched` with `escalation`, and `broken` with `not_in_allowlist`.
