@@ -163,7 +163,14 @@ A replica makes no outbound connection unless configured:
 
 A CI test starts a replica with every outbound setting at its default, inside a network namespace with no route out, runs a declared recommend, and asserts success and zero outbound connection attempts.
 
-Tenant management without a control plane: `maverick tenant create | list | suspend | activate | key create | key revoke` call the same code as the internal API, so an operator in a sealed network needs no Rails shell. The control plane (hosted) keeps using the internal API.
+**A replica is single-tenant** (owner direction 2026-09-30). A self-hosted customer is one organization using the app. They buy a license, download the release, install it on their infrastructure, and set the license key. They never create or manage tenants. The engine keeps its multi-tenant data model, because the hosted origin needs it, but on a replica:
+
+- **Bootstrap.** On first start with an empty database (after `maverick upgrade`), a replica creates exactly one tenant, named from the license's `licensee`, with the default pool (every active column) and default constraints, and one API key. The key is printed once to the process output and written to the file named by `MAVERICK_BOOTSTRAP_KEY_FILE` (mode 0600) when set. Nothing is created on later starts.
+- **API keys.** `maverick key create | list | revoke` manage the tenant's keys (rotation, one key per internal app). These call the same code as the internal API. The tenant is implicit, so no command takes a tenant id.
+- **Configuration.** The customer's admin configures pools, constraints, weights, and zero retention through the normal tenant API (`PUT /v1/config/...`) with one of their keys, exactly as a hosted tenant does.
+- **Refused on a replica.** `POST /internal/v1/tenants` (a second tenant), tenant suspend and activate (the license states replace suspension), and tenant limit overrides return `409 single_tenant_install`. The internal listener still serves health detail and column administration (local prices and endpoints).
+- **The license key.** "License key" in customer-facing docs means the license text (§4.1). `MAVERICK_LICENSE` takes it directly; `MAVERICK_LICENSE_FILE` takes a path. The license does not name a tenant and does not need to.
+- **The proxy.** A customer who wants base-URL integration also runs `maverick-proxy` in its self-hosted mode, pointed at their engine, with one of their keys as `MAVERICK_API_KEY` (the existing self-hosted proxy form, D13).
 
 Release artifacts for regulated customers: a container image and a static binary tarball per release, both signed (cosign for the image, a detached signature for the tarball), with an SBOM (CycloneDX) and the `cargo deny` report. An offline install kit bundles the image tarball, the migrations, and the checksums.
 
@@ -184,17 +191,46 @@ Rule: an SDK core or the proxy sends an optional request field only when the eng
 ### 7.3 Database
 
 - Migrations stay up-only and additive (D37). A change that removes or renames uses expand and contract across two minor releases: release N adds the new shape and writes both; release N+1 stops reading the old shape; a later release drops it only after the support window (below) has passed N.
-- **Support window.** Any release from the last 12 months upgrades directly to the current one. `maverick migrate` checks the database's schema version first; older than the window, it stops and names the intermediate release to run first.
+- **Support window.** Any release from the last 12 months upgrades directly to the current one. `maverick upgrade` (§7.4) checks the database's schema version first; older than the window, it stops and names the intermediate release to run first.
 - **No silent downgrade.** A binary that finds migrations it does not know (the database is newer than the binary) refuses to start and names both versions. Rollback is restore from backup (D37).
-- `serve` never migrates. It refuses to start while migrations are pending and names the command to run. Upgrades are an explicit step, which regulated change processes require.
+- `serve` never migrates. It refuses to start while migrations are pending and says `run maverick upgrade`. Upgrades are an explicit step, which regulated change processes require.
 
-### 7.4 Configuration
+### 7.4 The upgrade command
+
+Owner decision 2026-09-30: upgrading is one command, `maverick upgrade`. The operator installs the new release (image or binary) by their normal process, then runs `maverick upgrade` from the new release against the database, then restarts `serve`. The command does not download anything, so it works the same in a sealed network.
+
+`maverick upgrade` runs these steps in order and stops at the first failure, naming it:
+
+1. **Preflight** (read only):
+   - print the current state: the database's schema version, the release that last upgraded it, and this binary's `--version` output;
+   - the database is not newer than this binary (no unknown migrations);
+   - the database is inside the 12-month upgrade window; otherwise name the intermediate release to run first;
+   - the license allows this release (release date on or before `updates_until`) and lists this install's role;
+   - the active matrix bundle's format is one this release reads; otherwise say which bundle format to import after the upgrade;
+   - no other `maverick upgrade` holds the upgrade lock (a Postgres advisory lock);
+   - every running `serve` process is stopped, or the pending migrations are marked online-safe (below). Replicas report their release in a heartbeat row, so the command can see them.
+2. **Plan**: list the migrations it will apply (engine and job queue), each marked `online-safe` or `needs-downtime`.
+3. **Apply**: the engine migrations, then graphile_worker's, the same code `maverick migrate` runs, inside the upgrade lock.
+4. **Record**: write an `upgrades` row (from release, to release, started, finished, operator, migrations applied). This is the upgrade history support asks for.
+5. **Verify**: re-run the preflight checks and a read of each table the release touches.
+
+Flags:
+
+- `--check`: run step 1 and step 2 only, change nothing, exit 0 when an upgrade would succeed. Change-control boards ask for this output before approving.
+- `--yes`: skip the confirmation prompt after the plan (for automation). Without it, the command asks before step 3 when it runs in a terminal, and refuses to apply without `--yes` when it does not.
+- `--json`: machine-readable output of every step.
+
+**Online-safe migrations.** A migration is online-safe when the previous release keeps working against the new schema (additive columns with defaults, new tables, new indexes built concurrently). Expand and contract (§7.3) keeps nearly every migration online-safe, so a multi-replica install can upgrade without downtime: run `maverick upgrade`, then roll the `serve` processes. A `needs-downtime` migration needs all `serve` processes stopped, and the preflight enforces that. Each migration file declares its class in a header comment, and a CI check refuses a migration without one.
+
+`maverick migrate` stays as the low-level command (Go parity, development, CI). It shares the newer-database and window checks, so it can never do something unsafe that `upgrade` would refuse, but it skips the license, bundle, lock, record, and replica checks. The docs point operators to `maverick upgrade` only.
+
+### 7.5 Configuration
 
 - Unknown `MAVERICK_*` variables are logged once at startup as a warning, never an error.
 - A renamed variable keeps its old name working for 12 months, with a deprecation warning that names the new one.
 - A new required setting needs a safe default or ships only in a major release.
 
-### 7.5 Version skew between components
+### 7.6 Version skew between components
 
 | Pair | Supported |
 |---|---|
@@ -203,9 +239,9 @@ Rule: an SDK core or the proxy sends an optional request field only when the eng
 | Bundle and replica | bundle format versions listed by `maverick --version`; the origin publishes the two most recent formats during a format change |
 | License and engine | license format versions listed by `maverick --version`; the signing service can issue the older format on request |
 
-### 7.6 Tests
+### 7.7 Tests
 
-- **Upgrade matrix.** CI keeps a database dump from each release in the support window, populated by a fixed scenario (tenants, keys, pools, traces, aggregates). Each CI run upgrades every dump with the new binary, runs the contract tests against it, and checks that existing traces and history still read correctly.
+- **Upgrade matrix.** CI keeps a database dump from each release in the support window, populated by a fixed scenario (for origin: several tenants; for replica: the single bootstrapped tenant; keys, pools, traces, aggregates). Each CI run upgrades every dump with `maverick upgrade --yes`, runs the contract tests against it, and checks that existing traces and history still read correctly.
 - **Skew matrix.** The conformance harness runs the current SDK core and proxy against the previous engine release, and the previous proxy against the current engine.
 - **Bundle and license compatibility.** Fixture bundles and licenses from each supported format version stay in the test data forever and must keep loading.
 
@@ -229,8 +265,8 @@ The hosted deployment is an ordinary install with `MAVERICK_ROLE=origin` and a M
 | # | Area | Go behavior (oracle) | Rust expected | Plan / spec ref |
 |---|---|---|---|---|
 | D48 | License | None | `MAVERICK_LICENSE_FILE` or `MAVERICK_LICENSE` required; Ed25519 `mmlic1` format verified offline with embedded keys; states `valid`, `grace`, `lapsed`; `503 license_lapsed` on recommend when lapsed; `updates_until` gates release start and bundle import; `license` health component and alerts | `plans/self-hosted-engine-plan.md` §4; owner decision 2026-09-30 |
-| D49 | Deployment roles and matrix bundles | One role: every install loads a corpus and benchmarks | `MAVERICK_ROLE=origin\|replica`; replicas run no corpus jobs and import signed `mmbundle1` bundles (no corpus content); origin exports after each rebuild; local latency probes and price overrides on replicas; `maverick tenant` and `maverick matrix` commands | plan §3, §5, §6 |
-| D50 | Compatibility | `serve` behavior and no version surface per Go | `serve` refuses pending migrations and unknown (newer) migrations; `maverick migrate` enforces a 12-month upgrade window; `maverick --version`; `X-Maverick-Engine-Version` and `X-Maverick-API-Features` on every response; clients send optional fields only when the feature is advertised | plan §7 |
+| D49 | Deployment roles and matrix bundles | One role: every install loads a corpus and benchmarks | `MAVERICK_ROLE=origin\|replica`; replicas run no corpus jobs and import signed `mmbundle1` bundles (no corpus content); origin exports after each rebuild; local latency probes and price overrides on replicas; single-tenant replicas (bootstrap one tenant and key on first start; second tenant, suspend, activate, and limit overrides refused with `409 single_tenant_install`); `maverick key` and `maverick matrix` commands | plan §3, §5, §6 |
+| D50 | Compatibility | `serve` behavior and no version surface per Go | `serve` refuses pending migrations and unknown (newer) migrations; `maverick upgrade` (preflight, plan, apply, record, verify; `--check`, `--yes`, `--json`) is the upgrade command and enforces the 12-month window, license, bundle format, lock, and online-safe rules; an `upgrades` history table; `maverick --version`; `X-Maverick-Engine-Version` and `X-Maverick-API-Features` on every response; clients send optional fields only when the feature is advertised | plan §7 |
 
 ## 11. Open questions for the owner
 
@@ -245,6 +281,6 @@ The hosted deployment is an ordinary install with `MAVERICK_ROLE=origin` and a M
 1. Owner answers §11. Adopt D48 to D50 into the spec, `DIVERGENCES.md`, the master plan, and `docs/`.
 2. Version surface first (`--version`, response headers, feature list), because every other piece reports through it.
 3. In parallel: license verification and states; the signing tool; database upgrade rules (`serve` refuses pending or unknown migrations, the window check); the feature-gated optional fields in `maverick-core`.
-4. Deployment roles; bundle export on the origin; bundle import on replicas; tenant and matrix CLI commands.
+4. Deployment roles; bundle export on the origin; bundle import on replicas; single-tenant bootstrap and the key and matrix CLI commands.
 5. Sealed-environment test, release artifacts (signatures, SBOM, offline kit), upgrade and skew matrices in CI.
 6. Operations docs: a self-hosted install and upgrade guide, and the hosted runbook changes.
