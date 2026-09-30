@@ -813,6 +813,196 @@ async fn failure_tail_commits_with_the_outcome() {
     db.close().await;
 }
 
+/// The answer the fake gives for a smoke task.
+fn answer(task: &str) -> &'static str {
+    SMOKE_TASKS
+        .iter()
+        .find(|t| t.id == task)
+        .map(|t| t.answer)
+        .expect("smoke task")
+}
+
+/// An earlier delivery that died: a worker claimed tonight's lease, recorded `done`
+/// runs at `cost` each at 03:30 on the night (inside the guard's night window, as a real
+/// 03:00 batch's runs are), and never finished. The lease is expired, so the next
+/// delivery takes it over and resumes (D10). Returns the batch id.
+async fn died_mid_batch(
+    pool: &PgPool,
+    night: &str,
+    done: &[(&str, &str)],
+    cost: maverick_store::Decimal,
+) -> String {
+    let window = smoke(night).window().expect("window");
+    let batch_id = match lease()
+        .claim(pool, JobKind::NightlySmoke, &window, "worker-dead")
+        .await
+        .expect("claim")
+    {
+        maverick_jobs::BatchLeaseOutcome::Claimed(lease) => lease.id().to_owned(),
+        other => panic!("not claimed: {other:?}"),
+    };
+    for (task, column) in done {
+        for repeat in 0..3 {
+            let id = format!("run_{task}_{column}_{repeat}");
+            measurement::insert_run(
+                pool,
+                &measurement::NewRun {
+                    id: &id,
+                    batch_id: &batch_id,
+                    task_id: task,
+                    model_column_id: column,
+                    repeat_index: repeat,
+                    output: Some(answer(task)),
+                    tokens_in: Some(100),
+                    tokens_out: Some(10),
+                    latency_ms: Some(50),
+                    cost: Some(cost),
+                    temperature: 0.0,
+                    status: "ok",
+                    error: None,
+                    matrix_version: VERSION,
+                },
+            )
+            .await
+            .expect("run");
+        }
+    }
+    sqlx::query(
+        "update runs set ran_at = ($1::date + interval '3 hours 30 minutes') at time zone 'UTC'",
+    )
+    .bind(night)
+    .execute(pool)
+    .await
+    .expect("ran_at");
+    sqlx::query("update batches set lease_expires_at = now() - interval '1 hour'")
+        .execute(pool)
+        .await
+        .expect("expire");
+    batch_id
+}
+
+/// A resumed delivery's spend guard projects only the runs it still has to make. Its
+/// earlier runs are already in the night's actual spend, so projecting them again would
+/// count them twice, refuse the resume, and skip the grading and the rebuild of runs that
+/// were paid for (plan §3.1: a crash, a restart, or a timeout mid-batch ends with one
+/// completed batch and one rebuild). Go never resumed (D10: each retry was a new batch
+/// that re-ran everything), so there the full projection was the true forward cost.
+///
+/// The smoke fixture, by hand (est_in = ceil(chars / 4) + 600, $3 in / $15 out per Mtok,
+/// max_tokens 200): task_t1 (46 chars) 612 tokens, $0.004836 a run; task_t3 (50 chars)
+/// 613, $0.004839; task_t4 (56 chars) 614, $0.004842. col_warm runs the smoke tasks t1
+/// and t4, col_cold (cold start) runs all three, 3 repeats each: 15 runs, $0.072585.
+///
+/// The dead delivery made col_warm's 6 runs and col_cold's 3 task_t1 runs at $0.005:
+/// $0.045 spent. The 6 runs left project 3 x ($0.004839 + $0.004842) = $0.029043. With a
+/// $0.10 nightly cap the resume totals $0.074043 (under the 80% warning line), where the
+/// full projection would total $0.117585 and refuse.
+#[tokio::test]
+async fn resumed_batch_projects_only_its_remaining_runs() {
+    let Some(db) = maverick_testdb::database(&SCHEMA).await else {
+        return;
+    };
+    let pool = db.pool().await;
+    seed_smoke(&pool).await;
+    assert!((nightly_projection(&pool).await - 0.072585).abs() < 1e-12);
+    let night = "2030-10-01";
+    let batch_id = died_mid_batch(
+        &pool,
+        night,
+        &[
+            ("task_t1", "col_warm"),
+            ("task_t4", "col_warm"),
+            ("task_t1", "col_cold"),
+        ],
+        maverick_store::Decimal::new(5, 3),
+    )
+    .await;
+    let counter = Arc::new(Counter::default());
+    let config = config(
+        fake_answers(&[]),
+        SpendCaps {
+            nightly_usd: 0.10,
+            weekly_usd: 500.0,
+        },
+        &counter,
+    );
+
+    let _ = parity_support::divergence!("D10");
+    let out = ran(&pool, &smoke(night), &config).await;
+    assert!(!out.refused, "the resume is within the cap");
+    assert!(!out.spend_warned, "$0.074043 is under 80% of $0.10");
+    assert!(alerts(&pool, "spend_refusal").await.is_empty());
+    assert!(alerts(&pool, "spend_warning").await.is_empty());
+    assert_eq!(out.batch_id, batch_id);
+    // The output still reports the whole batch.
+    assert!((out.projected_usd - 0.072585).abs() < 1e-12);
+    assert_eq!((out.planned_runs, out.completed_runs), (15, 15));
+    assert_eq!((out.completion_pct, out.graded_runs), (1.0, 15));
+    assert_eq!(count(&pool, "select count(*) from runs").await, 15);
+    assert_eq!(
+        count(
+            &pool,
+            "select count(*) from batches where status = 'completed' and attempt = 2"
+        )
+        .await,
+        1
+    );
+    let chained = queued(&pool).await;
+    assert_eq!(chained.len(), 1);
+    assert_eq!(chained[0].0, "aggregate_rebuild");
+    assert_eq!(chained[0].1["batch_id"], batch_id);
+    db.close().await;
+}
+
+/// A resumed delivery with no run left spends nothing, so the guard does not run: the
+/// batch grades what it paid for, completes, and rebuilds, even when the night's actual
+/// spend came in above the cap. The dead delivery made all 15 runs at $0.01 ($0.15, over
+/// the $0.10 nightly cap) and died before grading.
+#[tokio::test]
+async fn resumed_batch_with_no_runs_left_skips_the_guard() {
+    let Some(db) = maverick_testdb::database(&SCHEMA).await else {
+        return;
+    };
+    let pool = db.pool().await;
+    seed_smoke(&pool).await;
+    let night = "2030-10-02";
+    let batch_id = died_mid_batch(
+        &pool,
+        night,
+        &[
+            ("task_t1", "col_warm"),
+            ("task_t4", "col_warm"),
+            ("task_t1", "col_cold"),
+            ("task_t3", "col_cold"),
+            ("task_t4", "col_cold"),
+        ],
+        maverick_store::Decimal::new(1, 2),
+    )
+    .await;
+    let counter = Arc::new(Counter::default());
+    let config = config(
+        fake_answers(&[]),
+        SpendCaps {
+            nightly_usd: 0.10,
+            weekly_usd: 500.0,
+        },
+        &counter,
+    );
+
+    let _ = parity_support::divergence!("D10");
+    let out = ran(&pool, &smoke(night), &config).await;
+    assert!(!out.refused && !out.spend_warned);
+    assert!(alerts(&pool, "spend_refusal").await.is_empty());
+    assert!(alerts(&pool, "spend_warning").await.is_empty());
+    assert_eq!((out.planned_runs, out.completed_runs), (15, 15));
+    assert_eq!((out.completion_pct, out.graded_runs), (1.0, 15));
+    assert_eq!(count(&pool, "select count(*) from runs").await, 15);
+    let chained = queued(&pool).await;
+    assert_eq!(chained.len(), 1);
+    assert_eq!(chained[0].1["batch_id"], batch_id);
+    db.close().await;
+}
+
 /// Nothing to run: no rebuild, and the window completes.
 #[tokio::test]
 async fn nothing_to_run() {
