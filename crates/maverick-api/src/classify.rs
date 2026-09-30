@@ -908,22 +908,16 @@ enum Called {
     Fallback { quota_exceeded: bool },
 }
 
-/// True when a catalog column for `column_ref` has valid zero-retention evidence at `now`.
+/// True when the column the classifier calls for `column_ref` has valid zero-retention
+/// evidence at `now` (D2, spec §8.3). That is the column [`find_column`] picks, the first
+/// catalog match by id, because its provider gets the call. A sibling with the same model
+/// and endpoint (other settings, or another provider) does not count: its evidence says
+/// nothing about the column that receives the prompt.
 fn has_zero_evidence(columns: &[ModelColumn], column_ref: &str, now: DateTime<Utc>) -> bool {
-    let Ok((model, endpoint)) = classify::parse_column_ref(column_ref) else {
-        return false;
-    };
-    columns
-        .iter()
-        .filter(|column| column.model_id == model && column.endpoint == endpoint)
-        .any(|column| {
-            let stored = match column.retention_mode.as_str() {
-                "zero" => RetentionMode::Zero,
-                "standard" => RetentionMode::Standard,
-                _ => RetentionMode::Unknown,
-            };
-            stored.effective(column.retention_valid_until, now) == RetentionMode::Zero
-        })
+    matches!(
+        find_column(columns, column_ref),
+        Ok(Some(column)) if crate::recommend::effective_retention(column, now) == RetentionMode::Zero
+    )
 }
 
 /// A cached classification, decoded leniently: unknown fields are ignored and a stored
