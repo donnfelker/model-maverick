@@ -844,6 +844,89 @@ async fn zero_retention_tenants_use_only_a_verified_zero_retention_column() {
     db.close().await;
 }
 
+/// Two catalog columns for the zero-retention ref (same model and endpoint): `col_zr_1`
+/// (settings `{}`) sorts first by id, so the classifier calls it; `col_zr_2` is a sibling
+/// with thinking on.
+async fn zero_retention_siblings(
+    pool: &PgPool,
+    first: (&str, Option<DateTime<Utc>>),
+    sibling: (&str, Option<DateTime<Utc>>),
+) {
+    sqlx::query("delete from model_columns")
+        .execute(pool)
+        .await
+        .unwrap();
+    let pricing = JsonRawValue::from_string("{}".to_owned()).unwrap();
+    for (id, settings, (mode, until)) in [
+        ("col_zr_1", "{}", first),
+        ("col_zr_2", r#"{"thinking":true}"#, sibling),
+    ] {
+        let settings = JsonRawValue::from_string(settings.to_owned()).unwrap();
+        catalog::create_model_column(
+            pool,
+            &NewModelColumn {
+                id,
+                provider: "anthropic",
+                model_id: "claude-haiku-4-5",
+                endpoint: "vertex",
+                settings: &settings,
+                status: "active",
+                pricing: &pricing,
+                quality_source_column_id: None,
+                cold_start_until: None,
+                deprecation_date: None,
+                execution_aliases: None,
+                retention_mode: Some(mode),
+                retention_verified_at: until.map(|_| Utc::now()),
+                retention_valid_until: until,
+                retention_source: None,
+                execution_alias_retention: None,
+                param_constraints: None,
+            },
+        )
+        .await
+        .unwrap();
+    }
+}
+
+/// DIVERGENCE: D2 (bead model-maverick-a49j). The zero evidence must be on the column the
+/// classifier calls, the first catalog column for the ref. A sibling with the same model
+/// and endpoint does not clear it (spec §8.3: "its evidence").
+#[tokio::test]
+async fn zero_retention_evidence_must_be_on_the_column_the_classifier_calls() {
+    let Some((db, pool)) = database().await else {
+        return;
+    };
+    let zero = Scripted::always(text(VALID));
+    let resolver =
+        || Resolver::new(settings()).with_zero_retention_classifier(zero.classifier(ZR_COLUMN));
+    let valid = Utc::now() + chrono::Duration::days(30);
+
+    // The called column is standard; only its sibling holds zero evidence: refused.
+    zero_retention_siblings(&pool, ("standard", None), ("zero", Some(valid))).await;
+    let columns = catalog::list_model_columns(&pool).await.unwrap();
+    assert_eq!(columns[0].id, "col_zr_1", "the catalog is ordered by id");
+    assert_eq!(
+        resolver()
+            .resolve(&pool, &zr_input("secret prompt", &columns))
+            .await,
+        Err(ZeroRetentionRefused)
+    );
+    assert_eq!(zero.calls(), 0, "the prompt never left the engine");
+    assert_eq!(cache_rows(&pool).await, 0);
+
+    // The reverse: the called column holds the evidence, so it classifies.
+    zero_retention_siblings(&pool, ("zero", Some(valid)), ("standard", None)).await;
+    let columns = catalog::list_model_columns(&pool).await.unwrap();
+    let resolution = resolver()
+        .resolve(&pool, &zr_input("secret prompt", &columns))
+        .await
+        .unwrap();
+    assert_eq!(resolution.method, Method::Classified);
+    assert_eq!(zero.calls(), 1);
+    db.close().await;
+}
+
 /// DIVERGENCE: D4. The tenant's daily quota and the global daily spend cap stop the
 /// classifier call; the answer is the fallback with `quota_exceeded`. Cache hits never
 /// count.
