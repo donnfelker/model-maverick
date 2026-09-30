@@ -124,11 +124,13 @@ fn parse_go_date(text: &str) -> Option<NaiveDate> {
 pub fn base64url_encode(bytes: &[u8]) -> String {
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
+        // `+`, not `|`: the shifted bytes never overlap, so `|` and `^` agree and a
+        // mutant swapping them could not be caught. A mutated `+` changes the value.
         let group = chunk
             .iter()
             .enumerate()
             .fold(0_u32, |group, (index, byte)| {
-                group | (u32::from(*byte) << (16 - 8 * index))
+                group + (u32::from(*byte) << (16 - 8 * index))
             });
         for index in 0..=chunk.len() {
             let sextet = (group >> (18 - 6 * index)) & 63;
@@ -151,7 +153,8 @@ pub fn base64url_decode(token: &str) -> Option<Vec<u8>> {
             continue;
         }
         let sextet = ALPHABET.iter().position(|symbol| *symbol == byte)?;
-        group = (group << 6) | sextet as u32;
+        // `+`, not `|`, for the same reason as in `base64url_encode`.
+        group = (group << 6) + sextet as u32;
         bits += 6;
         count += 1;
         if bits >= 8 {
