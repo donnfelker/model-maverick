@@ -198,33 +198,71 @@ fn batch_column(column: &ModelColumn) -> BatchColumn {
     }
 }
 
+fn spend_task(t: &Task) -> SpendTask<'_> {
+    SpendTask {
+        id: &t.id,
+        prompt: &t.prompt,
+        attachments: t.attachments.get(),
+        max_tokens: i64::from(t.max_tokens),
+    }
+}
+
+fn spend_column(c: &ModelColumn) -> SpendColumn<'_> {
+    SpendColumn {
+        id: &c.id,
+        pricing: c.pricing.get(),
+    }
+}
+
 /// The spend projection over every group. An error (bad pricing, a negative price,
 /// attachment JSON) fails the job so it retries.
 fn project(groups: &[Group<'_>], repeats: u32) -> Result<Projection, BatchError> {
     let mut total = Projection::default();
     for group in groups {
-        let tasks: Vec<SpendTask<'_>> = group
-            .tasks
-            .iter()
-            .map(|t| SpendTask {
-                id: &t.id,
-                prompt: &t.prompt,
-                attachments: t.attachments.get(),
-                max_tokens: i64::from(t.max_tokens),
-            })
-            .collect();
-        let columns: Vec<SpendColumn<'_>> = group
-            .columns
-            .iter()
-            .map(|c| SpendColumn {
-                id: &c.id,
-                pricing: c.pricing.get(),
-            })
-            .collect();
+        let tasks: Vec<SpendTask<'_>> = group.tasks.iter().map(|t| spend_task(t)).collect();
+        let columns: Vec<SpendColumn<'_>> = group.columns.iter().map(|c| spend_column(c)).collect();
         let projection =
             project_spend(&tasks, &columns, i64::from(repeats)).map_err(BatchError::Projection)?;
         total.projected_usd += projection.projected_usd;
         total.runs += projection.runs;
+    }
+    Ok(total)
+}
+
+/// The projection of the runs a resumed delivery still has to make: each (task, column)
+/// pair's repeats less the runs the batch already recorded for it (D10). Pairs are summed
+/// in [`project`]'s order.
+fn project_remaining(
+    groups: &[Group<'_>],
+    repeats: u32,
+    done: &[measurement::RunTriple],
+) -> Result<Projection, BatchError> {
+    let mut made: HashMap<(&str, &str), i64> = HashMap::new();
+    for run in done {
+        *made
+            .entry((run.task_id.as_str(), run.model_column_id.as_str()))
+            .or_default() += 1;
+    }
+    let mut total = Projection::default();
+    for group in groups {
+        let mut group_total = Projection::default();
+        for column in &group.columns {
+            for task in &group.tasks {
+                let already = made
+                    .get(&(task.id.as_str(), column.id.as_str()))
+                    .copied()
+                    .unwrap_or(0);
+                let to_make = i64::from(repeats) - already;
+                if to_make > 0 {
+                    let pair = project_spend(&[spend_task(task)], &[spend_column(column)], to_make)
+                        .map_err(BatchError::Projection)?;
+                    group_total.projected_usd += pair.projected_usd;
+                    group_total.runs += pair.runs;
+                }
+            }
+        }
+        total.projected_usd += group_total.projected_usd;
+        total.runs += group_total.runs;
     }
     Ok(total)
 }
@@ -430,14 +468,27 @@ pub async fn run_batch(
         output.lock_missing = true;
     }
 
+    // The guard projects only the runs this delivery will make. A resumed delivery (D10)
+    // skips the runs it already made, and their cost is already in the night's and the
+    // week's actual spend, so projecting them too would count them twice. With no run
+    // left there is nothing to spend: grade what was paid for and complete (plan §3.1).
+    // A first delivery has no runs yet and projects the whole batch, as Go did.
     let notifier = config.notifier.as_deref();
-    let spend = check_spend(pool, notifier, kind, night, &projection, config.caps).await?;
-    if !spend.allowed {
-        lease.finish(pool, BatchEnd::Skipped).await?;
-        output.refused = true;
-        return Ok(BatchOutcome::Ran(output));
+    let done = measurement::list_run_triples_by_batch(pool, &batch_id).await?;
+    let remaining = if done.is_empty() {
+        projection
+    } else {
+        project_remaining(&groups, repeats, &done)?
+    };
+    if remaining.runs > 0 {
+        let spend = check_spend(pool, notifier, kind, night, &remaining, config.caps).await?;
+        if !spend.allowed {
+            lease.finish(pool, BatchEnd::Skipped).await?;
+            output.refused = true;
+            return Ok(BatchOutcome::Ran(output));
+        }
+        output.spend_warned = spend.warned;
     }
-    output.spend_warned = spend.warned;
     output.batch_id.clone_from(&batch_id);
 
     // Execute each group under the deterministic batch id, resuming past earlier runs.
