@@ -4,7 +4,7 @@ Status: proposed 2026-09-30. The owner asked for this plan. Revised 2026-09-30 b
 
 ## 1. The problem
 
-A multi-turn conversation calls `/v1/recommend` once per turn. The trial proxy and every SDK core do this. Nothing ties a conversation to a model. Each turn is ranked alone.
+A multi-turn conversation calls `/v1/recommend` once per turn. The proxy and every SDK core do this. Nothing ties a conversation to a model. Each turn is ranked alone.
 
 The pick can move in the middle of a conversation for three reasons:
 
@@ -191,7 +191,7 @@ The declared path target stays p95 under 50 ms. Affinity adds one primary-key re
 
 ## 5. Components
 
-### 5.1 Trial proxy
+### 5.1 Proxy
 
 - A caller sends `X-Maverick-Conversation: <id>`. The value is 1 to 256 printable ASCII characters. A present but malformed value is `400 invalid_request` with message `X-Maverick-Conversation must be 1 to 256 printable ASCII characters`, and the engine is not called.
 - The proxy sends `affinity.key = <id>` and `affinity.context_tokens = ceil(request body bytes / 4)`. This is the same estimate that the spend guard uses. Base64 images make it high. That is accepted for v1 (§9 question 3).
@@ -236,7 +236,7 @@ The `recommend_model` tool schema gains the same optional `affinity` object, mir
 - §4.3: the cache price fields and their `price_sync` source.
 - §7.4: new "Conversation affinity" subsection with §4.3 and §4.4 of this plan.
 - §7.5: the `affinity` response block.
-- §8.1 "Trial proxy behavior": the `X-Maverick-Conversation` header rules.
+- §8.1 "Proxy behavior": the `X-Maverick-Conversation` header rules.
 - §9.2: the request field, validation, and response placement.
 - §9.7: `affinity_cost_aware` in the constraints payload of `PUT /v1/config/constraints` (and the internal tenant constraints endpoint).
 - §9.10: the served-column follow rule.
