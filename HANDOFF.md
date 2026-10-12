@@ -40,8 +40,6 @@ Read these when you need them:
 - `specs/model-maverick-v1.1-spec.md`: v1.1 (the Rails shell and the engine upgrades). This is not part of the first work.
 - `plans/model-maverick-sdk-v0-plan.md` and `plans/model-maverick-integration-surfaces-plan.md`: the SDK core, the conformance harness, and the proxy.
 - `docs/features/`, `docs/api.md`, `docs/operations.md`: feature and operation notes from the Go engine.
-- `docs/market-brief.md`: market data (2026-09) that the plan refers to.
-- `docs/agency-product-framework.md`: the owner's framework for the Rails shell.
 
 ## 4. Work packages, in order
 
@@ -123,7 +121,7 @@ See `parity/README.md`, section "Known gaps". In summary:
 | `specs/` | The normative specifications |
 | `reference/engine-reference.md` | The exact behavior of the Go engine |
 | `parity/` | Test data, the test manifest, and `DIVERGENCES.md` |
-| `docs/` | Feature docs, API and operations docs, the architecture set (`docs/architecture/`), the go-live runbook, the market brief, and the owner's framework |
+| `docs/` | Feature docs, API and operations docs, the architecture set (`docs/architecture/`), and the go-live runbook |
 | `evals/` | The classifier accuracy evaluation set and plan |
 | `scripts/` | The CI tiers (`ci.sh`), the latency harness, the Docker smoke, backup and restore, the live smoke, the Claude Code launcher script, and demo seed data |
 | `examples/` | A TypeScript agent example |

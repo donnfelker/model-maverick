@@ -131,7 +131,7 @@ telemetry switch `telemetry: on | off`
 3. `modelmaverick[openai]` — custom httpx client wrapper, mirror of the TS one.
 
 **Ruby (`modelmaverick-sdk-rb`, gem `modelmaverick`):** elevated because the
-operator's agency stack standardizes Rails + RubyLLM. RubyLLM is the leverage
+operator's own stack standardizes on Rails + RubyLLM. RubyLLM is the leverage
 target — it already translates to OpenAI/Anthropic/Gemini/Bedrock/DeepSeek/… — so
 the gem is the same meta-layer shape: ask recommend, drive RubyLLM with the pick,
 rescue provider errors → `with_model(next_in_chain)` retry, telemetry from a

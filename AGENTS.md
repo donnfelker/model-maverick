@@ -11,7 +11,7 @@ Model Maverick is a B2B recommendation engine for LLMs. It benchmarks models aga
 - **All source code in this project is Rust.** Use the current stable toolchain and the 2024 edition. Do not write Go. Do not look for the old Go source. It is not available, and you do not need it.
 - The Cargo workspace is at the root of this directory. Put crates in `crates/`. `plans/master-plan.md` §4 and §6 name the required crates: `maverick-core`, `maverick-proxy`, and `sdk-conformance`. You decide how to divide the engine crates.
 - Stack (from `plans/master-plan.md` §6): Tokio, axum and tower, sqlx 0.9 (compile-time checked queries, offline mode in CI), `graphile_worker` 0.13.x for jobs, reqwest with rustls (no OpenSSL), hand-written provider clients (Anthropic, OpenAI, Google; xAI through the OpenAI client), the `jsonschema` crate (draft 2020-12), serde, `rmcp` for MCP, `tracing` with JSON output, `tracing-opentelemetry` and `opentelemetry-otlp`, RustCrypto (`hmac`, `sha2`, `hkdf`, `aes-gcm`, `subtle`), `ulid`, testcontainers for store tests, and `insta` for snapshot fixtures.
-- Other components use other languages. They are not in this directory: the Rails shell (v1.1, see `docs/agency-product-framework.md`) and the customer SDKs (TypeScript, Ruby, Go, Python).
+- Other components use other languages. They are not in this directory: the Rails shell (v1.1) and the customer SDKs (TypeScript, Ruby, Go, Python).
 
 ## Order of authority
 

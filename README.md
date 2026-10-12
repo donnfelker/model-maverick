@@ -200,4 +200,4 @@ Outside the tiers, `scripts/latency.sh` measures the hot-path latency targets an
 
 ## License
 
-This project is not open source. The Cargo metadata declares `license = "UNLICENSED"` and there is no `LICENSE` file, so all rights are reserved. Contact the owner for terms.
+Model Maverick is released under the [MIT License](LICENSE).
