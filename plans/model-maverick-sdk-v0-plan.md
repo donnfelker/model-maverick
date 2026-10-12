@@ -140,8 +140,8 @@ frozen as the cross-language contract:
   (in-thread by default; optional ActiveJob adapter).
 - Ruby ≥ 3.2. Zero-gem interim path (RubyLLM `openai_api_base` → MM-routed
   proxy) stays documented for clients who arrive before the gem.
-- **Why second:** the operator's agency clients are Rails + RubyLLM — the gem
-  also slots into the agency framework's `add-ai-feature` template later.
+- **Why second:** the operator's early customers are Rails + RubyLLM — the gem
+  also slots into the Rails product template's `add-ai-feature` template later.
 - Fast-follows: bare `ruby-openai` wrapper if demand shows.
 
 ### 3.3 Go — `modelmaverick-sdk-go` (module `github.com/modelmaverick/modelmaverick-go`)
@@ -186,7 +186,7 @@ Supersedes the parent plan's N2–N7 table:
 
 N3–N6 are independent after N2 and can run in parallel or in the listed order
 (TS → Ruby → Go → Python). The listed order is the recommendation: TS for market
-size, Ruby because the agency clients are waiting, Go because the trial proxy is
+size, Ruby because the early customers are waiting, Go because the trial proxy is
 blocked behind it, Python last because its interim story (LiteLLM without MM) is
 the least painful.
 
@@ -204,4 +204,4 @@ the least painful.
 4. **Ruby ActiveJob adapter at v0** — in-thread batcher only (recommended) vs
    shipping the adapter now.
 5. **Version floors** — proposed Node 20 / Ruby 3.2 / Go 1.22 / Python 3.10;
-   confirm against the agency clients' actual fleets.
+   confirm against the early customers' actual fleets.

@@ -1,8 +1,8 @@
 # Model Maverick v1.1 — Engineering Specification
 
-Status: draft for review (revised 2026-07-13: shell aligned to the Agency Product Framework; revised 2026-09-28: shell identity, databases, and contract pipeline aligned to the framework's current template, outcome blending gated on checked outcomes, classification quota in entitlements, engine OTel export, adopted from `plans/master-plan.md` §10)
+Status: draft for review (revised 2026-07-13: shell aligned to the Rails Product Template; revised 2026-09-28: shell identity, databases, and contract pipeline aligned to the template's current version, outcome blending gated on checked outcomes, classification quota in entitlements, engine OTel export, adopted from `plans/master-plan.md` §10)
 Source plan: `plans/model-maverick-v1-plan.md` (§Version 1.1: product shell and calibration)
-Framework: the **Agency Product Framework** (`product-development-framework/agency-product-framework.md`, sibling repo) governs the shell's stack, contract machinery, deployment, and observability. Where the plan's product sketch and the framework disagree (Devise, Hotwire/importmap), the framework wins — the shell is a framework product, built from the framework template. Divergences from the plan are called out in place; divergences from the framework are enumerated in §3.11.
+Template: the owner's private **Rails Product Template** (a sibling repo) governs the shell's stack, contract machinery, deployment, and observability. Where the plan's product sketch and the template disagree (Devise, Hotwire/importmap), the template wins — the shell is a template product, built from the Rails product template. Divergences from the plan are called out in place; divergences from the template are enumerated in §3.11.
 Baseline: `specs/model-maverick-v1-spec.md` — cited throughout as "v1 §n". Everything v1 specifies stays true unless a section here explicitly amends it. Where the engine as built diverges from the v1 spec, this document specifies against the code as built (the divergences are recorded in `docs/`).
 Companion: `specs/capability-matrix-design.md` (measurement methodology).
 
@@ -35,7 +35,7 @@ Framework-inherited non-goals, restated because they bind this release: no JWT o
 ### 1.3 Vocabulary additions
 
 - **Shell** — the Rails application (identity, commerce, dashboard, marketing).
-- **Account** — the framework's tenancy root (`Account`, with `AccountUser` memberships and `AccountInvitation`s); owns exactly one engine tenant once provisioned.
+- **Account** — the template's tenancy root (`Account`, with `AccountUser` memberships and `AccountInvitation`s); owns exactly one engine tenant once provisioned.
 - **Entitlement** — a plan-derived limit (rate limit, history retention, daily classification quota) that Rails writes into the engine through the seam.
 - **Fit** — one IRT estimation run for one capability.
 - **Completion** — a matrix-completion prediction for a cell.
@@ -76,25 +76,25 @@ The recommend hot path touches none of these (G9).
 ### 2.2 Repositories and deployment
 
 - Engine: `modelmaverick` (this repo), unchanged shape.
-- Shell: **new repository `modelmaverick-web`** — cloned from the framework template via the `new-product` skill (tokens file, contract pipeline, OTel wiring, Kamal roles, and CLAUDE.md conventions arrive pre-wired), then given its own migrations and Kamal config.
+- Shell: **new repository `modelmaverick-web`** — cloned from the Rails product template via the `new-product` skill (tokens file, contract pipeline, OTel wiring, Kamal roles, and CLAUDE.md conventions arrive pre-wired), then given its own migrations and Kamal config.
 - Corpus: `modelmaverick-corpus` (private), gains the two new capability directories.
 
 Both applications deploy with Kamal to the same **dedicated** Hetzner host at v1.1 scale (framework Tier 1, one box per product — ModelMaverick trips the shared-box promotion triggers on day one: paying users, production provider API keys — so a shared box was never an option). The Kamal proxy routes `www`/`app` hosts to Rails and `api` to the engine; the engine's internal listener stays reachable only on the private Docker network, where Rails addresses it by container name. Nothing about the engine's single-node design changes.
 
 Framework deploy posture, applied to this box:
 
-- **The shell ships two Kamal roles:** `web`, and `worker` running the same image with `cmd: bin/jobs` and the proxy disabled — a web-only deploy passes a web smoke test while the outbox silently never drains. CI includes the framework's deployed smoke test: enqueue a job, verify it executed.
+- **The shell ships two Kamal roles:** `web`, and `worker` running the same image with `cmd: bin/jobs` and the proxy disabled — a web-only deploy passes a web smoke test while the outbox silently never drains. CI includes the template's deployed smoke test: enqueue a job, verify it executed.
 - **Postgres per application as a Kamal accessory** with a named volume; **nightly off-box backups for both databases** with a documented restore path. Backup freshness is monitored (§2.3), and a scheduled restore test into a disposable Postgres instance proves the dumps are usable.
 - **Secret custody:** one vault project for the product; `.kamal/secrets` contains resolver code only, never raw credentials — no raw value in shell history, CI variables, or dotfiles. Kamal's on-host materialized env files are a documented, rotation-covered artifact.
 - **Host hardening:** only 80/443/SSH exposed, key-only SSH, unattended OS security upgrades, and the quarterly Docker/kamal-proxy/OS upgrade pass from the ops runbook.
 
 ### 2.3 Fleet health and observability
 
-The shell is a framework product and joins the ops-box pipeline; the engine keeps its v1 surface. Concretely:
+The shell is a template product and joins the ops-box pipeline; the engine keeps its v1 surface. Concretely:
 
 - **Shell telemetry:** standard OTel Ruby SDK exporting to the Collector on the ops box (never a backend directly) — traces to Tempo, errors to GlitchTip via the Sentry SDK (DSN by env), logs to stdout → Docker log driver → host shipper → Loki, metrics derived at the Collector. Per-product resource labels on every signal. Telemetry is best-effort by design: exporters buffer and drop, never block the app. The shell has no AI features, so the RubyLLM/GenAI instrumentation and the content-capture wrapper are simply not pulled in.
-- **Engine telemetry:** the engine and the trial proxy export OTel traces, logs, and metrics to the ops-box Collector over the private network (v1 §14.3), available from v1 and independent of the shell, with no public metrics endpoint. The v1 §14.3 redaction rule applies: no prompt text, completion, request body, or credential in any span, log field, or metric label, and the Collector pipeline does not export engine or proxy GenAI content to Langfuse. The engine still sits outside the framework template (§3.11); the host shipper and the probes below cover it too. (changed 2026-09-28 for the Rust port; the Go engine implements the prior rule: structured logs only, no OTel)
-- **Fleet health, per the framework:** HTTP probes from the ops box against both apps (`/up` on each); a **dead-man heartbeat** — a recurring Solid Queue job pinging a per-product check, catching dead workers, dead schedulers, and DB connectivity in one signal (the engine's own alert machinery already covers its job chain); a **backup-freshness heartbeat** (last success time + dump size, alerting past the stated RPO) covering both databases; alert routing defined once, to the same operator channels v1 already uses.
+- **Engine telemetry:** the engine and the trial proxy export OTel traces, logs, and metrics to the ops-box Collector over the private network (v1 §14.3), available from v1 and independent of the shell, with no public metrics endpoint. The v1 §14.3 redaction rule applies: no prompt text, completion, request body, or credential in any span, log field, or metric label, and the Collector pipeline does not export engine or proxy GenAI content to Langfuse. The engine still sits outside the Rails product template (§3.11); the host shipper and the probes below cover it too. (changed 2026-09-28 for the Rust port; the Go engine implements the prior rule: structured logs only, no OTel)
+- **Fleet health, per the template:** HTTP probes from the ops box against both apps (`/up` on each); a **dead-man heartbeat** — a recurring Solid Queue job pinging a per-product check, catching dead workers, dead schedulers, and DB connectivity in one signal (the engine's own alert machinery already covers its job chain); a **backup-freshness heartbeat** (last success time + dump size, alerting past the stated RPO) covering both databases; alert routing defined once, to the same operator channels v1 already uses.
 
 ---
 
@@ -104,13 +104,13 @@ The shell is a framework product and joins the ops-box pipeline; the engine keep
 
 ### 3.1 Stack
 
-Per the framework's locked stack (this supersedes the plan's Devise/Hotwire sketch, which predates Amendment 001):
+Per the template's locked stack (this supersedes the plan's Devise/Hotwire sketch, which predates Amendment 001):
 
 - Rails 8 (Ruby current stable), Postgres, **Solid Queue / Solid Cache / Solid Cable** — no Redis, matching the engine's no-Redis stance.
-- **Rails 8 auth generator** with database-backed cookie sessions (httpOnly, Secure, SameSite; CSRF-protected). Email/password + email confirmation + reset; TOTP two-factor (rotp) SHOULD ship for operator accounts, MAY ship for customers. No JWT, no bearer tokens in the browser — framework hard rule. *(Plan divergence: the plan named Devise; the framework template ships the Rails 8 generator, and the shell inherits it.)*
+- **Rails 8 auth generator** with database-backed cookie sessions (httpOnly, Secure, SameSite; CSRF-protected). Email/password + email confirmation + reset; TOTP two-factor (rotp) SHOULD ship for operator accounts, MAY ship for customers. No JWT, no bearer tokens in the browser — template hard rule. *(Plan divergence: the plan named Devise; the Rails product template ships the Rails 8 generator, and the shell inherits it.)*
 - **Vite React + TypeScript SPA**, served same-origin from the Rails image — the Vite build runs at image build time, output copied into Rails public assets. **Tailwind + shadcn/ui**, themed entirely through `app/frontend/styles/tokens.css` (generated by the `design-tokens` skill at kickoff); components use tokens and the existing component set only — inline style values are forbidden and linted.
-- **The contract pipeline** (non-negotiable, template-inherited): the SPA consumes the shell's own `/api/v1` namespace; the OpenAPI spec is **hand-authored and spec-first**, the source of truth for every endpoint, and Minitest request tests assert each endpoint's requests and responses against it (committee/skooma conformance), so behavior cannot drift from the spec in either direction without a red build; the TypeScript client and TanStack Query hooks are generated from the spec (openapi-typescript/orval); CI (the template's prewired `bin/ci`) regenerates and diffs, and any drift hard-fails the build. An endpoint starts in the spec, gets a conformance test, and regenerates the client in the same commit. *(changed 2026-09-28: replaces the rswag-generated spec, which the framework no longer uses)* All browser data fetching goes through the generated hooks; raw `fetch` is forbidden and linted. Serialization through named serializer objects, never ad hoc controller hashes. Default-deny CORS (everything is same-origin — nothing to configure), and the idempotency-key convention on mutating endpoints.
-- **Pay** with **Stripe** for billing. Stripe Checkout for card entry; the shell stores no card data. *(Product-level addition: the framework template deliberately ships no billing framework; this product needs billing.)*
+- **The contract pipeline** (non-negotiable, template-inherited): the SPA consumes the shell's own `/api/v1` namespace; the OpenAPI spec is **hand-authored and spec-first**, the source of truth for every endpoint, and Minitest request tests assert each endpoint's requests and responses against it (committee/skooma conformance), so behavior cannot drift from the spec in either direction without a red build; the TypeScript client and TanStack Query hooks are generated from the spec (openapi-typescript/orval); CI (the template's prewired `bin/ci`) regenerates and diffs, and any drift hard-fails the build. An endpoint starts in the spec, gets a conformance test, and regenerates the client in the same commit. *(changed 2026-09-28: replaces the rswag-generated spec, which the template no longer uses)* All browser data fetching goes through the generated hooks; raw `fetch` is forbidden and linted. Serialization through named serializer objects, never ad hoc controller hashes. Default-deny CORS (everything is same-origin — nothing to configure), and the idempotency-key convention on mutating endpoints.
+- **Pay** with **Stripe** for billing. Stripe Checkout for card entry; the shell stores no card data. *(Product-level addition: the Rails product template deliberately ships no billing framework; this product needs billing.)*
 - **Accounts-first identity and Pundit** (template-inherited): `Account` / `AccountUser` (jsonb roles) / `AccountInvitation`, `Current.account` set per request from the session and resolved through the user's memberships only, tenant-owned models inheriting `AccountRecord` (acts_as_tenant), and Pundit policies receiving `Current.account_user` as `pundit_user` (§3.3). *(changed 2026-09-28: replaces the organizations/memberships sketch)*
 - **Postgres with the Rails 8 multi-database layout:** the primary database plus dedicated `queue`, `cache`, and `cable` logical databases, each with its own migration path, backing Solid Queue, Solid Cache, and Solid Cable.
 - Minitest: request tests assert OpenAPI conformance (committee/skooma) and double as the API test suite; Rails system tests cover the SPA's core loops. RuboCop rails-omakase. *(changed 2026-09-28: replaces RSpec, rswag, and Capybara)*
@@ -128,9 +128,9 @@ Rails migrations in the primary database (the `queue`, `cache`, and `cable` data
 |---|---|---|
 | `users` | `email_address`, `password_digest`, `name` (Rails 8 auth generator) | |
 | `sessions` | `user_id`, `ip_address`, `user_agent` | Rails 8 auth generator; DB-backed sessions |
-| `accounts` | `name`, `owner_id`, `personal` flag, membership counter cache (framework template) | one account ↔ one engine tenant |
-| `account_users` | `account_id`, `user_id`, `roles` jsonb (default `{}`) (framework template) | unique (account_id, user_id) |
-| `account_invitations` | `account_id`, `invited_by_id`, `token`, `name`, `email`, `roles` jsonb (framework template) | unique (account_id, email); unique token |
+| `accounts` | `name`, `owner_id`, `personal` flag, membership counter cache (Rails product template) | one account ↔ one engine tenant |
+| `account_users` | `account_id`, `user_id`, `roles` jsonb (default `{}`) (Rails product template) | unique (account_id, user_id) |
+| `account_invitations` | `account_id`, `invited_by_id`, `token`, `name`, `email`, `roles` jsonb (Rails product template) | unique (account_id, email); unique token |
 | `engine_links` | `account_id` (unique), `engine_tenant_id`, `dashboard_key_id`, `dashboard_key_ciphertext` (Rails `encrypts`), `state` enum: `pending`,`provisioned`,`suspended` | the account↔tenant mapping (G9) |
 | `provisioning_actions` | `account_id`, `action`, `payload` jsonb, `state` enum: `pending`,`succeeded`,`failed`, `attempts`, `last_error`, `idempotency_key` | the outbox (§3.4) |
 | `plans` | `name`, `stripe_price_id`, `rpm`, `retention_days`, `classification_daily_quota`, `trial_days`, `active` | plans are data, not code |
@@ -217,7 +217,7 @@ Operator alerts (spend, job failures) are unchanged v1 machinery — SMTP + oper
 
 ### 3.9 Security posture
 
-- The internal token and Stripe secrets reach the app as env via the framework's vault-resolver custody chain (§2.2/§15); dashboard keys encrypted at rest (`encrypts`); raw tenant API keys are never stored anywhere in the shell.
+- The internal token and Stripe secrets reach the app as env via the template's vault-resolver custody chain (§2.2/§15); dashboard keys encrypted at rest (`encrypts`); raw tenant API keys are never stored anywhere in the shell.
 - The shell never receives, stores, or logs prompt text; the dashboard renders fingerprints and traces only (G5).
 - CSRF protection on session and API controllers; session cookies `Secure`/`HttpOnly`/`SameSite=Lax`; login throttling with lockout after repeated failures; password policy: length floor + breached-password denylist check (the auth generator imposes none — the shell must).
 - The seam is reachable only over the private network; Rails validates it is not configured with a public engine URL at boot (refuses to start if the internal base URL resolves outside RFC 1918/private ranges, overridable for development).
@@ -229,14 +229,14 @@ Public controllers and server-rendered ERB views in the same Rails app: landing,
 
 ### 3.11 Framework conformance
 
-The shell starts from the framework template (`new-product` skill) and inherits its conventions wholesale — contract pipeline and drift gate, design tokens, CLAUDE.md hard rules, OTel wiring, Kamal roles, secret custody, fleet heartbeats. Deviations, named so they are decisions rather than drift:
+The shell starts from the Rails product template (`new-product` skill) and inherits its conventions wholesale — contract pipeline and drift gate, design tokens, CLAUDE.md hard rules, OTel wiring, Kamal roles, secret custody, fleet heartbeats. Deviations, named so they are decisions rather than drift:
 
-- **The engine is Go.** The one-stack rule governs products built through the framework; the engine predates the framework and *is* the product being sold — a measurement system, not a second web stack. It stays outside the template and its drift policy, with its own spec lineage (v1 §1).
+- **The engine is Go.** The one-stack rule governs products built through the template; the engine predates the template and *is* the product being sold — a measurement system, not a second web stack. It stays outside the template and its drift policy, with its own spec lineage (v1 §1).
 - **Pay + Stripe** — product work, not template work (§3.1).
-- **Server-rendered marketing pages** (§3.10) — the framework's frontend choice is about product UI, not public content.
+- **Server-rendered marketing pages** (§3.10) — the template's frontend choice is about product UI, not public content.
 - **No AI features in the shell** — RubyLLM conventions, the sidecar escape hatch, and the GenAI content-capture wrapper are unused here. The AI is the engine, on the other side of the seam.
 
-Everything else is the framework verbatim.
+Everything else is the template verbatim.
 
 ---
 
@@ -618,7 +618,7 @@ All engine vars `MAVERICK_`-prefixed, validated at boot per v1 §14.1:
 | `DEEPSEEK_API_KEY` / `GROQ_API_KEY` / `TOGETHER_API_KEY` | — | §11 |
 | `SPEND_NIGHTLY_CAP_USD` / `SPEND_WEEKLY_CAP_USD` | `150` / `750` | §14 |
 
-Shell secrets follow the framework's custody policy: one vault project for the product, `.kamal/secrets` holding resolver code only, Kamal materializing env at deploy (§2.2). The values: engine internal base URL + internal token, Stripe keys, SMTP, reconciliation allowlist, `SENTRY_DSN` (GlitchTip), `OTEL_EXPORTER_OTLP_ENDPOINT`/`OTEL_EXPORTER_OTLP_HEADERS` (ops-box Collector). Per-account webhook secrets are generated data, encrypted in the shell database, not deploy secrets.
+Shell secrets follow the template's custody policy: one vault project for the product, `.kamal/secrets` holding resolver code only, Kamal materializing env at deploy (§2.2). The values: engine internal base URL + internal token, Stripe keys, SMTP, reconciliation allowlist, `SENTRY_DSN` (GlitchTip), `OTEL_EXPORTER_OTLP_ENDPOINT`/`OTEL_EXPORTER_OTLP_HEADERS` (ops-box Collector). Per-account webhook secrets are generated data, encrypted in the shell database, not deploy secrets.
 
 ## 16. Testing strategy
 
@@ -634,10 +634,10 @@ Engine — v1 §15 conventions extended:
 
 Shell:
 
-- **The contract pipeline is the test suite's spine:** the hand-authored OpenAPI spec is the source of truth; Minitest request tests assert every endpoint's requests and responses against it (committee/skooma); CI regenerates the TypeScript client and hard-fails on any diff between spec, generated client, and committed code (the framework's drift gate; a warning gate is decorative).
+- **The contract pipeline is the test suite's spine:** the hand-authored OpenAPI spec is the source of truth; Minitest request tests assert every endpoint's requests and responses against it (committee/skooma); CI regenerates the TypeScript client and hard-fails on any diff between spec, generated client, and committed code (the template's drift gate; a warning gate is decorative).
 - Minitest unit and request tests with the seam stubbed by WebMock against response shapes from this spec and `docs/api.md`; Rails system tests drive the SPA's core loops through the real generated client. The framework's cross-tenant isolation test (account B cannot read account A's data) covers every shell endpoint, and Pundit policy tests cover each role.
 - **Integration CI is the real engine:** the shell's CI boots the engine image + Postgres (compose), migrates, and runs the provisioning/entitlement/reconciliation flows against it. Seam drift fails a build, not a customer.
-- **Deployed smoke tests** per the framework: post-deploy checks that a Solid Queue job enqueued on the deployed box actually executes (the worker role exists and drains), alongside the web check.
+- **Deployed smoke tests** per the template: post-deploy checks that a Solid Queue job enqueued on the deployed box actually executes (the worker role exists and drains), alongside the web check.
 - Billing: Stripe test clocks through Pay for trial expiry, past-due grace, and cancellation transitions; webhook idempotency tests.
 - Security tests: dashboard key cannot write (403 path), webhook receiver rejects bad signatures, `/admin` denies non-operators, login throttling engages.
 
@@ -645,7 +645,7 @@ Shell:
 
 Milestones continue v1's numbering; deliverable-scoped, dependency-ordered. Rails track (M7–M10) and engine measurement track (M11–M12) can run in parallel; M8–M10 need their engine additions (§4) landed first within each milestone.
 
-- **M7. Shell skeleton:** `modelmaverick-web` from the framework template (`new-product`: clone, tokens file, contract pipeline green in CI), Rails 8 auth, the framework's `Account`/`AccountUser`/`AccountInvitation` with `Current.account` and Pundit (one engine tenant per `Account`), seam client, outbox, provisioning happy path against a dev engine, Kamal deploy (`web` + `worker`) beside it with the deployed job-execution smoke passing.
+- **M7. Shell skeleton:** `modelmaverick-web` from the Rails product template (`new-product`: clone, tokens file, contract pipeline green in CI), Rails 8 auth, the template's `Account`/`AccountUser`/`AccountInvitation` with `Current.account` and Pundit (one engine tenant per `Account`), seam client, outbox, provisioning happy path against a dev engine, Kamal deploy (`web` + `worker`) beside it with the deployed job-execution smoke passing.
 - **M8. Billing and lifecycle:** engine §4.2–§4.4 (limits, tenant list, acting-party); Pay/Stripe plans, entitlement sync, the suspension state machine, reconciliation.
 - **M9. Dashboard:** engine §4.1 (key scopes); all read surfaces as SPA pages over the generated client, config editing via the seam, key management. First customer-visible artifact.
 - **M10. Alerts everywhere:** engine §4.5 (alert_tenants, `/v1/alerts`, tenant webhooks); Rails receiver, dashboard alerts, notification emails, `/admin`, marketing site. **v1.1 launchable for existing-style tenants at this point.**
