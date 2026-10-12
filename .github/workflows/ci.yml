@@ -10,6 +10,14 @@ on:
   schedule:
     - cron: "17 2 * * *"
   workflow_dispatch:
+    inputs:
+      runner:
+        # Empty keeps the pinned image. Set it (for example to ubuntu-26.04) to try every
+        # gate on another image without changing push, pull request, or nightly runs.
+        description: "Runner image for this run (empty: ubuntu-24.04)"
+        type: string
+        required: false
+        default: ""
 
 # Many agents push to main, often faster than the fast tier runs. On main a running run
 # is never cancelled: it finishes, and GitHub keeps only the newest pending run behind it,
@@ -37,7 +45,10 @@ env:
 jobs:
   tiers:
     name: ${{ matrix.tier }}
-    runs-on: ubuntu-latest
+    # Pinned (bead model-maverick-a7d0): `ubuntu-latest` moves to Ubuntu 26 from
+    # 2026-10-19, and a new image can change the disk, Docker, and toolchain setup under
+    # the gates. A manual run with the `runner` input tries another image first.
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     strategy:
       fail-fast: false
       matrix:
@@ -48,7 +59,7 @@ jobs:
           - e2e
     steps:
       - name: Free runner disk space
-        # ubuntu-latest ships about 45 GB of SDKs and Docker images this project never
+        # The runner image ships about 45 GB of SDKs and Docker images this project never
         # uses. Rust comes from rustup in the home directory, not the hosted tool cache,
         # and the tests pull their own postgres image.
         run: |
@@ -72,6 +83,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.tier }}
+          # Another image keeps its own cache: binaries built there (the cargo tools in
+          # ~/.cargo/bin, build scripts) may need a newer glibc than 24.04 has.
+          prefix-key: ${{ inputs.runner && format('v0-rust-{0}', inputs.runner) || 'v0-rust' }}
 
       - name: Install fast-tier cargo tools
         if: matrix.tier == 'fast'
@@ -107,7 +121,7 @@ jobs:
   mutants-diff:
     name: mutants (changed lines)
     if: github.event_name == 'push' || github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     # `actions: read` lets scripts/mutants-base.sh list this workflow's runs and jobs.
     permissions:
       contents: read
@@ -138,6 +152,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: mutants
+          # Another image keeps its own cache: binaries built there (the cargo tools in
+          # ~/.cargo/bin, build scripts) may need a newer glibc than 24.04 has.
+          prefix-key: ${{ inputs.runner && format('v0-rust-{0}', inputs.runner) || 'v0-rust' }}
 
       - name: Install cargo-mutants
         # See the fast-tier install step: skip when the cached binary is already pinned.
@@ -183,7 +200,7 @@ jobs:
   mutants-full:
     name: mutants (shard ${{ matrix.shard }}/8)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 300
     strategy:
       fail-fast: false
@@ -212,6 +229,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: mutants
+          # Another image keeps its own cache: binaries built there (the cargo tools in
+          # ~/.cargo/bin, build scripts) may need a newer glibc than 24.04 has.
+          prefix-key: ${{ inputs.runner && format('v0-rust-{0}', inputs.runner) || 'v0-rust' }}
           save-if: ${{ matrix.shard == 0 }}
 
       - name: Install cargo-mutants
