@@ -47,3 +47,5 @@ coverage/
 # cargo-mutants output
 /mutants.out
 /mutants.out.old
+# ntm session state (agent logs, inbox, summaries); never publish it
+/.ntm/
