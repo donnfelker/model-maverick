@@ -16,7 +16,7 @@ Rules for this document:
 3. [Part 3. Scoring, jobs, predictions, alerts, and catalog](#part-3)
 4. [Part 4. Policy, recommend, classify, auth, tracing, and history](#part-4)
 5. [Part 5. HTTP API and MCP](#part-5)
-6. [Part 6. Trial proxy](#part-6)
+6. [Part 6. Proxy](#part-6)
 7. [Part 7. SQL query catalog](#part-7)
 
 <a id="part-1"></a>
@@ -3522,7 +3522,7 @@ Fixtures `../fixtures/api/apierrors.json` (4 tests) and `../fixtures/api/middlew
 
 <a id="part-6"></a>
 
-# Part 6. Trial proxy
+# Part 6. Proxy
 
 (Source area: `proxy`.)
 
@@ -4056,7 +4056,7 @@ DIVERGENCE: Rust plan §3.5 requires "tighter rate limits than the API", per ten
 
 - DIVERGENCE: workload projection plus `X-Maverick-Workload` header replace the last-user-text rule (§3.5 "Workload projection"; section 6 above).
 - DIVERGENCE: tenant key per request in `X-Maverick-API-Key`, per-tenant rate limits and telemetry; single `MAVERICK_API_KEY` stays as the self-hosted form (§3.5, §2 "URL interception"; section 7 above). Rust must also strip `X-Maverick-API-Key` from upstream requests (§3.5 "pass through except hop-by-hop and credentials"); Go forwards it.
-- DIVERGENCE: hosted mode reads no provider env keys; caller OpenRouter key or surface-native credential only, chain restricted to that provider (§3.5, §7.0 step 6, §10 "Trial proxy keys"; section 8.3 above).
+- DIVERGENCE: hosted mode reads no provider env keys; caller OpenRouter key or surface-native credential only, chain restricted to that provider (§3.5, §7.0 step 6, §10 "Proxy keys"; section 8.3 above).
 - DIVERGENCE: chain entries carry `settings`; the proxy applies them unless `?settings=caller`, and records `settings_applied` (§3.2 "Ranking"; sections 5, 7 above).
 - DIVERGENCE: parameter normalization becomes "nearest value the routed model accepts", catalog-driven (§3.5; section 10 above).
 - DIVERGENCE (probable): proxy on `maverick-core` respects `Retry-After` and uses the 10 s / 20 items / exit-flush batcher (§3.5; sections 8.4, 11 above).

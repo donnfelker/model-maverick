@@ -7,7 +7,7 @@ and deployment.
 - Endpoint shapes are in `docs/api.md`.
 - Configuration is authoritative in spec §14.1 and `crates/maverick-config`. This page names
   the variables an operator touches.
-- The trial proxy has its own page: `docs/features/proxy.md`.
+- The proxy has its own page: `docs/features/proxy.md`.
 - The deploy images, the Kamal files, and the backup scripts are described in
   [`docker/README.md`](../docker/README.md).
 
@@ -447,7 +447,7 @@ scripts/live-smoke.sh
   `maverick_job_recoveries_total`, and `maverick_batch_spend_usd`. There is no metrics
   endpoint to scrape. The proxy exports its own records with `MAVERICK_PROXY_OTLP_ENDPOINT`
   (D31).
-- **The trial proxy** (`crates/maverick-proxy`) is a separate binary and deployable. It has
+- **The proxy** (`crates/maverick-proxy`) is a separate binary and deployable. It has
   no database and no migrations. See `docs/features/proxy.md`.
 
 ## Hot-path latency

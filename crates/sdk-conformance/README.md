@@ -2,7 +2,7 @@
 
 The SDK conformance harness. It is a mock Model Maverick engine plus a mock provider that run
 scripted scenarios. Every SDK (TypeScript, Ruby, Go, Python) runs it in CI, and the Rust
-trial proxy runs the same scenarios, so all of them behave identically on chain advancement,
+proxy runs the same scenarios, so all of them behave identically on chain advancement,
 fail-open, zero retention, telemetry, and alias parsing.
 
 The servers are dumb and deterministic. A scenario names the exact HTTP reply for each call,

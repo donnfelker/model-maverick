@@ -28,7 +28,7 @@ mean every framework integration per language; fast-follows are listed per SDK.
   (the declared hot path answers in single-digit ms; the uncached prompt path
   targets p95 < 1.8 s, inside the 2s timeout, v1 spec §2.3).
 - **Workload projection** (added 2026-09-28): the prompt form is built by one
-  versioned projection shared with the trial proxy: system/developer
+  versioned projection shared with the proxy: system/developer
   instructions, bounded recent conversation text (not only the last user
   message), the response-format schema, and tool names and descriptions,
   excluding binary content. The core sends the projection version
@@ -146,7 +146,7 @@ frozen as the cross-language contract:
 
 ### 3.3 Go — `modelmaverick-sdk-go` (module `github.com/modelmaverick/modelmaverick-go`)
 
-- **Dual role, build once use twice:** this module IS the trial proxy's routing
+- **Dual role, build once use twice:** this module IS the proxy's routing
   library — `cmd/maverick-proxy` imports the same core (recommend client, chain
   executor, telemetry batcher). The proxy milestone depends on this one.
 - **Flagship interception:** an `http.RoundTripper` — the idiomatic Go seam.
@@ -180,13 +180,13 @@ Supersedes the parent plan's N2–N7 table:
 | N2 | Core spec + conformance harness | §2 frozen as a spec doc; `cmd/sdk-conformance` mock server + vectors | N1 |
 | N3 | TypeScript SDK | core + AI SDK meta-provider + OpenAI wrapper | N2 |
 | N4 | Ruby SDK | core + RubyLLM meta-layer + Rails initializer | N2 |
-| N5 | Go SDK + trial proxy | Go core + RoundTripper; `cmd/maverick-proxy` consumes it | N2 |
+| N5 | Go SDK + proxy | Go core + RoundTripper; `cmd/maverick-proxy` consumes it | N2 |
 | N6 | Python SDK + LiteLLM proxy plugin | core + LiteLLM strategy + OpenAI wrapper; Track 2 plugin from the same strategy | N2 |
 | N7 | Fast-follows | Anthropic wrappers, Portkey spike/decision, langchaingo, docs pass | N3–N6 |
 
 N3–N6 are independent after N2 and can run in parallel or in the listed order
 (TS → Ruby → Go → Python). The listed order is the recommendation: TS for market
-size, Ruby because the early customers are waiting, Go because the trial proxy is
+size, Ruby because the early customers are waiting, Go because the proxy is
 blocked behind it, Python last because its interim story (LiteLLM without MM) is
 the least painful.
 

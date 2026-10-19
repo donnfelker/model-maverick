@@ -1,4 +1,4 @@
-//! The trial proxy binary.
+//! The proxy binary.
 //!
 //! Reads its configuration from the environment, logs JSON lines to stdout, serves until
 //! SIGINT or SIGTERM, drains for 10 s, and exits 1 on a configuration, listener, or

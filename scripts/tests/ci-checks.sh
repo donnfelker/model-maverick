@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Exercise the engine boundary check through the real CI entry point. Each case uses
-# tracked files in a throwaway repository and needs neither Cargo nor network access.
+# Exercise the engine boundary and label checks through the real CI entry point. Each case
+# uses tracked files in a throwaway repository and needs neither Cargo nor network access.
 set -Eeuo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -88,5 +88,25 @@ exit 2
 EOF
 chmod +x "$work/bin/git"
 PATH="$work/bin:$PATH" expect "git errors fail the check" 2 "$repo"
+
+# The label check forbids one word. This file spells it in two parts, so it never matches.
+label="tr""ial"
+
+repo="$(new_repo label-docs)"
+plant "$repo" docs/guide.md "Start with a free ${label^^} key."
+expect "label match is rejected regardless of case" 1 "$repo"
+
+repo="$(new_repo label-tests)"
+plant "$repo" crates/core/tests/proxy.rs "// the ${label} proxy"
+expect "label match in test code is rejected" 1 "$repo"
+
+repo="$(new_repo label-excluded)"
+plant "$repo" .beads/issues.jsonl "{\"title\":\"the ${label} proxy\"}"
+plant "$repo" specs/model-maverick-v1.1-spec.md "A free ${label} period is a control-plane plan."
+expect "label in .beads and the v1.1 spec is allowed" 0 "$repo"
+
+repo="$(new_repo label-fast)"
+plant "$repo" README.md "The ${label} proxy."
+PATH="$work/no-cargo:$PATH" expect "fast tier rejects the label before running Cargo" 1 "$repo" fast
 
 printf 'ci-checks: all tests passed\n'

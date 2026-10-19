@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Launch Claude Code through the Model Maverick trial proxy.
+# Launch Claude Code through the Model Maverick proxy.
 #
 # Put local secrets in .env.maverick.local next to the repo root. That file is
 # gitignored. Example for hosted mode:

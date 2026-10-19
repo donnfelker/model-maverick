@@ -1,6 +1,6 @@
 [package]
 name = "maverick-core"
-description = "The Rust copy of the shared SDK core: recommend client, chain executor, fail-open ladder, telemetry batcher, alias grammar, workload projection. The trial proxy depends on it by path."
+description = "The Rust copy of the shared SDK core: recommend client, chain executor, fail-open ladder, telemetry batcher, alias grammar, workload projection. The proxy depends on it by path."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

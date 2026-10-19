@@ -4,7 +4,7 @@ Read this file before you do work in this directory. Then read `HANDOFF.md`.
 
 ## The project
 
-Model Maverick is a B2B recommendation engine for LLMs. It benchmarks models against a private task corpus every night. It classifies each workload, applies tenant policy, and returns a ranked list of models (a fallback chain). The engine does not execute inference. The only component that executes inference is the trial proxy, and it uses only the caller's credentials.
+Model Maverick is a B2B recommendation engine for LLMs. It benchmarks models against a private task corpus every night. It classifies each workload, applies tenant policy, and returns a ranked list of models (a fallback chain). The engine does not execute inference. The only component that executes inference is the proxy, and it uses only the caller's credentials.
 
 ## Language and stack
 

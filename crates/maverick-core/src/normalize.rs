@@ -1,5 +1,5 @@
 //! D29: per-model parameter constraints and the normalization of caller values (spec v1
-//! §8.1 "Trial proxy behavior"; reference Part 6 §10; `parity/DIVERGENCES.md` D29).
+//! §8.1 "Proxy behavior"; reference Part 6 §10; `parity/DIVERGENCES.md` D29).
 //!
 //! The model catalog stores `param_constraints` per column as
 //! `{"<field>": {"allowed": [...], "order": [...]}}`, keyed by a surface-neutral field

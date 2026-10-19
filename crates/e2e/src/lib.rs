@@ -1,7 +1,7 @@
 //! The full-stack end-to-end harness (bead 9.10).
 //!
 //! [`FakeProviderServer`] serves the deterministic fake provider over HTTP, in each wire
-//! format the engine's provider clients and the trial proxy speak, so the real binaries
+//! format the engine's provider clients and the proxy speak, so the real binaries
 //! can run against it with only a base URL changed:
 //!
 //! | wire | path | engine config | proxy config |

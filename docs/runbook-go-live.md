@@ -1,6 +1,6 @@
 # Go-live runbook
 
-This runbook takes the Rust engine and the hosted trial proxy live on the deploy host.
+This runbook takes the Rust engine and the hosted proxy live on the deploy host.
 - Bead `model-maverick-rust-port-3hk.9.12` wrote it.
 - Bead `model-maverick-rust-port-3hk.9.5` runs it with the owner.
 - It covers master plan §7.0 step 4.
@@ -384,7 +384,7 @@ operator key. Fix the column, the key, or the variable. Apply a variable or key 
      -d '{"workload": {"capability": "structured_extraction", "difficulty": 3}}'
    ```
 
-## 8. The hosted trial proxy [owner]
+## 8. The hosted proxy [owner]
 
 The proxy runs in hosted mode, as its own Kamal service (`config/deploy-proxy.yml`):
 - it holds no MM key and no provider key (D12, D13);

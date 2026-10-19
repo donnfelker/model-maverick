@@ -49,7 +49,7 @@ on it.
   admin endpoint (no external price feed is wired).
 - **Execution aliases.** A column may carry a flat map of execution-backend
   model slugs (v1 defines one key, `"openrouter"`) alongside its
-  provider/model/endpoint identity. This lets an SDK or the trial proxy
+  provider/model/endpoint identity. This lets an SDK or the proxy
   dispatch the engine's pick through an alternate execution path — one
   customer key routing through OpenRouter instead of N provider keys —
   without the engine ever touching that traffic or the catalog needing a

@@ -1,7 +1,7 @@
-# Trial Proxy
+# Proxy
 
-The trial proxy is a demo path for existing OpenAI and Anthropic clients. A
-caller points its base URL at the proxy, uses a `maverick/*` model alias, and
+The proxy is the base-URL integration for existing OpenAI and Anthropic
+clients. A caller points its base URL at the proxy, uses a `maverick/*` model alias, and
 keeps the provider wire format it already sends. The proxy asks the engine for a
 ranked chain, tries the entries in order, and reports the attempts through
 `/v1/telemetry`.
@@ -16,7 +16,7 @@ operator keys.
 uses one `MAVERICK_API_KEY` for engine calls. It may also read provider keys
 from its own environment as fallback credentials.
 
-`MAVERICK_PROXY_MODE=hosted` is the shared trial mode. Each request must carry a
+`MAVERICK_PROXY_MODE=hosted` is the shared hosted mode. Each request must carry a
 tenant key in `X-Maverick-API-Key`. Hosted mode does not read provider keys from
 the proxy process. The caller must send its provider credential on the request.
 
@@ -88,7 +88,7 @@ tenant, the alias must have valid zero-retention evidence, or the proxy returns
 `409 no_compliant_columns`.
 
 Claude Code uses the Messages surface, so the launcher refuses `sk-or-` keys.
-Use an OpenAI-compatible client for OpenRouter trials.
+Use an OpenAI-compatible client for OpenRouter testing.
 
 ## Fences
 
@@ -99,8 +99,9 @@ Use an OpenAI-compatible client for OpenRouter trials.
 - `X-Maverick-API-Key` is stripped before any upstream provider call.
 - The default hosted rate limit is 60 requests per minute per tenant key.
 - The default body cap is 32 MiB.
-- This path has no production SLA. Production traffic should use an SDK or a
-  gateway plugin once those exist.
+- The proxy is a production path. Its fail-open ladder, availability target,
+  and alerts are in `plans/production-proxy-plan.md` §4 and §5 until the spec and
+  `docs/operations.md` carry them.
 
 ## Telemetry
 
@@ -116,9 +117,9 @@ count them (D43).
 
 ## Nice To Have (Not Planned)
 
-A graduation-link response header could point trial users to the production
-integration path. The owner removed it from v1 on 2026-09-28 as premature
-because SDKs and public docs do not exist yet. Revisit when they do.
+A graduation-link response header was once planned to point proxy users to
+another integration path. It is moot: the proxy is a production path
+(`plans/production-proxy-plan.md`, owner decision 2026-09-30).
 
 ## References
 

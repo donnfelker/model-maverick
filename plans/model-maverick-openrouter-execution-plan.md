@@ -26,7 +26,7 @@ this case.
    In openrouter mode the chain executor sends every entry to one upstream with
    the entry's alias as the model slug — strictly *simpler* than direct mode.
    Telemetry records which endpoint actually executed (`endpoint_used`).
-3. **Trial proxy variant:** OpenRouter-backed trial — BYOK shrinks to a single
+3. **Proxy variant:** OpenRouter-backed execution, so BYOK shrinks to a single
    key. Evaluated as the preferred Track 3 shape at N5.
 
 ## Non-goals
@@ -55,14 +55,14 @@ this case.
 | N1 (engine prereqs) | `execution_aliases` migration + internal/public API exposure; `openrouter` accepted as endpoint value; telemetry item gains `endpoint_used` |
 | N2 (core spec + harness) | `execution` mode in the shared core spec; conformance scenarios 10–12 |
 | N3–N6 (each SDK) | openrouter mode ships with each SDK's core — no per-language extra |
-| N5 (trial proxy) | decide OpenRouter-backed variant vs per-provider BYOK |
+| N5 (proxy) | decide OpenRouter-backed variant vs per-provider BYOK |
 
 ## Open decisions
 
 1. **Alias shape** — generic `execution_aliases` map (recommended; Bedrock/
    Azure/Vertex aliases become the same mechanism later) vs a single
    `openrouter_slug` column.
-2. **Trial proxy default** — OpenRouter-backed (recommended: one BYOK key,
+2. **Proxy default** — OpenRouter-backed (recommended: one BYOK key,
    one upstream, no per-provider compat matrix) vs per-provider compat
    endpoints as originally planned.
 3. **Alias population** — operator-maintained via internal API only (v0,

@@ -1,6 +1,6 @@
 [package]
 name = "maverick-proxy"
-description = "The trial proxy binary. No database, its own deployment. Executes a chain using only the caller's credentials."
+description = "The proxy binary. No database, its own deployment. Executes a chain using only the caller's credentials."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

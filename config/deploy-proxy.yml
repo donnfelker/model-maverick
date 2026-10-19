@@ -1,4 +1,4 @@
-# The hosted trial proxy: its own Kamal 2 service (bead 9.4; owner decision 2026-09-28;
+# The hosted proxy: its own Kamal 2 service (bead 9.4; owner decision 2026-09-28;
 # master plan §4 "Deployment"). Deploy it with the config flag:
 #
 #   kamal setup  -c config/deploy-proxy.yml

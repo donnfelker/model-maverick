@@ -5,8 +5,8 @@ This directory explains how Model Maverick is built, one document per area. Star
 ## Documents
 
 - [Overview](overview.md): the component map and how a request and the nightly benchmark flow through the system.
-- [Request path](request-path.md): the trial-proxy chat request, from alias to recommendation to relay, with the fail-open ladder.
-- [Trial proxy](trial-proxy.md): hosted and self-hosted modes, chain execution, and how credentials are resolved.
+- [Request path](request-path.md): the proxy chat request, from alias to recommendation to relay, with the fail-open ladder.
+- [Proxy](proxy.md): hosted and self-hosted modes, chain execution, and how credentials are resolved.
 - [Nightly benchmark](nightly-benchmark.md): the corpus, the runner, scoring, and the rankings rebuild, under the spend cap.
 - [Data model and store](data-model.md): the Postgres tables, migrations, and sqlx offline mode.
 - [Jobs and scheduling](jobs-and-scheduling.md): the `graphile_worker` job kinds, cron, leases, and the shutdown rule.
@@ -17,4 +17,4 @@ This directory explains how Model Maverick is built, one document per area. Star
 
 ## The one-paragraph version
 
-Model Maverick recommends which LLM to call for a given workload, and it proves those recommendations with a nightly benchmark. The engine (the `maverick` binary) serves recommendations over HTTP and runs the benchmark jobs on Postgres. The trial proxy (the `maverick-proxy` binary) is a separate deployment that a customer's traffic flows through: it asks the engine for a ranked chain, then relays the call to the first runnable model using only the customer's own provider credentials. Both share one library, `maverick-core`, so the proxy and the customer SDKs behave the same way. The engine never executes customer inference, never stores a prompt outside an encrypted debug window, and never lets an MM outage break a customer call.
+Model Maverick recommends which LLM to call for a given workload, and it proves those recommendations with a nightly benchmark. The engine (the `maverick` binary) serves recommendations over HTTP and runs the benchmark jobs on Postgres. The proxy (the `maverick-proxy` binary) is a separate deployment that a customer's traffic flows through: it asks the engine for a ranked chain, then relays the call to the first runnable model using only the customer's own provider credentials. Both share one library, `maverick-core`, so the proxy and the customer SDKs behave the same way. The engine never executes customer inference, never stores a prompt outside an encrypted debug window, and never lets an MM outage break a customer call.

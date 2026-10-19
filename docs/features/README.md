@@ -73,7 +73,7 @@ Arrows read "feeds into."
 | [MCP server](mcp-surface.md) | The agent surface: same services, same auth, same audit |
 | [Internal provisioning API](internal-provisioning.md) | The Rails seam: root control plane on the private listener |
 | [Observability & health](observability.md) | Structured logs, the two health endpoints, why no metrics stack yet |
-| [The trial proxy](proxy.md) | Zero-code-change routing via a base-URL swap: chain execution, BYOK, automatic telemetry |
+| [The proxy](proxy.md) | Zero-code-change routing via a base-URL swap: chain execution, BYOK, automatic telemetry |
 
 ## The eight guarantees
 

@@ -363,8 +363,7 @@ The registry is static, embedded in the binary, with one spec per capability
 ## POST /v1/telemetry
 
 **This is SDK and plugin plumbing, not a customer obligation (G13).**
-MM-authored components (the client SDKs, gateway plugins, and the trial
-proxy) call it automatically as a side effect of routing a request. No public
+MM-authored components (the client SDKs, gateway plugins, and the proxy) call it automatically as a side effect of routing a request. No public
 surface asks a caller to report what happened by hand. A component with
 telemetry disabled never calls it: zero calls, no fallback. The consequence is
 that the tenant's own outcome blending (v1.1 §7) has no data, and its rankings
@@ -641,7 +640,7 @@ is `null` or `false`.
 `telemetry_opt_out: true` (D39) turns off outcome telemetry for the tenant.
 Recommend responses then carry `"telemetry": false`, MM components send no
 telemetry, and the engine drops any telemetry items it still receives. The
-trial proxy also exports no OTel record for a request whose recommendation
+proxy also exports no OTel record for a request whose recommendation
 says `telemetry: false`: no log record, and no count in
 `maverick_proxy_recommendations_total` (D43). A request that fails before the
 engine answers has no flag, so it is still recorded. The constraint filters no
@@ -827,7 +826,7 @@ An unknown tool is JSON-RPC error `-32602`, and an unknown method is
 ## SDK integration conventions
 
 Every MM-authored component (the client SDKs, the gateway plugins, and the
-trial proxy) follows two conventions (integration-surfaces plan §1). They are
+proxy) follows two conventions (integration-surfaces plan §1). They are
 not part of the engine's own wire contract.
 
 - **Model-alias grammar.** `maverick/auto` (balanced), `maverick/quality`,

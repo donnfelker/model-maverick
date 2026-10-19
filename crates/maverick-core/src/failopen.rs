@@ -8,8 +8,9 @@
 //! open only to `zero`-stamped cached entries or to models configured as verified
 //! zero-retention, and otherwise fails closed. All state is in memory.
 //!
-//! The trial proxy is exempt from fail-open by position (an engine failure is its
+//! The proxy is exempt from fail-open today (an engine failure is its
 //! `502 engine_error`); it still obeys the zero-retention rules.
+//! `plans/production-proxy-plan.md` §4 (proposed D46) moves the proxy onto this ladder.
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::future::Future;

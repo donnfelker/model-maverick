@@ -1,4 +1,4 @@
-//! The telemetry producer (spec §9.10 and §8.1 "Trial proxy behavior", D27, D16, D14).
+//! The telemetry producer (spec §9.10 and §8.1 "Proxy behavior", D27, D16, D14).
 //!
 //! One item per dispatched attempt goes to a batcher that sends every 10 s or at 20
 //! queued items, one batch stream per tenant key, and flushes at shutdown within a bound.

@@ -1,10 +1,10 @@
 # Model Maverick
 
-Model Maverick is a B2B recommendation engine for LLMs. It benchmarks models every night against a private task corpus, classifies each workload, applies tenant policy, and returns a ranked list of models (a fallback chain). The engine does not execute inference. The only component that executes inference is the trial proxy, and it uses only the caller's credentials.
+Model Maverick is a B2B recommendation engine for LLMs. It benchmarks models every night against a private task corpus, classifies each workload, applies tenant policy, and returns a ranked list of models (a fallback chain). The engine does not execute inference. The only component that executes inference is the proxy, and it uses only the caller's credentials.
 
 [![CI](https://github.com/donnfelker/model-maverick/actions/workflows/ci.yml/badge.svg)](https://github.com/donnfelker/model-maverick/actions/workflows/ci.yml)
 
-This repository holds the Rust port of the engine, the trial proxy, and the SDK conformance harness. Other components live elsewhere: the Rails shell and the customer SDKs (TypeScript, Ruby, Go, Python).
+This repository holds the Rust port of the engine, the proxy, and the SDK conformance harness. Other components live elsewhere: the Rails shell and the customer SDKs (TypeScript, Ruby, Go, Python).
 
 ## Key ideas and guarantees
 
@@ -12,7 +12,7 @@ The engine keeps a set of guarantees, G1 to G14, defined in [`specs/model-maveri
 
 - **Privacy.** A prompt is never stored except in an encrypted debug-capture window. A prompt, a completion, a request body, or a credential never reaches a span, a log line, or a metric label. Every `#[tracing::instrument]` uses `skip_all` with an allowlist, and the `instrument-lint` CI check rejects any that does not.
 - **Zero retention.** For a zero-retention tenant, the engine never sends a prompt or a pick to a column or an alias without valid zero-retention evidence. This rule fails closed and outranks the others.
-- **Fail-open (G14).** An MM outage never breaks the customer's call. The SDK core falls open to the last-known-good chain, then a default model, then the caller's own model. The trial proxy is exempt by position: an engine failure is its `502 engine_error`.
+- **Fail-open (G14).** An MM outage never breaks the customer's call. The SDK core falls open to the last-known-good chain, then a default model, then the caller's own model. The proxy is exempt today: an engine failure is its `502 engine_error`. `plans/production-proxy-plan.md` §4 (proposed D46) gives the proxy the same ladder.
 - **Spend is capped (G8).** A batch projects its cost first and refuses to run when the projection is over the cap.
 - **Pools are hard boundaries (G2).** A request can make a pool smaller. It can never make a pool larger.
 - **No schema translation.** The engine and the proxy do not translate between provider wire formats.
@@ -26,7 +26,7 @@ The private corpus (task prompts, golden answers, rubrics) is never committed to
 
 ```mermaid
 flowchart TD
-    caller["Caller (SDK or app)"] -->|"chat / messages, caller key"| proxy["maverick-proxy<br/>trial proxy"]
+    caller["Caller (SDK or app)"] -->|"chat / messages, caller key"| proxy["maverick-proxy"]
     proxy -->|"POST /v1/recommend"| api
     proxy -->|"relay with caller key"| providers["LLM providers"]
     proxy -.->|"POST /v1/telemetry"| api
@@ -50,7 +50,7 @@ flowchart TD
     class caller,providers ext;
 ```
 
-A customer request enters the trial proxy. The proxy asks the engine for a recommendation, then relays the request to the first runnable provider using only the caller's credentials, and reports the outcome through `/v1/telemetry`. Every night the job runner benchmarks each model in the corpus with operator keys, scores the results, and updates the rankings the engine serves. See [`docs/architecture/`](docs/architecture/) for the detail.
+A customer request enters the proxy. The proxy asks the engine for a recommendation, then relays the request to the first runnable provider using only the caller's credentials, and reports the outcome through `/v1/telemetry`. Every night the job runner benchmarks each model in the corpus with operator keys, scores the results, and updates the rankings the engine serves. See [`docs/architecture/`](docs/architecture/) for the detail.
 
 ## Repository layout
 
@@ -68,7 +68,7 @@ Crates live in `crates/`.
 | `maverick-config` | Environment parsing and validation for the engine. Fails loud on missing or invalid config. |
 | `maverick-alerts` | Alert rows and their delivery: the insert helper and the SMTP and HMAC webhook fan-out. |
 | `maverick-core` | The Rust copy of the shared SDK core: recommend client, chain executor, fail-open ladder, telemetry batcher, alias grammar, workload projection. The proxy depends on it. |
-| `maverick-proxy` | The trial proxy binary. No database, its own deployment. Executes a chain with the caller's credentials only. |
+| `maverick-proxy` | The proxy binary. No database, its own deployment. Executes a chain with the caller's credentials only. |
 | `sdk-conformance` | The conformance harness: a mock engine and a mock provider, plus the frozen cross-language scenarios and test vectors. |
 | `maverick-acceptance` | Cross-cutting acceptance suites: the real engine and proxy in one process, on Postgres, with recording provider fakes and a mock OTLP collector. |
 | `maverick-e2e` | The full-stack end-to-end harness: the real binaries as separate processes, on Postgres, against a fake provider over HTTP. Test-only, localhost only. |
@@ -145,7 +145,7 @@ MAVERICK_INTERNAL_TOKENS=rails:secret \
 MAVERICK_CAPTURE_MASTER_KEY=$(head -c 32 /dev/urandom | xxd -p -c 64) \
 cargo run -p maverick -- serve
 
-# Start the trial proxy (self-hosted), pointing at the engine.
+# Start the proxy (self-hosted), pointing at the engine.
 MAVERICK_PROXY_MODE=self-hosted \
 MAVERICK_ENGINE_URL=http://localhost:8080 \
 MAVERICK_API_KEY=mk_live_example \
@@ -168,7 +168,7 @@ All tests run through the tiers in [`scripts/ci.sh`](scripts/ci.sh):
 
 | Tier | What it runs |
 |---|---|
-| `fast` | `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test --workspace`, `cargo deny`, the sqlx offline check, the strict manifest audit (`parity_coverage --strict`), and the `#[instrument]` lint (`scripts/check-instrumentation.sh`). The store and job tests on a real Postgres (testcontainers) run here, inside `cargo test --workspace`. |
+| `fast` | `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test --workspace`, `cargo deny`, the sqlx offline check, the strict manifest audit (`parity_coverage --strict`), the `#[instrument]` lint (`scripts/check-instrumentation.sh`), and two grep checks with their own test (`scripts/tests/ci-checks.sh`): no match of the old try-it label, and no billing state in engine source or schema (`plans/production-proxy-plan.md` §8). The store and job tests on a real Postgres (testcontainers) run here, inside `cargo test --workspace`. |
 | `db` | A placeholder. It has no separate suite, because the store and job tests already run in `fast`. |
 | `parity` | The proxy replay, the API replay, and the SDK conformance scenarios (proxy and core-direct), each checked against the reviewed `DIVERGENCES.md` allowlist. |
 | `e2e` | The full-stack script (`scripts/e2e.sh`): the real binaries on Postgres against the fake provider. |

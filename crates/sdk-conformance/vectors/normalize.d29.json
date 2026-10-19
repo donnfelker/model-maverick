@@ -1,6 +1,6 @@
 {
   "divergence": "D29",
-  "source": "spec v1 §8.1 'Trial proxy behavior'; parity/DIVERGENCES.md D29; crates/maverick-core/src/normalize.rs. Hand-written: every expect was worked out from the rule below, not generated. Replayed by crates/maverick-core/tests/normalize_vectors.rs and crates/maverick-proxy/tests/normalize_vectors.rs",
+  "source": "spec v1 §8.1 'Proxy behavior'; parity/DIVERGENCES.md D29; crates/maverick-core/src/normalize.rs. Hand-written: every expect was worked out from the rule below, not generated. Replayed by crates/maverick-core/tests/normalize_vectors.rs and crates/maverick-proxy/tests/normalize_vectors.rs",
   "wire_paths": {
     "reasoning_effort": {"chat_completions": "reasoning_effort", "messages": "output_config.effort"}
   },

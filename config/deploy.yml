@@ -17,7 +17,7 @@
 #   `directories` from $PWD/<service>-<accessory>/ in the SSH user's home, not as named
 #   volumes. `kamal accessory remove postgres` DELETES that directory and the data.
 # - The `backup` accessory runs scripts/backup.sh every night (see the accessory below).
-# - The hosted trial proxy is its own service: config/deploy-proxy.yml.
+# - The hosted proxy is its own service: config/deploy-proxy.yml.
 #
 # Migrations: .kamal/hooks/pre-app-boot runs `maverick migrate` with the new image before
 # each new app container boots, so the schema is current before traffic moves. The

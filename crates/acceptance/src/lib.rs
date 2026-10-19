@@ -1,4 +1,4 @@
-//! The acceptance harness: the real engine and the real trial proxy in one process.
+//! The acceptance harness: the real engine and the real proxy in one process.
 //!
 //! [`Stack::start`] creates a migrated database (testcontainers), seeds the catalog and
 //! the measurements every suite shares, and serves the engine's public and internal
@@ -7,7 +7,7 @@
 //! through the catalog. The only substitutes are the provider clients: two [`Recorder`]s
 //! answer the two classifier columns and keep every prompt they receive.
 //!
-//! [`Stack::proxy`] starts the trial proxy the way its binary does (hosted mode, from
+//! [`Stack::proxy`] starts the proxy the way its binary does (hosted mode, from
 //! environment values) against this engine and against [`Upstream`] mocks that keep every
 //! request. [`Collector`] is a mock OTLP/HTTP collector that keeps every payload.
 //!
@@ -561,7 +561,7 @@ impl Stack {
             .expect("count")
     }
 
-    /// The trial proxy in hosted mode against this engine and `upstreams`, built the way
+    /// The proxy in hosted mode against this engine and `upstreams`, built the way
     /// its binary builds it. `extra` adds or overrides environment values.
     pub async fn proxy(&self, upstreams: &Upstreams, extra: &[(&str, &str)]) -> RunningProxy {
         let mut env: Vec<(String, String)> = vec![
@@ -634,7 +634,7 @@ async fn reply(request: reqwest::RequestBuilder) -> Reply {
     Reply { status, body }
 }
 
-/// A running trial proxy.
+/// A running proxy.
 pub struct RunningProxy {
     pub url: String,
     /// Every environment name the configuration looked up.

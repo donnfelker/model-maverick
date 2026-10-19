@@ -3,7 +3,7 @@
 //! in `tests/canary.rs` because it owns the process's global subscriber.
 //!
 //! Each test runs the real engine on real Postgres and, where the rule concerns the proxy,
-//! the real trial proxy in hosted mode. Every provider is a recording fake, so each test
+//! the real proxy in hosted mode. Every provider is a recording fake, so each test
 //! shows where a prompt went and where it did not.
 
 use maverick_acceptance::{

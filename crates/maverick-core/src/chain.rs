@@ -1,4 +1,4 @@
-//! The chain executor (spec v1 §8.1 "Trial proxy behavior"; sdk-v0 plan §2.1 and §2.3
+//! The chain executor (spec v1 §8.1 "Proxy behavior"; sdk-v0 plan §2.1 and §2.3
 //! scenarios 2 to 5; reference part 6 §8.4; D26).
 //!
 //! The executor walks the recommended chain in order. For each entry the caller's

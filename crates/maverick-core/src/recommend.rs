@@ -1,4 +1,4 @@
-//! The recommend client: `POST {engine}/v1/recommend` for the trial proxy and the SDK
+//! The recommend client: `POST {engine}/v1/recommend` for the proxy and the SDK
 //! cores (sdk-v0 plan §2.1; master plan §3.5; reference part 6 §7; spec §8.1, §9.2).
 //!
 //! - The request carries the declared form (capability, difficulty, domain tags) or the
@@ -34,7 +34,7 @@ use crate::projection::{self, PROJECTION_VERSION, Projection, WorkloadHeaderErro
 mod wire;
 
 /// The SDK cores' recommend timeout (sdk-v0 plan §2.1). The engine's 1.5 s classifier
-/// deadline fits inside it. The trial proxy configures its own (the Go proxy used 10 s).
+/// deadline fits inside it. The proxy configures its own (the Go proxy used 10 s).
 pub const SDK_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// The most retries a client makes (sdk-v0 plan §2.2: none beyond one).

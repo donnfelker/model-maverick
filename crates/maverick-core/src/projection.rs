@@ -1,6 +1,6 @@
 //! The versioned workload projection (D5).
 //!
-//! The trial proxy and every SDK core turn a chat request into the prompt-form workload
+//! The proxy and every SDK core turn a chat request into the prompt-form workload
 //! the engine classifies. This module is the one definition of that projection. It
 //! replaces the Go proxy's `extractLastUserText` (last user message text only; reference
 //! part 6 §6). See spec v1 §8.1 "Workload projection" and "Projection format p1", and

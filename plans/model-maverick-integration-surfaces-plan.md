@@ -1,7 +1,7 @@
 # Model Maverick — Integration Surfaces Plan
 
 **Status:** draft for review (2026-07-14; revised 2026-09-28 to adopt the G14
-privacy override, three-valued `check_pass`, and the trial proxy's tenant-header
+privacy override, three-valued `check_pass`, and the proxy's tenant-header
 and credential rules from `plans/master-plan.md` §3.5)
 **Origin:** adversarial review of the invocation mechanic (2026-07-14). Finding: the
 recommend API is right as the engine core and wrong as the only door — every
@@ -22,7 +22,7 @@ a favor the customer performs. Three surfaces deliver this for three segments:
 |---|---|---|---|
 | 1 | Client SDKs (in-process interception) | App teams — the main market | None; interception happens in the customer's process |
 | 2 | Gateway plugins | Platform teams with existing gateways | None; their gateway keeps the traffic |
-| 3 | Trial proxy | Evaluators; 60-second first taste | Transit only, trial-fenced |
+| 3 | Proxy (base-URL integration) | Any OpenAI or Anthropic client; 60-second first taste | Transit only |
 
 **Leverage rule (binding for Tracks 1–2):** never write provider schema translation.
 Ride the ecosystems that already ship it — Vercel AI SDK providers, the LiteLLM
@@ -41,8 +41,9 @@ the chain, and the telemetry; the wire work is someone else's solved problem.
 - **G14 — Fail-open.** An MM component failure never breaks or blocks the
   customer's LLM call. SDKs and plugins degrade: last-known-good chain (TTL cache)
   → configured static default → the customer's original model string. Telemetry is
-  fire-and-forget and drops silently. (The trial proxy is exempt — it is in-path by
-  design and trial-fenced by positioning.) **Privacy outranks G14** (added
+  fire-and-forget and drops silently. (The proxy is exempt today: it is in-path by
+  design, and an engine failure is its `502 engine_error`. The production-proxy
+  plan §4, proposed D46, gives it the same ladder.) **Privacy outranks G14** (added
   2026-09-28): for a zero-retention tenant, fallback may use only cached entries
   stamped `retention_mode: zero`, and the static default or original model only
   if locally configured as verified zero-retention; otherwise the call fails
@@ -85,7 +86,7 @@ Small, and a precondition for everything below.
 build detail, shared-core spec, and conformance harness in
 `plans/model-maverick-sdk-v0-plan.md`. New repos: `modelmaverick-sdk-ts` (npm
 scope `@modelmaverick`), `modelmaverick-sdk-rb` (gem `modelmaverick`),
-`modelmaverick-sdk-go` (Go module — also the trial proxy's routing library),
+`modelmaverick-sdk-go` (Go module, also the proxy's routing library),
 `modelmaverick-sdk-py` (PyPI `modelmaverick`). All are thin shells around a
 shared core design:
 
@@ -162,7 +163,7 @@ else. Outcomes flow without the customer knowing the concept exists.
 - Deliverable includes a reference-architecture doc: *MM as the brain inside the
   gateway you already run* — the recipe the adversarial review found missing.
 
-## 4. Track 3 — trial proxy (the funnel)
+## 4. Track 3: the proxy (base-URL integration)
 
 A separate small deployable — `cmd/maverick-proxy` in the engine repo, its own
 binary, its own deployment, its own SLA class. The engine stays control-plane pure
@@ -174,7 +175,7 @@ by deployment topology, same as the internal listener does today.
   a generic gateway).
 - **No translation layer:** the proxy forwards OpenAI-format requests to the picked
   provider's OpenAI-compat endpoint (OpenAI native; Anthropic and Gemini compat
-  endpoints). The trial pool is constrained to compat-capable providers. This is
+  endpoints). The proxy's pool is constrained to compat-capable providers. This is
   what keeps the proxy genuinely thin — recommend, pick, forward, stream back,
   telemetry.
 - **Keys: caller credentials only** (decided 2026-09-28, replacing the
@@ -206,12 +207,12 @@ by deployment topology, same as the internal listener does today.
   writes no outcome rows — G13 holds even where MM is in-path); chain execution
   on provider failure per the core rules; response
   headers carry `X-Maverick-Recommendation-Id` and `X-Maverick-Model-Used`.
-  Documented non-goals: production SLA, embeddings, images, audio, batch,
-  fine-tuning. This is the demo door, never the production data plane.
+  Documented non-goals: embeddings, images, audio, batch, fine-tuning. The
+  proxy is a production path (`plans/production-proxy-plan.md` §5).
 - **Nice to have (not planned; removed by the owner 2026-09-28 as premature):**
-  a "graduation link" response header pointing trial users to the production
-  integration path (SDK or gateway plugin). Revisit once SDKs and a public docs
-  page exist.
+  a "graduation link" response header pointing proxy users to another
+  integration path (SDK or gateway plugin). Moot since 2026-09-30: the proxy is
+  a production path.
 
 ## 5. Who uses which door — client coverage
 
@@ -229,7 +230,7 @@ as the universal fallback. Per client, the answer:
 | **Rails app on RubyLLM** | `modelmaverick` gem (meta-layer over RubyLLM); or zero-gem: `openai_api_base` → MM-routed proxy | gem initializer, or two config lines |
 | Go app (openai-go, anthropic-sdk-go, net/http) | `modelmaverick-go` — `http.RoundTripper` interceptor or explicit client | wrap HTTP client, alias |
 | Platform team with a gateway | Track 2 plugin (LiteLLM proxy first) | few lines of `config.yaml`; their app devs change nothing |
-| Any other language (Java, PHP, C#, …) | OpenAI-compat client → self-hosted LiteLLM+plugin (production) or trial proxy (eval) | `base_url` + `maverick/*` alias |
+| Any other language (Java, PHP, C#, …) | OpenAI-compat client → self-hosted LiteLLM+plugin or the proxy | `base_url` + `maverick/*` alias |
 | Agents | MCP surface (ships in v1 today) | tool call |
 | None of the above | raw `POST /v1/recommend` — ask-then-act, hand-rolled dispatch | their code, their choice |
 
@@ -240,7 +241,7 @@ RubyLLM detail (verified against its docs): `config.openai_api_base` redirects i
 `:openai` provider to any OpenAI-compatible URL — RubyLLM documents exactly this
 pattern for LiteLLM/vLLM proxies — and `assume_model_exists: true` lets
 `maverick/auto` through its model registry. So Rails clients have a production
-path (self-hosted LiteLLM + MM plugin, N6) and a trial path (N5) if they arrive
+path (self-hosted LiteLLM + MM plugin, N6) and the proxy (N5) if they arrive
 before the gem (N4), which upgrades them to in-process interception, no proxy hop.
 
 ## 6. Sequencing
@@ -253,23 +254,22 @@ Superseded in detail by `plans/model-maverick-sdk-v0-plan.md` §4; summary:
 | N2 | SDK core spec + conformance harness | Shared behaviors frozen; `cmd/sdk-conformance` mock server + test vectors |
 | N3 | TypeScript SDK | core + AI SDK meta-provider + OpenAI wrapper |
 | N4 | Ruby SDK | core + RubyLLM meta-layer + Rails initializer |
-| N5 | Go SDK + trial proxy | Go core doubles as the proxy's routing library |
+| N5 | Go SDK + proxy | Go core doubles as the proxy's routing library |
 | N6 | Python SDK + LiteLLM proxy plugin | LiteLLM strategy seeds the Track 2 plugin |
 | N7 | Fast-follows | Anthropic wrappers, Portkey spike/decision, langchaingo, docs pass |
 
-N3–N6 are independent after N2 — parallel or in listed order. The trial proxy
-rides N5 because it imports the Go SDK core; the SDK-before-funnel rationale
-stands: trials need something to graduate to.
+N3 to N6 are independent after N2: parallel or in listed order. The proxy
+rides N5 because it imports the Go SDK core.
 
 ## 7. Open decisions
 
-1. **Trial proxy keys**: decided 2026-09-28, caller credentials only, hosted
+1. **Proxy keys**: decided 2026-09-28, caller credentials only, hosted
    mode reads no provider env keys, self-hosted may use env keys (§4). MM-owned
-   capped trial keys were rejected (cost exposure, abuse handling, and a
+   capped keys were rejected (cost exposure, abuse handling, and a
    commerce problem the v1.1 shell isn't scoped for).
 2. **Language order** — TS first (recommended: Vercel AI SDK meta-provider is the
    single highest-leverage artifact in the plan) vs Python first.
-3. **Trial proxy hosting** — MM-operated hosted instance (recommended, it's the
+3. **Proxy hosting** — MM-operated hosted instance (recommended, it's the
    funnel) plus downloadable binary, vs binary-only.
 4. **Scope label** — standalone v1.2 (recommended; v1.1 is already large and only
    Phase 0 touches it) vs folding into v1.1.

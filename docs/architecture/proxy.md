@@ -1,6 +1,6 @@
-# Trial proxy
+# Proxy
 
-The trial proxy (`maverick-proxy`) is the only component that executes customer inference, and it uses only the caller's credentials. It is a separate deployment with no database. It is built on `maverick-core`, so it runs the same recommend, chain, and telemetry logic as the customer SDKs. See [Request path](request-path.md) for the recommend-and-relay core; this document covers the proxy's own configuration, pipeline, and credential rules.
+The proxy (`maverick-proxy`) is the only component that executes customer inference, and it uses only the caller's credentials. It is a separate deployment with no database. It is built on `maverick-core`, so it runs the same recommend, chain, and telemetry logic as the customer SDKs. See [Request path](request-path.md) for the recommend-and-relay core; this document covers the proxy's own configuration, pipeline, and credential rules.
 
 ## Deployment modes
 

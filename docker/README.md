@@ -50,7 +50,7 @@ backup and restore test.
   - Accessories: Postgres 16, and the nightly `backup`.
   - `.kamal/hooks/pre-app-boot` runs `maverick migrate` with the new image before the new
     containers boot.
-- `config/deploy-proxy.yml`: the hosted trial proxy, its own service (`kamal deploy -c
+- `config/deploy-proxy.yml`: the hosted proxy, its own service (`kamal deploy -c
   config/deploy-proxy.yml`). It has no MM key and no provider key (D12, D13).
 - `.kamal/secrets`: environment references only. Export the values in the deploying shell.
 

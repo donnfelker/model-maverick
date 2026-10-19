@@ -1,6 +1,6 @@
 # Request path
 
-This is the path a customer's chat request takes through the trial proxy and the engine. The pieces live in `maverick-core` (shared with the SDKs) and `maverick-proxy` (the HTTP shell). The [Trial proxy](trial-proxy.md) document covers the proxy's own pipeline steps (auth, body cap, rate limit); this document covers the recommend-and-relay core.
+This is the path a customer's chat request takes through the proxy and the engine. The pieces live in `maverick-core` (shared with the SDKs) and `maverick-proxy` (the HTTP shell). The [Proxy](proxy.md) document covers the proxy's own pipeline steps (auth, body cap, rate limit); this document covers the recommend-and-relay core.
 
 ## The steps
 
@@ -69,7 +69,7 @@ Fail-open (G14) is the SDK core's behavior when the engine itself is unreachable
 
 Privacy outranks G14. A terminal privacy error from the engine (`422 zero_retention_requires_declared`, `409 no_compliant_columns`) is surfaced unchanged, never failed open, and it purges the tenant's cached chains. A zero-retention tenant with no compliant fallback fails closed.
 
-The trial proxy is exempt from fail-open by position: it maps an engine failure to `502 engine_error`. It still obeys the zero-retention rules.
+The proxy is exempt from fail-open today: it maps an engine failure to `502 engine_error`. It still obeys the zero-retention rules. `plans/production-proxy-plan.md` §4 (proposed D46) gives the proxy the same ladder as the SDK cores.
 
 ## Where this is verified
 

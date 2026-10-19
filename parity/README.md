@@ -23,7 +23,7 @@ Nothing here is Go code. Data and contracts (SQL, fixture files, prompts, schema
 | `measurement-core` | Part 3: scoring, jobs, predictions, alerts, catalog | 136 |
 | `decision` | Part 4: policy, recommend, classify, auth, tracing, history | 105 |
 | `api` | Part 5: HTTP API, MCP | 209 |
-| `proxy` | Part 6: trial proxy | 34 |
+| `proxy` | Part 6: proxy | 34 |
 | **Total** | | **675** |
 
 The counts include the `TestMain` harnesses. 35 test names occur in more than one package (640 unique names).

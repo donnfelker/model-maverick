@@ -33,7 +33,7 @@ reconstructable.
   [calibration](calibration.md) series. All list endpoints paginate by
   opaque cursor.
 - **Outcomes close the loop, automatically.** MM-authored SDK, gateway
-  plugin, and trial-proxy components report what actually happened against
+  plugin, and proxy components report what actually happened against
   a recommendation id as an invisible side effect of routing the call —
   success, parse failure, latency exceeded, provider error — including
   which endpoint served it. No public surface ever asks a caller to report

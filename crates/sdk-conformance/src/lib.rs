@@ -1,7 +1,7 @@
 //! The SDK conformance harness (sdk-v0 plan §2.3; master plan §3.5, §7.2 N2).
 //!
 //! One core is specified once and implemented four times (TypeScript, Ruby, Go, Python),
-//! and the Rust trial proxy runs the same behavior. This crate is the thing that keeps them
+//! and the Rust proxy runs the same behavior. This crate is the thing that keeps them
 //! honest: a mock MM engine and a mock provider that run scripted scenarios, plus a
 //! language-neutral control API so a test in any language can drive them.
 //!

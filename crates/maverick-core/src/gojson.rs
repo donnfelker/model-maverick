@@ -1,4 +1,4 @@
-//! Go `encoding/json` compatibility helpers for the SDK core and the trial proxy.
+//! Go `encoding/json` compatibility helpers for the SDK core and the proxy.
 //!
 //! The Go proxy wrote JSON with `json.Marshal` and read it with `json.Unmarshal` into
 //! structs. These helpers reproduce the parts the Rust port needs:

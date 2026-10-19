@@ -1,6 +1,6 @@
 [package]
 name = "maverick-acceptance"
-description = "Cross-cutting acceptance suites: the real engine and the real trial proxy in one process, on Postgres, with recording fakes for every provider and a mock OTLP collector."
+description = "Cross-cutting acceptance suites: the real engine and the real proxy in one process, on Postgres, with recording fakes for every provider and a mock OTLP collector."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

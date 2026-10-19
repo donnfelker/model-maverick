@@ -3,7 +3,7 @@
 Model Maverick has two runtime components and one shared library.
 
 - **The engine** is the `maverick` binary. It serves recommendations and telemetry over HTTP, and it runs the nightly benchmark jobs. It owns the Postgres database.
-- **The trial proxy** is the `maverick-proxy` binary. It is a separate deployment with no database. Customer traffic flows through it. It asks the engine for a chain, then relays the call to a provider with the caller's credentials.
+- **The proxy** is the `maverick-proxy` binary. It is a separate deployment with no database. Customer traffic flows through it. It asks the engine for a chain, then relays the call to a provider with the caller's credentials.
 - **`maverick-core`** is the shared library that both the proxy and the customer SDKs are built on: the recommend client, the chain executor, the fail-open ladder, the telemetry batcher, the alias grammar, and the workload projection. It keeps the proxy and the four SDKs behaving the same way.
 
 ## Component map
@@ -34,7 +34,7 @@ The engine crates form a layered stack. `maverick-api` holds the HTTP and MCP su
 
 ## The two flows
 
-**A customer request** enters the proxy. The proxy parses the `maverick/*` alias, picks the workload (a declared header or a prompt projection), and calls the engine's `POST /v1/recommend`. The engine classifies the workload, applies the tenant's policy and pools, ranks the eligible models, and returns a fallback chain. The proxy walks the chain: for each entry it builds one upstream request with the caller's key and the entry's settings, sends it, and relays the first response that settles. It reports the outcome to `POST /v1/telemetry`. If the engine is unreachable, the SDK core fails open to the last-known-good chain, a default model, or the caller's own model. The proxy itself does not fail open: an engine failure is its `502`. See [Request path](request-path.md) and [Trial proxy](trial-proxy.md).
+**A customer request** enters the proxy. The proxy parses the `maverick/*` alias, picks the workload (a declared header or a prompt projection), and calls the engine's `POST /v1/recommend`. The engine classifies the workload, applies the tenant's policy and pools, ranks the eligible models, and returns a fallback chain. The proxy walks the chain: for each entry it builds one upstream request with the caller's key and the entry's settings, sends it, and relays the first response that settles. It reports the outcome to `POST /v1/telemetry`. If the engine is unreachable, the SDK core fails open to the last-known-good chain, a default model, or the caller's own model. The proxy itself does not fail open: an engine failure is its `502`. See [Request path](request-path.md) and [Proxy](proxy.md).
 
 **The nightly benchmark** is a cron job on the engine. It runs the active corpus through every model in the catalog with operator keys, grades the results, updates each model's score with an exponential moving average, scans for regressions, and rebuilds the rankings that the next day's recommendations use. It projects its spend first and refuses to run over the cap. See [Nightly benchmark](nightly-benchmark.md).
 

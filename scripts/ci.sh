@@ -11,7 +11,7 @@ Usage: scripts/ci.sh [all|fast|boundary|db|parity|e2e]
        scripts/ci.sh mutants-diff <base>    only mutants on lines changed since <base>
 
 No argument runs all tiers except mutants.
-The boundary tier checks engine source and migrations without compiling.
+The boundary tier checks engine source, migrations, and the old label without compiling.
 USAGE
 }
 
@@ -88,9 +88,29 @@ check_engine_boundary() {
     echo "Engine boundary check passed."
 }
 
+check_label() {
+    # The old try-it label is gone from the repository (production-proxy plan section 8).
+    # The pattern is a character class, so this script never matches itself. .beads/ is
+    # history, and the v1.1 spec is the control-plane document, so both stay excluded.
+    local status
+    if git grep -n -i -I -e 'tr[i]al' -- . ':(exclude).beads' \
+        ':(exclude)specs/model-maverick-v1.1-spec.md'; then
+        echo "Reword every match of the old label (plans/production-proxy-plan.md section 8)."
+        return 1
+    else
+        status=$?
+    fi
+    if [[ "$status" -ne 1 ]]; then
+        echo "Label check failed: git grep exited $status." >&2
+        return "$status"
+    fi
+    echo "Label check passed."
+}
+
 run_boundary() {
     run_logged fast engine-boundary-tests bash scripts/tests/ci-checks.sh
     run_logged fast engine-boundary check_engine_boundary
+    run_logged fast label check_label
 }
 
 run_fast() {
@@ -214,6 +234,7 @@ case "$TIER" in
     boundary)
         # This tier checks the repository only; it needs neither Cargo nor Postgres.
         run_logged fast engine-boundary check_engine_boundary
+        run_logged fast label check_label
         ;;
     db)
         run_db

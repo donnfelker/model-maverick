@@ -285,7 +285,7 @@
     },
     {
       "file": "vectors/normalize.d29.json",
-      "sha256": "4542809a1ccf90be8524676ff9accceae9de2a0e422811dc9cb59d3c6825918c",
+      "sha256": "cbccae9bd48eb3b2169ca8b711942f543664cb4df70c83043f92b747749c3d1b",
       "vector_set": "normalize",
       "version": "d29"
     },

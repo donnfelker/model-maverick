@@ -17,8 +17,9 @@
 //! - Group 5: chain exhaustion relays the last upstream error unchanged. The proxy answers
 //!   `502 no_executable_candidates` instead (reference part 6 §4), so this is core only.
 //! - Group 6: the fail-open ladder (last-known-good, default model, original model). The
-//!   proxy is exempt from fail-open by position (G14): it maps a failed recommend to `502
-//!   engine_error`. Core only.
+//!   proxy is exempt from fail-open today (G14): it maps a failed recommend to `502
+//!   engine_error`. Core only. `plans/production-proxy-plan.md` §4
+//!   changes this.
 //! - Groups 10 to 12: OpenRouter execution (D15) needs an `sk-or-` caller key, which the
 //!   proxy recognizes only in hosted mode. Hosted mode reads the tenant key from
 //!   `X-Maverick-API-Key`, which must start with `mk_live_`, but these scenarios expect the

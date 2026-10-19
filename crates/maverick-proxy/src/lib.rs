@@ -1,4 +1,4 @@
-//! The trial proxy (`maverick-proxy`).
+//! The proxy (`maverick-proxy`).
 //!
 //! A separate HTTP service with no database. A client points its base URL here and sets
 //! `model` to a `maverick/*` alias. Per request the proxy parses the alias, projects the
@@ -6,7 +6,7 @@
 //! the providers with the caller's own credential. It never uses MM-owned provider keys
 //! for customer traffic and never translates between provider wire formats.
 //!
-//! Reference part 6; spec v1 §8.1 "Trial proxy behavior"; master plan §3.5.
+//! Reference part 6; spec v1 §8.1 "Proxy behavior"; master plan §3.5.
 //!
 //! - [`config`]: environment configuration and the deployment mode (D12, D13, D38).
 //! - [`credentials`]: provider credential resolution and upstream headers (D12, D30).

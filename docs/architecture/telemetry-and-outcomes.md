@@ -4,7 +4,7 @@ Outcome data is how the engine learns what happened to a recommendation in produ
 
 ## One path in
 
-Outcome data comes only from MM components: the trial proxy and the customer SDKs, through `POST /v1/telemetry`. There is no `POST /v1/outcomes`. A caller cannot inject outcomes directly. This keeps the outcome signal trustworthy: every item was produced by code MM controls, alongside a real relayed request.
+Outcome data comes only from MM components: the proxy and the customer SDKs, through `POST /v1/telemetry`. There is no `POST /v1/outcomes`. A caller cannot inject outcomes directly. This keeps the outcome signal trustworthy: every item was produced by code MM controls, alongside a real relayed request.
 
 ## What an item is
 

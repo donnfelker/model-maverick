@@ -6,7 +6,7 @@ This document is your start point. It tells you what exists, what to read, and w
 
 ## 1. The task
 
-Build the Model Maverick engine in Rust. The engine includes the trial proxy and the SDK conformance harness.
+Build the Model Maverick engine in Rust. The engine includes the proxy and the SDK conformance harness.
 
 An earlier Go engine implemented most of v1. Its exact behavior and all its 675 tests are in this directory, as documents and as test data. Your Rust engine must give the same results as that Go engine, except for the approved differences in `parity/DIVERGENCES.md`.
 
@@ -51,7 +51,7 @@ These packages come from `plans/master-plan.md` §7.0 step 2. Each package is co
 | 2a | Domain crates | IDs, task and grader types, graders, scoring, EWMA and Welford, ranking, policy, ceilings, alias grammar, capture crypto | `parity/fixtures/` for these areas | Parts 2, 3, 4 |
 | 2b | Schema and store | One sqlx baseline migration, the new `batches` table, all queries, config loading, CLI | `parity/schema/schema.sql` comparison; store tests on real Postgres; `parity/fixtures/store/` | Parts 1, 7 |
 | 2c | Providers | Anthropic, OpenAI, Google, and xAI clients; the fake provider; the runner | `parity/fixtures/measurement-io/providers_wire.json`, `fake_provider.json`, `runner.json` | Part 2 |
-| 2d | API, MCP, seam, proxy | Public and internal listeners, all endpoints, MCP, the trial proxy | Replay of `parity/blackbox/`; replay of `parity/fixtures/proxy/scenarios.json` | Parts 5, 6 |
+| 2d | API, MCP, seam, proxy | Public and internal listeners, all endpoints, MCP, the proxy | Replay of `parity/blackbox/`; replay of `parity/fixtures/proxy/scenarios.json` | Parts 5, 6 |
 | 2e | Jobs | `graphile_worker` jobs, the `batches` lease, the spend guard, alerts, catalog jobs | `parity/fixtures/measurement-core/`; the job tests in plan §3.1 | Part 3 |
 
 Packages 2a, 2b, and 2c can run at the same time. Package 2d needs 2a and 2b. Package 2e needs 2a, 2b, and 2c.
@@ -92,7 +92,7 @@ These decisions belong to the owner. Do not decide them yourself. If one blocks 
 
 The first four were settled on 2026-09-28:
 - The number of paid pilots and the price for the M6b commercial gate. **Decided:** M6b is not a gate. The goal is a working system (bead 3hk.10.9).
-- The trial proxy execution default. The plan recommends direct execution, with OpenRouter as an opt-in. **Decided:** direct by default, OpenRouter opt-in, and hosted plus a binary for self-hosting (bead 3hk.10.7).
+- The proxy execution default. The plan recommends direct execution, with OpenRouter as an opt-in. **Decided:** direct by default, OpenRouter opt-in, and hosted plus a binary for self-hosting (bead 3hk.10.7).
 - The default values for the classifier quota and the classifier spend cap. The spec says "set from M6 cost measurement". **Decided for now:** 1000 per tenant per day and $5.00 per day globally. They are placeholders until M6 (bead 3hk.10.5; the retune is bead 3hk.9.8).
 - The name of the OpenRouter zero-data-retention request parameter. The spec uses `provider.zdr`, but nobody has confirmed that name against the OpenRouter API. **Confirmed** against the OpenRouter docs: `provider.zdr` (bead 3hk.10.6).
 - The other open rows in `plans/master-plan.md` §10. **Still open.** Most are about later work (the SDKs, the v1.1 shell, and aliases). One owner question is open for the engine: the debug replay rules for zero-retention tenants (D2) and the classifier budget on replay (D4), bead 3hk.10.12.

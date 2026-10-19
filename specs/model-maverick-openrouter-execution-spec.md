@@ -146,9 +146,9 @@ endpoint-drift analysis and any future endpoint-aware blending have real data.
 Openrouter-mode executions stamp `endpoint_used: "openrouter"` on every item.
 Direct mode omits the field. Opt-out behavior (G13) unchanged.
 
-## 4. Trial proxy OpenRouter backend (opt-in; details decided at milestone N5)
+## 4. Proxy OpenRouter backend (opt-in; details decided at milestone N5)
 
-The trial proxy executes per-provider direct by default. OpenRouter is an
+The proxy executes per-provider direct by default. OpenRouter is an
 opt-in backend, not the default: OpenRouter is being acquired by Stripe and
 runs a free Auto Router that overlaps MM, so defaulting evaluators through it
 sends them to a competitor and adds a single-vendor dependency. On the hosted
@@ -158,9 +158,9 @@ integration-surfaces plan §4) has every chain entry executed through
 OpenRouter; alias-less entries are skipped. The hosted proxy reads no provider
 env keys. Zero-retention tenants get the §3.2 rules: the Zero Data Retention
 option on every attempt, non-`zero` aliases skipped, `409 no_compliant_columns`
-when nothing remains. Custody stays transit-only. All other Track 3 fencing
-(rate limits, no production SLA, tenant telemetry opt-out honored) is
-unchanged. (changed 2026-09-28: the prior draft made the proxy OpenRouter-only
+when nothing remains. Custody stays transit-only. All other Track 3 rules
+(rate limits, tenant telemetry opt-out honored) are unchanged. Production
+operations are in `plans/production-proxy-plan.md` §5. (changed 2026-09-28: the prior draft made the proxy OpenRouter-only
 with an `X-Maverick-OpenRouter-Key` header)
 
 ## 5. Measurement fidelity
@@ -208,7 +208,7 @@ the same case against the hosted proxy.
 ## 8. Open decisions (mirrors the plan)
 
 1. Alias shape: generic map (recommended, spec as written) vs single column.
-2. Trial proxy execution: per-provider direct by default (recommended,
+2. Proxy execution: per-provider direct by default (recommended,
    2026-09-28) with OpenRouter as one opt-in backend among several, vs
    OpenRouter-backed only (§4).
 3. Alias population: operator-only at v0 (recommended, spec as written) vs a
