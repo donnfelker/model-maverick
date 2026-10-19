@@ -23,7 +23,7 @@ use axum::body::Body;
 use axum::http::Request;
 use http_body_util::BodyExt;
 use maverick_api::{
-    ApiState, AuthState, HealthState, Identity, RateLimiter, StaticAuthBackend,
+    ApiState, AuthState, Clock, HealthState, Identity, RateLimiter, StaticAuthBackend,
     internal_router_with, public_router_with,
 };
 use maverick_domain::keys;
@@ -316,11 +316,21 @@ fn api_on_unreachable_store() -> ApiState {
     ApiState::with_health(pool, HealthState::detached())
 }
 
+/// A clock that never moves. The limiter's windows are aligned to the minute, so two
+/// calls on the system clock could fall in two windows and both pass.
+struct FixedClock;
+
+impl Clock for FixedClock {
+    fn unix_seconds(&self) -> i64 {
+        1_783_000_000
+    }
+}
+
 fn routers(backend: StaticAuthBackend, rpm: u32, api: ApiState) -> (Router, Router) {
     let auth = AuthState::new(
         Arc::new(backend),
         keys::parse_internal_tokens("ops:alpha").unwrap(),
-        RateLimiter::new(rpm),
+        RateLimiter::with_clock(rpm, Arc::new(FixedClock)),
     );
     (
         public_router_with(auth.clone(), api.clone()),
