@@ -12,9 +12,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 
 use crate::anthropic::go_compact;
+use crate::models::{
+    ListedModel, ModelListFuture, ModelLister, get_page, is_text_model_id, parse_page, unix_time,
+};
 use crate::{
     CompletionRequest, CompletionResponse, ProviderClient, ProviderError, ProviderErrorKind,
-    ProviderFuture, RetryPolicy, retry_provider_observed, setting_string, wrap_error,
+    ProviderFuture, RetryPolicy, retry_provider, retry_provider_observed, setting_string,
+    wrap_error,
 };
 
 /// The OpenAI default API base.
@@ -137,6 +141,55 @@ impl OpenAiClient {
             tokens_out: parsed.usage.completion_tokens,
         })
     }
+
+    /// `{base}/models`, however the base ends.
+    pub fn models_url(&self) -> String {
+        format!("{}/models", self.base_url.trim_end_matches('/'))
+    }
+
+    async fn model_list(&self) -> Result<ModelList, ProviderError> {
+        let url = self.models_url();
+        let request = self.http.get(&url).bearer_auth(&self.api_key);
+        let text = get_page(self.provider, &url, request).await?;
+        parse_page(self.provider, &text)
+    }
+}
+
+/// Spec §4.6: `GET {base}/models`, for OpenAI and for xAI. The API answers in one page.
+impl ModelLister for OpenAiClient {
+    fn provider(&self) -> &str {
+        self.provider
+    }
+
+    fn list_models<'a>(&'a self) -> ModelListFuture<'a> {
+        Box::pin(async move {
+            let list = retry_provider(self.retry.clone(), || self.model_list()).await?;
+            Ok(list
+                .data
+                .into_iter()
+                .filter(|model| is_text_model_id(&model.id))
+                .map(|model| ListedModel {
+                    provider: self.provider.to_owned(),
+                    model_id: model.id,
+                    display_name: None,
+                    created_at: unix_time(model.created),
+                })
+                .collect())
+        })
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ListedEntry {
+    id: String,
+    #[serde(default)]
+    created: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ModelList {
+    #[serde(default)]
+    data: Vec<ListedEntry>,
 }
 
 /// The SDK's error text: the body's `error` object re-emitted compactly with its key

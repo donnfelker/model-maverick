@@ -15,6 +15,7 @@ use std::time::Duration;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
+use crate::models::{ListedModel, ModelListFuture, ModelLister};
 use crate::{
     CompletionRequest, CompletionResponse, DeadlineExceeded, ProviderClient, ProviderError,
     ProviderErrorKind, ProviderFuture, boxed_source,
@@ -115,14 +116,62 @@ fn scripted_kind(error: &str) -> Result<Option<ProviderErrorKind>, FakeError> {
 }
 
 fn scripted_error(kind: ProviderErrorKind) -> ProviderError {
+    scripted_error_for("fake", kind)
+}
+
+fn scripted_error_for(provider: &str, kind: ProviderErrorKind) -> ProviderError {
     match kind {
-        ProviderErrorKind::RateLimited => ProviderError::new("fake", kind).with_status(429),
-        ProviderErrorKind::ProviderError => ProviderError::new("fake", kind).with_status(500),
-        ProviderErrorKind::InvalidRequest => ProviderError::new("fake", kind).with_status(400),
+        ProviderErrorKind::RateLimited => ProviderError::new(provider, kind).with_status(429),
+        ProviderErrorKind::ProviderError => ProviderError::new(provider, kind).with_status(500),
+        ProviderErrorKind::InvalidRequest => ProviderError::new(provider, kind).with_status(400),
         ProviderErrorKind::Timeout => {
-            ProviderError::new("fake", kind).with_source(DeadlineExceeded)
+            ProviderError::new(provider, kind).with_source(DeadlineExceeded)
         }
-        ProviderErrorKind::Unknown => ProviderError::new("fake", kind),
+        ProviderErrorKind::Unknown => ProviderError::new(provider, kind),
+    }
+}
+
+/// A scripted model list for one provider label (spec §4.6), so discovery runs in CI
+/// without a real provider. It returns its models exactly as scripted: the text-model
+/// filter belongs to the real clients.
+#[derive(Debug, Clone)]
+pub struct FakeModelLister {
+    provider: String,
+    result: Result<Vec<ListedModel>, ProviderErrorKind>,
+}
+
+impl FakeModelLister {
+    /// A provider whose list call returns `models`.
+    #[must_use]
+    pub fn new(provider: impl Into<String>, models: Vec<ListedModel>) -> Self {
+        Self {
+            provider: provider.into(),
+            result: Ok(models),
+        }
+    }
+
+    /// A provider whose list call fails with `kind`, rendered like the fake's scripted
+    /// completion errors but under `provider`.
+    #[must_use]
+    pub fn failing(provider: impl Into<String>, kind: ProviderErrorKind) -> Self {
+        Self {
+            provider: provider.into(),
+            result: Err(kind),
+        }
+    }
+}
+
+impl ModelLister for FakeModelLister {
+    fn provider(&self) -> &str {
+        &self.provider
+    }
+
+    fn list_models<'a>(&'a self) -> ModelListFuture<'a> {
+        Box::pin(async move {
+            self.result
+                .clone()
+                .map_err(|kind| scripted_error_for(&self.provider, kind))
+        })
     }
 }
 

@@ -13,10 +13,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 use serde_json::{Map, Value};
 
+use crate::models::{
+    ListedModel, MAX_LIST_PAGES, ModelListFuture, ModelLister, display_name, get_page,
+    is_text_model_id, parse_page, parse_time, unfinished_list, with_query,
+};
 use crate::{
     CompletionRequest, CompletionResponse, ProviderClient, ProviderError, ProviderErrorKind,
-    ProviderFuture, RetryPolicy, SETTING_RESPONSE_SCHEMA, retry_provider_observed, setting_bool,
-    setting_int, wrap_error,
+    ProviderFuture, RetryPolicy, SETTING_RESPONSE_SCHEMA, retry_provider, retry_provider_observed,
+    setting_bool, setting_int, wrap_error,
 };
 
 /// The provider name errors carry.
@@ -33,6 +37,8 @@ pub const FORCED_TOOL_DESCRIPTION: &str = "Record the structured result.";
 pub const DEFAULT_THINKING_BUDGET: i64 = 1024;
 /// The per-request timeout the Go SDK set (`X-Stainless-Timeout: 600`).
 pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(600);
+/// The models one model-list page asks for (the API's maximum).
+pub const MODEL_PAGE_LIMIT: usize = 1000;
 
 /// An Anthropic Messages API client.
 #[derive(Debug, Clone)]
@@ -112,6 +118,89 @@ impl AnthropicClient {
         }
         parse_response(&text, forced)
     }
+
+    /// `{base}/v1/models`, however the base ends.
+    pub fn models_url(&self) -> String {
+        format!("{}/v1/models", self.base_url.trim_end_matches('/'))
+    }
+
+    /// One `GET /v1/models` page, after `after_id` when it is set.
+    async fn model_page(&self, after_id: Option<&str>) -> Result<ModelPage, ProviderError> {
+        let url = self.models_url();
+        let limit = MODEL_PAGE_LIMIT.to_string();
+        let mut query = vec![("limit", limit.as_str())];
+        if let Some(after_id) = after_id {
+            query.push(("after_id", after_id));
+        }
+        let request = self
+            .http
+            .get(with_query(PROVIDER, &url, &query)?)
+            .header("x-api-key", &self.api_key)
+            .header("anthropic-version", API_VERSION);
+        let text = get_page(PROVIDER, &url, request).await?;
+        parse_page(PROVIDER, &text)
+    }
+}
+
+/// Spec §4.6: every page of `GET /v1/models`, following `last_id` while `has_more` is
+/// true. Each page is retried on its own.
+impl ModelLister for AnthropicClient {
+    fn provider(&self) -> &str {
+        PROVIDER
+    }
+
+    fn list_models<'a>(&'a self) -> ModelListFuture<'a> {
+        Box::pin(async move {
+            let mut models = Vec::new();
+            let mut after_id: Option<String> = None;
+            for _ in 0..MAX_LIST_PAGES {
+                let page =
+                    retry_provider(self.retry.clone(), || self.model_page(after_id.as_deref()))
+                        .await?;
+                models.extend(
+                    page.data
+                        .into_iter()
+                        .filter(|model| is_text_model_id(&model.id))
+                        .map(|model| ListedModel {
+                            provider: PROVIDER.to_owned(),
+                            created_at: parse_time(model.created_at.as_deref()),
+                            display_name: display_name(model.display_name),
+                            model_id: model.id,
+                        }),
+                );
+                if !page.has_more {
+                    return Ok(models);
+                }
+                match page.last_id {
+                    Some(last_id) if !last_id.is_empty() => after_id = Some(last_id),
+                    _ => return Err(unfinished_list(PROVIDER, "has_more without last_id")),
+                }
+            }
+            Err(unfinished_list(
+                PROVIDER,
+                &format!("not finished after {MAX_LIST_PAGES} pages"),
+            ))
+        })
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ListedEntry {
+    id: String,
+    #[serde(default)]
+    display_name: Option<String>,
+    #[serde(default)]
+    created_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ModelPage {
+    #[serde(default)]
+    data: Vec<ListedEntry>,
+    #[serde(default)]
+    has_more: bool,
+    #[serde(default)]
+    last_id: Option<String>,
 }
 
 impl ProviderClient for AnthropicClient {

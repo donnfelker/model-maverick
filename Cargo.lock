@@ -2477,6 +2477,7 @@ dependencies = [
 name = "maverick-providers"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "maverick-domain",
  "opentelemetry",
  "opentelemetry_sdk",

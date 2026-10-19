@@ -13,6 +13,8 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
+# A listed model's `created_at` (spec §4.6).
+chrono = { workspace = true }
 maverick-domain = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true }

@@ -12,15 +12,23 @@ use serde_json::Value;
 use serde_json::value::RawValue;
 
 use crate::anthropic::go_compact;
+use crate::models::{
+    ListedModel, MAX_LIST_PAGES, ModelListFuture, ModelLister, display_name, get_page,
+    is_text_model_id, parse_page, unfinished_list, with_query,
+};
 use crate::{
     CompletionRequest, CompletionResponse, ProviderClient, ProviderError, ProviderErrorKind,
-    ProviderFuture, RetryPolicy, retry_provider_observed, setting_int, wrap_error,
+    ProviderFuture, RetryPolicy, retry_provider, retry_provider_observed, setting_int, wrap_error,
 };
 
 /// The provider name errors carry.
 pub const PROVIDER: &str = "google";
 /// The default API base (Gemini API backend).
 pub const DEFAULT_BASE_URL: &str = "https://generativelanguage.googleapis.com/";
+/// The models one `models.list` page asks for (the API's maximum).
+pub const MODEL_PAGE_SIZE: usize = 1000;
+/// The generation method a text model supports.
+pub const TEXT_GENERATION_METHOD: &str = "generateContent";
 
 /// A Gemini API client.
 #[derive(Clone)]
@@ -91,6 +99,89 @@ impl GoogleClient {
         }
         parse_response(&text)
     }
+
+    /// `{base}/v1beta/models`, however the base ends.
+    pub fn models_url(&self) -> String {
+        format!("{}/v1beta/models", self.base_url.trim_end_matches('/'))
+    }
+
+    /// One `models.list` page, from `page_token` when it is set.
+    async fn model_page(&self, page_token: Option<&str>) -> Result<ModelPage, ProviderError> {
+        let url = self.models_url();
+        let page_size = MODEL_PAGE_SIZE.to_string();
+        let mut query = vec![("pageSize", page_size.as_str())];
+        if let Some(page_token) = page_token {
+            query.push(("pageToken", page_token));
+        }
+        let request = self
+            .http
+            .get(with_query(PROVIDER, &url, &query)?)
+            .header("x-goog-api-key", &self.api_key);
+        let text = get_page(PROVIDER, &url, request).await?;
+        parse_page(PROVIDER, &text)
+    }
+}
+
+/// Spec §4.6: every page of `models.list`, following `nextPageToken`. A model is kept
+/// only when its `supportedGenerationMethods` contains `generateContent`, and its id is
+/// its `name` without the `models/` prefix.
+impl ModelLister for GoogleClient {
+    fn provider(&self) -> &str {
+        PROVIDER
+    }
+
+    fn list_models<'a>(&'a self) -> ModelListFuture<'a> {
+        Box::pin(async move {
+            let mut models = Vec::new();
+            let mut page_token: Option<String> = None;
+            for _ in 0..MAX_LIST_PAGES {
+                let page = retry_provider(self.retry.clone(), || {
+                    self.model_page(page_token.as_deref())
+                })
+                .await?;
+                models.extend(page.models.into_iter().filter_map(|model| {
+                    let id = model.name.strip_prefix("models/").unwrap_or(&model.name);
+                    let generates_text = model
+                        .supported_generation_methods
+                        .iter()
+                        .any(|method| method == TEXT_GENERATION_METHOD);
+                    (generates_text && is_text_model_id(id)).then(|| ListedModel {
+                        provider: PROVIDER.to_owned(),
+                        model_id: id.to_owned(),
+                        display_name: display_name(model.display_name),
+                        created_at: None,
+                    })
+                }));
+                match page.next_page_token {
+                    Some(token) if !token.is_empty() => page_token = Some(token),
+                    _ => return Ok(models),
+                }
+            }
+            Err(unfinished_list(
+                PROVIDER,
+                &format!("not finished after {MAX_LIST_PAGES} pages"),
+            ))
+        })
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ListedEntry {
+    name: String,
+    #[serde(default)]
+    display_name: Option<String>,
+    #[serde(default)]
+    supported_generation_methods: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ModelPage {
+    #[serde(default)]
+    models: Vec<ListedEntry>,
+    #[serde(default)]
+    next_page_token: Option<String>,
 }
 
 impl ProviderClient for GoogleClient {
