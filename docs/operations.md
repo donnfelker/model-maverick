@@ -26,7 +26,7 @@ logged, but it never blocks or fails the write that created the row.
 | `job_failure` | warning or critical | batch and rebuild jobs | A batch completed below 90% (warning), failed mid-batch, or an aggregate rebuild failed (critical). |
 | `regression` | warning or critical | `regression_scan` | A cell regressed per spec §6.5: a smoothed drop of more than 3.0 points against the trailing 7-day maximum, or a raw shock. It is critical when the cell falls below a quality bar that it cleared before. One alert per cell per 7 days, re-armed when the drop deepens by 2 points or more. |
 | `parse_failure_rate` | warning | `regression_scan` | A column's batch parse-failure rate is above 5% **and** above twice its trailing 7-day rate: the early sign of silent escalation on the caller side. |
-| `classifier_degraded` | critical (info for a D41 resolution) | the classifier resolver and its re-resolution | More than 5% of classifier calls failed over 15 minutes (at least 20 samples). One alert per episode, re-armed on recovery. Or the classifier column stayed unresolved for 5 minutes (subject `reason: "unresolved"`, D41), and its later resolution writes an `info` alert (`reason: "resolved"`). Prompt-form requests get the fallback classification meanwhile. |
+| `classifier_degraded` | critical (info for a resolution or restored evidence) | the classifier resolver, its re-resolution, and `PUT /internal/v1/columns/{id}` | More than 5% of classifier calls failed over 15 minutes (at least 20 samples). One alert per episode, re-armed on recovery. Or the classifier column stayed unresolved for 5 minutes (subject `reason: "unresolved"`, D41), and its later resolution writes an `info` alert (`reason: "resolved"`). Prompt-form requests get the fallback classification meanwhile. Or the zero-retention classifier column has no valid zero evidence (`reason: "zero_retention_evidence"`, spec §8.3). Zero-retention tenants' prompt-form requests then get `422 zero_retention_requires_declared` until it is fixed, and valid evidence writes an `info` alert (`reason: "zero_retention_evidence_restored"`). See "Zero-retention evidence". |
 | `pool_would_be_empty` | critical | retirement guard, drift check, recommend | A retirement was blocked (spec §4.1), the nightly drift check found a pool with no usable column for some cell, or a request found that drift. The subject names the tenants and pools. |
 | `retention_expiring` | warning | `catalog_sync` | A column's or an execution alias's zero-retention evidence expires within 14 days (spec §4.5). Renew it before it expires: expired evidence reads as `unknown`, and zero-retention tenants then lose that column (D1, D15). |
 | `new_model_available` | info | `model_discovery` and the models refresh (not running yet, D51) | A provider lists a text model that no catalog column covers. One alert per provider and base id. Enroll it or leave it (see "New models"). |
@@ -236,6 +236,23 @@ validity window is at most 90 days. Evidence past `retention_valid_until` reads 
 `unknown`. A zero-retention tenant then loses that column (`409 no_compliant_columns` when
 none is left, D1) or that OpenRouter alias (D15). `catalog_sync` warns 14 days ahead with
 `retention_expiring`.
+
+The column that `MAVERICK_CLASSIFIER_ZERO_RETENTION_COLUMN` names is watched like a pool
+member (spec §8.3). The API processes check it at boot, every 5 min, and after each
+`PUT /internal/v1/columns/{id}`. When it resolves but holds no valid zero evidence, a
+critical `classifier_degraded` alert fires with `reason: "zero_retention_evidence"`. Its
+subject names `classifier_column`, `column_id`, and `zero_retention_column`. Until you fix
+it, every zero-retention tenant's prompt-form request gets
+`422 zero_retention_requires_declared`. That fails closed, so no prompt leaves the engine,
+but those requests fail. Fix it one of two ways:
+- Renew the column's evidence with `PUT /internal/v1/columns/{id}`. The same request writes
+  an `info` `classifier_degraded` with `reason: "zero_retention_evidence_restored"`.
+- Point `MAVERICK_CLASSIFIER_ZERO_RETENTION_COLUMN` at a column that holds valid zero
+  evidence, and restart the API processes (`serve` or `serve --api-only`). The setting is
+  read only at startup. The alert state is kept per reference, so no `restored` alert
+  follows for the old one.
+
+The usual cause is expired evidence, so renew when `retention_expiring` warns.
 
 ### Pricing
 
