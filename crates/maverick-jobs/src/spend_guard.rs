@@ -41,9 +41,44 @@ fn decimal_to_f64(value: maverick_store::Decimal) -> f64 {
     value.to_string().parse().unwrap_or(0.0)
 }
 
-/// `check(job, night, est, applyNightlyCap)`: the nightly cap applies to every job but
-/// `weekly_sweep`. Windows are over `runs.ran_at`, half-open: the night is
-/// `[night 00:00 UTC, +1 day)` and the week `[night - 6 days, night + 1 day)`.
+/// `(night_spent, week_spent)`: the cost of the runs already made in the batch's windows.
+/// Windows are over `runs.ran_at`, half-open: the night is `[night 00:00 UTC, +1 day)`
+/// and the week `[night - 6 days, night + 1 day)`.
+pub async fn window_spend(pool: &PgPool, night: NaiveDate) -> Result<(f64, f64), sqlx::Error> {
+    let night_start = Utc.from_utc_datetime(&night.and_time(NaiveTime::MIN));
+    let night_end = night_start + Days::new(1);
+    let week_start = night_start - Days::new(6);
+    let night_spent =
+        decimal_to_f64(measurement::sum_run_cost_between(pool, night_start, night_end).await?);
+    let week_spent =
+        decimal_to_f64(measurement::sum_run_cost_between(pool, week_start, night_end).await?);
+    Ok((night_spent, week_spent))
+}
+
+/// The guard's check of one batch: the nightly cap applies to every job but
+/// `weekly_sweep`.
+pub fn spend_check(
+    job: JobKind,
+    night: NaiveDate,
+    projection: &Projection,
+    caps: SpendCaps,
+    night_spent_usd: f64,
+    week_spent_usd: f64,
+) -> SpendCheck<'static> {
+    SpendCheck {
+        job: job.as_str(),
+        night,
+        projected_usd: projection.projected_usd,
+        planned_runs: projection.runs,
+        night_spent_usd,
+        week_spent_usd,
+        caps,
+        apply_nightly_cap: job != JobKind::WeeklySweep,
+    }
+}
+
+/// `check(job, night, est, applyNightlyCap)`: [`window_spend`] and [`spend_check`], then
+/// the alert for a warning or a refusal.
 pub async fn check_spend(
     pool: &PgPool,
     notifier: Option<&dyn AlertNotifier>,
@@ -52,23 +87,8 @@ pub async fn check_spend(
     projection: &Projection,
     caps: SpendCaps,
 ) -> Result<SpendOutcome, SpendGuardError> {
-    let night_start = Utc.from_utc_datetime(&night.and_time(NaiveTime::MIN));
-    let night_end = night_start + Days::new(1);
-    let week_start = night_start - Days::new(6);
-    let night_spent =
-        decimal_to_f64(measurement::sum_run_cost_between(pool, night_start, night_end).await?);
-    let week_spent =
-        decimal_to_f64(measurement::sum_run_cost_between(pool, week_start, night_end).await?);
-    let check = SpendCheck {
-        job: job.as_str(),
-        night,
-        projected_usd: projection.projected_usd,
-        planned_runs: projection.runs,
-        night_spent_usd: night_spent,
-        week_spent_usd: week_spent,
-        caps,
-        apply_nightly_cap: job != JobKind::WeeklySweep,
-    };
+    let (night_spent, week_spent) = window_spend(pool, night).await?;
+    let check = spend_check(job, night, projection, caps, night_spent, week_spent);
     let decision = check.decision();
     let outcome = SpendOutcome {
         allowed: decision != SpendDecision::Refuse,

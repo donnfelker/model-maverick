@@ -104,6 +104,29 @@ UTC calendar day, the week is the trailing 7 days) and compares the totals with 
 Tunables: `MAVERICK_SPEND_NIGHTLY_CAP_USD` (default 100) and `MAVERICK_SPEND_WEEKLY_CAP_USD`
 (default 500). Each batch logs its projected and actual spend.
 
+Cold-start columns run the whole corpus every night, not the smoke set, and the projection
+prices every task at its full `max_tokens`. So a new column can take a night over the
+nightly cap. Size the caps before you add columns (`docs/runbook-go-live.md` section 1).
+
+- A resumed batch (D10) projects only the runs it still has to make, because the earlier
+  runs are already in the actual spend.
+- The hidden `maverick spend preview` command (D52) prints per-group and per-column
+  projections, planned and remaining runs, night and week actual spend, both caps, and
+  the verdict. It writes nothing and makes no provider call. A refusal verdict still
+  exits 0 because the report succeeded.
+
+After loading and activating the corpus and configuring columns, preview both jobs:
+
+```sh
+kamal app exec --roles=web --primary "spend preview --job nightly_smoke --night YYYY-MM-DD"
+kamal app exec --roles=web --primary "spend preview --job weekly_sweep --night YYYY-MM-DD"
+```
+
+Omit `--night` for today in UTC and `--job` for `nightly_smoke`. Size both configured caps
+for the cold-start week, then run the reports again. The weekly actual includes nightly
+spend from the trailing seven days. The report does not predict future nights or judge
+grading costs; the G8 projection covers benchmark runs only.
+
 The classifier has its own budget (D4): `MAVERICK_CLASSIFIER_DAILY_QUOTA` (default 1000
 classifications per tenant per day) and `MAVERICK_CLASSIFIER_DAILY_SPEND_CAP_USD` (default
 5.00 per day in total). Past either, prompt-form requests get the fallback classification

@@ -63,9 +63,18 @@ The deploying machine needs:
    - `MAVERICK_SPEND_NIGHTLY_CAP_USD` (default 100);
    - `MAVERICK_SPEND_WEEKLY_CAP_USD` (default 500).
 
-   Each new column runs the **full** corpus every night for its first 5 nights (section 5).
-   Size the nightly cap for that. A batch whose projection is over a cap does not run, and it
-   raises a critical `spend_refusal` alert (`docs/operations.md` "Spend caps").
+   **The defaults are likely too low for the first week.** Each new column runs the
+   **full** corpus every night for its first 5 nights (section 5), not the smoke set, and
+   the projection prices every task at its full `max_tokens`. A launch catalog of 10 or
+   more columns can project over the $100 nightly default on night 1.
+   - Nightly spend also counts toward the weekly cap, which covers the trailing 7 days. So
+     the weekly cap must hold about 5 cold-start nights.
+   - A batch whose projection is over a cap does not run. It raises a critical
+     `spend_refusal` alert (`docs/operations.md` "Spend caps").
+   - Size both caps before the first night. After activating the corpus, run the spend
+     preview commands in section 6 to check the projection and guard verdict.
+   - Once the columns are `active`, a night runs only the smoke set, which is about a fifth
+     of the corpus. Lower the caps then.
 3. **Classifier limits.** They stay at their defaults, which are the owner's placeholders.
    Bead 9.8 retunes them.
    - `MAVERICK_CLASSIFIER_DAILY_QUOTA`: 1000 classifications per tenant per day;
@@ -319,6 +328,24 @@ operator key. Fix the column, the key, or the variable. Apply a variable or key 
 
    - `corpus status` lists the version with 221 tasks and `true` in the ACTIVE column.
    - `/health/detail` now reports it as `active_matrix_version`.
+
+4. Preview the benchmark spend before the first scheduled batch (D52). These commands
+   read the active corpus, runnable columns, prior runs, and configured caps. They write
+   nothing and call no provider:
+
+   ```sh
+   kamal app exec --roles=web --primary "spend preview --job nightly_smoke"
+   kamal app exec --roles=web --primary "spend preview --job weekly_sweep"
+   ```
+
+   - **Expect:** the cold-start group contains every new column and the full corpus.
+     Review its per-column projection, the night and week actuals, both caps, and the
+     verdict. A `refuse` report exits 0; it says the batch would not run with those caps.
+   - Size both caps for the cold-start week. Nightly actual spend counts against the
+     trailing seven-day weekly cap. The preview uses current actuals, so future nights
+     need a separate allowance. Judge grading costs are outside the G8 projection.
+   - Apply any owner-approved cap changes in `config/deploy.yml`, redeploy, and preview
+     again. Use `--night YYYY-MM-DD` to inspect another UTC date.
 
 ## 7. Tenant #1 [owner]
 

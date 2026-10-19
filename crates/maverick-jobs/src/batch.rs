@@ -17,7 +17,9 @@ use maverick_alerts::{AlertError, AlertKind, AlertNotifier, Severity, write_aler
 use maverick_domain::graders::{
     GradeInput, GradeTask, GraderKind, Registry, RunMeta, parse_envelope,
 };
-use maverick_domain::spend::{Projection, SpendCaps, SpendColumn, SpendTask, project_spend};
+use maverick_domain::spend::{
+    Projection, SpendCaps, SpendColumn, SpendDecision, SpendTask, project_spend,
+};
 use maverick_runner::{
     Batch, BatchColumn, BatchTask, Cancellation, Clients, RunKey, RunRow, RunSink, Runner,
     RunnerConfig, SinkFuture,
@@ -34,7 +36,7 @@ use sqlx::PgPool;
 
 use crate::fold::save_scores;
 use crate::rebuild::{enqueue_in, with_heartbeat};
-use crate::spend_guard::{SpendGuardError, check_spend};
+use crate::spend_guard::{SpendGuardError, check_spend, spend_check, window_spend};
 use crate::{
     BatchEnd, BatchFollowupArgs, BatchLeaseError, BatchLeaseManager, BatchLeaseOutcome, JobArgs,
     JobKind, JobsError, NightlySmokeArgs, WeeklySweepArgs, with_job_timeout,
@@ -74,8 +76,13 @@ impl std::fmt::Debug for BatchConfig {
 
 impl BatchConfig {
     fn repeats(&self) -> u32 {
-        if self.repeats == 0 { 3 } else { self.repeats }
+        effective_repeats(self.repeats)
     }
+}
+
+/// `MAVERICK_RUNNER_REPEATS` as a batch applies it: 0 means 3.
+pub fn effective_repeats(repeats: u32) -> u32 {
+    if repeats == 0 { 3 } else { repeats }
 }
 
 /// The batch output (`batchOutput`); false, zero, and empty optional keys are omitted.
@@ -173,8 +180,77 @@ impl RunSink for PgRunSink {
 
 /// One (tasks × columns) group.
 struct Group<'a> {
+    /// `smoke` and `cold_start` for `nightly_smoke`, `full` for `weekly_sweep`.
+    name: &'static str,
     tasks: Vec<&'a Task>,
     columns: Vec<&'a ModelColumn>,
+}
+
+/// What a batch runs: the active corpus version's active tasks and the runnable columns.
+/// The batch and [`preview_spend`] both compose through here, so a preview projects
+/// exactly what the batch would.
+pub struct Composition {
+    /// The active corpus version, or empty when none is active.
+    pub matrix_version: String,
+    pub tasks: Vec<Task>,
+    pub columns: Vec<ModelColumn>,
+}
+
+impl Composition {
+    /// Reads the active corpus version's active tasks and the runnable columns, by id.
+    pub async fn load(pool: &PgPool) -> Result<Self, sqlx::Error> {
+        let (matrix_version, tasks) = match corpus::get_active_corpus_version(pool).await {
+            Ok(version) => {
+                let tasks =
+                    corpus::list_active_tasks_by_corpus_version(pool, &version.version).await?;
+                (version.version, tasks)
+            }
+            Err(sqlx::Error::RowNotFound) => (String::new(), Vec::new()),
+            Err(error) => return Err(error),
+        };
+        let columns: Vec<ModelColumn> = catalog::list_model_columns(pool)
+            .await?
+            .into_iter()
+            .filter(|c| maverick_domain::catalog::runnable(&c.status))
+            .collect();
+        Ok(Composition {
+            matrix_version,
+            tasks,
+            columns,
+        })
+    }
+
+    /// `nightly_smoke` runs the smoke tasks for the columns past cold start and every task
+    /// for the `cold_start` columns. `weekly_sweep` runs every task for every column.
+    fn groups(&self, kind: JobKind) -> Vec<Group<'_>> {
+        match kind {
+            JobKind::NightlySmoke => vec![
+                Group {
+                    name: "smoke",
+                    tasks: self.tasks.iter().filter(|t| t.smoke_member).collect(),
+                    columns: self
+                        .columns
+                        .iter()
+                        .filter(|c| c.status != "cold_start")
+                        .collect(),
+                },
+                Group {
+                    name: "cold_start",
+                    tasks: self.tasks.iter().collect(),
+                    columns: self
+                        .columns
+                        .iter()
+                        .filter(|c| c.status == "cold_start")
+                        .collect(),
+                },
+            ],
+            _ => vec![Group {
+                name: "full",
+                tasks: self.tasks.iter().collect(),
+                columns: self.columns.iter().collect(),
+            }],
+        }
+    }
 }
 
 fn batch_task(task: &Task) -> BatchTask {
@@ -198,19 +274,23 @@ fn batch_column(column: &ModelColumn) -> BatchColumn {
     }
 }
 
-fn spend_task(t: &Task) -> SpendTask<'_> {
+fn spend_task(task: &Task) -> SpendTask<'_> {
     SpendTask {
-        id: &t.id,
-        prompt: &t.prompt,
-        attachments: t.attachments.get(),
-        max_tokens: i64::from(t.max_tokens),
+        id: &task.id,
+        prompt: &task.prompt,
+        attachments: task.attachments.get(),
+        max_tokens: i64::from(task.max_tokens),
     }
 }
 
-fn spend_column(c: &ModelColumn) -> SpendColumn<'_> {
+fn spend_tasks<'a>(group: &Group<'a>) -> Vec<SpendTask<'a>> {
+    group.tasks.iter().map(|t| spend_task(t)).collect()
+}
+
+fn spend_column(column: &ModelColumn) -> SpendColumn<'_> {
     SpendColumn {
-        id: &c.id,
-        pricing: c.pricing.get(),
+        id: &column.id,
+        pricing: column.pricing.get(),
     }
 }
 
@@ -219,10 +299,9 @@ fn spend_column(c: &ModelColumn) -> SpendColumn<'_> {
 fn project(groups: &[Group<'_>], repeats: u32) -> Result<Projection, BatchError> {
     let mut total = Projection::default();
     for group in groups {
-        let tasks: Vec<SpendTask<'_>> = group.tasks.iter().map(|t| spend_task(t)).collect();
         let columns: Vec<SpendColumn<'_>> = group.columns.iter().map(|c| spend_column(c)).collect();
-        let projection =
-            project_spend(&tasks, &columns, i64::from(repeats)).map_err(BatchError::Projection)?;
+        let projection = project_spend(&spend_tasks(group), &columns, i64::from(repeats))
+            .map_err(BatchError::Projection)?;
         total.projected_usd += projection.projected_usd;
         total.runs += projection.runs;
     }
@@ -265,6 +344,138 @@ fn project_remaining(
         total.runs += group_total.runs;
     }
     Ok(total)
+}
+
+/// One column in a [`SpendPreview`] group.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PreviewColumn {
+    pub id: String,
+    pub provider: String,
+    pub model_id: String,
+    pub endpoint: String,
+    pub status: String,
+    pub runs: i64,
+    pub projected_usd: f64,
+}
+
+/// One (tasks × columns) group in a [`SpendPreview`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct PreviewGroup {
+    /// `smoke` and `cold_start` for `nightly_smoke`, `full` for `weekly_sweep`.
+    pub name: &'static str,
+    pub tasks: usize,
+    pub columns: Vec<PreviewColumn>,
+}
+
+/// What a batch would project and what the G8 guard would decide, without running it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpendPreview {
+    pub kind: JobKind,
+    pub night: NaiveDate,
+    /// The active corpus version, or empty when none is active.
+    pub matrix_version: String,
+    pub repeats: u32,
+    pub groups: Vec<PreviewGroup>,
+    /// The whole batch, as `planned_runs` reports it.
+    pub projection: Projection,
+    /// The runs the window's batch already recorded (a partly run night, D10).
+    pub done_runs: usize,
+    /// What the guard checks: the whole batch on a first delivery, else only the runs
+    /// still to make (bead 8mfe). With no run left the batch skips the guard.
+    pub remaining: Projection,
+    pub night_spent_usd: f64,
+    pub week_spent_usd: f64,
+    pub caps: SpendCaps,
+    /// False for `weekly_sweep`: only the weekly cap applies.
+    pub apply_nightly_cap: bool,
+    /// `Allow` when no runs remain: the batch skips the guard in that case.
+    pub decision: SpendDecision,
+}
+
+/// The batch of `kind` for `night` as the job would compose, project, and guard it, with
+/// `repeats` (`MAVERICK_RUNNER_REPEATS`; 0 means 3) and `caps`. Read only: it takes no
+/// lease, writes no alert, and runs nothing, so the guard's alert never fires here.
+/// Operators use it to size the caps before the cold-start nights, when every new column
+/// runs the whole corpus (bead 9.15).
+pub async fn preview_spend(
+    pool: &PgPool,
+    kind: JobKind,
+    night: NaiveDate,
+    repeats: u32,
+    caps: SpendCaps,
+) -> Result<SpendPreview, BatchError> {
+    if !matches!(kind, JobKind::NightlySmoke | JobKind::WeeklySweep) {
+        return Err(BatchError::WrongKind(kind));
+    }
+    let repeats = effective_repeats(repeats);
+    let composition = Composition::load(pool).await?;
+    let groups = composition.groups(kind);
+    let projection = project(&groups, repeats)?;
+    let mut preview_groups = Vec::with_capacity(groups.len());
+    for group in &groups {
+        let tasks = spend_tasks(group);
+        let mut columns = Vec::with_capacity(group.columns.len());
+        for column in &group.columns {
+            let one = project_spend(&tasks, &[spend_column(column)], i64::from(repeats))
+                .map_err(BatchError::Projection)?;
+            columns.push(PreviewColumn {
+                id: column.id.clone(),
+                provider: column.provider.clone(),
+                model_id: column.model_id.clone(),
+                endpoint: column.endpoint.clone(),
+                status: column.status.clone(),
+                runs: one.runs,
+                projected_usd: one.projected_usd,
+            });
+        }
+        preview_groups.push(PreviewGroup {
+            name: group.name,
+            tasks: group.tasks.len(),
+            columns,
+        });
+    }
+    // The window's batch id, as the lease derives it: a night that is already partly run
+    // projects only its remaining runs, like the resumed delivery's guard.
+    let window = match kind {
+        JobKind::WeeklySweep => crate::iso_week(night),
+        _ => night.format("%Y-%m-%d").to_string(),
+    };
+    let done =
+        measurement::list_run_triples_by_batch(pool, &crate::deterministic_batch_id(kind, &window))
+            .await?;
+    let remaining = if done.is_empty() {
+        projection
+    } else {
+        project_remaining(&groups, repeats, &done)?
+    };
+    let (night_spent_usd, week_spent_usd) = window_spend(pool, night).await?;
+    let check = spend_check(
+        kind,
+        night,
+        &remaining,
+        caps,
+        night_spent_usd,
+        week_spent_usd,
+    );
+    Ok(SpendPreview {
+        kind,
+        night,
+        matrix_version: composition.matrix_version.clone(),
+        repeats,
+        groups: preview_groups,
+        projection,
+        done_runs: done.len(),
+        remaining,
+        night_spent_usd,
+        week_spent_usd,
+        caps,
+        apply_nightly_cap: check.apply_nightly_cap,
+        decision: if remaining.runs > 0 {
+            check.decision()
+        } else {
+            SpendDecision::Allow
+        },
+    })
 }
 
 /// The grading tally of one pass.
@@ -406,42 +617,9 @@ pub async fn run_batch(
     let batch_id = lease.id().to_owned();
     let started = tokio::time::Instant::now();
 
-    // Composition: the active corpus's active tasks and the runnable columns, by id.
-    let (matrix_version, tasks) = match corpus::get_active_corpus_version(pool).await {
-        Ok(version) => {
-            let tasks = corpus::list_active_tasks_by_corpus_version(pool, &version.version).await?;
-            (version.version, tasks)
-        }
-        Err(sqlx::Error::RowNotFound) => (String::new(), Vec::new()),
-        Err(error) => return Err(error.into()),
-    };
-    let columns: Vec<ModelColumn> = catalog::list_model_columns(pool)
-        .await?
-        .into_iter()
-        .filter(|c| maverick_domain::catalog::runnable(&c.status))
-        .collect();
-    let groups: Vec<Group<'_>> = match kind {
-        JobKind::NightlySmoke => vec![
-            Group {
-                tasks: tasks.iter().filter(|t| t.smoke_member).collect(),
-                columns: columns
-                    .iter()
-                    .filter(|c| c.status != "cold_start")
-                    .collect(),
-            },
-            Group {
-                tasks: tasks.iter().collect(),
-                columns: columns
-                    .iter()
-                    .filter(|c| c.status == "cold_start")
-                    .collect(),
-            },
-        ],
-        _ => vec![Group {
-            tasks: tasks.iter().collect(),
-            columns: columns.iter().collect(),
-        }],
-    };
+    let composition = Composition::load(pool).await?;
+    let matrix_version = &composition.matrix_version;
+    let groups = composition.groups(kind);
     let repeats = config.repeats();
     let projection = project(&groups, repeats)?;
     let mut output = BatchOutput {
@@ -540,7 +718,11 @@ pub async fn run_batch(
         .into_iter()
         .map(|s| s.run_id)
         .collect();
-    let by_id: HashMap<&str, &Task> = tasks.iter().map(|t| (t.id.as_str(), t)).collect();
+    let by_id: HashMap<&str, &Task> = composition
+        .tasks
+        .iter()
+        .map(|t| (t.id.as_str(), t))
+        .collect();
     let grading = with_heartbeat(
         pool,
         &mut lease,

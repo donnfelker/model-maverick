@@ -14,6 +14,8 @@ Requirement keywords MUST, MUST NOT, SHOULD, and MAY are used per RFC 2119.
 
 Model Maverick is a recommendation engine. It benchmarks language models continuously, classifies incoming workloads, applies tenant policy, and returns a ranked list of model columns. It never executes caller inference.
 
+The operator command `maverick spend preview [--job nightly_smoke|weekly_sweep] [--night YYYY-MM-DD]` is hidden from the main help text (D52; owner decision 2026-10-19). Defaults are `nightly_smoke` and today in UTC. It reports per-group and per-column projected spend and planned runs, completed and remaining runs, night and week actual spend, configured caps, and the batch's allow, warn, or refuse verdict. It uses the batch's composition and guard, including remaining-run projection on resume and skipping the guard when no runs remain. It writes no lease, alert, or run and calls no provider. Usage errors exit 2, configuration or database failures exit 1, and a completed report exits 0 even when the verdict is refuse.
+
 ### 1.1 System guarantees
 
 These invariants hold everywhere; any implementation that violates one is wrong regardless of what any other section says.

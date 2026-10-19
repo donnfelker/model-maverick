@@ -8,7 +8,7 @@ use maverick_domain::gofmt::quote;
 use crate::flags::{FlagSet, Parsed};
 use crate::logging::{Output, with_logger};
 
-/// The main usage text (exact; `demo-run` is hidden).
+/// The main usage text (exact; `demo-run` and `spend` are hidden).
 pub const MAIN_USAGE: &str = "Usage: maverick <command> [flags]
 
 Commands:
@@ -36,6 +36,18 @@ Subcommands:
             tier-trend outliers; a report, never a gate
 ";
 
+/// The `spend` usage text (bead 9.15). The command is hidden: [`MAIN_USAGE`] is Go's
+/// exact text and does not list it.
+pub const SPEND_USAGE: &str =
+    "Usage: maverick spend preview [--job nightly_smoke|weekly_sweep] [--night YYYY-MM-DD]
+
+Subcommands:
+  preview   print what the batch would project and what the spend guard would
+            decide (allow, warn, or refuse), per group and per column, from the
+            active corpus, the runnable columns, and the runs already costed in
+            the night and week windows; read only: no lease, no alert, no run
+";
+
 /// Exit code for a runtime or configuration failure.
 const EXIT_FAILURE: i32 = 1;
 /// Exit code for a usage or flag error.
@@ -58,6 +70,7 @@ pub fn run(
         "migrate" => migrate(rest, lookup, stdout, stderr),
         "demo-run" => demo_run(rest, lookup, stdout, stderr),
         "corpus" => corpus(rest, lookup, stdout, stderr),
+        "spend" => spend(rest, lookup, stdout, stderr),
         "mcp-stdio" => mcp_stdio(rest, lookup, stderr),
         other => {
             let _ = write!(
@@ -268,6 +281,78 @@ fn corpus(
             EXIT_USAGE
         }
     }
+}
+
+/// `spend preview [--job <kind>] [--night <YYYY-MM-DD>]` (bead 9.15), hidden from the usage.
+fn spend(
+    args: &[String],
+    lookup: &dyn Fn(&str) -> Option<String>,
+    stdout: Output,
+    mut stderr: Output,
+) -> i32 {
+    match args.first().map(String::as_str) {
+        Some("preview") => {}
+        Some(other) => {
+            let _ = write!(
+                stderr,
+                "maverick spend: unknown subcommand {}\n\n{SPEND_USAGE}",
+                quote(other)
+            );
+            return EXIT_USAGE;
+        }
+        None => {
+            let _ = stderr.write_all(SPEND_USAGE.as_bytes());
+            return EXIT_USAGE;
+        }
+    }
+    let set = FlagSet::new("spend preview")
+        .string(
+            "job",
+            "nightly_smoke",
+            "the batch to preview: nightly_smoke or weekly_sweep",
+        )
+        .string(
+            "night",
+            "",
+            "the batch's night, YYYY-MM-DD in UTC (default: today)",
+        );
+    let Some(flags) = parse_flags(&set, &args[1..], &mut stderr) else {
+        return EXIT_USAGE;
+    };
+    if !flags.args().is_empty() {
+        let _ = writeln!(
+            stderr,
+            "maverick spend preview: unexpected positional arguments"
+        );
+        return EXIT_USAGE;
+    }
+    let job = match flags.string("job") {
+        "nightly_smoke" => maverick_jobs::JobKind::NightlySmoke,
+        "weekly_sweep" => maverick_jobs::JobKind::WeeklySweep,
+        other => {
+            let _ = writeln!(
+                stderr,
+                "maverick spend preview: --job must be nightly_smoke or weekly_sweep, not {}",
+                quote(other)
+            );
+            return EXIT_USAGE;
+        }
+    };
+    let night = match flags.string("night") {
+        "" => chrono::Utc::now().date_naive(),
+        text => match chrono::NaiveDate::parse_from_str(text, "%Y-%m-%d") {
+            Ok(night) if text.len() == 10 && night.format("%Y-%m-%d").to_string() == text => night,
+            _ => {
+                let _ = writeln!(
+                    stderr,
+                    "maverick spend preview: --night must be YYYY-MM-DD, not {}",
+                    quote(text)
+                );
+                return EXIT_USAGE;
+            }
+        },
+    };
+    crate::spend::preview(job, night, lookup, stdout, stderr)
 }
 
 /// `mcp-stdio --api-key <key>` (§7.4). Logs to STDERR: stdout is the MCP channel.
