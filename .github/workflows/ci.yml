@@ -12,9 +12,9 @@ on:
   workflow_dispatch:
     inputs:
       runner:
-        # Empty keeps the pinned image. Set it (for example to ubuntu-26.04) to try every
+        # Empty keeps the pinned image. Set it (for example to ubuntu-28.04) to try every
         # gate on another image without changing push, pull request, or nightly runs.
-        description: "Runner image for this run (empty: ubuntu-24.04)"
+        description: "Runner image for this run (empty: ubuntu-26.04)"
         type: string
         required: false
         default: ""
@@ -45,10 +45,11 @@ env:
 jobs:
   tiers:
     name: ${{ matrix.tier }}
-    # Pinned (bead model-maverick-a7d0): `ubuntu-latest` moves to Ubuntu 26 from
-    # 2026-10-19, and a new image can change the disk, Docker, and toolchain setup under
-    # the gates. A manual run with the `runner` input tries another image first.
-    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
+    # Pinned (beads model-maverick-a7d0 and model-maverick-ckgy): a new image can change
+    # the disk, Docker, and toolchain setup under the gates, so the default moves only
+    # after a manual run with the `runner` input passes every job on the new image.
+    # ubuntu-26.04 passed in run 39329679284.
+    runs-on: ${{ inputs.runner || 'ubuntu-26.04' }}
     strategy:
       fail-fast: false
       matrix:
@@ -83,9 +84,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.tier }}
-          # Another image keeps its own cache: binaries built there (the cargo tools in
-          # ~/.cargo/bin, build scripts) may need a newer glibc than 24.04 has.
-          prefix-key: ${{ inputs.runner && format('v0-rust-{0}', inputs.runner) || 'v0-rust' }}
+          # Each image keeps its own cache: binaries built on one (the cargo tools in
+          # ~/.cargo/bin, build scripts) may need a newer glibc than another has. The
+          # default here must match runs-on.
+          prefix-key: ${{ format('v0-rust-{0}', inputs.runner || 'ubuntu-26.04') }}
 
       - name: Install fast-tier cargo tools
         if: matrix.tier == 'fast'
@@ -121,7 +123,7 @@ jobs:
   mutants-diff:
     name: mutants (changed lines)
     if: github.event_name == 'push' || github.event_name == 'pull_request'
-    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
+    runs-on: ${{ inputs.runner || 'ubuntu-26.04' }}
     # `actions: read` lets scripts/mutants-base.sh list this workflow's runs and jobs.
     permissions:
       contents: read
@@ -152,9 +154,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: mutants
-          # Another image keeps its own cache: binaries built there (the cargo tools in
-          # ~/.cargo/bin, build scripts) may need a newer glibc than 24.04 has.
-          prefix-key: ${{ inputs.runner && format('v0-rust-{0}', inputs.runner) || 'v0-rust' }}
+          # Each image keeps its own cache: binaries built on one (the cargo tools in
+          # ~/.cargo/bin, build scripts) may need a newer glibc than another has. The
+          # default here must match runs-on.
+          prefix-key: ${{ format('v0-rust-{0}', inputs.runner || 'ubuntu-26.04') }}
 
       - name: Install cargo-mutants
         # See the fast-tier install step: skip when the cached binary is already pinned.
@@ -200,7 +203,7 @@ jobs:
   mutants-full:
     name: mutants (shard ${{ matrix.shard }}/8)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
+    runs-on: ${{ inputs.runner || 'ubuntu-26.04' }}
     timeout-minutes: 300
     strategy:
       fail-fast: false
@@ -229,9 +232,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: mutants
-          # Another image keeps its own cache: binaries built there (the cargo tools in
-          # ~/.cargo/bin, build scripts) may need a newer glibc than 24.04 has.
-          prefix-key: ${{ inputs.runner && format('v0-rust-{0}', inputs.runner) || 'v0-rust' }}
+          # Each image keeps its own cache: binaries built on one (the cargo tools in
+          # ~/.cargo/bin, build scripts) may need a newer glibc than another has. The
+          # default here must match runs-on.
+          prefix-key: ${{ format('v0-rust-{0}', inputs.runner || 'ubuntu-26.04') }}
           save-if: ${{ matrix.shard == 0 }}
 
       - name: Install cargo-mutants
