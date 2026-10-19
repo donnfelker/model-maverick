@@ -20,6 +20,8 @@ maverick-alerts = { workspace = true }
 maverick-config = { workspace = true }
 # The prompt path's classifier is a provider call (spec §8.3).
 maverick-providers = { workspace = true }
+# The models refresh runs the discovery job's code and the spend preview (spec §4.6).
+maverick-jobs = { workspace = true }
 axum = { workspace = true }
 tower = { workspace = true, features = ["util"] }
 tower-http = { workspace = true }

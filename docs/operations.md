@@ -29,8 +29,8 @@ logged, but it never blocks or fails the write that created the row.
 | `classifier_degraded` | critical (info for a resolution or restored evidence) | the classifier resolver, its re-resolution, and `PUT /internal/v1/columns/{id}` | More than 5% of classifier calls failed over 15 minutes (at least 20 samples). One alert per episode, re-armed on recovery. Or the classifier column stayed unresolved for 5 minutes (subject `reason: "unresolved"`, D41), and its later resolution writes an `info` alert (`reason: "resolved"`). Prompt-form requests get the fallback classification meanwhile. Or the zero-retention classifier column has no valid zero evidence (`reason: "zero_retention_evidence"`, spec §8.3). Zero-retention tenants' prompt-form requests then get `422 zero_retention_requires_declared` until it is fixed, and valid evidence writes an `info` alert (`reason: "zero_retention_evidence_restored"`). See "Zero-retention evidence". |
 | `pool_would_be_empty` | critical | retirement guard, drift check, recommend | A retirement was blocked (spec §4.1), the nightly drift check found a pool with no usable column for some cell, or a request found that drift. The subject names the tenants and pools. |
 | `retention_expiring` | warning | `catalog_sync` | A column's or an execution alias's zero-retention evidence expires within 14 days (spec §4.5). Renew it before it expires: expired evidence reads as `unknown`, and zero-retention tenants then lose that column (D1, D15). |
-| `new_model_available` | info | `model_discovery` (D51) | A provider lists a text model that no catalog column covers. One alert per provider and base id. Enroll it or leave it (see "New models"). |
-| `model_withdrawn` | warning | `model_discovery` (D51) | A non-retired `direct` column's model is no longer in its provider's list. One alert per column. The column keeps its status until you deprecate it. |
+| `new_model_available` | info | `model_discovery` and the models refresh (D51) | A provider lists a text model that no catalog column covers. One alert per provider and base id. Enroll it or leave it (see "New models"). |
+| `model_withdrawn` | warning | `model_discovery` and the models refresh (D51) | A non-retired `direct` column's model is no longer in its provider's list. One alert per column. The column keeps its status until you deprecate it. |
 
 Read the feed at `GET /internal/v1/alerts?since=&kind=` (internal listener, a bearer token
 from `MAVERICK_INTERNAL_TOKENS`).
@@ -270,10 +270,6 @@ refresh them from models.dev (bead 7.15):
 A price edit never restates the cost of past runs.
 
 ## New models
-
-Status: the daily `model_discovery` job runs (D51, spec §4.6). The refresh endpoint is
-specified but not served yet (bead 8l1b.4), so enroll a new model by hand with
-`POST /internal/v1/columns`.
 
 The engine notices model releases through each provider's own model-list API, never through
 a third-party feed.

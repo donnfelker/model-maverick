@@ -179,6 +179,7 @@ fn seam(pool: &PgPool) -> Seam {
             cold_start_nights: 5,
             default_classification_quota: 1000,
             clock: Arc::new(clock),
+            ..InternalSettings::default()
         });
     Seam {
         internal: internal_router_with(auth.clone(), api.clone()),

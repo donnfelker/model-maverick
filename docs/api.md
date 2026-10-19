@@ -873,8 +873,7 @@ write"`, `audit=true`, `actor=<label>`, `action=<dotted.action>` (for example
 A route with a tenant `{id}` looks the tenant up before it reads the body. An
 unknown tenant is `404 not_found` (`tenant <id> does not exist`).
 
-All 17 routes. One of them, `POST /internal/v1/models/refresh`, is specified
-but not served yet (D51): it answers `404` until beads 8l1b.2 to 8l1b.4 land.
+All 17 routes:
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -891,7 +890,7 @@ but not served yet (D51): it answers `404` until beads 8l1b.2 to 8l1b.4 land.
 | GET | `/internal/v1/alerts` | Operator alert feed |
 | POST | `/internal/v1/columns` | Create a catalog column |
 | PUT | `/internal/v1/columns/{id}` | Edit a column |
-| POST | `/internal/v1/models/refresh` | Run provider model discovery now, and optionally enroll new models (D51, not served yet) |
+| POST | `/internal/v1/models/refresh` | Run provider model discovery now, and optionally enroll new models (D51) |
 | POST | `/internal/v1/corpus/activate` | Change the active corpus version |
 | GET | `/internal/v1/captures` | List debug captures (no prompt text) |
 | GET | `/internal/v1/captures/{id}/prompt` | Decrypt and read one captured prompt (audited) |
@@ -1038,12 +1037,11 @@ column, as for create.
 
 ### POST /internal/v1/models/refresh
 
-Status: specified (D51, spec §4.6). The engine does not serve it yet (beads
-8l1b.2 to 8l1b.4). Until then the path answers `404`.
-
-Runs provider model discovery now, the same code as the daily `model_discovery`
-job, and writes the same alerts. With `enroll`, it also adds new models to the
-catalog. The body is optional: an empty body or `{}` only reports.
+D51, spec §4.6. Runs provider model discovery now, the same code as the daily
+`model_discovery` job, and writes the same alerts, except for the models this
+call enrolls. With `enroll`, it also adds new models to the catalog. The body is
+optional: an empty body or `{}` only reports. Each provider's list call may take
+12 s; the providers are listed one after another.
 
 ```json
 {
@@ -1062,7 +1060,7 @@ catalog. The body is optional: an empty body or `{}` only reports.
   "providers": [
     { "provider": "anthropic", "status": "ok", "listed": 9 },
     { "provider": "google", "status": "skipped_no_key" },
-    { "provider": "openai", "status": "failed", "error": "status 503" },
+    { "provider": "openai", "status": "failed", "error": "provider_error (status 503)" },
     { "provider": "xai", "status": "ok", "listed": 6 }
   ],
   "new": [
@@ -1080,11 +1078,14 @@ catalog. The body is optional: an empty body or `{}` only reports.
 
 - `providers` has one entry per provider, in the order `anthropic`, `google`,
   `openai`, `xai`. `status` is `ok` (with `listed`, the count of kept text
-  models), `skipped_no_key`, or `failed`. A failure gives only an error class
-  and status in `error`, never a response body (G5).
-- `new` and `withdrawn` follow spec §4.6. `new` names the newest listed
-  snapshot as `model_id`, and `base_model_id` is the id without the date stamp.
-  An empty catalog makes every kept model new.
+  models), `skipped_no_key`, or `failed`. A failure gives only the error class
+  and the HTTP status in `error` (`provider_error (status 503)`, or `timeout`),
+  never a response body (G5).
+- `new` and `withdrawn` follow spec §4.6, as the run found them before any
+  enrollment. `new` names the newest listed snapshot as `model_id`, and
+  `base_model_id` is the id without the date stamp. `display_name` and
+  `created_at` appear when the provider gives them. An empty catalog makes every
+  kept model new.
 - **Enrollment.** Each entry takes the fields of `POST /internal/v1/columns`.
   `provider`, `model_id`, and `pricing` are required (provider lists carry no
   prices), and `endpoint` defaults to `direct`. `model_id` must be a listed id
@@ -1095,8 +1096,11 @@ catalog. The body is optional: an empty body or `{}` only reports.
   in the column reply shape.
 - `spend_preview` is `null` without enrollment. With enrollment, it is the
   projection for the next nightly batch with the new columns, from the same
-  computation the batch's spend guard runs (the spend preview of bead 9.15). A
-  projection over the nightly cap means that batch will be refused (G8).
+  computation the batch's spend guard runs (`maverick spend preview`, D52):
+  `{job, night, runs, projected_usd, night_spent_usd, nightly_cap_usd,
+  week_spent_usd, weekly_cap_usd, decision}`. `night` is the night of the next
+  `MAVERICK_CRON_NIGHTLY` firing. `decision` is `allow`, `warn`, or `refuse`;
+  `refuse` means that batch will not run (G8).
 - A run in which every provider is skipped or failed still answers `200`, with
   each provider's status.
 

@@ -83,6 +83,10 @@ pub struct Discovery {
     pub providers: Vec<ProviderReport>,
     pub new: Vec<NewEntry>,
     pub withdrawn: Vec<WithdrawnModel>,
+    /// Every kept model of every provider that answered, in list order. The refresh
+    /// endpoint checks enrollment entries against it.
+    #[serde(skip)]
+    pub listed: Vec<ListedModel>,
 }
 
 impl Discovery {
@@ -158,6 +162,7 @@ pub async fn discover_with_timeout(
     let mut reports = Vec::with_capacity(PROVIDERS.len());
     let mut listings = Vec::with_capacity(PROVIDERS.len());
     let mut details: HashMap<(String, String), ListedModel> = HashMap::new();
+    let mut listed = Vec::new();
     for provider in PROVIDERS {
         let Some(lister) = listers.iter().find(|lister| lister.provider() == provider) else {
             reports.push(ProviderReport {
@@ -200,6 +205,7 @@ pub async fn discover_with_timeout(
                     provider: provider.to_owned(),
                     model_ids: Some(models.iter().map(|model| model.model_id.clone()).collect()),
                 });
+                listed.extend(models.iter().cloned());
                 for model in models {
                     details.insert((provider.to_owned(), model.model_id.clone()), model);
                 }
@@ -249,6 +255,7 @@ pub async fn discover_with_timeout(
         providers: reports,
         new,
         withdrawn: diff.withdrawn,
+        listed,
     })
 }
 
@@ -282,8 +289,9 @@ async fn stored_subjects<T: for<'de> Deserialize<'de>>(
 
 /// Writes the run's alerts (spec §4.6): one `new_model_available` (info) per provider and
 /// base id, and one `model_withdrawn` (warning) per column. No second row is written while
-/// an earlier row for the same pair or column exists. Messages name ids only.
-async fn write_alerts(
+/// an earlier row for the same pair or column exists. Messages name ids only. Returns the
+/// counts written. The refresh endpoint calls it too.
+pub async fn write_alerts(
     pool: &PgPool,
     notifier: Option<&dyn AlertNotifier>,
     run: &Discovery,

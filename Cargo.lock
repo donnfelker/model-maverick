@@ -2347,6 +2347,7 @@ dependencies = [
  "maverick-alerts",
  "maverick-config",
  "maverick-domain",
+ "maverick-jobs",
  "maverick-providers",
  "maverick-runner",
  "maverick-store",

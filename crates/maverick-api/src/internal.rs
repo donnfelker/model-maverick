@@ -18,7 +18,10 @@ use maverick_domain::catalog::{RetirementBlocked, retention_window_error};
 use maverick_domain::gofmt::quote;
 use maverick_domain::gojson::{self, JsonValue, match_field};
 use maverick_domain::pricing::parse_pricing;
+use maverick_domain::spend::SpendCaps;
 use maverick_domain::{ids, keys};
+use maverick_jobs::{JobClient, JobClientConfig};
+use maverick_providers::models::ModelLister;
 use maverick_store::catalog::{
     self, CatalogChange, ModelColumn, ModelColumnUpdate, NewModelColumn, log_change,
 };
@@ -26,6 +29,8 @@ use maverick_store::{JsonRawValue, corpus, is_not_found, simulation, sqlstate, t
 use sqlx::PgPool;
 
 use crate::config::{self, ConfigFailure, Resource};
+
+pub(crate) mod refresh;
 use crate::strict::{self, invalid, malformed, required_field};
 use crate::{
     ApiError, ApiState, ErrorCode, InternalActor, audit, classifier_evidence, escape_go_json,
@@ -55,6 +60,14 @@ pub struct InternalSettings {
     pub default_classification_quota: u32,
     /// Today's date for `cold_start_until` and the guard's clock (tests pin it).
     pub clock: Arc<dyn Fn() -> DateTime<Utc> + Send + Sync>,
+    /// One model lister per provider with an operator key, for the models refresh (spec
+    /// §4.6). Empty: every provider is `skipped_no_key`.
+    pub model_listers: Vec<Arc<dyn ModelLister>>,
+    /// `runner.repeats` (0 means 3) and the G8 caps, for the refresh's spend preview.
+    pub runner_repeats: u32,
+    pub spend_caps: SpendCaps,
+    /// The job schedules, for the night of the next nightly batch. `None`: the next day.
+    pub jobs: Option<JobClient>,
 }
 
 impl InternalSettings {
@@ -62,6 +75,12 @@ impl InternalSettings {
         InternalSettings {
             cold_start_nights: config.catalog_cold_start_nights,
             default_classification_quota: config.classifier_daily_quota,
+            runner_repeats: config.runner_repeats,
+            spend_caps: SpendCaps {
+                nightly_usd: config.spend_nightly_cap_usd,
+                weekly_usd: config.spend_weekly_cap_usd,
+            },
+            jobs: JobClient::from_config(config).ok(),
             ..Self::default()
         }
     }
@@ -77,6 +96,10 @@ impl Default for InternalSettings {
             cold_start_nights: 5,
             default_classification_quota: 1000,
             clock: Arc::new(Utc::now),
+            model_listers: Vec::new(),
+            runner_repeats: 0,
+            spend_caps: SpendCaps::default(),
+            jobs: JobClient::new(JobClientConfig::default()).ok(),
         }
     }
 }
@@ -89,6 +112,16 @@ impl fmt::Debug for InternalSettings {
                 "default_classification_quota",
                 &self.default_classification_quota,
             )
+            .field(
+                "model_listers",
+                &self
+                    .model_listers
+                    .iter()
+                    .map(|lister| lister.provider().to_owned())
+                    .collect::<Vec<_>>(),
+            )
+            .field("runner_repeats", &self.runner_repeats)
+            .field("spend_caps", &self.spend_caps)
             .finish_non_exhaustive()
     }
 }
@@ -1203,6 +1236,34 @@ async fn insert_column(api: &ApiState, actor: &InternalActor, request: Request) 
         .await
         .map_err(|response| Failure::Response(Box::new(response)))?;
     let input = decode_column(&body, "createColumnRequest", &CREATE_FIELDS)?;
+    let prepared = prepare_column(api, input).await?;
+    let column = write_column(pool_of(api)?, api, &prepared).await?;
+    audit::column_create(
+        &actor.0,
+        &column.id,
+        &column.provider,
+        &column.model_id,
+        &column.endpoint,
+        &column.status,
+    );
+    Ok(json(StatusCode::CREATED, &column_json(&column)?))
+}
+
+/// A new column that passed every create check, ready to write.
+struct PreparedColumn {
+    input: ColumnInput,
+    settings: Box<JsonRawValue>,
+    pricing: Box<JsonRawValue>,
+    deprecation_date: Option<NaiveDate>,
+    aliases: Option<Box<JsonRawValue>>,
+    retention: Retention,
+    alias_retention: Option<Box<JsonRawValue>>,
+    param_constraints: Option<Box<JsonRawValue>>,
+}
+
+/// The create checks of `POST /internal/v1/columns` (§7.8), in order. The models refresh
+/// runs them on every enrollment entry (spec §4.6).
+async fn prepare_column(api: &ApiState, input: ColumnInput) -> Result<PreparedColumn, Failure> {
     for (field, value) in [
         ("provider", &input.provider),
         ("model_id", &input.model_id),
@@ -1242,11 +1303,26 @@ async fn insert_column(api: &ApiState, actor: &InternalActor, request: Request) 
             Err(error) => return Err(error.into()),
         }
     }
-    let settings = raw(settings)?;
-    let pricing = raw(pricing)?;
-    let aliases_raw = aliases.map(|(_, text)| raw(text)).transpose()?;
-    let alias_retention_raw = retention.aliases.clone().map(raw).transpose()?;
-    let param_constraints_raw = param_constraints.map(raw).transpose()?;
+    Ok(PreparedColumn {
+        settings: raw(settings)?,
+        pricing: raw(pricing)?,
+        deprecation_date,
+        aliases: aliases.map(|(_, text)| raw(text)).transpose()?,
+        alias_retention: retention.aliases.clone().map(raw).transpose()?,
+        param_constraints: param_constraints.map(raw).transpose()?,
+        retention,
+        input,
+    })
+}
+
+/// Writes a prepared column as `cold_start` on `db` (the pool, or the refresh's
+/// transaction). A column with the same provider, model, endpoint, and settings is `422`.
+async fn write_column<'e>(
+    db: impl sqlx::PgExecutor<'e>,
+    api: &ApiState,
+    prepared: &PreparedColumn,
+) -> Result<ModelColumn, Failure> {
+    let input = &prepared.input;
     let settings_internal = api.internal();
     let today = settings_internal.now().date_naive();
     let cold_start_until = today + Duration::days(i64::from(settings_internal.cold_start_nights));
@@ -1258,45 +1334,34 @@ async fn insert_column(api: &ApiState, actor: &InternalActor, request: Request) 
             provider: &input.provider,
             model_id: &input.model_id,
             endpoint: &input.endpoint,
-            settings: &settings,
+            settings: &prepared.settings,
             status: "cold_start",
-            pricing: &pricing,
+            pricing: &prepared.pricing,
             quality_source_column_id: input.quality_source_column_id.as_deref(),
             cold_start_until: Some(cold_start_until),
-            deprecation_date,
-            execution_aliases: aliases_raw.as_deref(),
-            retention_mode: retention.mode.as_deref(),
-            retention_verified_at: retention.verified_at,
-            retention_valid_until: retention.valid_until,
-            retention_source: retention.source.as_deref(),
-            execution_alias_retention: alias_retention_raw.as_deref(),
-            param_constraints: param_constraints_raw.as_deref(),
+            deprecation_date: prepared.deprecation_date,
+            execution_aliases: prepared.aliases.as_deref(),
+            retention_mode: prepared.retention.mode.as_deref(),
+            retention_verified_at: prepared.retention.verified_at,
+            retention_valid_until: prepared.retention.valid_until,
+            retention_source: prepared.retention.source.as_deref(),
+            execution_alias_retention: prepared.alias_retention.as_deref(),
+            param_constraints: prepared.param_constraints.as_deref(),
         },
     )
     .await;
-    let column = match created {
-        Ok(column) => column,
-        Err(error) if sqlstate(&error).as_deref() == Some("23505") => {
-            return Err(invalid(format!(
-                "a column for {}/{}/{} with identical settings already exists",
-                input.provider, input.model_id, input.endpoint
-            ))
-            .detail("provider", input.provider.as_str())
-            .detail("model_id", input.model_id.as_str())
-            .detail("endpoint", input.endpoint.as_str())
-            .into());
-        }
-        Err(error) => return Err(error.into()),
-    };
-    audit::column_create(
-        &actor.0,
-        &column.id,
-        &column.provider,
-        &column.model_id,
-        &column.endpoint,
-        &column.status,
-    );
-    Ok(json(StatusCode::CREATED, &column_json(&column)?))
+    match created {
+        Ok(column) => Ok(column),
+        Err(error) if sqlstate(&error).as_deref() == Some("23505") => Err(invalid(format!(
+            "a column for {}/{}/{} with identical settings already exists",
+            input.provider, input.model_id, input.endpoint
+        ))
+        .detail("provider", input.provider.as_str())
+        .detail("model_id", input.model_id.as_str())
+        .detail("endpoint", input.endpoint.as_str())
+        .into()),
+        Err(error) => Err(error.into()),
+    }
 }
 
 /// `PUT /internal/v1/columns/{id}` (§7.9). Absent fields keep their stored values;

@@ -278,6 +278,12 @@ const ENDPOINTS: &[Endpoint] = &[
     ),
     internal(
         "POST",
+        "/internal/v1/models/refresh",
+        "/internal/v1/models/refresh",
+        "{}",
+    ),
+    internal(
+        "POST",
         "/internal/v1/corpus/activate",
         "/internal/v1/corpus/activate",
         r#"{"version":"2026-07-01"}"#,
@@ -669,6 +675,7 @@ const REQUIRED: &[(&str, u16, &str)] = &[
     ("PUT /internal/v1/columns/{id}", 404, "not_found"),
     ("PUT /internal/v1/columns/{id}", 422, "invalid_request"),
     ("PUT /internal/v1/columns/{id}", 422, "pool_would_be_empty"),
+    ("POST /internal/v1/models/refresh", 422, "invalid_request"),
     ("POST /internal/v1/corpus/activate", 404, "not_found"),
     ("POST /internal/v1/corpus/activate", 422, "invalid_request"),
     ("GET /internal/v1/captures", 422, "invalid_request"),
@@ -684,6 +691,41 @@ const REQUIRED: &[(&str, u16, &str)] = &[
 
 /// Pairs the recording does not hold, each with its Rust test.
 const RUST: &[(&str, u16, &str, &str, &str)] = &[
+    (
+        "POST /internal/v1/models/refresh",
+        422,
+        "invalid_request",
+        "models_refresh.rs",
+        "a_bad_body_is_422",
+    ),
+    (
+        "POST /internal/v1/models/refresh",
+        422,
+        "invalid_request",
+        "models_refresh.rs",
+        "an_entry_needs_pricing_and_a_valid_column",
+    ),
+    (
+        "POST /internal/v1/models/refresh",
+        422,
+        "invalid_request",
+        "models_refresh.rs",
+        "an_entry_for_a_provider_that_did_not_answer_is_422",
+    ),
+    (
+        "POST /internal/v1/models/refresh",
+        422,
+        "invalid_request",
+        "models_refresh.rs",
+        "an_entry_that_is_not_new_is_422",
+    ),
+    (
+        "POST /internal/v1/models/refresh",
+        422,
+        "invalid_request",
+        "models_refresh.rs",
+        "enrollment_is_all_or_nothing",
+    ),
     (
         "POST /v1/recommend",
         422,

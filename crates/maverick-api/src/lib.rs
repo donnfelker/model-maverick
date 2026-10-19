@@ -94,6 +94,16 @@ impl ApiState {
         &self.internal
     }
 
+    /// Replaces the models refresh's listers (spec §4.6): one per provider with an
+    /// operator key.
+    pub fn with_model_listers(
+        mut self,
+        listers: Vec<Arc<dyn maverick_providers::models::ModelLister>>,
+    ) -> Self {
+        self.internal.model_listers = listers;
+        self
+    }
+
     /// The live MCP streamable-HTTP sessions.
     pub fn mcp_sessions(&self) -> &mcp::McpSessions {
         &self.mcp
@@ -977,6 +987,7 @@ fn internal_v1_router(state: AuthState, api: ApiState) -> Router {
         .route("/alerts", any(internal::alerts))
         .route("/columns", any(internal::create_column))
         .route("/columns/{id}", any(internal::update_column))
+        .route("/models/refresh", any(internal::refresh::models_refresh))
         .route("/corpus/activate", any(internal::activate_corpus))
         .route("/captures", any(debug::operator_captures_handler))
         .route("/captures/{id}/prompt", any(debug::operator_prompt_handler))

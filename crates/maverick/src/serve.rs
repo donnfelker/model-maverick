@@ -306,7 +306,7 @@ async fn run(config: &Config, api_only: bool, worker_only: bool) -> i32 {
             graders: Arc::new(graders),
             notifier: Some(Arc::clone(&notifier)),
             price_source: None,
-            model_listers,
+            model_listers: model_listers.clone(),
         };
         let options = worker::worker_options(&client, config, deps)
             .pg_pool(pool.clone())
@@ -344,7 +344,9 @@ async fn run(config: &Config, api_only: bool, worker_only: bool) -> i32 {
             return EXIT_FAILURE;
         }
     };
-    let api = ApiState::new(pool.clone(), config).with_recommend_config(recommend);
+    let api = ApiState::new(pool.clone(), config)
+        .with_recommend_config(recommend)
+        .with_model_listers(model_listers);
 
     let mut code = 0;
     let mut servers = Vec::new();
