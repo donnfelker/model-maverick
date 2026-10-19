@@ -6,11 +6,12 @@ cd "$ROOT_DIR"
 
 usage() {
     cat <<'USAGE'
-Usage: scripts/ci.sh [all|fast|db|parity|e2e]
+Usage: scripts/ci.sh [all|fast|boundary|db|parity|e2e]
        scripts/ci.sh mutants [k/n]          full run, or shard k of n (0-based)
        scripts/ci.sh mutants-diff <base>    only mutants on lines changed since <base>
 
 No argument runs all tiers except mutants.
+The boundary tier checks engine source and migrations without compiling.
 USAGE
 }
 
@@ -68,7 +69,32 @@ run_sqlx_check() {
     run_logged fast sqlx scripts/sqlx-prepare.sh --check
 }
 
+check_engine_boundary() {
+    # Plans and subscription state belong to the control plane (production-proxy plan
+    # section 8). Explicit glob pathspecs include nested source and migration files.
+    local status
+    if git grep -n -i -I -E 'stripe|billing|past_due|subscription_status' -- \
+        ':(top,glob)crates/*/src/**' ':(top,glob)crates/*/migrations/**'; then
+        echo "Engine source and migrations must not contain commerce logic."
+        echo "Commerce logic belongs to the control plane (plans/production-proxy-plan.md section 8)."
+        return 1
+    else
+        status=$?
+    fi
+    if [[ "$status" -ne 1 ]]; then
+        echo "Engine boundary check failed: git grep exited $status." >&2
+        return "$status"
+    fi
+    echo "Engine boundary check passed."
+}
+
+run_boundary() {
+    run_logged fast engine-boundary-tests bash scripts/tests/ci-checks.sh
+    run_logged fast engine-boundary check_engine_boundary
+}
+
 run_fast() {
+    run_boundary
     require_cargo_command deny cargo-deny 0.20.2 ""
     require_cargo_command sqlx sqlx-cli 0.9.0 "--no-default-features --features rustls,postgres"
 
@@ -184,6 +210,10 @@ case "$TIER" in
         ;;
     fast)
         run_fast
+        ;;
+    boundary)
+        # This tier checks the repository only; it needs neither Cargo nor Postgres.
+        run_logged fast engine-boundary check_engine_boundary
         ;;
     db)
         run_db
