@@ -18,6 +18,7 @@ use graphile_worker::{
 use maverick_alerts::AlertNotifier;
 use maverick_domain::graders::Registry;
 use maverick_domain::spend::SpendCaps;
+use maverick_providers::models::ModelLister;
 use maverick_runner::{Clients, ProviderLimits, RunnerConfig};
 use maverick_store::health::GRAPHILE_WORKER_SCHEMA;
 use serde::{Deserialize, Serialize};
@@ -26,6 +27,7 @@ use tokio::task::JoinHandle;
 
 use crate::batch::{BatchConfig, NightlySmokeJob, WeeklySweepJob};
 use crate::catalog::{self, CatalogDeps, ModelsDevPriceSource, PriceSource};
+use crate::discovery::{self, DiscoveryConfig};
 use crate::predictions::{
     CalibrationConfig, CalibrationScoreJob, PredictionLockConfig, PredictionLockJob,
 };
@@ -41,13 +43,14 @@ use crate::{
 /// The kinds that get a cron trigger, in schedule order: every scheduled kind. The
 /// chained kinds (aggregate_rebuild, regression_scan, calibration_score) are enqueued by
 /// the jobs before them.
-pub const SCHEDULED: [JobKind; 8] = [
+pub const SCHEDULED: [JobKind; 9] = [
     JobKind::PredictionLock,
     JobKind::NightlySmoke,
     JobKind::WeeklySweep,
     JobKind::LatencyProbes,
     JobKind::PriceSync,
     JobKind::CatalogSync,
+    JobKind::ModelDiscovery,
     JobKind::CaptureExpiry,
     JobKind::HistoryPrune,
 ];
@@ -63,6 +66,9 @@ pub struct WorkerDeps {
     pub notifier: Option<Arc<dyn AlertNotifier>>,
     /// `None`: `price_sync` is a no-op.
     pub price_source: Option<Arc<dyn PriceSource>>,
+    /// One model lister per provider with an operator key (spec §4.6). Empty:
+    /// `model_discovery` reports every provider as `skipped_no_key`.
+    pub model_listers: Vec<Arc<dyn ModelLister>>,
 }
 
 /// The configuration of the catalog tasks.
@@ -164,6 +170,11 @@ pub fn worker_options(
         notifier: deps.notifier.clone(),
         price_source,
     };
+    let discovery = DiscoveryConfig {
+        lease: lease.clone(),
+        notifier: deps.notifier.clone(),
+        listers: deps.model_listers,
+    };
     let retention = RetentionConfig {
         notifier: deps.notifier,
         capture_retention: Duration::from_secs(u64::from(config.capture_retention_hours) * 3600),
@@ -185,6 +196,7 @@ pub fn worker_options(
         .add_extension(RebuildConfig::from_config(config, lease))
         .add_extension(probes)
         .add_extension(catalog)
+        .add_extension(discovery)
         .add_extension(retention)
         .define_job::<PredictionLockJob>()
         .define_job::<NightlySmokeJob>()
@@ -195,6 +207,7 @@ pub fn worker_options(
         .define_job::<LatencyProbesJob>()
         .define_job::<PriceSyncJob>()
         .define_job::<CatalogSyncJob>()
+        .define_job::<ModelDiscoveryJob>()
         .define_job::<CaptureExpiryJob>()
         .define_job::<HistoryPruneJob>()
         .define_job::<CronPredictionLock>()
@@ -203,6 +216,7 @@ pub fn worker_options(
         .define_job::<CronLatencyProbes>()
         .define_job::<CronPriceSync>()
         .define_job::<CronCatalogSync>()
+        .define_job::<CronModelDiscovery>()
         .define_job::<CronCaptureExpiry>()
         .define_job::<CronHistoryPrune>()
         .with_crons(cron_triggers(client))
@@ -323,6 +337,11 @@ cron_trigger!(
 cron_trigger!(CronPriceSync, JobKind::PriceSync, "cron.price_sync");
 cron_trigger!(CronCatalogSync, JobKind::CatalogSync, "cron.catalog_sync");
 cron_trigger!(
+    CronModelDiscovery,
+    JobKind::ModelDiscovery,
+    "cron.model_discovery"
+);
+cron_trigger!(
     CronCaptureExpiry,
     JobKind::CaptureExpiry,
     "cron.capture_expiry"
@@ -389,6 +408,27 @@ impl TaskHandler for CatalogSyncJob {
         };
         with_job_timeout(&ctx, JobKind::CatalogSync, async {
             catalog::run_catalog_sync(&catalog_deps(&ctx, config), &self.0, Utc::now())
+                .await
+                .map(|_| ())
+        })
+        .await
+    }
+}
+
+/// The `model_discovery` task (spec §4.6).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ModelDiscoveryJob(pub DayArgs);
+
+impl TaskHandler for ModelDiscoveryJob {
+    const IDENTIFIER: &'static str = "model_discovery";
+
+    async fn run(self, ctx: WorkerContext) -> impl IntoTaskHandlerResult {
+        let Some(config) = ctx.extensions().get::<DiscoveryConfig>() else {
+            return Err(missing(JobKind::ModelDiscovery, "DiscoveryConfig"));
+        };
+        with_job_timeout(&ctx, JobKind::ModelDiscovery, async {
+            discovery::model_discovery(ctx.pg_pool(), &self.0, config, ctx.worker_id())
                 .await
                 .map(|_| ())
         })

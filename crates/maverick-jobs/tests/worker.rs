@@ -49,6 +49,7 @@ fn deps() -> WorkerDeps {
         graders: Arc::new(Registry::new()),
         notifier: None,
         price_source: None,
+        model_listers: Vec::new(),
     }
 }
 
@@ -167,7 +168,8 @@ async fn a_bad_firing_time_fails_the_trigger() {
     assert!(queued(&pool).await.is_empty());
 }
 
-/// The catalog and retention tasks find their configuration on the worker and run.
+/// The catalog, discovery, and retention tasks find their configuration on the worker
+/// and run.
 #[tokio::test]
 async fn catalog_and_retention_tasks_run_through_the_worker() {
     let Some(db) = maverick_testdb::database(&SCHEMA).await else {
@@ -184,9 +186,11 @@ async fn catalog_and_retention_tasks_run_through_the_worker() {
     let utils = worker.create_utils();
     add(&utils, "price_sync", json!({"day": "2031-01-02"})).await;
     add(&utils, "catalog_sync", json!({"day": "2031-01-02"})).await;
+    // D51: with no model listers, every provider is skipped and the day completes.
+    add(&utils, "model_discovery", json!({"day": "2031-01-02"})).await;
     add(&utils, "capture_expiry", json!({"hour": "2031-01-02T05"})).await;
     add(&utils, "history_prune", json!({"day": "2031-01-02"})).await;
-    for _ in 0..4 {
+    for _ in 0..5 {
         worker.run_once().await.expect("run");
     }
     // Completed jobs are deleted; a failed one would stay queued with its error.

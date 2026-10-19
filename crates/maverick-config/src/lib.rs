@@ -141,6 +141,8 @@ pub struct Config {
     pub cron_latency_probes: String,
     pub cron_price_sync: String,
     pub cron_catalog_sync: String,
+    /// `MAVERICK_CRON_MODEL_DISCOVERY` (spec §4.6, §11; D51, Rust-only).
+    pub cron_model_discovery: String,
     pub cron_capture_expiry: String,
     pub cron_history_prune: String,
     pub models_dev_price_url: String,
@@ -289,6 +291,7 @@ impl fmt::Debug for Config {
             .field("cron_latency_probes", &self.cron_latency_probes)
             .field("cron_price_sync", &self.cron_price_sync)
             .field("cron_catalog_sync", &self.cron_catalog_sync)
+            .field("cron_model_discovery", &self.cron_model_discovery)
             .field("cron_capture_expiry", &self.cron_capture_expiry)
             .field("cron_history_prune", &self.cron_history_prune)
             .field("models_dev_price_url", &self.models_dev_price_url)
@@ -473,6 +476,12 @@ where
         "10 6 * * *",
         &mut issues,
     );
+    let cron_model_discovery = cron(
+        &lookup,
+        "MAVERICK_CRON_MODEL_DISCOVERY",
+        "20 6 * * *",
+        &mut issues,
+    );
     let cron_capture_expiry = cron(
         &lookup,
         "MAVERICK_CRON_CAPTURE_EXPIRY",
@@ -613,6 +622,7 @@ where
             cron_latency_probes,
             cron_price_sync,
             cron_catalog_sync,
+            cron_model_discovery,
             cron_capture_expiry,
             cron_history_prune,
             models_dev_price_url,

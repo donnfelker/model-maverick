@@ -5,6 +5,7 @@
 
 pub mod batch;
 pub mod catalog;
+pub mod discovery;
 pub mod fold;
 mod metrics;
 pub mod predictions;
@@ -60,12 +61,13 @@ pub enum JobKind {
     LatencyProbes,
     PriceSync,
     CatalogSync,
+    ModelDiscovery,
     CaptureExpiry,
     HistoryPrune,
 }
 
 impl JobKind {
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::PredictionLock,
         Self::NightlySmoke,
         Self::WeeklySweep,
@@ -75,6 +77,7 @@ impl JobKind {
         Self::LatencyProbes,
         Self::PriceSync,
         Self::CatalogSync,
+        Self::ModelDiscovery,
         Self::CaptureExpiry,
         Self::HistoryPrune,
     ];
@@ -90,6 +93,7 @@ impl JobKind {
             Self::LatencyProbes => "latency_probes",
             Self::PriceSync => "price_sync",
             Self::CatalogSync => "catalog_sync",
+            Self::ModelDiscovery => "model_discovery",
             Self::CaptureExpiry => "capture_expiry",
             Self::HistoryPrune => "history_prune",
         }
@@ -186,6 +190,7 @@ pub enum JobArgs {
     LatencyProbes(HourArgs),
     PriceSync(DayArgs),
     CatalogSync(DayArgs),
+    ModelDiscovery(DayArgs),
     CaptureExpiry(HourArgs),
     HistoryPrune(DayArgs),
 }
@@ -202,6 +207,7 @@ impl JobArgs {
             Self::LatencyProbes(_) => JobKind::LatencyProbes,
             Self::PriceSync(_) => JobKind::PriceSync,
             Self::CatalogSync(_) => JobKind::CatalogSync,
+            Self::ModelDiscovery(_) => JobKind::ModelDiscovery,
             Self::CaptureExpiry(_) => JobKind::CaptureExpiry,
             Self::HistoryPrune(_) => JobKind::HistoryPrune,
         }
@@ -220,7 +226,10 @@ impl JobArgs {
             Self::LatencyProbes(args) | Self::CaptureExpiry(args) => {
                 json!({ "hour": args.hour })
             }
-            Self::PriceSync(args) | Self::CatalogSync(args) | Self::HistoryPrune(args) => {
+            Self::PriceSync(args)
+            | Self::CatalogSync(args)
+            | Self::ModelDiscovery(args)
+            | Self::HistoryPrune(args) => {
                 json!({ "day": args.day })
             }
         }
@@ -251,7 +260,10 @@ impl JobArgs {
                 parse_hour(self.kind(), &args.hour)?;
                 Ok(args.hour.clone())
             }
-            Self::PriceSync(args) | Self::CatalogSync(args) | Self::HistoryPrune(args) => {
+            Self::PriceSync(args)
+            | Self::CatalogSync(args)
+            | Self::ModelDiscovery(args)
+            | Self::HistoryPrune(args) => {
                 parse_day(self.kind(), &args.day)?;
                 Ok(args.day.clone())
             }
@@ -319,6 +331,7 @@ pub struct JobClientConfig {
     pub cron_latency_probes: String,
     pub cron_price_sync: String,
     pub cron_catalog_sync: String,
+    pub cron_model_discovery: String,
     pub cron_capture_expiry: String,
     pub cron_history_prune: String,
     pub recovery_sweep_threshold: Duration,
@@ -337,6 +350,7 @@ impl Default for JobClientConfig {
             cron_latency_probes: "0 * * * *".to_string(),
             cron_price_sync: "0 6 * * *".to_string(),
             cron_catalog_sync: "10 6 * * *".to_string(),
+            cron_model_discovery: "20 6 * * *".to_string(),
             cron_capture_expiry: "0 * * * *".to_string(),
             cron_history_prune: "0 5 * * *".to_string(),
             recovery_sweep_threshold: GRAPHILE_RECOVERY_SWEEP_THRESHOLD,
@@ -357,6 +371,7 @@ impl From<&maverick_config::Config> for JobClientConfig {
             cron_latency_probes: config.cron_latency_probes.clone(),
             cron_price_sync: config.cron_price_sync.clone(),
             cron_catalog_sync: config.cron_catalog_sync.clone(),
+            cron_model_discovery: config.cron_model_discovery.clone(),
             cron_capture_expiry: config.cron_capture_expiry.clone(),
             cron_history_prune: config.cron_history_prune.clone(),
             recovery_sweep_threshold: GRAPHILE_RECOVERY_SWEEP_THRESHOLD,
@@ -1007,6 +1022,11 @@ fn validate_schedules(config: &JobClientConfig) -> Result<Vec<SchedulePlan>, Job
             config.cron_catalog_sync.as_str(),
         ),
         (
+            "MAVERICK_CRON_MODEL_DISCOVERY",
+            JobKind::ModelDiscovery,
+            config.cron_model_discovery.as_str(),
+        ),
+        (
             "MAVERICK_CRON_CAPTURE_EXPIRY",
             JobKind::CaptureExpiry,
             config.cron_capture_expiry.as_str(),
@@ -1055,6 +1075,7 @@ fn scheduled_args(kind: JobKind, at: DateTime<Utc>) -> JobArgs {
         JobKind::LatencyProbes => JobArgs::LatencyProbes(HourArgs { hour }),
         JobKind::PriceSync => JobArgs::PriceSync(DayArgs { day: night }),
         JobKind::CatalogSync => JobArgs::CatalogSync(DayArgs { day: night }),
+        JobKind::ModelDiscovery => JobArgs::ModelDiscovery(DayArgs { day: night }),
         JobKind::CaptureExpiry => JobArgs::CaptureExpiry(HourArgs { hour }),
         JobKind::HistoryPrune => JobArgs::HistoryPrune(DayArgs { day: night }),
         JobKind::AggregateRebuild | JobKind::RegressionScan | JobKind::CalibrationScore => {
@@ -1444,6 +1465,7 @@ mod tests {
         assert_eq!(JobKind::LatencyProbes.as_str(), "latency_probes");
         assert_eq!(JobKind::PriceSync.as_str(), "price_sync");
         assert_eq!(JobKind::CatalogSync.as_str(), "catalog_sync");
+        assert_eq!(JobKind::ModelDiscovery.as_str(), "model_discovery");
         assert_eq!(JobKind::CaptureExpiry.as_str(), "capture_expiry");
         assert_eq!(JobKind::HistoryPrune.as_str(), "history_prune");
 
@@ -1471,6 +1493,7 @@ mod tests {
         );
         assert_eq!(JobKind::PredictionLock.timeout(&config), FAST_JOB_TIMEOUT);
         assert_eq!(JobKind::HistoryPrune.timeout(&config), FAST_JOB_TIMEOUT);
+        assert_eq!(JobKind::ModelDiscovery.timeout(&config), FAST_JOB_TIMEOUT);
     }
 
     #[test]
@@ -1528,7 +1551,7 @@ mod tests {
     #[test]
     fn job_client_validates_all_crons_and_lease_ttl() {
         let client = JobClient::new(JobClientConfig::default()).expect("default config is valid");
-        assert_eq!(client.schedules().len(), 8);
+        assert_eq!(client.schedules().len(), 9);
 
         let mut config = JobClientConfig {
             cron_nightly: "99 99 * * *".to_string(),

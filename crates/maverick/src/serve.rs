@@ -31,6 +31,7 @@ use maverick_jobs::JobClient;
 use maverick_jobs::worker::{self, RunningWorker, WorkerDeps};
 use maverick_providers::anthropic::AnthropicClient;
 use maverick_providers::google::GoogleClient;
+use maverick_providers::models::ModelLister;
 use maverick_providers::openai::OpenAiClient;
 use maverick_providers::{CompletionRequest, ProviderClient};
 use maverick_runner::Clients;
@@ -253,7 +254,15 @@ async fn run(config: &Config, api_only: bool, worker_only: bool) -> i32 {
         }
     };
 
-    let providers = provider_clients(config);
+    let built = built_clients(config);
+    let model_listers: Vec<Arc<dyn ModelLister>> = built
+        .iter()
+        .map(|(_, client)| Arc::clone(&client.listing))
+        .collect();
+    let providers: Vec<(&'static str, Arc<dyn ProviderClient>)> = built
+        .into_iter()
+        .map(|(name, client)| (name, client.completions))
+        .collect();
     let fanout = match Fanout::new(
         &config.smtp_url,
         &config.alerts_webhook_url,
@@ -297,6 +306,7 @@ async fn run(config: &Config, api_only: bool, worker_only: bool) -> i32 {
             graders: Arc::new(graders),
             notifier: Some(Arc::clone(&notifier)),
             price_source: None,
+            model_listers,
         };
         let options = worker::worker_options(&client, config, deps)
             .pg_pool(pool.clone())
@@ -464,22 +474,46 @@ fn client_map(
         .collect()
 }
 
+/// A provider client built from the operator config: the same client for completions
+/// and for its model list (spec §4.6).
+struct BuiltClient {
+    completions: Arc<dyn ProviderClient>,
+    listing: Arc<dyn ModelLister>,
+}
+
 /// A built provider client, or why it could not be built.
-type Built = Result<Arc<dyn ProviderClient>, String>;
+type Built = Result<BuiltClient, String>;
 /// A provider's name, its API key, its base URL (empty is the default), and how to build
 /// its client.
 type Candidate<'a> = (&'static str, &'a str, &'a str, fn(&str, &str) -> Built);
 
-fn shared<C: ProviderClient + 'static>(built: Result<C, impl std::fmt::Display>) -> Built {
+fn shared<C: ProviderClient + ModelLister + 'static>(
+    built: Result<C, impl std::fmt::Display>,
+) -> Built {
     built
-        .map(|client| Arc::new(client) as Arc<dyn ProviderClient>)
+        .map(|client| {
+            let client = Arc::new(client);
+            BuiltClient {
+                completions: Arc::clone(&client) as Arc<dyn ProviderClient>,
+                listing: client,
+            }
+        })
         .map_err(|error| error.to_string())
+}
+
+/// The completion clients of [`built_clients`].
+fn provider_clients(config: &Config) -> Vec<(&'static str, Arc<dyn ProviderClient>)> {
+    built_clients(config)
+        .into_iter()
+        .map(|(name, client)| (name, client.completions))
+        .collect()
 }
 
 /// One client per provider whose API key is set, in the order anthropic, openai, xai,
 /// google. A non-empty `MAVERICK_<PROVIDER>_BASE_URL` replaces the provider's default URL.
-/// A client that cannot be built is logged and left out.
-fn provider_clients(config: &Config) -> Vec<(&'static str, Arc<dyn ProviderClient>)> {
+/// A client that cannot be built is logged and left out, so `model_discovery` reports
+/// its provider as `skipped_no_key`.
+fn built_clients(config: &Config) -> Vec<(&'static str, BuiltClient)> {
     let candidates: [Candidate<'_>; 4] = [
         (
             "anthropic",
@@ -747,5 +781,13 @@ mod tests {
             })
             .await;
         assert_eq!(*seen.lock().unwrap(), ["/v1/messages"]);
+
+        // Spec §4.6: the same configured client lists the provider's models, on the same
+        // base URL, so `model_discovery` never reaches a provider the config did not name.
+        let built = built_clients(&config);
+        assert_eq!(built.len(), 1);
+        assert_eq!(built[0].1.listing.provider(), "anthropic");
+        built[0].1.listing.list_models().await.expect("list");
+        assert_eq!(*seen.lock().unwrap(), ["/v1/messages", "/v1/models"]);
     }
 }

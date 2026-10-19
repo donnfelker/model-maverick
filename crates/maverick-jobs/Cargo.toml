@@ -17,6 +17,9 @@ maverick-domain = { workspace = true }
 maverick-config = { workspace = true }
 maverick-store = { workspace = true }
 maverick-runner = { workspace = true }
+# The model listers of the `model_discovery` job (spec §4.6). Tests also use the fake
+# provider, which answers the latency probes.
+maverick-providers = { workspace = true }
 maverick-alerts = { workspace = true }
 chrono = { workspace = true }
 graphile_worker = { workspace = true }
@@ -35,8 +38,6 @@ ulid = { workspace = true }
 opentelemetry_sdk = { workspace = true, features = ["testing"] }
 maverick-testdb = { workspace = true }
 parity-support = { path = "../parity-support" }
-# The fake provider answers the latency probes in tests.
-maverick-providers = { workspace = true }
 # Log capture with the secret-leak guard for the corpus gates (G7).
 test-support = { path = "../test-support" }
 # Builds sample strings from grader regexes for the corpus gates' autofail traps.

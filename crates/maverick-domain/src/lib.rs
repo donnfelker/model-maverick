@@ -13,6 +13,7 @@ pub mod catalog;
 pub mod ceilings;
 pub mod checks;
 pub mod classify;
+pub mod discovery;
 pub mod entries;
 pub mod gofmt;
 pub mod gojson;
