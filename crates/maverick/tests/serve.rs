@@ -1,6 +1,7 @@
 //! `maverick serve` as a real process (reference Part 1 §7.3; bead 3.12): the startup
 //! lines, both listeners, the three process shapes, SIGTERM, and a busy port.
 
+use std::collections::HashSet;
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::{Receiver, channel};
@@ -19,12 +20,23 @@ static SCHEMA: LazyLock<Schema> = LazyLock::new(|| {
 
 const INTERNAL_TOKEN: &str = "ops:alpha-token";
 
+/// A port no other test in this binary was given. `bind(:0)` can return a port that an
+/// earlier call released, and `serve` logs `listening` before it binds (reference Part 1
+/// §7.3 step 11). So two tests could share a port, and one engine's request reached the
+/// other engine's router (bead model-maverick-yve4).
 fn free_port() -> u16 {
-    std::net::TcpListener::bind("127.0.0.1:0")
-        .expect("bind")
-        .local_addr()
-        .expect("addr")
-        .port()
+    static GIVEN: LazyLock<Mutex<HashSet<u16>>> = LazyLock::new(Mutex::default);
+    for _ in 0..100 {
+        let port = std::net::TcpListener::bind("127.0.0.1:0")
+            .expect("bind")
+            .local_addr()
+            .expect("addr")
+            .port();
+        if GIVEN.lock().expect("lock").insert(port) {
+            return port;
+        }
+    }
+    panic!("no unused port after 100 tries");
 }
 
 /// A running `maverick serve` with its stdout lines collected.
