@@ -372,7 +372,7 @@ create table alerts (
   kind        text not null,
   -- 'regression','parse_failure_rate','job_failure','spend_warning',
   -- 'spend_refusal','pool_would_be_empty','classifier_degraded',
-  -- 'retention_expiring' (§4.5)
+  -- 'retention_expiring' (§4.5), 'new_model_available', 'model_withdrawn' (§4.6, D51)
   severity    text not null check (severity in ('info','warning','critical')),
   subject     jsonb not null,                   -- machine-readable: column/cell/job/tenant refs
   message     text not null,
@@ -448,7 +448,7 @@ V1 measures quality on one primary endpoint per model. Secondary-endpoint column
 
 ### 4.3 Pricing and catalog sync
 
-`pricing` snapshots list price per million tokens. `price_sync` and `catalog_sync` (§11) refresh pricing and statuses from provider data; both write data, never code. Price changes append to the audit trail via `updated_at` and a `catalog_changes` slog entry; historical run costs are never restated (runs store the cost computed at execution time).
+`pricing` snapshots list price per million tokens. `price_sync` and `catalog_sync` (§11) refresh pricing and statuses from provider data; both write data, never code. Price changes append to the audit trail via `updated_at` and a `catalog_changes` slog entry; historical run costs are never restated (runs store the cost computed at execution time). `price_sync` never adds a column. New models come from provider model discovery (§4.6) or an operator write.
 
 ### 4.4 Seed catalog
 
@@ -464,6 +464,31 @@ Every column carries `retention_mode` ∈ `unknown | standard | zero`, `retentio
 - If expiry or a downgrade leaves a zero-retention tenant's pool with no compliant column, requests return `409 no_compliant_columns` (§7.1 step 3); stale compliance is never assumed.
 
 Recommend entries and `GET /v1/models` expose each column's `retention_mode` (as effective after the expiry rule). (changed 2026-09-28 for the Rust port; the Go engine implements the prior rule: it stores the tenant flag but enforces it only for debug capture, and columns carry no retention status)
+
+### 4.6 Provider model discovery
+
+Added 2026-09-30 by owner decision (D51). The Go engine has no discovery: new columns come only from `POST /internal/v1/columns`.
+
+The engine learns about new models from each connected provider's own model-list API, never from models.dev or another third-party feed. Discovery reports. It never changes the catalog by itself: the operator enrolls.
+
+- **Sources.** Every provider with an operator key (`MAVERICK_<PROVIDER>_API_KEY`), through its base URL (§14.1): Anthropic `GET /v1/models`, OpenAI `GET /v1/models`, Google `models.list` (Gemini API, with the `models/` prefix removed from each name), and xAI through the OpenAI client. Every page is read. A provider without a key is `skipped_no_key`, never an error. A provider whose call fails is `failed`, and the other providers still run. A list call costs nothing and sends no prompt, so G8 does not apply.
+- **Filter.** Only text generation models are kept:
+  - Google: models whose `supportedGenerationMethods` contains `generateContent`.
+  - Anthropic: every listed model.
+  - OpenAI and xAI: every id except the embedding, image, audio and speech, transcription, moderation, realtime, and fine-tuned (`ft:`) ids. Each client holds its exact patterns, with a test for each excluded class.
+  - Moving aliases are dropped for every provider: an id that ends in `-latest`, and OpenAI's `chatgpt-` ids.
+- **Snapshots.** An id that ends in a date stamp is a snapshot of its base id, the id without the stamp. The stamps are `-YYYYMMDD`, `-YYYY-MM-DD`, `-MM-DD`, and `-MMDD`, with a month from 01 to 12 and a day from 01 to 31. A listed id and a catalog `model_id` match when their base ids are equal. So a catalog column `claude-haiku-4-5` covers a listed `claude-haiku-4-5-20251001`, and the reverse.
+- **New.** A base id that no catalog column of the same provider has is new. Endpoint, settings, and status do not matter: a retired column still covers its model. The entry names the newest listed snapshot of the base id as `model_id`, which is the pinned id to enroll. When no snapshot is listed, it names the base id. It carries `display_name` and `created_at` when the provider gives them.
+- **Withdrawn.** A non-retired catalog column on the `direct` endpoint is withdrawn when its base id is missing from its provider's list. Only a provider whose call succeeded can withdraw a column, so a skipped or failed provider withdraws nothing. The first-party list does not judge the other endpoints (Vertex, Bedrock, Azure, OpenRouter). A withdrawn column keeps its status. The operator deprecates it, and retirement still passes the retirement guard (§4.1).
+- **Alerts.**
+  - `new_model_available` is `info`, with subject `{provider, base_model_id, model_id}`. It is written once per provider and base id: no second row is written while an earlier row for the same pair exists.
+  - `model_withdrawn` is `warning`, with subject `{column_id, provider, model_id}`. It is written once per column.
+  - Alert messages name ids only.
+- **When.** The daily `model_discovery` job runs it (§11). `POST /internal/v1/models/refresh` runs the same code synchronously, and can enroll (§13).
+- **Enrollment.** An enrolled model becomes a `cold_start` column through the `POST /internal/v1/columns` code path and its validation (§4.1). It runs the full corpus nightly for `catalog.cold_start_nights`, and its cells become measured after `scoring.min_nights`. Provider lists carry no prices, so every enrollment entry needs `pricing`. Nothing enrolls automatically, because enrollment spends operator money under G8.
+- **Records.** The job claims its `batches` row like every job (§11.2), so `/health/detail` shows its last completion. Each run logs one INFO line, `model discovery finished`, with the provider names for each status and the `new` and `withdrawn` counts.
+- **Manual choices stay manual.** Discovery never re-points the judge pool or the classifier column. Those stay empirical, logged, manual operations (§5.5).
+- **Privacy.** Model ids are public data. A failed call logs the provider, the error class, and the HTTP status, never a response body or a key (G5).
 
 ---
 
@@ -1003,6 +1028,7 @@ River (Postgres-backed; no Redis). All periodic jobs use River's periodic-jobs w
 | `calibration_score` | chained after rebuild | Brier + overconfidence per capability vs the locked predictions → `calibration`. |
 | `price_sync` | 06:00 daily | Refresh pricing snapshots (provider pricing data/config). |
 | `catalog_sync` | 06:10 daily | Refresh model statuses/deprecations; runs the pool-drift check (§7.2), including retention expiry; raises `retention_expiring` 14 days before any `retention_valid_until` (§4.5). |
+| `model_discovery` | 06:20 daily | List the text models of every provider with an operator key and compare them with the catalog; raise `new_model_available` and `model_withdrawn` (§4.6, D51). List calls cost nothing; the catalog does not change. |
 | `capture_expiry` | hourly | Hard-delete expired `debug_captures`. |
 | `history_prune` | 05:00 daily | Enforce `history.retention_days` (§10.3). |
 
@@ -1073,6 +1099,7 @@ The Rails seam, existing before Rails does (plan M5). Internal listener only (`:
 | `PUT /internal/v1/tenants/{id}/pools` `/weights` `/constraints` | Same payloads and validation as §9.7 (G4 applies). |
 | `GET /internal/v1/alerts?since=&kind=` | Operator alert feed (also delivered per §11.1). |
 | `POST /internal/v1/columns` / `PUT /internal/v1/columns/{id}` | Catalog administration: create column, edit status/pricing/retention fields (retirement guard §4.1 enforced; retention rules §4.5, downgrade simulation §7.2). |
+| `POST /internal/v1/models/refresh` | Run provider model discovery now (§4.6) and return each provider's status with the `new` and `withdrawn` sets. Optional `{enroll: [...]}` creates `cold_start` columns through the column create path, all or nothing, with operator-supplied `pricing`; the response adds the next nightly spend projection (G8). Errors are `401`, `413`, `422 invalid_request`, and `500`; a run where every provider failed still answers `200` (added 2026-09-30 by owner decision, D51) |
 | `PUT /internal/v1/tenants/{id}/limits` | Operator override of per-tenant limits: `{classification_daily_quota?}` (null clears the override; response echoes effective values). v1.1 §4.2 adds `rpm` and `history_retention_days` to the same endpoint and entitlement sync writes it from M8. (added 2026-09-28 for the Rust port) |
 | `POST /internal/v1/corpus/activate` | Flip active corpus version (after `maverick corpus load`). |
 
@@ -1112,7 +1139,7 @@ Env vars, prefix `MAVERICK_`, parsed and validated at boot (fail fast, print the
 | `MAVERICK_RATELIMIT_RPM` | `300` | §9.1 |
 | `MAVERICK_HISTORY_RETENTION_DAYS` | `365` | §10.3 |
 | `MAVERICK_SMTP_URL`, `MAVERICK_ALERTS_WEBHOOK_URL`, `MAVERICK_ALERTS_WEBHOOK_SECRET` | — | §11.1 |
-| `MAVERICK_CRON_NIGHTLY`, `MAVERICK_CRON_WEEKLY`, ... | §11 defaults | Schedules |
+| `MAVERICK_CRON_NIGHTLY`, `MAVERICK_CRON_WEEKLY`, `MAVERICK_CRON_MODEL_DISCOVERY` (D51), ... | §11 defaults | Schedules |
 
 ### 14.2 Deployment
 

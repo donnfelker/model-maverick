@@ -29,6 +29,8 @@ logged, but it never blocks or fails the write that created the row.
 | `classifier_degraded` | critical (info for a D41 resolution) | the classifier resolver and its re-resolution | More than 5% of classifier calls failed over 15 minutes (at least 20 samples). One alert per episode, re-armed on recovery. Or the classifier column stayed unresolved for 5 minutes (subject `reason: "unresolved"`, D41), and its later resolution writes an `info` alert (`reason: "resolved"`). Prompt-form requests get the fallback classification meanwhile. |
 | `pool_would_be_empty` | critical | retirement guard, drift check, recommend | A retirement was blocked (spec §4.1), the nightly drift check found a pool with no usable column for some cell, or a request found that drift. The subject names the tenants and pools. |
 | `retention_expiring` | warning | `catalog_sync` | A column's or an execution alias's zero-retention evidence expires within 14 days (spec §4.5). Renew it before it expires: expired evidence reads as `unknown`, and zero-retention tenants then lose that column (D1, D15). |
+| `new_model_available` | info | `model_discovery` and the models refresh (not running yet, D51) | A provider lists a text model that no catalog column covers. One alert per provider and base id. Enroll it or leave it (see "New models"). |
+| `model_withdrawn` | warning | `model_discovery` and the models refresh (not running yet, D51) | A non-retired `direct` column's model is no longer in its provider's list. One alert per column. The column keeps its status until you deprecate it. |
 
 Read the feed at `GET /internal/v1/alerts?since=&kind=` (internal listener, a bearer token
 from `MAVERICK_INTERNAL_TOKENS`).
@@ -226,6 +228,41 @@ refresh them from models.dev (bead 7.15):
   change. A change of more than 10 times the stored price is refused.
 
 A price edit never restates the cost of past runs.
+
+## New models
+
+Status: specified (D51, spec §4.6). The `model_discovery` job and the refresh endpoint land
+with beads 8l1b.2 to 8l1b.4. Until then, add columns by hand with
+`POST /internal/v1/columns`.
+
+The engine notices model releases through each provider's own model-list API, never through
+a third-party feed.
+
+- **Daily.** At 06:20 UTC (`MAVERICK_CRON_MODEL_DISCOVERY`), `model_discovery` lists the
+  text models of each provider that has an operator key, and compares them with the catalog.
+  A provider without a key is skipped.
+- **Alerts.** A model the catalog does not have raises one `new_model_available` alert
+  (info). A `direct` column whose model its provider no longer lists raises one
+  `model_withdrawn` alert (warning). The catalog does not change by itself.
+- **On demand.** `POST /internal/v1/models/refresh` through the tunnel runs discovery now
+  (`docs/api.md`). An empty body reports. `{"enroll": [...]}` creates the columns, all or
+  nothing.
+- **Enrolling.** Use the pinned snapshot id that the report names. Provider lists carry no
+  prices, so give the list price as `pricing` (see "Pricing"), and the retention evidence
+  when you have it (see "Zero-retention evidence").
+- **Spend.** A new column is `cold_start`: it runs the whole corpus every night for
+  `MAVERICK_CATALOG_COLD_START_NIGHTS` (5) nights, not the smoke set, and its cells become
+  measured after `MAVERICK_SCORING_MIN_NIGHTS` (3). So one new column costs far more per
+  night than a measured one. The refresh response shows the next nightly projection with the
+  new columns. A projection over the nightly cap refuses that whole batch (G8). So check it
+  before you enroll several models at once.
+- **Withdrawn models.** Deprecate the column (`PUT /internal/v1/columns/{id}` with
+  `status: deprecated` and a `deprecation_date`), then retire it later. The retirement guard
+  still protects the pools (see "Column lifecycle and the retirement guard").
+- **The judge pool and the classifier column stay manual.** Discovery never re-points them.
+  A new model joins `MAVERICK_JUDGE_POOL` only after its `critique_and_judging` cells are
+  measured and rank above the current members (see "The judge pool and the classifier
+  column").
 
 ## Debug capture and retention
 

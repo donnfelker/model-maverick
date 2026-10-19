@@ -528,3 +528,20 @@ async fn a_missing_notifier_still_writes_the_row() {
     pool.close().await;
     db.close().await;
 }
+
+/// DIVERGENCE: D51. Provider model discovery (spec §4.6) writes two alert kinds that the Go
+/// engine never had. Their stored names are the spec's, and serde agrees with `as_str`.
+#[test]
+fn d51_discovery_alert_kinds_have_their_stored_names() {
+    for (kind, stored) in [
+        (AlertKind::NewModelAvailable, "new_model_available"),
+        (AlertKind::ModelWithdrawn, "model_withdrawn"),
+    ] {
+        assert_eq!(kind.as_str(), stored);
+        assert_eq!(kind.to_string(), stored);
+        assert_eq!(
+            serde_json::to_value(kind).unwrap(),
+            Value::String(stored.to_owned())
+        );
+    }
+}

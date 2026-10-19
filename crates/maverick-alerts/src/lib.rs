@@ -21,7 +21,8 @@ pub use webhook::{
     SIGNATURE_HEADER, Webhook, body as webhook_body, signature as webhook_signature,
 };
 
-/// The alert kinds (closed set; reference Part 3 §4.1, plus Rust `retention_expiring`).
+/// The alert kinds (closed set; reference Part 3 §4.1, plus Rust `retention_expiring` and
+/// the D51 discovery kinds).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AlertKind {
@@ -34,6 +35,10 @@ pub enum AlertKind {
     ClassifierDegraded,
     /// Spec §4.5: 14 days before a column's or alias's retention evidence expires.
     RetentionExpiring,
+    /// Spec §4.6 (D51): a provider lists a model the catalog does not have (info).
+    NewModelAvailable,
+    /// Spec §4.6 (D51): a `direct` column's model is no longer listed (warning).
+    ModelWithdrawn,
 }
 
 impl AlertKind {
@@ -48,6 +53,8 @@ impl AlertKind {
             Self::PoolWouldBeEmpty => "pool_would_be_empty",
             Self::ClassifierDegraded => "classifier_degraded",
             Self::RetentionExpiring => "retention_expiring",
+            Self::NewModelAvailable => "new_model_available",
+            Self::ModelWithdrawn => "model_withdrawn",
         }
     }
 }
