@@ -5,6 +5,7 @@
 
 pub mod audit;
 pub mod capture;
+pub mod classifier_evidence;
 pub mod classify;
 pub mod config;
 mod debug;

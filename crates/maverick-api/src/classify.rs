@@ -311,7 +311,7 @@ pub fn client_for(
 }
 
 /// The first catalog column whose model id and endpoint are `column_ref`'s.
-fn find_column<'a>(
+pub(crate) fn find_column<'a>(
     columns: &'a [ModelColumn],
     column_ref: &str,
 ) -> Result<Option<&'a ModelColumn>, String> {

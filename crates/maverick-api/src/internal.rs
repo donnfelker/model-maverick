@@ -28,8 +28,8 @@ use sqlx::PgPool;
 use crate::config::{self, ConfigFailure, Resource};
 use crate::strict::{self, invalid, malformed, required_field};
 use crate::{
-    ApiError, ApiState, ErrorCode, InternalActor, audit, escape_go_json, internal_error, not_found,
-    read_body, response_with_json,
+    ApiError, ApiState, ErrorCode, InternalActor, audit, classifier_evidence, escape_go_json,
+    internal_error, not_found, read_body, response_with_json,
 };
 
 /// The providers a column may name.
@@ -1453,7 +1453,33 @@ async fn change_column(
     }
     audit::column_update(&actor.0, id, &column.status);
     retention_downgrade_alerts(api, db, &stored, &column, now).await?;
+    classifier_evidence_alert(api, db, now).await?;
     Ok(json(StatusCode::OK, &column_json(&column)?))
+}
+
+/// The zero-retention classifier column is covered like a pool member (spec §8.3): a
+/// write that takes its zero evidence away writes a critical `classifier_degraded` alert,
+/// and a write that restores it writes an `info` one ([`classifier_evidence`]).
+async fn classifier_evidence_alert(
+    api: &ApiState,
+    db: &PgPool,
+    now: DateTime<Utc>,
+) -> Result<(), Failure> {
+    let settings = api.recommend().classifier.settings();
+    if settings.zero_retention_column.is_none() {
+        return Ok(());
+    }
+    let columns = catalog::list_model_columns(db).await?;
+    classifier_evidence::alert_on_change(
+        db,
+        api.recommend().alerts.as_deref(),
+        settings,
+        &columns,
+        now,
+    )
+    .await
+    .map_err(|error| Failure::Internal(error.to_string()))?;
+    Ok(())
 }
 
 fn stored_alias_keys(column: &ModelColumn) -> Vec<String> {

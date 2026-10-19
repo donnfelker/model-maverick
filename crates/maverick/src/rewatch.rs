@@ -17,8 +17,10 @@ use std::collections::HashMap;
 use std::sync::{Arc, PoisonError, RwLock};
 use std::time::Duration;
 
+use chrono::Utc;
 use maverick_alerts::{AlertKind, AlertNotifier, Severity, write_alert};
-use maverick_api::classify::Resolver;
+use maverick_api::classifier_evidence;
+use maverick_api::classify::{Resolver, ResolverSettings};
 use maverick_domain::gojson::JsonValue;
 use maverick_domain::graders::judge_rubric::{
     FamilyResolver, JudgeClient, PoolColumn, pool_from_config,
@@ -27,6 +29,7 @@ use maverick_domain::graders::{
     BoxError, BoxFuture, GradeInput, GradeResult, Grader, JudgeRubric, SpecValidator,
 };
 use maverick_providers::ProviderClient;
+use maverick_store::catalog::ModelColumn;
 use serde_json::json;
 use sqlx::PgPool;
 use tokio::time::Instant;
@@ -62,6 +65,13 @@ pub(crate) async fn watch_classifier(
     let mut complete = resolver.connection().complete();
     let mut unresolved_since = (!complete).then(Instant::now);
     let mut alerted = false;
+    // Spec §8.3: the zero-retention classifier column is validated at boot.
+    match maverick_store::catalog::list_model_columns(&pool).await {
+        Ok(columns) => check_evidence(&pool, notifier.as_ref(), &settings, &columns).await,
+        Err(error) => {
+            tracing::warn!(error = %error, "classifier evidence check: reading the catalog failed");
+        }
+    }
     loop {
         tokio::time::sleep(if complete {
             timing.refresh
@@ -106,6 +116,7 @@ pub(crate) async fn watch_classifier(
                     unresolved_since = Some(Instant::now());
                 }
                 complete = now;
+                check_evidence(&pool, notifier.as_ref(), &settings, &columns).await;
             }
             Err(error) => {
                 tracing::warn!(error = %error, "classifier re-resolution: reading the catalog failed");
@@ -132,6 +143,23 @@ pub(crate) async fn watch_classifier(
             .await;
             alerted = true;
         }
+    }
+}
+
+/// The zero-retention classifier column's evidence, covered like a pool member's (spec
+/// §8.3): its loss and its return each write one `classifier_degraded` alert. This also
+/// catches evidence that expires with no catalog write.
+async fn check_evidence(
+    pool: &PgPool,
+    notifier: &dyn AlertNotifier,
+    settings: &ResolverSettings,
+    columns: &[ModelColumn],
+) {
+    if let Err(error) =
+        classifier_evidence::alert_on_change(pool, Some(notifier), settings, columns, Utc::now())
+            .await
+    {
+        tracing::error!(error = %error, "checking the zero-retention classifier column's evidence");
     }
 }
 
@@ -283,8 +311,8 @@ mod tests {
     use std::sync::LazyLock;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use chrono::Utc;
-    use maverick_api::classify::{Method, ResolveInput, ResolverSettings};
+    use maverick_api::classifier_evidence::{LOST, RESTORED};
+    use maverick_api::classify::{Method, ResolveInput};
     use maverick_domain::graders::judge_rubric::JudgeRequest;
     use maverick_providers::{CompletionRequest, CompletionResponse, ProviderFuture};
     use maverick_store::alerts::Alert;
@@ -484,6 +512,72 @@ mod tests {
             .await
             .expect("resolve");
         assert_eq!(after.method, Method::Classified);
+        watcher.abort();
+        pool.close().await;
+        db.close().await;
+    }
+
+    /// Spec §8.3: the zero-retention classifier column is validated at boot, like a pool
+    /// member. A column with no zero evidence alerts at once, and evidence that arrives
+    /// with no write through the API is noticed on the next refresh (D2).
+    #[tokio::test]
+    async fn the_zero_retention_columns_evidence_is_checked_at_boot_and_on_refresh() {
+        let Some(db) = maverick_testdb::database(&SCHEMA).await else {
+            return;
+        };
+        let pool = db.pool().await;
+        column(&pool, "col_classifier", "anthropic", "claude-haiku-4-5").await;
+        column(&pool, "col_zr", "anthropic", "zr-classifier").await;
+        let clients: HashMap<String, Arc<dyn ProviderClient>> = HashMap::from([(
+            "anthropic".to_owned(),
+            Arc::new(Answering) as Arc<dyn ProviderClient>,
+        )]);
+        let settings = ResolverSettings {
+            column: CLASSIFIER.to_owned(),
+            zero_retention_column: Some("zr-classifier/direct".to_owned()),
+            ..ResolverSettings::default()
+        };
+        let columns = catalog::list_model_columns(&pool).await.expect("columns");
+        let resolver = Arc::new(Resolver::new(settings).connect(&columns, &clients));
+        assert!(resolver.connection().complete(), "both columns resolve");
+
+        let counter = Arc::new(Counter::default());
+        let watcher = tokio::spawn(watch_classifier(
+            Arc::clone(&resolver),
+            pool.clone(),
+            clients,
+            Arc::clone(&counter) as Arc<dyn AlertNotifier>,
+            Rewatch {
+                refresh: Duration::from_millis(50),
+                ..fast()
+            },
+        ));
+        until("the boot check", || async {
+            degraded(&pool).await == [("critical".to_owned(), LOST.to_owned())]
+        })
+        .await;
+
+        sqlx::query(
+            "update model_columns set retention_mode = 'zero',
+                 retention_verified_at = now() - interval '10 days',
+                 retention_valid_until = now() + interval '60 days'
+             where id = 'col_zr'",
+        )
+        .execute(&pool)
+        .await
+        .expect("evidence");
+        until("the restored alert", || async {
+            degraded(&pool).await.len() == 2
+        })
+        .await;
+        assert_eq!(
+            degraded(&pool).await,
+            [
+                ("critical".to_owned(), LOST.to_owned()),
+                ("info".to_owned(), RESTORED.to_owned()),
+            ]
+        );
+        assert_eq!(counter.0.load(Ordering::SeqCst), 2);
         watcher.abort();
         pool.close().await;
         db.close().await;

@@ -32,6 +32,7 @@ maverick-jobs = { workspace = true }
 maverick-alerts = { workspace = true }
 maverick-api = { workspace = true }
 tokio = { workspace = true }
+chrono = { workspace = true }
 # serve: the HTTP/1.1 listeners with Go's header read timeout and a graceful drain.
 axum = { workspace = true }
 hyper = { version = "1", features = ["server", "http1"] }
@@ -49,4 +50,3 @@ opentelemetry-otlp = { workspace = true }
 [dev-dependencies]
 maverick-testdb = { workspace = true }
 reqwest = { workspace = true }
-chrono = { workspace = true }
