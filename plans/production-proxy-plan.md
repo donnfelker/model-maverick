@@ -1,6 +1,6 @@
-# The proxy as a production path, with OpenRouter-style model names (proposed D45, D46)
+# The proxy as a production path, with OpenRouter-style model names (D45, D46)
 
-Status: proposed 2026-09-30. Owner decisions from 2026-09-30 are in §2. The beads are under the epic "Production proxy and OpenRouter-style model names (D45, D46)".
+Status: adopted 2026-10-24 into `specs/model-maverick-v1-spec.md` and `parity/DIVERGENCES.md` (D45, D46, D47). Owner decisions from 2026-09-30 are in §2, and the §9 answers from 2026-10-24 are in §9. The beads are under the epic "Production proxy and OpenRouter-style model names (D45, D46)".
 
 ## 1. Why
 
@@ -37,7 +37,7 @@ The engine itself has no try-it concept. No engine crate uses the label.
 
 Rules:
 
-- A string that starts with `maverick/` is a Maverick route. Everything after the prefix up to the first `:` is the route name. `auto` is the default pool. Any other name is a pool name. The text after the first `:` is the variant. An empty route name, an empty variant, or an unknown variant is `400 malformed_alias` on the proxy (same code as today).
+- A string that starts with `maverick/` is a Maverick route. Everything after the prefix up to the first `:` is the route name. `auto` is the default pool. Any other name is a pool name. The text after the first `:` is the variant. An empty route name, an empty variant, or an unknown variant is `400 invalid_model_alias` on the proxy (same code as today; `malformed_alias` is the parser's error name). The spec adds two cases: a `?` after the prefix is malformed, and a missing or empty `model` keeps Go's `400 invalid_model_alias`.
 - Variants are exact and case sensitive: `quality`, `balanced`, `cost`. There is no `auto` variant.
 - A pool cannot be named `auto`, and a pool name cannot contain `:`. `PUT /v1/config/pools` rejects both with `422 invalid_request` naming the pool. Pool names may contain `/`.
 - **Settings opt-out.** The `?settings=caller` suffix (D14) is removed from the grammar. A caller sends the header `X-Maverick-Settings: caller` instead (SDK cores: the existing option, now sent as a field, not a suffix). Any other value of the header is `400 invalid_request`. The proxy strips the header upstream. The OpenRouter grammar has no query suffix, and a header does not collide with a future variant.
@@ -93,6 +93,8 @@ The last good store is in memory only (the proxy has no database), bounded (defa
 | D46 | Proxy fail-open | The proxy is exempt from G14. Any engine failure is `502 engine_error` | The proxy runs the core fail-open ladder: in-memory last good list per tenant key and route (max age 24 h), then a per-surface default model, then `503 engine_unavailable` with `Retry-After`. Zero-retention codes are terminal; zero-retention tenants use only `zero` entries or a default marked zero retention. `401` and `403` keep the D13 mapping. `X-Maverick-Fallback` marks fallback responses | `plans/production-proxy-plan.md` §4; spec §1.1 G14, §8.1; owner decision 2026-09-30 |
 
 D14's "Rust expected" cell changes to name the header instead of the suffix.
+
+§9 question 2 adds D47: `POST /v1/recommend` without `mode` ranks in `quality` mode.
 
 ## 8. Removing the label
 

@@ -47,7 +47,7 @@ Non-goals:
 - The engine does not count tokens exactly. It takes an estimate from the caller.
 - No switch happens in the middle of a stream. The chain executor rules are unchanged.
 - No schema translation, no Redis, no prompt storage.
-- This plan does not change how the existing modes weigh cost. `balanced` (the default mode) already weighs cost at 0.35 and uses a 1.5-point band, and every mode breaks ties inside the 0.75-point noise band toward the cheaper column (spec §7.4). A caller that wants the highest-quality column without affinity sends `mode: "quality"` (band 0, weights 0.8/0.1/0.1). Changing the default mode or the tie rule is a separate owner decision (§9 question 7).
+- This plan does not change how the existing modes weigh cost. The default mode is `quality` (band 0, weights 0.8/0.1/0.1; D47, decided 2026-10-24, see §9 question 7). `balanced` weighs cost at 0.35 and uses a 1.5-point band, and every mode breaks ties inside the 0.75-point noise band toward the cheaper column (spec §7.4). Changing the tie rule is a separate owner decision.
 
 ## 3. Design choice
 
@@ -195,7 +195,7 @@ The declared path target stays p95 under 50 ms. Affinity adds one primary-key re
 
 - A caller sends `X-Maverick-Conversation: <id>`. The value is 1 to 256 printable ASCII characters. A present but malformed value is `400 invalid_request` with message `X-Maverick-Conversation must be 1 to 256 printable ASCII characters`, and the engine is not called.
 - The proxy sends `affinity.key = <id>` and `affinity.context_tokens = ceil(request body bytes / 4)`. This is the same estimate that the spend guard uses. Base64 images make it high. That is accepted for v1 (§9 question 3).
-- The header is stripped from every upstream request, like `X-Maverick-API-Key` (D30).
+- The header is stripped from every upstream request, like `X-Maverick-API-Key` (D30) and `X-Maverick-Settings` (D45).
 - The proxy stamps `X-Maverick-Affinity: <status>` on the response next to `X-Maverick-Recommendation-Id`.
 - No header means no affinity. Behavior is unchanged.
 - The proxy has no per-request cost-aware switch. It uses the tenant setting.
@@ -259,7 +259,7 @@ Decided 2026-10-24 by the owner: accept the recommendation for 1, 2, 3, 4, 6, an
 5. **Per-tenant settings.** Decided 2026-09-30 by the owner: cost-aware affinity is a tenant setting, `affinity_cost_aware`, default off, with a per-request override. The default is always the best model for the turn. A per-tenant bonus value is not added until a tenant asks.
 6. **Client fail-open.** During an engine outage, should the SDK core keep the last pick per conversation in memory and use it first? Recommendation: not in this change. The core keeps its current last-known-good ladder.
 
-7. **Cost in the default ranking.** The owner's goal is the best model for the task, with cost not deciding the pick. The default mode, `balanced`, weighs cost at 0.35, and all modes break near-ties toward the cheaper column. Should the default mode become `quality`, or should a tenant be able to set its default mode? Recommendation: decide separately from D44. Until then, callers who want pure quality send `mode: "quality"` or use the `maverick/quality` alias.
+7. **Cost in the default ranking.** The owner's goal is the best model for the task, with cost not deciding the pick. The default mode, `balanced`, weighs cost at 0.35, and all modes break near-ties toward the cheaper column. Should the default mode become `quality`, or should a tenant be able to set its default mode? Recommendation: decide separately from D44. Until then, callers who want pure quality send `mode: "quality"`. Answered 2026-10-24 by `plans/production-proxy-plan.md` §9 question 2: the engine default mode is `quality` (D47), and `maverick/auto` means quality (D45).
 
 ## 10. Build order
 

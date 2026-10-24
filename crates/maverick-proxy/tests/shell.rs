@@ -586,6 +586,7 @@ async fn engine_failure_is_502_engine_error_and_one_log_line() {
     // Dropping `logs` fails the test if the prompt or the key reached any log line.
 }
 
+/// D46: the terminal privacy codes are never fail-open triggers; the proxy relays them.
 #[tokio::test]
 async fn terminal_privacy_errors_are_relayed_with_their_code() {
     let engine = MockEngine::start(vec![
@@ -1009,6 +1010,7 @@ async fn hosted_tenant_keys_are_checked_and_isolated() {
     proxy.stop().await.expect("clean shutdown");
 }
 
+/// D13, D46: an engine 401 or 403 keeps this mapping and never triggers fail-open.
 #[tokio::test]
 async fn hosted_engine_401_and_403_map_to_the_tenant() {
     let engine = MockEngine::start(vec![

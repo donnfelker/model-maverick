@@ -143,7 +143,8 @@ Full request (all fields except `workload` optional):
 ```
 
 - `pool` defaults to the tenant default pool.
-- `mode` ∈ `quality | balanced | cost`, default `balanced`.
+- `mode` ∈ `quality | balanced | cost`, default `quality`. An empty string
+  also means the default. (D47: the Go engine defaulted to `balanced`.)
 - `allowed_models` entries are **model names** (request-time ergonomics;
   stored pool config references `column_id`s).
 - `constraints` are per-request preferences. Standing tenant constraints
@@ -599,6 +600,12 @@ and the standing constraints apply, including zero retention: a
 zero-retention tenant's pools each need a column with valid zero-retention
 evidence, D1), `422 invalid_request`.
 
+A pool cannot be named `auto`, and a pool name cannot contain `:`, because
+the model grammar reserves both (D45, see "SDK integration conventions").
+The first such pool is `422 invalid_request` with `details.pool`, and the
+message is `pool name "auto" is reserved` or
+`pool name "<name>" must not contain ':'`. A pool name may contain `/`.
+
 ### GET/PUT /v1/config/weights
 
 Per-capability ranking weights and quality bar:
@@ -826,21 +833,52 @@ An unknown tool is JSON-RPC error `-32602`, and an unknown method is
 ## SDK integration conventions
 
 Every MM-authored component (the client SDKs, the gateway plugins, and the
-proxy) follows two conventions (integration-surfaces plan §1). They are
+proxy) follows these conventions (integration-surfaces plan §1). They are
 not part of the engine's own wire contract.
 
-- **Model-alias grammar.** `maverick/auto` (balanced), `maverick/quality`,
-  `maverick/cost`, or `maverick/<pool>:<mode>`, where `<mode>` is `auto`,
-  `quality`, or `cost`. The grammar is exact and case sensitive. The string
-  splits at the first `:`, and neither part may be empty. `maverick-core`
-  parses it, so the proxy and the SDK cores agree. An alias may end with
-  `?settings=caller`: the component then leaves the caller's settings alone
-  instead of applying the recommended entry's `settings` (D14). A string
-  without the `maverick/` prefix is not an alias: the proxy refuses it with
-  `400 invalid_model_alias`, and an SDK passes it through. The component never
-  sends an alias to the engine. It turns the alias into a `POST /v1/recommend`
-  call (declared or prompt form, per its privacy mode) and runs its own chain
-  executor over the returned chain.
+- **Model names (D45).** The names follow OpenRouter's model ids.
+  `maverick-core` parses them, so the proxy and the SDK cores agree.
+
+  | Model string | Meaning |
+  |---|---|
+  | `maverick/auto` | The tenant's default pool, `quality` mode |
+  | `maverick/auto:quality`, `:balanced`, `:cost` | The default pool in that mode |
+  | `maverick/<pool>` | The named pool, `quality` mode |
+  | `maverick/<pool>:<variant>` | The named pool in that mode |
+  | `anthropic/claude-opus-5-5`, `claude-opus-5-5` | A direct model: no routing |
+
+  A string that starts with `maverick/` is a route. The text up to the
+  first `:` is the route name: `auto` is the default pool, and any other
+  name is a pool (it may contain `/`). The text after the first `:` is the
+  variant: `quality`, `balanced`, or `cost`, and no variant means `quality`.
+  The grammar is exact and case sensitive. An empty route, an empty or
+  unknown variant, or a `?` after the prefix is malformed, and the proxy
+  answers `400 invalid_model_alias`. `maverick/quality` and `maverick/cost`
+  name pools called `quality` and `cost`. For a mode on the default pool,
+  send `maverick/auto:cost`.
+
+  Any other string is a direct model, and the component calls it as the
+  caller wrote it, with no engine call and no telemetry. The proxy removes
+  an `anthropic/` prefix on `/v1/messages` and an `openai/` prefix on
+  `/v1/chat/completions`. Another author is `400 invalid_request`, because
+  the proxy does not translate schemas. With a caller OpenRouter key, the
+  string goes to OpenRouter unchanged.
+
+  The component never sends a model string to the engine. It turns a route
+  into a `POST /v1/recommend` call (declared or prompt form, per its privacy
+  mode) and runs its own chain executor over the returned chain.
+- **Settings opt-out.** The request header `X-Maverick-Settings: caller`
+  tells the component to leave the caller's settings alone instead of
+  applying the recommended entry's `settings` (D14, D45). Any other value is
+  `400 invalid_request`. The proxy strips the header before it calls a
+  provider. The old `?settings=caller` model suffix is gone, and the proxy
+  answers it with `400 invalid_model_alias`.
+- **Fail-open (G14).** An MM outage never breaks the call. The proxy and the
+  SDK cores use the last good list for the route, then a configured default
+  model. The proxy answers `503 engine_unavailable` with `Retry-After: 5`
+  when neither is usable, and it marks a fallback response with
+  `X-Maverick-Fallback: last_known_good` or `default_model` (D46). For a
+  zero-retention tenant, only fallbacks verified as zero retention are used.
 - **Correlation response headers.** A component that sits in the request path
   sets `X-Maverick-Recommendation-Id` and `X-Maverick-Model-Used` (the model it
   executed) on the response. A caller can then tie a provider response to its

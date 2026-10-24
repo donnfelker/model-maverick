@@ -41,9 +41,9 @@ the chain, and the telemetry; the wire work is someone else's solved problem.
 - **G14 — Fail-open.** An MM component failure never breaks or blocks the
   customer's LLM call. SDKs and plugins degrade: last-known-good chain (TTL cache)
   → configured static default → the customer's original model string. Telemetry is
-  fire-and-forget and drops silently. (The proxy is exempt today: it is in-path by
-  design, and an engine failure is its `502 engine_error`. The production-proxy
-  plan §4, proposed D46, gives it the same ladder.) **Privacy outranks G14** (added
+  fire-and-forget and drops silently. (The proxy follows the same ladder for a
+  `maverick/*` route: its last good list, then a per-surface default model, then
+  `503 engine_unavailable`; D46, adopted 2026-10-24. The Go proxy was exempt.) **Privacy outranks G14** (added
   2026-09-28): for a zero-retention tenant, fallback may use only cached entries
   stamped `retention_mode: zero`, and the static default or original model only
   if locally configured as verified zero-retention; otherwise the call fails
@@ -69,10 +69,11 @@ Small, and a precondition for everything below.
   `completed_unchecked`, which counts toward availability only and never enters
   outcome blending (v1 spec §9.10, changed 2026-09-28). Same tenant Bearer auth. Documented only in SDK/plugin internals — it is
   plumbing, not API surface for customers.
-- **Mode alias grammar**, defined once, parsed identically by every track:
-  `maverick/auto` (= balanced), `maverick/quality`, `maverick/cost`, extension
-  `maverick/<pool>:<mode>`. A concrete model name is never valid where an alias is
-  expected.
+- **Model name grammar**, defined once, parsed identically by every track (D45,
+  adopted 2026-10-24; spec §8.1): `maverick/auto` (the default pool, quality),
+  `maverick/auto:<variant>`, and `maverick/<pool>[:<variant>]`, with variant
+  `quality`, `balanced`, or `cost`. Any other string is a direct model, called as
+  the caller wrote it.
 - **Correlation convention:** components stamp `X-Maverick-Recommendation-Id` (and
   `X-Maverick-Model-Used`) on responses they touched.
 - **v1.1 spec edits when accepted:** §7 data source becomes telemetry-observed
@@ -99,8 +100,8 @@ capability/difficulty; off never calls MM and uses the configured default —
 a kill switch that keeps deploys safe; a `zero_retention: true` recommend
 response forces declared mode, and the engine's two privacy codes are terminal,
 per G14's privacy rule); workload projection and the `X-Maverick-Workload`
-declared header, and applying each entry's `settings` by default with a
-`?settings=caller` opt-out, per `plans/model-maverick-sdk-v0-plan.md` §2.1;
+declared header, and applying each entry's `settings` by default with an
+`X-Maverick-Settings: caller` opt-out (D45), per `plans/model-maverick-sdk-v0-plan.md` §2.1;
 telemetry switch `telemetry: on | off`
 (default on, env `MODELMAVERICK_TELEMETRY=off`) — off suppresses all
 `/v1/telemetry` traffic per G13. Config: `MODELMAVERICK_API_KEY` + optional
@@ -195,8 +196,8 @@ by deployment topology, same as the internal listener does today.
 - **Workload:** the proxy builds the prompt form with the shared versioned
   workload projection (`plans/model-maverick-sdk-v0-plan.md` §2.1), not only the
   last user message, and honors `X-Maverick-Workload: <capability>[:<tier>]` as a
-  declared override. Entry `settings` are applied unless the alias carries
-  `?settings=caller`. Zero-retention tenants get the G14 privacy rule and the
+  declared override. Entry `settings` are applied unless the request carries
+  `X-Maverick-Settings: caller` (D45). Zero-retention tenants get the G14 privacy rule and the
   OpenRouter Zero Data Retention rules (OpenRouter execution spec §3.2).
 - **Auth and fences:** the tenant's Maverick key travels in `X-Maverick-API-Key`
   (the hosted proxy is one shared instance; rate limits and telemetry are per

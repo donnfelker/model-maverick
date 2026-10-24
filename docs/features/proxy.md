@@ -1,14 +1,62 @@
 # Proxy
 
 The proxy is the base-URL integration for existing OpenAI and Anthropic
-clients. A caller points its base URL at the proxy, uses a `maverick/*` model alias, and
+clients. A caller points its base URL at the proxy, uses a `maverick/*` model name, and
 keeps the provider wire format it already sends. The proxy asks the engine for a
 ranked chain, tries the entries in order, and reports the attempts through
-`/v1/telemetry`.
+`/v1/telemetry`. Any other model name is a direct call, so pointing a client at the
+proxy never breaks it.
 
 The engine still does not execute inference. The proxy is the only component
 that calls providers, and it uses the caller credential or the self-hosted
 operator keys.
+
+## Model names
+
+The names follow OpenRouter's model ids (D45):
+
+| Model | What the proxy does |
+|---|---|
+| `maverick/auto` | Routes over the tenant's default pool in `quality` mode |
+| `maverick/auto:balanced`, `maverick/auto:cost` | Routes over the default pool in that mode |
+| `maverick/<pool>`, `maverick/<pool>:<variant>` | Routes over the named pool (`quality` when there is no variant) |
+| `anthropic/claude-opus-5-5` on `/v1/messages` | Calls `claude-opus-5-5` at Anthropic directly |
+| `claude-opus-5-5` | Calls that model on the surface's own provider directly |
+
+A direct call skips the engine. It has no recommendation id and sends no telemetry.
+Claude Code sends bare ids such as `claude-opus-5-5` unless you set a `maverick/*`
+model, so its default model is a direct call. A model from another provider than the
+surface's own is `400 invalid_request`, because the proxy does not translate schemas.
+
+`maverick/quality` and `maverick/cost` name pools called `quality` and `cost`. Use
+`maverick/auto:cost` for cost mode on the default pool. A malformed `maverick/*` name is
+`400 invalid_model_alias`. The full grammar is in
+[API conventions](../api.md#sdk-integration-conventions).
+
+The proxy applies the recommended entry's settings (reasoning effort, thinking mode).
+Send `X-Maverick-Settings: caller` to keep your own. The proxy strips that header
+before it calls a provider.
+
+## Fail-open
+
+An engine outage does not break a routed call (D46). When the engine times out, cannot
+be reached, answers 5xx, or sends a malformed answer, the proxy uses:
+
+1. The last good ranked list for the same tenant key and route, if it is younger than
+   `MAVERICK_PROXY_LKG_MAX_AGE` (default 24 h).
+2. Else the surface's default model, `MAVERICK_PROXY_DEFAULT_MODEL_MESSAGES` or
+   `MAVERICK_PROXY_DEFAULT_MODEL_CHAT` (unset by default), as a direct call.
+3. Else `503 engine_unavailable` with `Retry-After: 5`.
+
+A fallback response carries `X-Maverick-Fallback: last_known_good` or
+`X-Maverick-Fallback: default_model`. The last good store is in memory, per replica,
+and bounded. It holds ranked lists, never prompts.
+
+Privacy comes first. The engine's `422 zero_retention_requires_declared` and
+`409 no_compliant_columns` are relayed, never fallen open. For a zero-retention tenant,
+the proxy uses only cached entries marked `zero`, and the default model only when
+`MAVERICK_PROXY_DEFAULT_MODEL_ZERO_RETENTION=true`. Otherwise it answers the `503`. An
+engine `401` or `403` is never a fallback trigger.
 
 ## Modes
 
@@ -97,11 +145,12 @@ Use an OpenAI-compatible client for OpenRouter testing.
 - The Messages surface executes Anthropic entries only.
 - Hosted mode never falls back to provider keys owned by Model Maverick.
 - `X-Maverick-API-Key` is stripped before any upstream provider call.
-- The default hosted rate limit is 60 requests per minute per tenant key.
+- The default rate limit is 600 requests per minute per tenant key
+  (`MAVERICK_PROXY_RATELIMIT_RPM`). Direct calls count against it.
 - The default body cap is 32 MiB.
-- The proxy is a production path. Its fail-open ladder, availability target,
-  and alerts are in `plans/production-proxy-plan.md` §4 and §5 until the spec and
-  `docs/operations.md` carry them.
+- The proxy is a production path. Its fail-open ladder is in spec §8.1 (D46).
+  Its availability target and alerts are in `plans/production-proxy-plan.md` §5
+  until `docs/operations.md` carries them.
 
 ## Telemetry
 

@@ -20,9 +20,10 @@ mean every framework integration per language; fast-follows are listed per SDK.
 
 ### 2.1 Behaviors (identical across languages)
 
-- **Alias grammar:** `maverick/auto` (= balanced) | `maverick/quality` |
-  `maverick/cost` | `maverick/<pool>:<mode>`, each optionally suffixed
-  `?settings=caller`. Anything else passes through untouched — a concrete model
+- **Model name grammar** (D45, adopted 2026-10-24; spec §8.1): `maverick/auto`
+  (the default pool, quality) | `maverick/auto:<variant>` |
+  `maverick/<pool>[:<variant>]`, with variant `quality`, `balanced`, or `cost`.
+  Anything else passes through untouched — a concrete model
   name means "don't route, just call it."
 - **Recommend client:** declared + prompt forms; request timeout default 2s
   (the declared hot path answers in single-digit ms; the uncached prompt path
@@ -40,8 +41,8 @@ mean every framework integration per language; fast-follows are listed per SDK.
 - **Settings** (added 2026-09-28): every chain entry carries its column's
   `settings` (reasoning effort, thinking mode). The core applies them to the
   provider call by default and records `settings_applied` in telemetry; the
-  `?settings=caller` alias suffix opts out and leaves the caller's own values
-  untouched.
+  `X-Maverick-Settings: caller` request option (D45) opts out and leaves the
+  caller's own values untouched.
 - **Chain executor:** try `recommendations[0]`; advance on 429 / 5xx / timeout /
   connection error; respect `Retry-After`; **never** advance on semantic 4xx (a
   bad request is bad on every model); per-entry timeout; exhausted chain →
@@ -111,9 +112,9 @@ frozen as the cross-language contract:
    `settings_applied` set when entry settings were applied.
 8. `MODELMAVERICK_TELEMETRY=off` → zero bytes to `/v1/telemetry` (asserted by
    the mock).
-9. Alias parsing table, including pass-through of concrete model names and the
-   `?settings=caller` suffix (entry settings applied by default, left alone
-   with the suffix). The prompt-form request carries the workload projection
+9. Alias parsing table, including pass-through of concrete model names (the
+   `alias.v2.json` vectors, D45). Entry settings are applied by default and left
+   alone with `X-Maverick-Settings: caller`. The prompt-form request carries the workload projection
    and its version; an `X-Maverick-Workload` override sends the declared form.
 
 ## 3. The four SDKs

@@ -32,11 +32,13 @@ These invariants hold everywhere; any implementation that violates one is wrong 
 G9 to G12 are defined in the v1.1 spec (§1.1). G13 and G14 are defined in `plans/model-maverick-integration-surfaces-plan.md` §0 and restated here because the engine contract depends on them:
 
 - **G13 — Zero ceremony.** No public surface asks the caller to report back. Outcome data is produced only by MM-authored components (SDKs, plugins, proxy) through `POST /v1/telemetry` (§9.10). Telemetry is opt-out in every component and off means zero bytes.
-- **G14 — Fail-open.** An MM component failure never breaks the customer's LLM call: last-known-good chain, then the configured static default, then the original model string. The proxy is exempt today: an engine failure is its `502 engine_error`. `plans/production-proxy-plan.md` §4 (proposed D46) removes the exemption. **Privacy outranks G14:** for a zero-retention tenant, fallback may use only cached chain entries stamped `retention_mode: zero`, and the static default or original model only if locally configured as verified zero-retention; otherwise the call fails closed. `422 zero_retention_requires_declared` and `409 no_compliant_columns` are terminal privacy errors, never fail-open triggers. (changed 2026-09-28 for the Rust port; the Go engine implements the prior rule)
+- **G14 — Fail-open.** An MM component failure never breaks the customer's LLM call: last-known-good chain, then the configured static default, then the original model string. The proxy follows the same ladder for a `maverick/*` route: its last good list, then the surface's configured default model, then `503 engine_unavailable` (§8.1; changed 2026-10-24 for the Rust port, D46: the Go proxy is exempt, and an engine failure is its `502 engine_error`). **Privacy outranks G14:** for a zero-retention tenant, fallback may use only cached chain entries stamped `retention_mode: zero`, and the static default or original model only if locally configured as verified zero-retention; otherwise the call fails closed. `422 zero_retention_requires_declared` and `409 no_compliant_columns` are terminal privacy errors, never fail-open triggers. (changed 2026-09-28 for the Rust port; the Go engine implements the prior rule)
 
 ### 1.2 Non-goals for v1
 
 No inference execution, no Rails/product shell (v1.1), no tenant-private corpora (v2), no IRT calibration or matrix completion (v1.1 — but the data they need is collected from day one), no per-endpoint quality columns (latency/cost only), no self-hosted providers (v2), no public leaderboard.
+
+The engine has no plans, prices, billing, subscriptions, or free-period state. It knows a tenant's status (`active` or `suspended`) and its numeric limits only, and the control plane maps its plans to those (§13; added 2026-10-24).
 
 ### 1.3 Vocabulary
 
@@ -724,7 +726,7 @@ Tenant weights default per mode when the tenant has no `tenant_weights` row for 
 
 Index 0 is the pick; the array is the pool-constrained fallback chain (G2).
 
-**Chain entries carry settings.** The recommended unit is (model, settings): every entry returns its column's `settings` (reasoning effort, thinking mode) and its effective `retention_mode` (§4.5). MM-authored components (proxy, SDK cores) apply the entry's `settings` by default and record `settings_applied` in telemetry (§9.10); callers opt out with the alias suffix `?settings=caller` (for example `maverick/<pool>:<mode>?settings=caller`). (changed 2026-09-28 for the Rust port; the Go engine implements the prior rule: entries omit `settings` and components never apply them)
+**Chain entries carry settings.** The recommended unit is (model, settings): every entry returns its column's `settings` (reasoning effort, thinking mode) and its effective `retention_mode` (§4.5). MM-authored components (proxy, SDK cores) apply the entry's `settings` by default and record `settings_applied` in telemetry (§9.10); callers opt out with the request header `X-Maverick-Settings: caller` (§8.1; changed 2026-10-24 for the Rust port, D45: the header replaced the `?settings=caller` model suffix). (changed 2026-09-28 for the Rust port; the Go engine implements the prior rule: entries omit `settings` and components never apply them)
 
 ### 7.5 Flags
 
@@ -768,16 +770,52 @@ Both present or both absent → `422 invalid_request`.
 
 - The chain executor obeys `Retry-After` on a 429 before it advances to the next entry (D26).
 - Telemetry goes through the `maverick-core` batcher: every 10 s or at 20 items, with a flush at shutdown, per tenant key. Telemetry off means zero bytes (D27).
-- The proxy applies a fixed-window rate limit per tenant key. The limit is lower than the API limit (§9.1). A rejected request gets `429 rate_limited` with `Retry-After` (D28). The limit is `MAVERICK_PROXY_RATELIMIT_RPM` requests per clock minute (default 60; a value that is not a positive integer is a startup error). Hosted mode limits each tenant key; self-hosted mode has one key. The check runs after the tenant key is known and before the body is read. The response body is `{"error":{"code":"rate_limited","message":"rate limit exceeded"}}`, `Retry-After` is the seconds to the next minute (at least 1), and `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` are set as on the API. The engine and the providers are not called.
+- The proxy applies a fixed-window rate limit per tenant key. A rejected request gets `429 rate_limited` with `Retry-After` (D28). The limit is `MAVERICK_PROXY_RATELIMIT_RPM` requests per clock minute (default 600, changed 2026-10-24 by owner decision from 60; a value that is not a positive integer is a startup error). Direct model calls count against it. A routed request also makes one engine call, which counts against the engine's own per-key limit (§9.1). Hosted mode limits each tenant key; self-hosted mode has one key. The check runs after the tenant key is known and before the body is read. The response body is `{"error":{"code":"rate_limited","message":"rate limit exceeded"}}`, `Retry-After` is the seconds to the next minute (at least 1), and `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` are set as on the API. The engine and the providers are not called.
 - Caller parameter values that depend on the model (for example reasoning effort tiers) are normalized to the nearest value that the routed model accepts. The accepted values are per-model constraints in the model catalog, and each chain entry carries them. When the catalog has no constraint for a field, the proxy applies the Go mappings: chat `reasoning_effort` `xhigh` to `high`, messages `output_config.effort` `xhigh` to `max` (D29). The exact rule, shared by the proxy and the SDK cores: an accepted value is kept; a value in the constraint's `order` but not accepted becomes the accepted value nearest to it by position in `order`, and on a tie the higher value wins; a value that is not in `order`, or has no accepted value in `order` to move to, is sent unchanged. A constraint that is not an object with a non-empty `allowed` list counts as no constraint, so the Go mappings apply. A field the caller did not send is never added. The conformance vectors are `crates/sdk-conformance/vectors/normalize.d29.json`.
 - The proxy rejects a request body larger than 32 MiB (`MAVERICK_PROXY_MAX_BODY_BYTES`) with `413 payload_too_large`, before any engine or provider call (D38). The cap applies to the declared `Content-Length` and to the bytes read from a chunked body. The message is `request body is larger than <cap> bytes`.
 - The deployment mode is fixed per deployment by `MAVERICK_PROXY_MODE`: `self-hosted` (the default, Go behavior: one configured `MAVERICK_API_KEY`, provider env keys as a credential fallback) or `hosted` (MM's shared instance: the tenant key arrives per request in `X-Maverick-API-Key`, and the provider env keys are never read) (D12, D13). Any other value is a startup error.
-- Hosted tenant auth (D13): the first `X-Maverick-API-Key` value must start with `mk_live_`, as the engine requires. A missing or other value is `401` with `{"error":{"code":"unauthorized","message":"missing or invalid X-Maverick-API-Key"}}`, checked before the body is read, and the engine is not called. An engine `401` for that key maps to the same response. An engine `403 tenant_suspended` is relayed as `403` with message `tenant is suspended`. Self-hosted mode keeps Go's rule: every engine failure is `502 engine_error`.
+- Hosted tenant auth (D13): the first `X-Maverick-API-Key` value must start with `mk_live_`, as the engine requires. A missing or other value is `401` with `{"error":{"code":"unauthorized","message":"missing or invalid X-Maverick-API-Key"}}`, checked before the body is read, and the engine is not called. An engine `401` for that key maps to the same response. An engine `403 tenant_suspended` is relayed as `403` with message `tenant is suspended`. In self-hosted mode an engine `401` or `403` is `502 engine_error`, as in Go. In neither mode is an engine `401` or `403` a fail-open trigger (D46).
 - Provider credentials (D12): the chat surface reads the caller's key from `Authorization: Bearer`, the messages surface from `x-api-key`. The key is used only for the surface's native provider (openai, anthropic). Self-hosted mode falls back to the provider env keys for other entries. Hosted mode has no env keys, so the chain is restricted to the credential's provider. In hosted mode a caller key that starts with `sk-or-` is an OpenRouter key: it selects OpenRouter execution and is never sent to a direct provider.
-- The proxy relays the engine's terminal privacy errors with their status and code, `422 zero_retention_requires_declared` and `409 no_compliant_columns`, with the engine's message. Every other recommend failure is `502 engine_error` (D17).
+- The proxy relays the engine's terminal privacy errors with their status and code, `422 zero_retention_requires_declared` and `409 no_compliant_columns`, with the engine's message, and purges that tenant's last good lists (D46). An engine failure (a timeout, a connect error, a 5xx, or a malformed response) enters the fail-open ladder below (D46). Any other engine status is `502 engine_error` (D17).
 - A present `X-Maverick-Workload` value that is not `<capability>[:<tier>]` is `400 invalid_request`, message `X-Maverick-Workload must be <capability>[:<tier>]`. The engine is not called, and the proxy never falls back to the projection (D5).
-- The proxy strips `X-Maverick-API-Key` from every upstream request. The tenant's Maverick key never reaches a provider (D30).
+- `X-Maverick-Settings: caller` tells the proxy to leave the caller's settings alone instead of applying the entry's `settings` (§7.4, D14). Any other value is `400 invalid_request`, message `X-Maverick-Settings must be caller`, and the engine is not called (D45).
+- The proxy strips `X-Maverick-API-Key` (D30) and `X-Maverick-Settings` (D45) from every upstream request. The tenant's Maverick key never reaches a provider.
 - OTel export uses `tracing-opentelemetry` and `opentelemetry-otlp` with W3C trace context. The content stays the same (one `maverick.recommendation` log record per settled request, and the counter `maverick_proxy_recommendations_total` by `measured` and `classification_method`). The payload bytes are not reproduced. The §14.3 redaction rules apply (D31).
+
+**Model names** (changed 2026-10-24 for the Rust port; `parity/DIVERGENCES.md` D45; owner decision 2026-09-30; the Go proxy implements the prior grammar in `reference/engine-reference.md` Part 6 §5). The proxy and the SDK cores read the request's `model` with one grammar: `maverick-core` module `alias`, conformance vectors `crates/sdk-conformance/vectors/alias.v2.json`. It follows OpenRouter's own model ids (`<author>/<slug>` with an optional `:variant`).
+
+| Model string | Meaning |
+|---|---|
+| `maverick/auto` | Route over the tenant's default pool, `quality` mode |
+| `maverick/auto:quality` | Same as `maverick/auto` |
+| `maverick/auto:balanced` | Default pool, `balanced` mode |
+| `maverick/auto:cost` | Default pool, `cost` mode |
+| `maverick/<pool>` | Route over the named pool, `quality` mode |
+| `maverick/<pool>:<variant>` | Named pool; the variant is `quality`, `balanced`, or `cost` |
+| `<author>/<slug>`, for example `anthropic/claude-opus-5-5` | Direct model: no routing |
+| A bare provider model id, for example `claude-opus-5-5` | Direct model on the surface's native provider |
+
+- A string that starts with the exact prefix `maverick/` is a route. The text after the prefix up to the first `:` is the route name, and the text after the first `:` is the variant. Route `auto` is the default pool, so the engine request has no `pool`. Any other route name is a pool name, and it may contain `/`. The variant is the engine `mode`, and no variant means `quality`.
+- Variants are exact and case sensitive: `quality`, `balanced`, `cost`. There is no `auto` variant. Nothing is trimmed.
+- An empty route name, an empty or unknown variant, or a `?` anywhere after the prefix is `400 invalid_model_alias`, and the engine is not called. The `?` rule keeps the removed `?settings=caller` suffix (D14) out of pool names. A missing or empty `model` is the same error, as in Go. The message is `model must be a provider model id or maverick/<route>[:<variant>] with variant quality, balanced, or cost`.
+- `maverick/quality` and `maverick/cost` are pool routes now: they name pools called `quality` and `cost`. The Go grammar read them as modes on the default pool. A caller that wants a mode on the default pool sends `maverick/auto:<variant>`.
+- A string without the `maverick/` prefix is a direct model. The proxy sends it to the provider as the caller wrote it, with one change: an `<author>/` prefix is removed when the author is the surface's native provider (`anthropic/` on `/v1/messages`, `openai/` on `/v1/chat/completions`), because the provider APIs do not accept it. Another author is `400 invalid_request`, message `model <author>/<slug> is not served by this surface`, because the proxy does not translate schemas. With a caller OpenRouter key (hosted mode, D12), the string goes to OpenRouter unchanged.
+- A direct call makes no engine call, has no recommendation id, and sends no telemetry. Settings and parameter normalization (D29) are not applied. The rate limit applies.
+- The engine never sees a model string. A component turns a route into a `POST /v1/recommend` call and runs its own chain executor over the returned chain.
+
+**Fail-open** (changed 2026-10-24 for the Rust port; `parity/DIVERGENCES.md` D46; owner decision 2026-09-30; the Go proxy is exempt from G14). For a route, the proxy runs the `maverick-core` fail-open ladder that the SDK cores use:
+
+1. The engine answers: route as above.
+2. The engine fails (a timeout, a connect error, a 5xx, or a malformed response): the proxy uses the last good ranked list for the same tenant key and route (pool and variant) when it is younger than `MAVERICK_PROXY_LKG_MAX_AGE` (default 24 h).
+3. No usable last good list: the surface's configured default model (`MAVERICK_PROXY_DEFAULT_MODEL_MESSAGES` or `MAVERICK_PROXY_DEFAULT_MODEL_CHAT`, unset by default), called as a direct model.
+4. Nothing left: `503 engine_unavailable`, message `the engine is unavailable and no fallback model is configured`, with `Retry-After: 5`.
+
+- Privacy outranks fail-open (G14). `422 zero_retention_requires_declared` and `409 no_compliant_columns` are terminal: the proxy relays them and purges that tenant's last good lists. For a zero-retention tenant, step 2 uses only entries stamped `retention_mode: zero`, and step 3 runs only when `MAVERICK_PROXY_DEFAULT_MODEL_ZERO_RETENTION=true` marks the default models as verified zero retention. Otherwise the request gets the step 4 error. The proxy learns that a tenant is zero retention from the engine's `zero_retention` flag and keeps it in memory, as the SDK cores do (§9.2).
+- An engine `401` or `403 tenant_suspended` is never a fail-open trigger. It keeps the D13 mapping above.
+- A response served from step 2 or 3 carries `X-Maverick-Fallback: last_known_good` or `X-Maverick-Fallback: default_model`. Telemetry for a step 2 request uses the cached recommendation id. Step 3 sends no telemetry.
+- The last good store is in memory only, per replica, and bounded at 10,000 entries, with the least recently used entry evicted. Each replica fills its own store from successful recommends. It holds ranked lists, never prompts (G5).
+- The counter `maverick_proxy_fallbacks_total` counts each served step by `step` (`last_known_good`, `default_model`, `unavailable`). It has no tenant, key, or model label.
+- `GET /up` does not call the engine, so an engine outage does not take a proxy replica out of rotation.
 
 ### 8.2 Classification contract
 
@@ -841,7 +879,7 @@ Request (prompt form shown; declared form per §8.1):
 }
 ```
 
-All fields optional except `workload`. `pool` defaults to the tenant default; `mode` ∈ quality|balanced|cost, default balanced; unknown fields → `422 invalid_request` (strict decoding).
+All fields optional except `workload`. `pool` defaults to the tenant default; `mode` ∈ quality|balanced|cost, default quality, and an empty string means the default (changed 2026-10-24 for the Rust port, D47: the Go engine defaults to balanced); unknown fields → `422 invalid_request` (strict decoding).
 
 Response `200`:
 
@@ -934,7 +972,7 @@ Reads mirror writes: `GET/PUT /v1/config/pools`, `GET/PUT /v1/config/weights`, `
 { "pools": [ { "name": "vertex-only", "model_column_ids": ["col_01J...", "col_01K..."], "is_default": false } ] }
 ```
 
-Exactly one pool must be `is_default: true`. Columns are referenced by `column_id` (config is precise; request-time `allowed_models` accepts model names for ergonomics).
+Exactly one pool must be `is_default: true`. A pool cannot be named `auto`, and a pool name cannot contain `:`, because the model grammar reserves both (§8.1; added 2026-10-24 for the Rust port, D45). The check runs after the body decodes and before the catalog and G4 checks. The first such pool in request order is `422 invalid_request` with `details: {"pool": <name>}` and message `pool name %q is reserved` or `pool name %q must not contain ':'`. Nothing is written. A pool name may contain `/`. Columns are referenced by `column_id` (config is precise; request-time `allowed_models` accepts model names for ergonomics).
 
 ### 9.8 Debug capture (tenant-facing)
 
@@ -1082,6 +1120,8 @@ Three tools, thin wrappers over the same internal services as REST (same auth, s
 | `get_policy` | `{capability?, pool?}` | The §9.3 response object |
 | `list_models` | `{}` | The §9.4 response object |
 
+The `recommend_model` schema describes `mode` as `quality, balanced, or cost; default quality` (changed 2026-10-24 for the Rust port, D47; Go says `default balanced`).
+
 Tool descriptions instruct agents to prefer declared workloads when they already know the capability (faster, nothing leaves the session).
 
 ---
@@ -1140,6 +1180,10 @@ Env vars, prefix `MAVERICK_`, parsed and validated at boot (fail fast, print the
 | `MAVERICK_SCORING_MIN_NIGHTS` | `3` | measured flag |
 | `MAVERICK_CATALOG_COLD_START_NIGHTS` | `5` | §4.1 |
 | `MAVERICK_RATELIMIT_RPM` | `300` | §9.1 |
+| `MAVERICK_PROXY_RATELIMIT_RPM` | `600` | §8.1 proxy rate limit per tenant key (D28; changed 2026-10-24 from 60) |
+| `MAVERICK_PROXY_LKG_MAX_AGE` | `24h` | §8.1 proxy fail-open: the oldest usable last good list (D46) |
+| `MAVERICK_PROXY_DEFAULT_MODEL_MESSAGES` / `..._CHAT` | unset | §8.1 proxy fail-open: the default model per surface (D46) |
+| `MAVERICK_PROXY_DEFAULT_MODEL_ZERO_RETENTION` | `false` | §8.1 proxy fail-open: `true` marks the default models as verified zero retention (D46) |
 | `MAVERICK_HISTORY_RETENTION_DAYS` | `365` | §10.3 |
 | `MAVERICK_SMTP_URL`, `MAVERICK_ALERTS_WEBHOOK_URL`, `MAVERICK_ALERTS_WEBHOOK_SECRET` | — | §11.1 |
 | `MAVERICK_CRON_NIGHTLY`, `MAVERICK_CRON_WEEKLY`, `MAVERICK_CRON_MODEL_DISCOVERY` (D51), ... | §11 defaults | Schedules |
@@ -1222,6 +1266,19 @@ slog JSON to stdout. Every request logs: method, path, status, ms, tenant_id, ke
 | 500 | `internal_error` | Bug; recommendation_id-free, logged with request id |
 
 The four 422 policy codes are contractual (G3): callers are expected to branch on them. The two privacy codes, `422 zero_retention_requires_declared` and `409 no_compliant_columns` (added 2026-09-28 for the Rust port), are contractual too: they are the G1 exception, and SDK cores treat them as terminal, never as fail-open triggers (G14).
+
+The proxy (§8.1) uses the same envelope, without `details`. Its own codes:
+
+| HTTP | code | Meaning |
+|---|---|---|
+| 400 | `invalid_request` | Unreadable body, bad `X-Maverick-Workload` or `X-Maverick-Settings`, or a direct model from another author |
+| 400 | `invalid_model_alias` | Malformed `maverick/*` route, or no `model` (D45) |
+| 401 | `unauthorized` | Hosted mode: missing or invalid `X-Maverick-API-Key` (D13) |
+| 413 | `payload_too_large` | Body larger than the proxy cap (D38) |
+| 429 | `rate_limited` | Per-tenant-key limit; Retry-After set (D28) |
+| 502 | `engine_error` | An engine status that is neither a fail-open trigger nor relayed (D17) |
+| 502 | `no_executable_candidates` | No chain entry could be executed |
+| 503 | `engine_unavailable` | The engine failed and no fallback is usable; Retry-After 5 (D46) |
 
 ### Appendix C — Capabilities and illustrative seed catalog
 
