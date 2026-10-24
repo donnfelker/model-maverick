@@ -205,23 +205,38 @@ async fn keep(seen: &SeenLog, request: Request) -> Seen {
 
 /// A provider upstream: it keeps every request and answers a success in the wire format
 /// of the path (`/messages` is Anthropic's, anything else OpenAI's chat completion), with
-/// `completion` as the text.
+/// `completion` as the text. [`Upstream::fail`] scripts an error status for one model.
 #[derive(Clone)]
 pub struct Upstream {
     pub url: String,
     seen: SeenLog,
+    failures: Arc<Mutex<HashMap<String, u16>>>,
 }
 
 impl Upstream {
     pub async fn start(completion: &str) -> Self {
         let seen: SeenLog = Arc::default();
+        let failures: Arc<Mutex<HashMap<String, u16>>> = Arc::default();
         let completion = completion.to_owned();
         let log = seen.clone();
+        let scripted = failures.clone();
         let handler = move |request: Request| {
             let log = log.clone();
             let completion = completion.clone();
+            let scripted = scripted.clone();
             async move {
                 let seen = keep(&log, request).await;
+                let model = seen.json()["model"].as_str().unwrap_or_default().to_owned();
+                if let Some(status) = lock(&scripted).get(&model).copied() {
+                    let status = axum::http::StatusCode::from_u16(status).expect("a status");
+                    let error =
+                        json!({"error": {"type": "rate_limit_error", "message": "scripted"}});
+                    return (
+                        status,
+                        [("content-type", "application/json")],
+                        error.to_string(),
+                    );
+                }
                 let body = if seen.target.contains("/messages") {
                     json!({
                         "id": "msg_1", "type": "message", "role": "assistant",
@@ -239,11 +254,29 @@ impl Upstream {
                         "usage": {"prompt_tokens": 12, "completion_tokens": 7, "total_tokens": 19}
                     })
                 };
-                ([("content-type", "application/json")], body.to_string())
+                (
+                    axum::http::StatusCode::OK,
+                    [("content-type", "application/json")],
+                    body.to_string(),
+                )
             }
         };
         let (url, _) = serve_local(Router::new().fallback(handler)).await;
-        Self { url, seen }
+        Self {
+            url,
+            seen,
+            failures,
+        }
+    }
+
+    /// From now on, a request for `model` gets `status` and an error body.
+    pub fn fail(&self, model: &str, status: u16) {
+        lock(&self.failures).insert(model.to_owned(), status);
+    }
+
+    /// Every model succeeds again.
+    pub fn clear_failures(&self) {
+        lock(&self.failures).clear();
     }
 
     /// Every request received, oldest first.

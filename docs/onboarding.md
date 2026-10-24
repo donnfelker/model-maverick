@@ -307,7 +307,62 @@ curl -s http://localhost:8080/v1/history/recommendations/<RECOMMENDATION_ID> \
   -H "Authorization: Bearer $TENANT_KEY"
 ```
 
-## 12. Where to go from here
+## 12. Keep a conversation on one model (optional)
+
+A chat calls `/v1/recommend` once per turn, and each turn is ranked on its own. To let
+the engine follow the conversation, send the same id on every turn (D44, spec §7.6):
+
+- **Through the proxy:** the header `X-Maverick-Conversation: <id>`, 1 to 256 printable
+  ASCII characters. The proxy passes it to the engine, estimates the context from the
+  body size, never sends the header to a provider, and sets
+  `X-Maverick-Affinity: <status>` on the response.
+- **From an SDK:** the per-call `conversation_id` option. `affinity_cost_aware` overrides
+  the tenant setting for that call.
+- **Directly:**
+
+```sh
+curl -s -X POST http://localhost:8080/v1/recommend \
+  -H "Authorization: Bearer $TENANT_KEY" -H 'Content-Type: application/json' \
+  -d '{"workload":{"capability":"structured_extraction","difficulty":3},
+       "affinity":{"key":"conv-1","context_tokens":1200}}'
+```
+
+The response ends with an `affinity` block. The first turn is `new`; send the same
+request again and it is `kept`:
+
+```json
+"affinity": { "status": "kept", "previous_column_id": "col_01K...", "reason": null,
+              "cache_warm": true, "cost_aware": false }
+```
+
+- `new`: no earlier turn for this id in the last 24 hours.
+- `kept`: the pick is the column of the last turn.
+- `switched`: the pick moved. `reason` says why: `best_model` (the default setting), or,
+  with cost-aware affinity, `escalation`, `outranked`, `preference`, or
+  `low_availability`.
+- `broken`: the last turn's column can no longer be used, for example it left the pool
+  (`not_in_pool`).
+
+By default the engine still returns the best model for every turn and only reports
+whether it stayed. Cost-aware affinity also weighs the cost of a cold provider cache and
+gives the current column a small bonus, so a conversation stays put unless a switch is
+worth it. Turn it on for the tenant:
+
+```sh
+curl -s -X PUT http://localhost:8080/v1/config/constraints \
+  -H "Authorization: Bearer $TENANT_KEY" -H 'Content-Type: application/json' \
+  -d '{"constraints":{"affinity_cost_aware":true}}'
+```
+
+The PUT replaces every constraint, so send the others you rely on in the same body.
+
+The id is treated like a prompt: the engine stores only a per-tenant hash of it, and it
+never appears in a log or a trace. When a fallback entry serves a turn (for example after
+a `429` on the pick), the proxy's and the SDK's telemetry moves the conversation to that
+entry. A tenant that opted out of telemetry (`telemetry_opt_out`) sends none, so its
+conversations follow the engine's pick only.
+
+## 13. Where to go from here
 
 - Set provider keys (`MAVERICK_ANTHROPIC_API_KEY`,
   `MAVERICK_OPENAI_API_KEY`, `MAVERICK_GOOGLE_API_KEY`,

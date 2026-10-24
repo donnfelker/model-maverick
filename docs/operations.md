@@ -579,8 +579,8 @@ scripts/live-smoke.sh
   `maverick_provider_calls_total`, `maverick_provider_retries_total`,
   `maverick_queue_depth`, `maverick_queue_oldest_job_age_seconds`,
   `maverick_job_duration_ms`, `maverick_job_failures_total`,
-  `maverick_job_recoveries_total`, and `maverick_batch_spend_usd`. There is no metrics
-  endpoint to scrape. The proxy exports its own records with `MAVERICK_PROXY_OTLP_ENDPOINT`
+  `maverick_job_recoveries_total`, `maverick_batch_spend_usd`, and
+  `maverick_affinity_decisions_total` (D44). There is no metrics endpoint to scrape. The proxy exports its own records with `MAVERICK_PROXY_OTLP_ENDPOINT`
   (D31).
 - **The proxy** (`crates/maverick-proxy`) is a separate binary and deployable. It has
   no database and no migrations. See "The proxy in production" below and
@@ -621,6 +621,39 @@ tenant key's last good list for the route, then the surface's default model, the
 - **Logs.** Each engine failure is one ERROR line, `maverick-proxy: engine recommend
   failed`, with the error and, when the proxy fell open, the step. The drill is in
   `docs/runbook-go-live.md` §8.
+
+## Conversation affinity (D44)
+
+`POST /v1/recommend` can carry an `affinity` key that ties the turns of one conversation
+together (spec §7.6). The proxy sends it for `X-Maverick-Conversation`, and the SDK cores
+for `conversation_id`, but only to an engine that lists `affinity` in
+`X-Maverick-API-Features` (D50).
+
+- **State.** One `conversation_affinity` row per tenant and conversation, keyed by the
+  per-tenant HMAC of the caller's key. The key itself is never stored or logged. Each
+  recommendation that carried `affinity` also stores its decision in
+  `recommendations.affinity` (`GET /v1/history/recommendations/{id}` returns it).
+- **Settings** (spec §14.1), read at startup:
+  - `MAVERICK_AFFINITY_ENABLED` (default `true`). `false` still validates the field but
+    reads and writes no row and answers `status: "new"` with the normal ranking.
+  - `MAVERICK_AFFINITY_TTL` (default `24h`, at most `720h`): a row's lifetime after its
+    last use.
+  - `MAVERICK_AFFINITY_CACHE_WARM_SECONDS` (default `300`): how long the pinned column's
+    provider cache counts as warm.
+  - `MAVERICK_AFFINITY_INCUMBENT_BONUS` (default `1.5` quality points; `0` turns the bonus
+    off and keeps the cache-aware turn cost).
+- **Tenant setting.** `affinity_cost_aware` in the constraints payload (default
+  `false`). With it off, affinity never changes a pick; it only reports `kept` or
+  `switched`.
+- **Metric.** `maverick_affinity_decisions_total` by `status` (`new`, `kept`, `switched`,
+  `broken`) and `cost_aware`. No key, hash, or column id is a label. A rising share of
+  `switched` with `cost_aware="false"` shows how often tenants would gain from turning
+  the setting on; a rising `broken` share points at pool or retention changes.
+- **Telemetry follow.** A 2xx telemetry item from a chain entry after the pick moves the
+  row to that entry's column (spec §9.10). A failed move is a WARN line,
+  `telemetry: following the served column failed`, with the recommendation id only.
+- **Expired rows** read as missing. The hourly `affinity_prune` job that deletes them is
+  bead gcd2.8 and does not run yet; until it does, expired rows stay in the table.
 
 ## Hot-path latency
 
