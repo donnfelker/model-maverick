@@ -942,6 +942,8 @@ Exactly one pool must be `is_default: true`. Columns are referenced by `column_i
 - `DELETE /v1/debug/capture-windows/{id}` — end early.
 - `POST /v1/debug/replay/{capture_id}` — body `{classifier_version?}` (default: current). Decrypts the captured prompt in memory, re-runs classification, returns `{original_classification, replayed_classification, match: bool}`. Never returns the prompt text. Access-logged (§10.4).
 
+For a zero-retention tenant, replay sends the prompt only to `classifier.zero_retention_column` while that column has valid zero-retention evidence; otherwise it makes no call and returns `200` with `method: fallback_default` (D2). Replay counts against the tenant daily classifier quota and the global daily classifier spend cap, records its spend, and returns the fallback past either limit (D4). (Confirmed 2026-10-24 for the Rust port; owner decision 3hk.10.12.)
+
 ### 9.9 Health
 
 `GET /up` → `200` when the process can reach Postgres (Kamal health check). `GET /health/detail` (internal listener only) → component statuses: db, job queue, provider client config, active matrix_version, last batch times. (changed 2026-09-28 for the Rust port, `parity/DIVERGENCES.md` D35: the component is `job_queue`, with statuses `no_workers | stale | ok`, and `unknown` when the database or the queue read fails; data comes from graphile_worker; `last_batch_times` maps job kind to the latest `batches.completed_at`. The Go engine reported `river_queues`, which also had `paused`.)
