@@ -297,8 +297,23 @@ async fn column_with(pool: &PgPool, id: &str, status: &str, provider: &str, endp
     .unwrap();
 }
 
+/// Every test calls this first, through `db!`. Once per test binary it installs a global
+/// subscriber that is interested in every callsite. Without it, a callsite that a test
+/// thread with no subscriber registered first, while at most one dispatcher existed, was
+/// cached as `never` for the whole process (tracing-core's single-dispatcher path), and a
+/// scoped [`Captured`] in another test then missed its events (bead 3bgl). With a global
+/// dispatcher alive, interest is computed across every dispatcher, so it never caches
+/// `never` for a callsite that a scoped subscriber wants.
+fn every_callsite_enabled() {
+    static GLOBAL: std::sync::Once = std::sync::Once::new();
+    GLOBAL.call_once(|| {
+        let _ = tracing::subscriber::set_global_default(tracing_subscriber::registry());
+    });
+}
+
 macro_rules! db {
     () => {{
+        every_callsite_enabled();
         let Some(db) = maverick_testdb::database(&SCHEMA).await else {
             return;
         };
