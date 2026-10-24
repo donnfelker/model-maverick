@@ -2466,6 +2466,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "ed25519-dalek",
+ "maverick-bundle",
  "serde",
  "serde_json",
  "sha2 0.11.0",

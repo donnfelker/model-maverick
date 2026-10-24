@@ -1,7 +1,7 @@
 //! DIVERGENCE: D49. The public bundle is independently authenticated and immutable.
 use chrono::{TimeZone, Utc};
 use ed25519_dalek::{
-    SigningKey,
+    Signer, SigningKey,
     pkcs8::{EncodePrivateKey, spki::der::pem::LineEnding},
 };
 use maverick_bundle::*;
@@ -269,6 +269,76 @@ fn nonfinite_measurements_cannot_silently_become_json_null() {
     let mut m = matrix();
     m.calibration[0].overconfidence = f32::INFINITY;
     assert!(build(manifest(24), &m, &keys()).is_err());
+}
+
+#[test]
+fn authenticated_measurements_that_overflow_f32_are_refused() {
+    let keys = keys();
+    let bytes = build(manifest(24), &matrix(), &keys).unwrap();
+    for (payload, field) in [
+        ("aggregates.jsonl", "ewma"),
+        ("aggregates.jsonl", "variance"),
+        ("calibration.json", "brier_score"),
+        ("calibration.json", "overconfidence"),
+    ] {
+        for overflow in [-1e100, 1e100] {
+            let mut entries = entries(&bytes);
+            let path = format!("mmbundle1/{payload}");
+            let data = &mut entries.iter_mut().find(|(p, _)| *p == path).unwrap().1;
+            let mut value: serde_json::Value = serde_json::from_slice(data).unwrap();
+            let row = if payload.ends_with("jsonl") {
+                &mut value
+            } else {
+                &mut value[0]
+            };
+            row[field] = serde_json::json!(overflow);
+            *data = serde_json::to_vec(&value).unwrap();
+            let hash = sha256(data);
+            let mut manifest = manifest(24);
+            manifest.files = inspect(&bytes).unwrap().manifest.files;
+            manifest.files.insert(payload.into(), hash);
+            let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+            entries
+                .iter_mut()
+                .find(|(p, _)| p == "mmbundle1/manifest.json")
+                .unwrap()
+                .1 = manifest_bytes.clone();
+            entries
+                .iter_mut()
+                .find(|(p, _)| p == "mmbundle1/signatures/current")
+                .unwrap()
+                .1 = SigningKey::from_bytes(&[7; 32])
+                .sign(&manifest_bytes)
+                .to_bytes()
+                .to_vec();
+            let archive = repack(entries);
+            assert!(matches!(
+                inspect(&archive),
+                Err(BundleError::Invalid("non-finite measurement"))
+            ));
+            assert!(
+                matches!(
+                    verify(&archive, &keys.public_keys(), 12),
+                    Err(BundleError::Invalid("non-finite measurement"))
+                ),
+                "{payload}: {field} = {overflow}"
+            );
+        }
+    }
+}
+
+#[test]
+fn finite_f32_boundaries_survive_authenticated_roundtrip() {
+    let keys = keys();
+    let mut matrix = matrix();
+    matrix.aggregates[0].ewma = f32::MAX;
+    matrix.aggregates[0].variance = f32::MIN_POSITIVE;
+    matrix.calibration[0].brier_score = f32::MIN;
+    matrix.calibration[0].overconfidence = -0.0;
+    let bytes = build(manifest(24), &matrix, &keys).unwrap();
+    let read = verify(&bytes, &keys.public_keys(), 12).unwrap();
+    assert_eq!(read.matrix, matrix);
+    assert!(read.matrix.calibration[0].overconfidence.is_sign_negative());
 }
 
 #[test]

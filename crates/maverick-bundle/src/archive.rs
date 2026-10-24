@@ -78,7 +78,7 @@ pub fn sha256(bytes: &[u8]) -> String {
     hash.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-fn payloads(matrix: &PublicMatrix) -> Result<BTreeMap<String, Vec<u8>>, BundleError> {
+fn validate_measurements(matrix: &PublicMatrix) -> Result<(), BundleError> {
     if matrix
         .aggregates
         .iter()
@@ -90,6 +90,11 @@ fn payloads(matrix: &PublicMatrix) -> Result<BTreeMap<String, Vec<u8>>, BundleEr
     {
         return Err(BundleError::Invalid("non-finite measurement"));
     }
+    Ok(())
+}
+
+fn payloads(matrix: &PublicMatrix) -> Result<BTreeMap<String, Vec<u8>>, BundleError> {
+    validate_measurements(matrix)?;
     let mut matrix = matrix.clone();
     matrix.catalog.sort_by(|a, b| a.id.cmp(&b.id));
     matrix.aggregates.sort_by(|a, b| {
@@ -258,6 +263,7 @@ pub fn inspect(bytes: &[u8]) -> Result<VerifiedBundle, BundleError> {
         calibration: serde_json::from_slice(&files["calibration.json"])?,
         checks: serde_json::from_slice(&files["checks.json"])?,
     };
+    validate_measurements(&matrix)?;
     Ok(VerifiedBundle {
         manifest,
         manifest_bytes,
