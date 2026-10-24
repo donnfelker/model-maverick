@@ -13,6 +13,7 @@ mod demo;
 pub mod flags;
 mod key;
 pub mod logging;
+mod matrix;
 pub mod otel;
 mod rewatch;
 mod serve;
@@ -20,5 +21,6 @@ mod spend;
 pub mod upgrade;
 pub mod version;
 
-pub use cli::{CORPUS_USAGE, KEY_USAGE, MAIN_USAGE, SPEND_USAGE, run, run_with_env};
+pub use cli::{CORPUS_USAGE, KEY_USAGE, MAIN_USAGE, MATRIX_USAGE, SPEND_USAGE, run, run_with_env};
 pub use logging::Output;
+pub use matrix::NO_ACTIVE_BUNDLE;

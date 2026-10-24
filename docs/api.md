@@ -1039,8 +1039,9 @@ after the method check and before any tenant lookup or body read. Every other
 internal route works on a replica. The replica's one tenant and first key come
 from its first `serve` start, and `maverick key` manages its keys
 (`docs/operations.md`, "Single-tenant replica"). A pricing snapshot written
-through the column PUT on a replica is local (`"source": "local"`), and bundle
-imports never overwrite it (specified, not served yet).
+through the column PUT on a replica is stored as local (`"source": "local"`),
+whatever `source` the request sent, and bundle imports never overwrite it. On an
+origin the snapshot is stored as sent.
 
 All 17 routes:
 

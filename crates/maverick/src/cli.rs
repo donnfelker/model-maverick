@@ -9,8 +9,8 @@ use maverick_domain::gofmt::quote;
 use crate::flags::{FlagSet, Parsed};
 use crate::logging::{Output, with_logger};
 
-/// The main usage text (Go's text plus the D50 `upgrade` command and `--version` flag;
-/// `demo-run` and `spend` are hidden).
+/// The main usage text (Go's text plus the D50 `upgrade` command and `--version` flag, and
+/// the D49 `key` and `matrix` commands; `demo-run` and `spend` are hidden).
 pub const MAIN_USAGE: &str = "Usage: maverick <command> [flags]
 
 Commands:
@@ -21,6 +21,7 @@ Commands:
               calibration report (load | activate | status | calibrate)
   mcp-stdio   stdio MCP transport for local development (--api-key mk_live_...)
   key         the API keys of a single-tenant replica (create | list | revoke)
+  matrix      the active matrix bundle (status)
 
 Flags:
   --version   print the release, build, schema, and bundle formats
@@ -54,6 +55,14 @@ Subcommands:
   list    print the tenant's keys as a JSON array (never a raw key)
   revoke  --id <key id>
           revoke a key; revoking a revoked key changes nothing
+";
+
+/// The `matrix` usage text (spec §14.4, D49).
+pub const MATRIX_USAGE: &str = "Usage: maverick matrix <subcommand> [flags]
+
+Subcommands:
+  status  print the active matrix bundle: its matrix_version, when it was
+          published and imported, and how many days behind it is
 ";
 
 /// The `spend` usage text (bead 9.15). The command is hidden: [`MAIN_USAGE`] is Go's
@@ -114,6 +123,7 @@ pub fn run(
         "demo-run" => demo_run(rest, lookup, stdout, stderr),
         "corpus" => corpus(rest, lookup, stdout, stderr),
         "key" => key(rest, lookup, stdout, stderr),
+        "matrix" => matrix(rest, lookup, stdout, stderr),
         "spend" => spend(rest, lookup, stdout, stderr),
         "mcp-stdio" => mcp_stdio(rest, lookup, stderr),
         "--version" => version(rest, stdout, stderr),
@@ -361,6 +371,37 @@ fn key(
         _ => KeyCommand::List,
     };
     crate::key::run(&command, lookup, stdout, stderr)
+}
+
+/// `matrix status` (spec §14.4, D49).
+fn matrix(
+    args: &[String],
+    lookup: &dyn Fn(&str) -> Option<String>,
+    stdout: Output,
+    mut stderr: Output,
+) -> i32 {
+    let Some(sub) = args.first() else {
+        let _ = stderr.write_all(MATRIX_USAGE.as_bytes());
+        return EXIT_USAGE;
+    };
+    let rest = &args[1..];
+    match sub.as_str() {
+        "status" => {
+            let set = FlagSet::new("matrix status");
+            if parse_flags(&set, rest, &mut stderr).is_none() {
+                return EXIT_USAGE;
+            }
+            crate::matrix::status(lookup, stdout, stderr)
+        }
+        other => {
+            let _ = write!(
+                stderr,
+                "maverick matrix: unknown subcommand {}\n\n{MATRIX_USAGE}",
+                quote(other)
+            );
+            EXIT_USAGE
+        }
+    }
 }
 
 /// Runs `future` to completion on a runtime for this thread only, so its log events

@@ -18,7 +18,7 @@ use maverick_domain::catalog::{RetirementBlocked, retention_window_error};
 use maverick_domain::gofmt::quote;
 use maverick_domain::gojson::{self, JsonValue, match_field};
 use maverick_domain::ids;
-use maverick_domain::pricing::parse_pricing;
+use maverick_domain::pricing::{mark_local, parse_pricing};
 use maverick_domain::spend::SpendCaps;
 use maverick_jobs::{JobClient, JobClientConfig};
 use maverick_providers::models::ModelLister;
@@ -1368,7 +1368,8 @@ async fn write_column<'e>(
 }
 
 /// `PUT /internal/v1/columns/{id}` (§7.9). Absent fields keep their stored values;
-/// retiring a column goes through the retirement guard.
+/// retiring a column goes through the retirement guard. On a replica a pricing snapshot
+/// is stored with `"source": "local"` (§14.4, D49).
 pub(crate) async fn update_column(
     State(api): State<ApiState>,
     Extension(actor): Extension<InternalActor>,
@@ -1413,10 +1414,18 @@ async fn change_column(
         .clone()
         .unwrap_or_else(|| stored.status.clone());
     one_of("status", &status, &STATUSES)?;
+    // D49: a replica's snapshot is local, so a bundle import keeps it (spec §14.4).
+    let local = api.internal().role == Role::Replica;
     let pricing = input
         .pricing
         .as_ref()
-        .map(|value| validate_pricing(Some(value)))
+        .map(|value| {
+            if local {
+                validate_pricing(Some(&mark_local(value)))
+            } else {
+                validate_pricing(Some(value))
+            }
+        })
         .transpose()?;
     let deprecation_date = match &input.deprecation_date {
         Some(text) => validate_date(Some(text))?,

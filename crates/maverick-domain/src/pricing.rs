@@ -115,6 +115,34 @@ fn text(field: &str, value: &JsonValue) -> Result<String, String> {
     }
 }
 
+/// The `source` of a replica's local pricing snapshot (spec §14.4, D49): negotiated rates
+/// set through `PUT /internal/v1/columns/{id}`. A bundle import never overwrites it.
+pub const LOCAL_SOURCE: &str = "local";
+
+/// Whether `pricing` is a replica's local snapshot.
+pub fn is_local(pricing: &Pricing) -> bool {
+    pricing.source == LOCAL_SOURCE
+}
+
+/// `snapshot` as a local snapshot: every member that [`parse_pricing`] reads as `source`
+/// is dropped, and `"source": "local"` is appended. A value that is not an object comes
+/// back unchanged, so its validation error stays the same.
+pub fn mark_local(snapshot: &JsonValue) -> JsonValue {
+    let JsonValue::Object(members) = snapshot else {
+        return snapshot.clone();
+    };
+    let mut members: Vec<_> = members
+        .iter()
+        .filter(|(key, _)| gojson::match_field(key, &FIELDS) != Some("source"))
+        .cloned()
+        .collect();
+    members.push((
+        "source".to_owned(),
+        JsonValue::String(LOCAL_SOURCE.to_owned()),
+    ));
+    JsonValue::Object(members)
+}
+
 /// `Cost(tokensIn, tokensOut, pricing)`: the USD cost rounded half away from zero to 6
 /// decimal places, the precision of `runs.cost numeric(12,6)`.
 pub fn cost(tokens_in: i64, tokens_out: i64, pricing: &Pricing) -> f64 {
@@ -132,6 +160,51 @@ pub fn cost_numeric(cost: f64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// DIVERGENCE: D49. A local snapshot keeps every price and replaces each spelling of
+    /// `source`; a non-object is left for validation to refuse.
+    #[test]
+    fn mark_local_replaces_every_source_and_keeps_the_prices() {
+        let sent = gojson::unmarshal(
+            r#"{"Source": "models.dev", "input_per_mtok": 2.5, "SOURCE": null, "output_per_mtok": 10, "source_note": "x"}"#,
+        )
+        .expect("json");
+        let marked = gojson::marshal(&mark_local(&sent));
+        assert_eq!(
+            marked,
+            r#"{"input_per_mtok":2.5,"output_per_mtok":10,"source_note":"x","source":"local"}"#
+        );
+        let pricing = parse_pricing(&marked).expect("parses");
+        assert!(is_local(&pricing));
+        assert_eq!(
+            (pricing.input_per_mtok, pricing.output_per_mtok),
+            (2.5, 10.0)
+        );
+        assert_eq!(
+            gojson::marshal(&mark_local(&JsonValue::Object(Vec::new()))),
+            r#"{"source":"local"}"#
+        );
+        for other in ["[]", "1", "\"local\""] {
+            let value = gojson::unmarshal(other).expect("json");
+            assert_eq!(mark_local(&value), value, "{other}");
+        }
+    }
+
+    #[test]
+    fn only_the_local_source_is_local() {
+        for (source, local) in [
+            ("local", true),
+            ("Local", false),
+            ("", false),
+            ("models.dev", false),
+        ] {
+            let pricing = Pricing {
+                source: source.to_owned(),
+                ..Pricing::default()
+            };
+            assert_eq!(is_local(&pricing), local, "{source:?}");
+        }
+    }
 
     #[test]
     fn field_names_fold_and_the_last_duplicate_wins() {

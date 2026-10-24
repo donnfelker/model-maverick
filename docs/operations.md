@@ -27,6 +27,10 @@ when the active bundle is absent or more than seven days old. Health detail repo
 `role` and the active bundle version, or `""` before the first import. Probe clients
 use the configured provider endpoints on both roles.
 
+`maverick matrix status` prints the active bundle's `matrix_version`, when it was
+published and imported, and how many whole days behind it is. Before the first import
+it prints `no matrix bundle is active`. Both roles run it.
+
 ## Single-tenant replica (D49)
 
 A replica serves one organization. It has one tenant, and nobody creates or manages
@@ -356,6 +360,10 @@ refresh them from models.dev (bead 7.15):
   `price_sync` copies them from the models.dev `cache_read` and `cache_write` fields, and a
   change to one of them alone is a price change. A source entry with a negative cache
   price is skipped. Only cost-aware conversation affinity reads them; run cost never does.
+- On a replica, the column PUT stores the snapshot with `"source": "local"` for
+  negotiated rates, and a bundle import keeps it. `price_sync`, when a replica has
+  `MAVERICK_CRON_PRICE_SYNC`, still writes every mapped column, a local one included. Leave a
+  column with negotiated rates out of `MAVERICK_MODELS_DEV_PRICE_MAP`.
 
 A price edit never restates the cost of past runs.
 
