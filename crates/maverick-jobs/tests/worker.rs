@@ -221,10 +221,11 @@ async fn a_started_worker_stops_on_request() {
 #[tokio::test]
 async fn deployment_role_limits_registered_jobs_and_crons() {
     use maverick_config::Role;
-    for (role, prices) in [
-        (Role::Origin, true),
-        (Role::Replica, false),
-        (Role::Replica, true),
+    for (role, prices, export) in [
+        (Role::Origin, true, false),
+        (Role::Origin, true, true),
+        (Role::Replica, false, true),
+        (Role::Replica, true, false),
     ] {
         let Some(db) = maverick_testdb::database(&SCHEMA).await else {
             return;
@@ -232,6 +233,10 @@ async fn deployment_role_limits_registered_jobs_and_crons() {
         let pool = db.pool().await;
         let mut config = config();
         config.role = role;
+        if export {
+            config.matrix_export_dir = "/unused/export".into();
+            config.matrix_signing_keys = "test:/unused/key".into();
+        }
         if !prices {
             config.cron_price_sync.clear();
         }
@@ -266,13 +271,24 @@ async fn deployment_role_limits_registered_jobs_and_crons() {
                 "model_discovery",
             ]);
         }
+        if export && role == Role::Origin {
+            expected.push("matrix_export");
+        }
         if prices {
             expected.push("price_sync");
         }
         let mut handlers: Vec<String> = expected.iter().map(|s| (*s).to_owned()).collect();
         let mut crons: Vec<String> = expected
             .iter()
-            .filter(|s| !["aggregate_rebuild", "regression_scan", "calibration_score"].contains(s))
+            .filter(|s| {
+                ![
+                    "aggregate_rebuild",
+                    "regression_scan",
+                    "calibration_score",
+                    "matrix_export",
+                ]
+                .contains(s)
+            })
             .map(|s| format!("cron.{s}"))
             .collect();
         handlers.extend(crons.clone());

@@ -108,6 +108,8 @@ pub struct ModelsDevPriceMapEntry {
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Config {
     pub role: Role,
+    pub matrix_export_dir: String,
+    pub matrix_signing_keys: String,
     pub database_url: String,
     pub public_addr: String,
     pub internal_addr: String,
@@ -253,6 +255,8 @@ impl fmt::Debug for Config {
         formatter
             .debug_struct("Config")
             .field("role", &self.role)
+            .field("matrix_export_dir", &self.matrix_export_dir)
+            .field("matrix_signing_keys", &"<redacted>")
             .field("database_url", &redact_credentials(&self.database_url))
             .field("public_addr", &self.public_addr)
             .field("internal_addr", &self.internal_addr)
@@ -426,6 +430,16 @@ where
             issue(&mut issues, "MAVERICK_ROLE", "must be origin or replica");
             Role::Replica // Used only to collect further issues; no Config is returned.
         }
+    };
+    let matrix_export_dir = if role == Role::Origin {
+        optional(&lookup, "MAVERICK_MATRIX_EXPORT_DIR", "")
+    } else {
+        String::new()
+    };
+    let matrix_signing_keys = if !matrix_export_dir.is_empty() {
+        required(&lookup, "MAVERICK_MATRIX_SIGNING_KEYS", &mut issues)
+    } else {
+        String::new()
     };
     let database_url = required(&lookup, "MAVERICK_DATABASE_URL", &mut issues);
     let public_addr = listen_addr(&lookup, "MAVERICK_PUBLIC_ADDR", ":8080", &mut issues);
@@ -671,6 +685,8 @@ where
     if issues.is_empty() {
         Ok(Config {
             role,
+            matrix_export_dir,
+            matrix_signing_keys,
             database_url,
             public_addr,
             internal_addr,
@@ -1284,6 +1300,36 @@ mod tests {
                 lookup(name)
             }
         })
+    }
+
+    #[test]
+    fn export_requires_runtime_keys_only_on_an_enabled_origin() {
+        let load = |role: &str, export: Option<&str>, keys: Option<&str>| {
+            super::load_with(|name| match name {
+                "MAVERICK_ROLE" => Some(role.to_owned()),
+                "MAVERICK_DATABASE_URL" => Some("postgres://db".to_owned()),
+                "MAVERICK_INTERNAL_TOKENS" => Some("ops:s".to_owned()),
+                "MAVERICK_CAPTURE_MASTER_KEY" => Some("ab".repeat(32)),
+                "MAVERICK_MATRIX_EXPORT_DIR" => export.map(str::to_owned),
+                "MAVERICK_MATRIX_SIGNING_KEYS" => keys.map(str::to_owned),
+                _ => None,
+            })
+        };
+        assert!(
+            load("origin", None, None)
+                .unwrap()
+                .matrix_export_dir
+                .is_empty()
+        );
+        let error = load("origin", Some("/exports"), None).unwrap_err();
+        assert_eq!(error.issues().len(), 1);
+        assert_eq!(error.issues()[0].var, "MAVERICK_MATRIX_SIGNING_KEYS");
+        let origin = load("origin", Some("/exports"), Some("kid:/private/key-canary")).unwrap();
+        assert_eq!(origin.matrix_signing_keys, "kid:/private/key-canary");
+        assert!(!format!("{origin:?}").contains("key-canary"));
+        let replica = load("replica", Some("/ignored"), None).unwrap();
+        assert!(replica.matrix_export_dir.is_empty());
+        assert!(replica.matrix_signing_keys.is_empty());
     }
 
     /// DIVERGENCE: D49. No startup silently chooses a role.

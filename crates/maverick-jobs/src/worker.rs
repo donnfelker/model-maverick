@@ -239,6 +239,15 @@ pub fn worker_options(
     } else {
         options
     };
+    let options = if client.config().registers(JobKind::MatrixExport) {
+        options
+            .add_extension(crate::matrix_export::MatrixExportConfig::from_config(
+                config,
+            ))
+            .define_job::<crate::matrix_export::MatrixExportJob>()
+    } else {
+        options
+    };
     options.with_crons(cron_triggers(client))
 }
 

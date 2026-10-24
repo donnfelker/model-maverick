@@ -13,6 +13,7 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
+maverick-bundle = { workspace = true }
 maverick-domain = { workspace = true }
 maverick-config = { workspace = true }
 maverick-store = { workspace = true }
@@ -42,3 +43,5 @@ parity-support = { path = "../parity-support" }
 test-support = { path = "../test-support" }
 # Builds sample strings from grader regexes for the corpus gates' autofail traps.
 regex-syntax = "0.8"
+# Runtime PEM files in the public export privacy test use deterministic test-only keys.
+ed25519-dalek = { workspace = true }

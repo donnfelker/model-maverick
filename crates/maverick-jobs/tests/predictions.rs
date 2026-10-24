@@ -697,6 +697,7 @@ async fn prediction_calibration_chain() {
         .pg_pool(pool.clone())
         .add_extension(batch_config(&counter))
         .add_extension(RebuildConfig {
+            matrix_export_enabled: false,
             alpha: 0.3,
             lambda_var: 0.5,
             lambda_amb: 0.25,

@@ -34,6 +34,7 @@ use crate::{
 /// What `aggregate_rebuild` needs besides the pool.
 #[derive(Clone, Debug)]
 pub struct RebuildConfig {
+    pub matrix_export_enabled: bool,
     pub alpha: f64,
     pub lambda_var: f64,
     pub lambda_amb: f64,
@@ -47,6 +48,8 @@ pub struct RebuildConfig {
 impl RebuildConfig {
     pub fn from_config(config: &maverick_config::Config, lease: BatchLeaseManager) -> Self {
         RebuildConfig {
+            matrix_export_enabled: config.role == maverick_config::Role::Origin
+                && !config.matrix_export_dir.is_empty(),
             alpha: config.scoring_alpha,
             lambda_var: config.scoring_lambda_var,
             lambda_amb: config.scoring_lambda_amb,
@@ -438,16 +441,37 @@ pub async fn aggregate_rebuild(
         )
         .await?;
     }
-    batches::finish_batch(&mut *tx, lease.id(), lease.worker_id(), BatchEnd::Completed)
-        .await?
-        .ok_or_else(|| RebuildError::LeaseLost {
-            batch_id: lease.id().to_owned(),
-        })?;
+    let completed =
+        batches::finish_batch(&mut *tx, lease.id(), lease.worker_id(), BatchEnd::Completed)
+            .await?
+            .ok_or_else(|| RebuildError::LeaseLost {
+                batch_id: lease.id().to_owned(),
+            })?;
     for next in [
         JobArgs::RegressionScan(args.clone()),
         JobArgs::CalibrationScore(args.clone()),
     ] {
         enqueue_in(&mut tx, &next).await?;
+    }
+    if config.matrix_export_enabled {
+        let matrix_version = match maverick_store::corpus::get_active_corpus_version(&mut *tx).await
+        {
+            Ok(version) => version.version,
+            Err(error) if maverick_store::is_not_found(&error) => String::new(),
+            Err(error) => return Err(error.into()),
+        };
+        enqueue_in(
+            &mut tx,
+            &JobArgs::MatrixExport(crate::matrix_export::MatrixExportArgs {
+                night: args.night.clone(),
+                rebuild_id: lease.id().to_owned(),
+                matrix_version,
+                published_at: completed
+                    .completed_at
+                    .expect("completed batch has a completion time"),
+            }),
+        )
+        .await?;
     }
     tx.commit().await?;
     let output = RebuildOutput {

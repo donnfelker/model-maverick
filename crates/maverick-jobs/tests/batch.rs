@@ -230,6 +230,7 @@ fn config(fake: Arc<FakeProvider>, caps: SpendCaps, counter: &Arc<Counter>) -> B
 
 fn rebuild_config() -> RebuildConfig {
     RebuildConfig {
+        matrix_export_enabled: false,
         alpha: 0.3,
         lambda_var: 0.5,
         lambda_amb: 0.25,

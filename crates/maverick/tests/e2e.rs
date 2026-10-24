@@ -251,6 +251,7 @@ async fn phase2_exit_end_to_end_recommend() {
         notifier: None,
     };
     let rebuild = RebuildConfig {
+        matrix_export_enabled: false,
         alpha: 0.3,
         lambda_var: 0.5,
         lambda_amb: 0.25,

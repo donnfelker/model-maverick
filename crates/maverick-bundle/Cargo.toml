@@ -1,0 +1,22 @@
+[package]
+name = "maverick-bundle"
+description = "Signed public matrix bundle format, deterministic archives, and verification."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+ed25519-dalek = { workspace = true }
+tar = { workspace = true }

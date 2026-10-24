@@ -6,6 +6,7 @@ members = [
     "crates/instrument-lint",
     "crates/maverick",
     "crates/maverick-alerts",
+    "crates/maverick-bundle",
     "crates/maverick-api",
     "crates/maverick-config",
     "crates/maverick-core",
@@ -140,6 +141,8 @@ hkdf = "0.13"
 aes-gcm = "0.11"
 subtle = "2.6"
 rand = "0.10"
+ed25519-dalek = { version = "3", features = ["pem"] }
+tar = "0.4"
 
 # --- ids, time, errors ---
 ulid = "3"
@@ -156,6 +159,7 @@ proptest = "1"
 
 # --- internal crates (path deps, referenced with { workspace = true }) ---
 maverick-domain = { path = "crates/maverick-domain" }
+maverick-bundle = { path = "crates/maverick-bundle" }
 maverick-config = { path = "crates/maverick-config" }
 maverick-store = { path = "crates/maverick-store" }
 maverick-providers = { path = "crates/maverick-providers" }

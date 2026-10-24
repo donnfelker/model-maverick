@@ -56,6 +56,7 @@ fn day(s: &str) -> NaiveDate {
 
 fn config() -> RebuildConfig {
     RebuildConfig {
+        matrix_export_enabled: false,
         alpha: 0.3,
         lambda_var: 0.5,
         lambda_amb: 0.25,
@@ -837,4 +838,45 @@ fn timeout_uses_the_analytics_job_timeout() {
         JobKind::AggregateRebuild.timeout(&config),
         config.analytics_job_timeout
     );
+}
+
+/// DIVERGENCE: D49. The export identity is committed with the rebuild, once.
+#[tokio::test]
+async fn enabled_origin_chains_export_with_the_rebuild_completion_time() {
+    let Some(db) = maverick_testdb::database(&SCHEMA).await else {
+        return;
+    };
+    let pool = db.pool().await;
+    seed_version(&pool).await;
+    let mut config = config();
+    config.matrix_export_enabled = true;
+    let args = BatchFollowupArgs {
+        night: "2030-09-01".into(),
+        batch_id: "bat_export".into(),
+    };
+    aggregate_rebuild(&pool, &args, &config, "worker-export")
+        .await
+        .unwrap();
+    let exports:Vec<serde_json::Value>=sqlx::query_scalar("select j.payload from graphile_worker._private_jobs j join graphile_worker._private_tasks t on t.id=j.task_id where t.identifier='matrix_export'").fetch_all(&pool).await.unwrap();
+    assert_eq!(exports.len(), 1);
+    let export: maverick_jobs::matrix_export::MatrixExportArgs =
+        serde_json::from_value(exports[0].clone()).unwrap();
+    let completion: chrono::DateTime<chrono::Utc> =
+        sqlx::query_scalar("select completed_at from batches where id=$1")
+            .bind(&export.rebuild_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(export.published_at, completion);
+    assert_eq!(export.matrix_version, VERSION);
+    assert_eq!(export.night, args.night);
+    assert!(matches!(
+        aggregate_rebuild(&pool, &args, &config, "worker-export")
+            .await
+            .unwrap(),
+        RebuildOutcome::AlreadyFinished
+    ));
+    assert_eq!(enqueued(&pool).await.len(), 3);
+    pool.close().await;
+    db.close().await;
 }

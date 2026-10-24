@@ -520,6 +520,7 @@ async fn rebuild_chains_regression_scan() {
         .schema(GRAPHILE_WORKER_SCHEMA)
         .pg_pool(pool.clone())
         .add_extension(RebuildConfig {
+            matrix_export_enabled: false,
             alpha: 0.3,
             lambda_var: 0.5,
             lambda_amb: 0.25,
