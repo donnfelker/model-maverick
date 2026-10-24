@@ -1,0 +1,43 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "insert into model_columns (\n            id,provider,model_id,endpoint,settings,status,pricing,cold_start_until,deprecation_date,\n            execution_aliases,retention_mode,retention_verified_at,retention_valid_until,retention_source,\n            execution_alias_retention,param_constraints)\n            values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)\n            on conflict (id) do update set provider=excluded.provider, model_id=excluded.model_id,\n              endpoint=excluded.endpoint, settings=excluded.settings, status=excluded.status,\n              cold_start_until=excluded.cold_start_until, deprecation_date=excluded.deprecation_date,\n              execution_aliases=excluded.execution_aliases,retention_mode=excluded.retention_mode,\n              retention_verified_at=excluded.retention_verified_at,retention_valid_until=excluded.retention_valid_until,\n              retention_source=excluded.retention_source,execution_alias_retention=excluded.execution_alias_retention,\n              param_constraints=excluded.param_constraints,updated_at=now()\n            returning pricing as \"pricing: _\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "pricing: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "model_columns",
+            "name": "pricing"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb",
+        "Text",
+        "Jsonb",
+        "Date",
+        "Date",
+        "Jsonb",
+        "Text",
+        "Timestamptz",
+        "Timestamptz",
+        "Text",
+        "Jsonb",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0c83245161ded9bd40da574e3db2f76b67c47df844068edeab12500598485e50"
+}

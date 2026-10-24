@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "update model_columns set quality_source_column_id=$2 where id=$1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fcdf04081cdf1105c4bd5a6c9dfa90dcc3c4699635e9115ffe66cb9b9ef631db"
+}

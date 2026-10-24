@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "update matrix_imports set active=false where active",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "67ac1ef3b78e60516da8c5b13c78539b151f82c39d7c916aeff8161d79c36bc0"
+}

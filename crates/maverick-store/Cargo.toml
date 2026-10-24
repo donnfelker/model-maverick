@@ -20,6 +20,7 @@ tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+sha2 = { workspace = true }
 tracing = { workspace = true }
 ulid = { workspace = true }
 chrono = { workspace = true }
@@ -31,7 +32,8 @@ graphile_worker_migrations = { workspace = true }
 
 [dev-dependencies]
 maverick-testdb = { workspace = true }
-sha2 = { workspace = true }
 test-support = { path = "../test-support" }
 testcontainers = { workspace = true }
 insta = { workspace = true }
+# Deterministic test-only signing keys authenticate import fixtures.
+ed25519-dalek = { workspace = true }

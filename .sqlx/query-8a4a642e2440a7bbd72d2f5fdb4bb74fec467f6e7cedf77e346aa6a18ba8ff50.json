@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "update model_columns set pricing=$2 where id=$1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8a4a642e2440a7bbd72d2f5fdb4bb74fec467f6e7cedf77e346aa6a18ba8ff50"
+}

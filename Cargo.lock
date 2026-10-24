@@ -2649,6 +2649,7 @@ name = "maverick-store"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "ed25519-dalek",
  "graphile_worker",
  "graphile_worker_migrations",
  "insta",

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "update matrix_imports set active=true where manifest_sha256=$1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dc9e8c0b18e6dadf1d8896d8c439b3ae47e81289b60029a0aeccd7df9688bd32"
+}

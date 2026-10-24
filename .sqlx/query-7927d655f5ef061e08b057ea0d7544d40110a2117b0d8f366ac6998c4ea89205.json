@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select manifest_sha256, published_at from matrix_imports where active",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "manifest_sha256",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "matrix_imports",
+            "name": "manifest_sha256"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "published_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "matrix_imports",
+            "name": "published_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "7927d655f5ef061e08b057ea0d7544d40110a2117b0d8f366ac6998c4ea89205"
+}

@@ -23,6 +23,7 @@ pub mod corpus;
 pub mod decisions;
 pub mod health;
 pub mod matrix;
+pub mod matrix_import;
 pub mod measurement;
 pub mod migrate;
 pub mod schema;
