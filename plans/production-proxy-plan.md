@@ -112,6 +112,8 @@ The pure wording change lands first, on its own, so reviewers can see that it ch
 
 ## 9. Open questions
 
+Decided 2026-10-24 by the owner: accept the recommendation for 1, 2, and 3 (bead n9kh.1).
+
 1. **Direct models without the `<author>/` form.** Claude Code sends bare ids such as `claude-opus-5-5` when the caller has not set a `maverick/*` model. Recommendation: pass them through (§3), so pointing Claude Code at the proxy never breaks it. Routing happens only when the caller chooses a `maverick/*` model.
 2. **Engine API default mode.** `POST /v1/recommend` without `mode` is `balanced` (Go behavior). `maverick/auto` now means `quality`. Recommendation: change the API default to `quality` too, as a separate row, so every path means "best model" by default. This also answers open question 7 in `plans/conversation-affinity-plan.md`.
 3. **Rate limit default.** 600 requests per minute per tenant key. Recommendation: accept, and move to per-tenant limits with v1.1.
