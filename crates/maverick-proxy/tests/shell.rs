@@ -931,6 +931,22 @@ async fn slow_request_heads_are_cut_off() {
     proxy.stop().await.expect("clean shutdown");
 }
 
+/// D46, production-proxy plan §5: `GET /up` never calls the engine, so a replica stays in
+/// rotation while the engine is down and fail-open serves traffic.
+#[tokio::test]
+async fn up_answers_while_the_engine_is_down() {
+    let closed = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+    let engine_url = format!("http://{}", closed.local_addr().expect("address"));
+    drop(closed);
+    let proxy = start(self_hosted(&engine_url)).await;
+    let up = exchange(&proxy.addr, &raw_request("GET", "/up", &[], b"")).await;
+    assert_response("up", &up, 200, "{\"status\":\"ok\"}");
+    // The engine is down: a routed request with nothing to fall back to is the D46 503.
+    let routed = post(&proxy.addr, "/v1/chat/completions", &[], CHAT_HI).await;
+    assert_eq!(routed.status(), 503);
+    proxy.stop().await.expect("clean shutdown");
+}
+
 #[tokio::test]
 async fn shutdown_drains_and_returns() {
     let proxy = start(self_hosted("http://engine.invalid")).await;

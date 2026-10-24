@@ -25,7 +25,7 @@ flowchart LR
 ```
 
 - **Auth.** Hosted mode reads and validates the tenant key before the body is read, so an unauthenticated caller cannot make the proxy buffer a body.
-- **Rate limit (D28).** Per tenant key, `MAVERICK_PROXY_RATELIMIT_RPM` requests per minute (default 60). Over the limit is `429 rate_limited`, and neither the engine nor a provider is called.
+- **Rate limit (D28).** Per tenant key, `MAVERICK_PROXY_RATELIMIT_RPM` requests per minute (default 600). Over the limit is `429 rate_limited`, and neither the engine nor a provider is called.
 - **Body cap (D38).** Over `MAVERICK_PROXY_MAX_BODY_BYTES` (default 32 MiB), by the declared `Content-Length` or the bytes read, is `413 payload_too_large`.
 - **Decode and model name.** A malformed body is `400 invalid_request`. A malformed `maverick/*` route or an empty model is `400 invalid_model_alias`. Any other model is a direct call to the surface's provider, with no engine call (D45).
 - **Recommend.** A terminal privacy error is relayed as `422` or `409` with its code. In hosted mode an engine `401` becomes `401 unauthorized` and a `403` is relayed with its code (D13). An engine failure falls open (below). Any other engine answer is `502 engine_error`. Every engine failure logs one ERROR line.

@@ -481,7 +481,44 @@ scripts/live-smoke.sh
   endpoint to scrape. The proxy exports its own records with `MAVERICK_PROXY_OTLP_ENDPOINT`
   (D31).
 - **The proxy** (`crates/maverick-proxy`) is a separate binary and deployable. It has
-  no database and no migrations. See `docs/features/proxy.md`.
+  no database and no migrations. See "The proxy in production" below and
+  `docs/features/proxy.md`.
+
+## The proxy in production
+
+The proxy is a production path (D46). It fails open: during an engine outage it serves the
+tenant key's last good list for the route, then the surface's default model, then
+`503 engine_unavailable` (spec §8.1).
+
+- **Health.** `GET /up` answers 200 without calling the engine. An engine outage does not
+  take a replica out of rotation while fail-open serves traffic.
+- **Replicas.** The proxy is stateless apart from its in-memory last good store, so it can
+  run more than one replica (`config/deploy-proxy.yml`). Each replica fills its own store
+  from its own traffic. A new or restarted replica starts cold: until it has served a
+  route, an engine outage on that route goes to the default model or to the `503`.
+- **Availability target** (proposed 2026-10-24; the owner confirms the number): 99.9% of
+  proxy requests in a 30-day window get an answer that is not `503 engine_unavailable` and
+  not a `502` the proxy made itself (`engine_error`, `no_executable_candidates`). A
+  provider's own error, relayed to the caller, does not count against it.
+- **Alerts** on `maverick_proxy_fallbacks_total`, exported over OTLP when
+  `MAVERICK_PROXY_OTLP_ENDPOINT` is set. Its only label is `step`.
+  - Any `step="unavailable"` pages: callers got `503 engine_unavailable`. Check the engine
+    first (`/up`, `/health/detail`), then whether the proxy has a default model.
+  - `step="last_known_good"` rising for more than 10 minutes warns: the engine is down or
+    failing, and callers run on cached lists that expire after
+    `MAVERICK_PROXY_LKG_MAX_AGE`.
+  - Any `step="default_model"` warns: a cold route fell back to the configured default,
+    which is not a recommendation.
+- **Settings** (spec §14.1): `MAVERICK_PROXY_RATELIMIT_RPM` (default 600 per tenant key; a
+  routed request also counts against the engine's per-key limit, `MAVERICK_RATELIMIT_RPM`,
+  300 by default), `MAVERICK_PROXY_LKG_MAX_AGE` (default `24h`),
+  `MAVERICK_PROXY_DEFAULT_MODEL_MESSAGES` and `MAVERICK_PROXY_DEFAULT_MODEL_CHAT` (unset),
+  and `MAVERICK_PROXY_DEFAULT_MODEL_ZERO_RETENTION` (`false`). Set it to `true` only when
+  both default models have verified zero-retention evidence: a zero-retention tenant may
+  then fall open to them.
+- **Logs.** Each engine failure is one ERROR line, `maverick-proxy: engine recommend
+  failed`, with the error and, when the proxy fell open, the step. The drill is in
+  `docs/runbook-go-live.md` §8.
 
 ## Hot-path latency
 

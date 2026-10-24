@@ -387,10 +387,16 @@ operator key. Fix the column, the key, or the variable. Apply a variable or key 
 
 ## 8. The hosted proxy [owner]
 
-The proxy runs in hosted mode, as its own Kamal service (`config/deploy-proxy.yml`):
+The proxy runs in hosted mode, as its own Kamal service (`config/deploy-proxy.yml`). It is
+a production service:
 - it holds no MM key and no provider key (D12, D13);
-- its per-tenant rate limit is `MAVERICK_PROXY_RATELIMIT_RPM` (default 60);
-- it calls the engine's **public** URL.
+- its per-tenant rate limit is `MAVERICK_PROXY_RATELIMIT_RPM` (default 600);
+- it calls the engine's **public** URL;
+- it fails open during an engine outage (D46). Decide the default models now. Unset, a
+  cold route answers `503 engine_unavailable` while the engine is down. Mark them zero
+  retention only with verified evidence;
+- more replicas means more hosts under `servers.web`. Each replica keeps its own last good
+  store.
 
 ```sh
 kamal setup -c config/deploy-proxy.yml
@@ -421,6 +427,33 @@ curl -sS -D - -o /dev/null https://proxy.example.com/v1/messages \
   Anthropic entries only. So the pool needs a column of each kind.
 - The proxy strips `X-Maverick-API-Key` before any upstream call, and it never translates
   between wire formats.
+
+**Fail-open drill.** Do it before the proxy takes customer traffic. It needs the same
+real provider calls as the smoke, so the owner confirms them.
+
+1. Send the chat smoke request again. It answers `200` with no `x-maverick-fallback`
+   header, and the proxy now holds a last good list for `maverick/auto`.
+2. Stop the engine's web role:
+
+   ```sh
+   kamal app stop -r web
+   ```
+
+3. Send the same chat request. It answers `200` with `x-maverick-fallback:
+   last_known_good`, and the proxy logs one ERROR line `maverick-proxy: engine recommend
+   failed`.
+4. Send it once more with the model `maverick/auto:cost`, a route with no last good list.
+   It answers `503 engine_unavailable` with `Retry-After: 5`. With a chat default model
+   set, it answers `200` with `x-maverick-fallback: default_model`.
+5. Start the engine again, and wait until `https://maverick.example.com/up` answers `200`:
+
+   ```sh
+   kamal app start -r web
+   ```
+
+6. Send the step 1 request again. It answers `200` with no `x-maverick-fallback` header.
+   With OTLP set, `maverick_proxy_fallbacks_total` shows the `last_known_good` and
+   `unavailable` (or `default_model`) steps from steps 3 and 4.
 
 ## 9. The nightly schedule
 

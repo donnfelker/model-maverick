@@ -29,8 +29,10 @@ pub const DEFAULT_MAX_BODY_BYTES: u64 = 32 * 1024 * 1024;
 /// The per-tenant rate limit variable, requests per minute (D28).
 pub const RATELIMIT_RPM_VAR: &str = "MAVERICK_PROXY_RATELIMIT_RPM";
 
-/// The default per-tenant rate limit: 60 requests per minute, below the API's 300 (D28).
-pub const DEFAULT_RATELIMIT_RPM: u32 = 60;
+/// The default per-tenant rate limit: 600 requests per minute (D28; owner decision
+/// 2026-10-24, until v1.1 per-tenant limits). A routed request also counts against the
+/// engine's own per-key limit.
+pub const DEFAULT_RATELIMIT_RPM: u32 = 600;
 
 /// The last good list's maximum age, a Go duration such as `24h` (D46).
 pub const LKG_MAX_AGE_VAR: &str = "MAVERICK_PROXY_LKG_MAX_AGE";
@@ -382,7 +384,8 @@ mod tests {
             load(None).map(|c| c.ratelimit_rpm),
             Ok(DEFAULT_RATELIMIT_RPM)
         );
-        assert_eq!(load(Some("")).map(|c| c.ratelimit_rpm), Ok(60));
+        assert_eq!(DEFAULT_RATELIMIT_RPM, 600);
+        assert_eq!(load(Some("")).map(|c| c.ratelimit_rpm), Ok(600));
         assert_eq!(load(Some("1")).map(|c| c.ratelimit_rpm), Ok(1));
         assert_eq!(
             load(Some("4294967295")).map(|c| c.ratelimit_rpm),

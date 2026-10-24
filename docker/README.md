@@ -55,7 +55,9 @@ backup and restore test.
   - `.kamal/hooks/pre-app-boot` runs `maverick migrate` with the new image before the new
     containers boot.
 - `config/deploy-proxy.yml`: the hosted proxy, its own service (`kamal deploy -c
-  config/deploy-proxy.yml`). It has no MM key and no provider key (D12, D13).
+  config/deploy-proxy.yml`). It has no MM key and no provider key (D12, D13). It can run
+  more than one replica: list more hosts. Each replica keeps its own in-memory last good
+  store for fail-open (D46), so a new replica starts cold.
 - `.kamal/secrets`: environment references only. Export the values in the deploying shell.
 
 Replace the placeholders (`<HOST>`, `<REGISTRY_USERNAME>`, `maverick.example.com`,

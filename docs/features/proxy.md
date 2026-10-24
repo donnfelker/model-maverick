@@ -153,8 +153,8 @@ Use an OpenAI-compatible client for OpenRouter testing.
   (`MAVERICK_PROXY_RATELIMIT_RPM`). Direct calls count against it.
 - The default body cap is 32 MiB.
 - The proxy is a production path. Its fail-open ladder is in spec §8.1 (D46).
-  Its availability target and alerts are in `plans/production-proxy-plan.md` §5
-  until `docs/operations.md` carries them.
+  Its availability target, alerts, and replicas are in `docs/operations.md`
+  "The proxy in production".
 
 ## Telemetry
 

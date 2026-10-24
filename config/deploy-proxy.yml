@@ -9,8 +9,15 @@
 # - Each caller sends its tenant key in `X-Maverick-API-Key` (D13) and its own provider
 #   credential. The proxy has NO MM key and NO provider key in its environment, and hosted
 #   mode never reads one (D12).
-# - Per-tenant rate limits (D28): MAVERICK_PROXY_RATELIMIT_RPM.
+# - Per-tenant rate limits (D28): MAVERICK_PROXY_RATELIMIT_RPM, default 600.
 # - It calls the engine's PUBLIC listener. Never point it at the internal listener.
+# - It is a production path that fails open (D46): during an engine outage it serves each
+#   tenant key's last good list, then the surface's default model (when set below), then
+#   503 engine_unavailable. GET /up never calls the engine, so an engine outage does not
+#   take a replica out of rotation.
+# - More than one replica: list more hosts under servers.web. Each replica keeps its own
+#   in-memory last good store, filled from its own traffic, so a new replica starts cold.
+#   docs/operations.md "The proxy in production" has the alerts.
 #
 # Placeholders: <HOST> and <REGISTRY_USERNAME> as in config/deploy.yml, and
 # proxy.example.com (its A record must exist before the deploy).
@@ -52,7 +59,13 @@ env:
     MAVERICK_PROXY_MODE: hosted
     MAVERICK_PROXY_ADDR: ":8090"
     MAVERICK_ENGINE_URL: https://maverick.example.com
-    MAVERICK_PROXY_RATELIMIT_RPM: "60"
+    MAVERICK_PROXY_RATELIMIT_RPM: "600"
+    # Fail-open (D46). The default models are unset, so a cold route answers 503.
+    # MAVERICK_PROXY_LKG_MAX_AGE: "24h"
+    # MAVERICK_PROXY_DEFAULT_MODEL_MESSAGES: "<an Anthropic model id>"
+    # MAVERICK_PROXY_DEFAULT_MODEL_CHAT: "<an OpenAI model id>"
+    # `true` only for default models with verified zero-retention evidence.
+    # MAVERICK_PROXY_DEFAULT_MODEL_ZERO_RETENTION: "false"
     # `off` sends no telemetry at all (G13); the default is on.
     # MAVERICK_PROXY_TELEMETRY: "off"
     # MAVERICK_PROXY_OTLP_ENDPOINT: "http://otel-collector:4318"
