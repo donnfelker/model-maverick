@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use maverick_domain::affinity::{
     AffinityContext, AffinityDecision, AffinityReason, AffinityStatus, BonusWithheld,
-    INCUMBENT_BONUS, TurnCostSkipped, TurnPrices, rank_with_affinity,
+    INCUMBENT_BONUS, ServedEntry, TurnCostSkipped, TurnPrices, rank_with_affinity, served_column,
 };
 use maverick_domain::policy::{Exclusion, ExclusionReason, RetentionMode};
 use maverick_domain::pricing::Pricing;
@@ -680,4 +680,62 @@ fn reasons_and_decisions_serialize_as_the_spec_spells_them() {
     ] {
         assert_eq!(serde_json::to_value(skipped).unwrap(), json!(text));
     }
+}
+
+// ---------------------------------------------------------------------------------
+// The telemetry follow rule (spec §9.10).
+// ---------------------------------------------------------------------------------
+
+fn chain() -> Vec<ServedEntry> {
+    serde_json::from_value(json!([
+        {"provider": "anthropic", "model": "claude-a", "endpoint": "direct", "column_id": "col_0",
+         "execution_aliases": {"openrouter": "anthropic/claude-a"}, "settings": {}},
+        {"model": "gpt-b", "endpoint": "direct", "column_id": "col_1", "execution_aliases": {}},
+        {"model": "claude-a", "endpoint": "vertex", "column_id": "col_2",
+         "execution_aliases": {"openrouter": "anthropic/claude-a-vertex", "odd": 5}},
+        {"model": "gpt-b", "endpoint": "direct", "column_id": "col_3"}
+    ]))
+    .expect("chain")
+}
+
+/// DIVERGENCE: D44. A later entry that served the turn wins; the first of two that share
+/// model and endpoint wins.
+#[test]
+fn a_later_entry_that_served_the_turn_is_followed() {
+    let chain = chain();
+    assert_eq!(served_column(&chain, "gpt-b", "direct"), Some("col_1"));
+    assert_eq!(served_column(&chain, "claude-a", "vertex"), Some("col_2"));
+}
+
+/// DIVERGENCE: D44. An OpenRouter item names the alias, not the model.
+#[test]
+fn an_execution_alias_matches_its_entry() {
+    let chain = chain();
+    assert_eq!(
+        served_column(&chain, "anthropic/claude-a-vertex", "openrouter"),
+        Some("col_2")
+    );
+    // The alias name must match the endpoint, and its value the model.
+    assert_eq!(
+        served_column(&chain, "anthropic/claude-a-vertex", "direct"),
+        None
+    );
+    assert_eq!(served_column(&chain, "claude-a", "openrouter"), None);
+    // A non-string alias value never matches.
+    assert_eq!(served_column(&chain, "5", "odd"), None);
+}
+
+/// DIVERGENCE: D44. When the pick served the turn (directly or through its alias), or no
+/// entry matches, the row stays.
+#[test]
+fn the_pick_or_an_unknown_model_changes_nothing() {
+    let chain = chain();
+    assert_eq!(served_column(&chain, "claude-a", "direct"), None);
+    assert_eq!(
+        served_column(&chain, "anthropic/claude-a", "openrouter"),
+        None
+    );
+    assert_eq!(served_column(&chain, "gpt-b", "vertex"), None);
+    assert_eq!(served_column(&chain, "unknown", "direct"), None);
+    assert_eq!(served_column(&[], "gpt-b", "direct"), None);
 }

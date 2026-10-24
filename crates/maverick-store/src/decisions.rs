@@ -44,6 +44,16 @@ pub struct NewRecommendation<'a> {
     pub affinity: Option<&'a JsonRawValue>,
 }
 
+/// What the telemetry follow rule needs from a recommendation (spec §9.10, D44): its
+/// affinity hash and the chain it returned.
+#[derive(Debug, Clone)]
+pub struct AffinityFollow {
+    pub id: String,
+    pub affinity_hash: String,
+    /// The response's `recommendations` array.
+    pub chain: Json,
+}
+
 /// The filters of `ListRecommendationsPage`.
 #[derive(Debug, Clone, Copy)]
 pub struct RecommendationPageQuery<'a> {
@@ -226,6 +236,28 @@ pub async fn recommendation_ids_for_tenant<'e>(
     sqlx::query_scalar!(
         "select id from recommendations
          where tenant_id = $1 and id = any($2::text[])",
+        tenant_id,
+        ids
+    )
+    .fetch_all(db)
+    .await
+}
+
+/// The tenant's recommendations among `ids` that stored an affinity block with a hash,
+/// with that hash and their response chain (spec §9.10, D44). Another tenant's ids and
+/// recommendations made without affinity are not returned. No order.
+pub async fn affinity_follows<'e>(
+    db: impl PgExecutor<'e>,
+    tenant_id: &str,
+    ids: &[String],
+) -> sqlx::Result<Vec<AffinityFollow>> {
+    sqlx::query_as!(
+        AffinityFollow,
+        r#"select id, affinity->>'affinity_hash' as "affinity_hash!",
+                  response->'recommendations' as "chain!: _"
+           from recommendations
+           where tenant_id = $1 and id = any($2::text[])
+             and affinity->>'affinity_hash' is not null"#,
         tenant_id,
         ids
     )

@@ -8,16 +8,22 @@
 //!
 //! D39: when the caller's tenant has opted out of telemetry, every item is dropped the
 //! same way and no `outcomes` row is written. The response has the same shape.
+//!
+//! D44: an accepted 2xx item can move a conversation's affinity row to the chain entry
+//! that served the turn (spec §9.10). It never changes the counts.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use axum::body::Body;
 use axum::extract::{Extension, Request, State};
 use axum::http::{Method, Response, StatusCode};
+use maverick_domain::affinity::{ServedEntry, served_column};
 use maverick_domain::gojson::match_field;
+use maverick_domain::telemetry::TelemetryItem;
 use maverick_domain::{ids, telemetry};
-use maverick_store::{JsonRawValue, decisions, is_not_found, tenancy};
+use maverick_store::{JsonRawValue, affinity, decisions, is_not_found, tenancy};
+use sqlx::PgPool;
 use serde::de::{MapAccess, Visitor};
 
 use crate::{
@@ -183,7 +189,67 @@ pub(crate) async fn telemetry(
         }
         accepted += 1;
     }
+    if api.recommend().affinity.enabled {
+        follow_served_columns(pool, &identity.tenant_id, &items, &owned).await;
+    }
     counts(accepted, dropped)
+}
+
+/// D44: an accepted 2xx item that names a chain entry after the pick moves the
+/// conversation's row to that entry's column (spec §9.10), with a compare and set on the
+/// recommendation. A failure is logged and never fails the batch; the items stay
+/// accepted.
+async fn follow_served_columns(
+    pool: &PgPool,
+    tenant_id: &str,
+    items: &[TelemetryItem],
+    owned: &HashSet<String>,
+) {
+    let served: Vec<&TelemetryItem> = items
+        .iter()
+        .filter(|item| (200..300).contains(&item.status) && owned.contains(&item.recommendation_id))
+        .collect();
+    if served.is_empty() {
+        return;
+    }
+    let ids: Vec<String> = served.iter().map(|item| item.recommendation_id.clone()).collect();
+    let follows: HashMap<String, (String, Vec<ServedEntry>)> =
+        match decisions::affinity_follows(pool, tenant_id, &ids).await {
+            Ok(rows) => rows
+                .into_iter()
+                .filter_map(|row| {
+                    let chain = serde_json::from_str(row.chain.get()).ok()?;
+                    Some((row.id, (row.affinity_hash, chain)))
+                })
+                .collect(),
+            Err(error) => {
+                tracing::warn!(error = %error, "telemetry: reading affinity follows failed");
+                return;
+            }
+        };
+    for item in served {
+        let Some((hash, chain)) = follows.get(&item.recommendation_id) else {
+            continue;
+        };
+        let Some(column_id) = served_column(chain, &item.model_used, &item.endpoint_used) else {
+            continue;
+        };
+        if let Err(error) = affinity::follow_served_column(
+            pool,
+            tenant_id,
+            hash,
+            &item.recommendation_id,
+            column_id,
+        )
+        .await
+        {
+            tracing::warn!(
+                recommendation_id = %item.recommendation_id,
+                error = %error,
+                "telemetry: following the served column failed"
+            );
+        }
+    }
 }
 
 /// `200 {"accepted":n,"dropped":m}`.

@@ -270,9 +270,8 @@ model_not_in_pool | unknown_pool | zero_retention_requires_declared`, `413`,
 ### Conversation affinity (`affinity`)
 
 D44, spec §7.6. The engine lists `affinity` in `X-Maverick-API-Features`, and
-MM components send the field only to an engine that lists it (D50). Moving the
-state to a chain entry that served the turn (see `POST /v1/telemetry`) is not
-served yet (bead gcd2.7).
+MM components send the field only to an engine that lists it (D50). Telemetry
+moves the state to the chain entry that served a turn (see `POST /v1/telemetry`).
 
 A multi-turn conversation calls `/v1/recommend` once per turn. `affinity` ties
 the turns together, so the engine can report whether the pick stayed on one
@@ -500,7 +499,7 @@ set, every item is dropped and counted, and no outcome row is written. The
 response has the same shape. Recommend responses carry `"telemetry": false`
 for such a tenant, so MM components send nothing for it in the first place.
 
-**Conversation affinity (D44, not served yet):** when a 2xx item shows that a
+**Conversation affinity (D44):** when an accepted 2xx item shows that a
 later chain entry served the turn, the engine moves the conversation's
 affinity state to that entry's column, so the next turn finds the warm cache.
 An entry matches when `model_used` and `endpoint_used` are its `model` and

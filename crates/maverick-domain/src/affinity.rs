@@ -10,10 +10,14 @@
 //!
 //! The caller's survivors are never changed, so the displayed `score` stays P's real
 //! quality.
+//!
+//! [`served_column`] is the telemetry follow rule (spec §9.10): which chain entry served
+//! a turn, when it was not the pick.
 
 use std::collections::BTreeMap;
 
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
+use serde_json::Value as JsonValue;
 
 use crate::policy::{Exclusion, ExclusionReason};
 use crate::pricing::Pricing;
@@ -341,4 +345,36 @@ fn exclusion_reason(id: &str, no_data: &[Exclusion], policy: &[Exclusion]) -> Ex
         .chain(policy)
         .find(|exclusion| exclusion.column_id == id)
         .map_or(ExclusionReason::NotInPool, |exclusion| exclusion.reason)
+}
+
+/// One entry of a stored response chain, as a telemetry item names it (spec §9.10). Other
+/// members of the entry are ignored.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct ServedEntry {
+    pub column_id: String,
+    pub model: String,
+    pub endpoint: String,
+    #[serde(default)]
+    pub execution_aliases: BTreeMap<String, JsonValue>,
+}
+
+/// The column of the chain entry that served a turn, when that entry is not the pick
+/// (spec §9.10, D44). An entry matches when `model_used` and `endpoint_used` are its
+/// `model` and `endpoint`, or when `endpoint_used` names one of its execution aliases
+/// and `model_used` is that alias's value (D15). The first match decides: when it is
+/// index 0, or nothing matches, the row stays where it is (`None`).
+pub fn served_column<'a>(
+    chain: &'a [ServedEntry],
+    model_used: &str,
+    endpoint_used: &str,
+) -> Option<&'a str> {
+    let matches = |entry: &ServedEntry| {
+        (entry.model == model_used && entry.endpoint == endpoint_used)
+            || entry
+                .execution_aliases
+                .get(endpoint_used)
+                .is_some_and(|alias| alias.as_str() == Some(model_used))
+    };
+    let first = chain.iter().position(matches)?;
+    (first > 0).then(|| chain[first].column_id.as_str())
 }
