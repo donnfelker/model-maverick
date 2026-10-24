@@ -780,12 +780,17 @@ Production is one server deployed with Kamal 2. `config/deploy.yml` (the engine)
   directory `~/maverick-postgres/postgres-data` (a Kamal accessory directory, not a named
   volume), and its port is on the host loopback only. `kamal deploy` does not touch
   accessories. `kamal accessory remove postgres` deletes the data.
-- **Migrations:** the `.kamal/hooks/pre-app-boot` hook runs `maverick migrate` from the
-  version being deployed before traffic moves. `serve` never migrates, so any path that
-  skips the hook (a plain `docker run`, a manual restart) must run `maverick migrate` first.
-  `kamal migrate` runs it by hand. `migrate` loads the same required configuration as
-  `serve` (`MAVERICK_DATABASE_URL`, `MAVERICK_INTERNAL_TOKENS`,
-  `MAVERICK_CAPTURE_MASTER_KEY`), though it only touches the database.
+- **Migrations:** the `.kamal/hooks/pre-app-boot` hook runs `maverick upgrade --yes` from
+  the version being deployed before traffic moves (D50): the upgrade lock, the serve
+  heartbeat check, an `upgrades` row, and verify. `serve` never migrates and refuses a
+  database with pending migrations, so any path that skips the hook (a plain `docker run`,
+  a manual restart) must run `maverick upgrade` first. The old containers keep running
+  during a rolling deploy, so a release with a needs-downtime migration stops at the hook:
+  stop the app (`kamal app stop`), deploy, and it starts on the new schema. `kamal migrate`
+  runs the low-level `maverick migrate` by hand. Both load the same required
+  configuration as `serve` (`MAVERICK_ROLE`, `MAVERICK_DATABASE_URL`,
+  `MAVERICK_INTERNAL_TOKENS`, `MAVERICK_CAPTURE_MASTER_KEY`), though they only touch the
+  database.
 - **Secrets** come from `.kamal/secrets`, a committed file of environment references with
   **no values**. Export the values in the deploying shell, or fetch them with
   `kamal secrets fetch` from a password manager.

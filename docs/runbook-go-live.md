@@ -147,8 +147,9 @@ kamal setup
 `kamal setup` runs these steps:
 1. It builds and pushes the image, and boots kamal-proxy.
 2. It boots the `backup` accessory. It skips `postgres`, which already exists.
-3. It runs `.kamal/hooks/pre-app-boot`: `maverick migrate` with the new image, which applies
-   the sqlx migrations and the graphile_worker schema.
+3. It runs `.kamal/hooks/pre-app-boot`: `maverick upgrade --yes` with the new image, which
+   applies the sqlx migrations and the graphile_worker schema, records an `upgrades` row,
+   and verifies (D50).
 4. It boots the `web` role (`serve --api-only`) and the one `worker` role
    (`serve --worker-only`).
 

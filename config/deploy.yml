@@ -19,9 +19,9 @@
 # - The `backup` accessory runs scripts/backup.sh every night (see the accessory below).
 # - The hosted proxy is its own service: config/deploy-proxy.yml.
 #
-# Migrations: .kamal/hooks/pre-app-boot runs `maverick migrate` with the new image before
-# each new app container boots, so the schema is current before traffic moves. The
-# `migrate` alias runs it by hand: `kamal migrate`.
+# Migrations: .kamal/hooks/pre-app-boot runs `maverick upgrade --yes` with the new image
+# before each new app container boots, so the schema is current before traffic moves (D50).
+# The `migrate` alias runs the low-level `maverick migrate` by hand: `kamal migrate`.
 #
 # Placeholders to replace before `kamal setup` (secret values: .kamal/secrets):
 #   <HOST>                 the server's address
