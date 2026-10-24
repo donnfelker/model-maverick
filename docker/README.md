@@ -1,4 +1,4 @@
-# Deploy images, Kamal, and backups
+# Deploy images, Kamal, backups, and releases
 
 Bead `model-maverick-rust-port-3hk.9.4`. Master plan §4 "Deployment" and spec §14.2 are the
 authority. The go-live runbook, `docs/runbook-go-live.md` (bead 9.5), uses these files on the
@@ -93,3 +93,60 @@ major version. `docs/runbook-go-live.md` section 4 has the exact commands for th
 They copy `maverick` out of the deployed image, and they take the secrets from the web
 role's Kamal env file. Then they run the script in `postgres:16-alpine` on the `kamal`
 network, with the backup directory mounted at `/backups`.
+
+## Releases
+
+Bead `model-maverick-xq7v.21`. Spec §14.4 "Release artifacts" is the authority.
+`.github/workflows/release.yml` runs `scripts/release-artifacts.sh`, which anyone can also run
+locally. The script publishes nothing.
+
+```sh
+scripts/release-artifacts.sh 0.1.0 dist   # the version must equal the workspace version
+```
+
+It writes these files to `dist/`:
+
+- `maverick-<v>-x86_64-unknown-linux-musl.tar.gz`: the static `maverick` and
+  `maverick-proxy` binaries, `LICENSE`, and `README.md`;
+- `maverick-<v>.cdx.json` and `maverick-proxy-<v>.cdx.json`: CycloneDX 1.5 SBOMs;
+- `cargo-deny-<v>.json`: the `cargo deny check` report. A failing check stops the release;
+- `maverick-offline-kit-<v>.tar`: both image tarballs (`docker load`), the engine
+  migrations, and their `SHA256SUMS`;
+- `SHA256SUMS` over every file above.
+
+`maverick --version` in the binaries reports the release date (`MAVERICK_RELEASE_DATE`,
+default today in UTC) and the commit (`MAVERICK_RELEASE_COMMIT`, default `HEAD`). Without
+`MAVERICK_RELEASE_COMMIT`, the script refuses a checkout with uncommitted build inputs. It
+checks the version, date, and commit in the tarball's binary, and that the engine image runs
+the same binary. It leaves the images tagged `maverick:<v>` and `maverick-proxy:<v>`.
+
+**Cutting a release:**
+
+1. Set `version` in the root `Cargo.toml` (`[workspace.package]`) to the new SemVer
+   version. Commit it, and wait for CI to pass on that commit.
+2. Push the tag `v<version>` for that commit. The workflow refuses a tag that differs from
+   the workspace version.
+3. The workflow pushes `ghcr.io/<owner>/maverick:<v>` and
+   `ghcr.io/<owner>/maverick-proxy:<v>`. It signs both images by digest and every file in
+   `dist/` with cosign keyless signing (the workflow's GitHub OIDC identity; no key is
+   stored). Then it creates the GitHub release with the files and their `.sigstore.json`
+   bundles. The release notes list the image digests.
+
+A manual run of the workflow (`workflow_dispatch`) is a dry run: it attaches the unsigned
+files to the run and pushes nothing.
+
+**Verifying** (the identity is the release workflow at a tag):
+
+```sh
+cosign verify ghcr.io/<owner>/maverick@sha256:<digest> \
+  --certificate-identity-regexp '^https://github.com/<owner>/model-maverick/\.github/workflows/release\.yml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+cosign verify-blob --bundle maverick-<v>-x86_64-unknown-linux-musl.tar.gz.sigstore.json \
+  --certificate-identity-regexp '^https://github.com/<owner>/model-maverick/\.github/workflows/release\.yml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  maverick-<v>-x86_64-unknown-linux-musl.tar.gz
+sha256sum -c SHA256SUMS
+```
+
+The images are built for `linux/amd64` only. The registry, the image names, and the
+platforms wait for the owner (bead `model-maverick-xq7v.24`).

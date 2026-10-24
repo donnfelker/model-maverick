@@ -17,6 +17,10 @@
 #
 # The engine image runs every process shape through its arguments: `serve` (default),
 # `serve --api-only`, `serve --worker-only`, and `migrate`.
+#
+# The release pipeline (scripts/release-artifacts.sh) passes MAVERICK_RELEASE_DATE and
+# MAVERICK_RELEASE_COMMIT as build args, so `maverick --version` reports them. A build
+# without them reports `dev` and `unknown`.
 
 ARG RUST_VERSION=1.98
 
@@ -37,7 +41,12 @@ RUN cargo chef cook --release --locked --recipe-path recipe.json \
       --package maverick --package maverick-proxy
 COPY . .
 ENV SQLX_OFFLINE=true
-RUN cargo build --release --locked --package maverick --package maverick-proxy \
+ARG MAVERICK_RELEASE_DATE=""
+ARG MAVERICK_RELEASE_COMMIT=""
+# An empty build arg is unset, so the binary keeps its `dev` and `unknown` defaults.
+RUN if [ -z "${MAVERICK_RELEASE_DATE}" ]; then unset MAVERICK_RELEASE_DATE; fi \
+ && if [ -z "${MAVERICK_RELEASE_COMMIT}" ]; then unset MAVERICK_RELEASE_COMMIT; fi \
+ && cargo build --release --locked --package maverick --package maverick-proxy \
       --bin maverick --bin maverick-proxy \
  && for bin in maverick maverick-proxy; do \
       if readelf -l "target/release/${bin}" | grep -q INTERP; then \
