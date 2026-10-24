@@ -1,0 +1,153 @@
+{
+  "matrix_version": "fixture-v1",
+  "published_at": "2026-10-24T04:00:00Z",
+  "signing_kids": [
+    "test-standby"
+  ],
+  "matrix": {
+    "catalog": [
+      {
+        "id": "col_fixture_a",
+        "provider": "anthropic",
+        "model_id": "fixture-model-a",
+        "endpoint": "direct",
+        "settings": {},
+        "status": "active",
+        "pricing": {
+          "as_of": "2026-10-01",
+          "currency": "USD",
+          "input_per_mtok": 3.0,
+          "output_per_mtok": 15.0,
+          "source": "list"
+        },
+        "quality_source_column_id": null,
+        "cold_start_until": null,
+        "deprecation_date": null,
+        "execution_aliases": {},
+        "retention_mode": "standard",
+        "retention_verified_at": null,
+        "retention_valid_until": null,
+        "retention_source": null,
+        "execution_alias_retention": {},
+        "param_constraints": {}
+      },
+      {
+        "id": "col_fixture_b",
+        "provider": "openai",
+        "model_id": "fixture-model-b",
+        "endpoint": "direct",
+        "settings": {},
+        "status": "active",
+        "pricing": {
+          "as_of": "2026-10-01",
+          "currency": "USD",
+          "input_per_mtok": 3.0,
+          "output_per_mtok": 15.0,
+          "source": "list"
+        },
+        "quality_source_column_id": null,
+        "cold_start_until": null,
+        "deprecation_date": null,
+        "execution_aliases": {},
+        "retention_mode": "standard",
+        "retention_verified_at": null,
+        "retention_valid_until": null,
+        "retention_source": null,
+        "execution_alias_retention": {},
+        "param_constraints": {}
+      }
+    ],
+    "aggregates": [
+      {
+        "model_column_id": "col_fixture_a",
+        "capability": "structured_extraction",
+        "difficulty_tier": 2,
+        "dimension": "latency_p95_ms",
+        "ewma": 850.0,
+        "variance": 0.0,
+        "n": 20,
+        "measured": true,
+        "matrix_version": "fixture-v1",
+        "as_of": "2026-10-23"
+      },
+      {
+        "model_column_id": "col_fixture_a",
+        "capability": "structured_extraction",
+        "difficulty_tier": 2,
+        "dimension": "pass_rate",
+        "ewma": 0.91,
+        "variance": 0.0,
+        "n": 20,
+        "measured": true,
+        "matrix_version": "fixture-v1",
+        "as_of": "2026-10-23"
+      },
+      {
+        "model_column_id": "col_fixture_a",
+        "capability": "structured_extraction",
+        "difficulty_tier": 2,
+        "dimension": "quality",
+        "ewma": 0.91,
+        "variance": 0.0,
+        "n": 20,
+        "measured": true,
+        "matrix_version": "fixture-v1",
+        "as_of": "2026-10-23"
+      },
+      {
+        "model_column_id": "col_fixture_b",
+        "capability": "structured_extraction",
+        "difficulty_tier": 2,
+        "dimension": "latency_p95_ms",
+        "ewma": 850.0,
+        "variance": 0.0,
+        "n": 20,
+        "measured": true,
+        "matrix_version": "fixture-v1",
+        "as_of": "2026-10-23"
+      },
+      {
+        "model_column_id": "col_fixture_b",
+        "capability": "structured_extraction",
+        "difficulty_tier": 2,
+        "dimension": "pass_rate",
+        "ewma": 0.74,
+        "variance": 0.0,
+        "n": 20,
+        "measured": true,
+        "matrix_version": "fixture-v1",
+        "as_of": "2026-10-23"
+      },
+      {
+        "model_column_id": "col_fixture_b",
+        "capability": "structured_extraction",
+        "difficulty_tier": 2,
+        "dimension": "quality",
+        "ewma": 0.74,
+        "variance": 0.0,
+        "n": 20,
+        "measured": true,
+        "matrix_version": "fixture-v1",
+        "as_of": "2026-10-23"
+      }
+    ],
+    "calibration": [
+      {
+        "batch_id": "batch_fixture_1",
+        "capability": "structured_extraction",
+        "brier_score": 0.125,
+        "overconfidence": 0.0625,
+        "n": 40,
+        "scored_at": "2026-10-23T04:00:00Z"
+      }
+    ],
+    "checks": {
+      "structured_extraction": [
+        {
+          "id": "fixture-check",
+          "type": "json_schema"
+        }
+      ]
+    }
+  }
+}

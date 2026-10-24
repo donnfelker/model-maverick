@@ -25,3 +25,7 @@ sha2 = { workspace = true }
 thiserror = { workspace = true }
 ed25519-dalek = { workspace = true }
 tar = { workspace = true }
+
+[dev-dependencies]
+# The integration tests (the format fixtures) use `trust::test_keys`.
+maverick-bundle = { path = ".", features = ["test-keys"] }
