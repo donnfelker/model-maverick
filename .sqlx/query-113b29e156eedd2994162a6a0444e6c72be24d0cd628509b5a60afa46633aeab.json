@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "insert into tenant_constraints\n           (tenant_id, max_cost_per_run, max_latency_ms, zero_retention, telemetry_opt_out)\n         values ($1, $2, $3, $4, $5)\n         on conflict (tenant_id) do update set\n           max_cost_per_run = excluded.max_cost_per_run,\n           max_latency_ms = excluded.max_latency_ms,\n           zero_retention = excluded.zero_retention,\n           telemetry_opt_out = excluded.telemetry_opt_out,\n           updated_at = now()\n         returning tenant_id, max_cost_per_run, max_latency_ms, zero_retention, updated_at,\n                   telemetry_opt_out",
+  "query": "insert into tenant_constraints\n           (tenant_id, max_cost_per_run, max_latency_ms, zero_retention, telemetry_opt_out,\n            affinity_cost_aware)\n         values ($1, $2, $3, $4, $5, false)\n         on conflict (tenant_id) do update set\n           max_cost_per_run = excluded.max_cost_per_run,\n           max_latency_ms = excluded.max_latency_ms,\n           zero_retention = excluded.zero_retention,\n           telemetry_opt_out = excluded.telemetry_opt_out,\n           affinity_cost_aware = excluded.affinity_cost_aware,\n           updated_at = now()\n         returning tenant_id, max_cost_per_run, max_latency_ms, zero_retention, updated_at,\n                   telemetry_opt_out, affinity_cost_aware",
   "describe": {
     "columns": [
       {
@@ -68,6 +68,17 @@
             "name": "telemetry_opt_out"
           }
         }
+      },
+      {
+        "ordinal": 6,
+        "name": "affinity_cost_aware",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "tenant_constraints",
+            "name": "affinity_cost_aware"
+          }
+        }
       }
     ],
     "parameters": {
@@ -85,8 +96,9 @@
       true,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "26abf64d77841dd4c428221f4b8b89ea68b28e8067519b0d21dbb982e4620d24"
+  "hash": "113b29e156eedd2994162a6a0444e6c72be24d0cd628509b5a60afa46633aeab"
 }

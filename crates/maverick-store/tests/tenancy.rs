@@ -404,3 +404,45 @@ async fn constraints_upsert_replaces_every_value() {
     pool.close().await;
     db.close().await;
 }
+
+/// DIVERGENCE: D44. `affinity_cost_aware` defaults to false, every read returns it, and
+/// the upsert replaces it with false like every other value (no payload carries it yet).
+#[tokio::test]
+async fn constraints_carry_affinity_cost_aware() {
+    let Some(db) = maverick_testdb::database(&SCHEMA).await else {
+        return;
+    };
+    let pool = db.pool().await;
+    tenant(&pool, "ten_1").await;
+
+    let first = tenancy::upsert_tenant_constraints(&pool, "ten_1", None, None, false, false)
+        .await
+        .expect("insert");
+    assert!(!first.affinity_cost_aware);
+
+    sqlx::query("update tenant_constraints set affinity_cost_aware = true where tenant_id = $1")
+        .bind("ten_1")
+        .execute(&pool)
+        .await
+        .expect("set");
+    let read = tenancy::get_tenant_constraints(&pool, "ten_1")
+        .await
+        .expect("get");
+    assert!(read.affinity_cost_aware);
+    let context = tenancy::get_tenant_context(&pool, "ten_1")
+        .await
+        .expect("context");
+    assert!(
+        context
+            .constraints
+            .expect("constraints")
+            .affinity_cost_aware
+    );
+
+    let replaced = tenancy::upsert_tenant_constraints(&pool, "ten_1", None, None, true, false)
+        .await
+        .expect("replace");
+    assert!(!replaced.affinity_cost_aware);
+    pool.close().await;
+    db.close().await;
+}

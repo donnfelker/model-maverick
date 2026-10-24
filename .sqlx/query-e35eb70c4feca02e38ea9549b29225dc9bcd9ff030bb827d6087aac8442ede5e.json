@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "insert into conversation_affinity\n           (tenant_id, affinity_hash, column_id, recommendation_id, last_used_at, expires_at)\n         values ($1, $2, $3, $4, $5, $6)\n         on conflict (tenant_id, affinity_hash) do update set\n           column_id = excluded.column_id,\n           recommendation_id = excluded.recommendation_id,\n           last_used_at = excluded.last_used_at,\n           expires_at = excluded.expires_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e35eb70c4feca02e38ea9549b29225dc9bcd9ff030bb827d6087aac8442ede5e"
+}

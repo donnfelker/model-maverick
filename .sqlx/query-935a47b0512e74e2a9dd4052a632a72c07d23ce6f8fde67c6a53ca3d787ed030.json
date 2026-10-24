@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "update conversation_affinity\n         set column_id = $4\n         where tenant_id = $1 and affinity_hash = $2 and recommendation_id = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "935a47b0512e74e2a9dd4052a632a72c07d23ce6f8fde67c6a53ca3d787ed030"
+}

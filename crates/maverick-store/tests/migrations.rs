@@ -85,6 +85,26 @@ const ADDED: &[&str] = &[
      public.classifier_usage USING btree (usage_date, tenant_id)",
     // 0009_tenant_constraints_telemetry_opt_out.sql
     "column tenant_constraints.telemetry_opt_out boolean not null default false",
+    // 0010_conversation_affinity.sql (D44)
+    "table conversation_affinity",
+    "column conversation_affinity.tenant_id text not null",
+    "column conversation_affinity.affinity_hash text not null",
+    "column conversation_affinity.column_id text not null",
+    "column conversation_affinity.recommendation_id text not null",
+    "column conversation_affinity.last_used_at timestamp with time zone not null",
+    "column conversation_affinity.expires_at timestamp with time zone not null",
+    "constraint conversation_affinity.conversation_affinity_pkey PRIMARY KEY (tenant_id, \
+     affinity_hash)",
+    "constraint conversation_affinity.conversation_affinity_tenant_id_fkey FOREIGN KEY \
+     (tenant_id) REFERENCES tenants(id)",
+    "constraint conversation_affinity.conversation_affinity_column_id_fkey FOREIGN KEY \
+     (column_id) REFERENCES model_columns(id)",
+    "index conversation_affinity_pkey CREATE UNIQUE INDEX conversation_affinity_pkey ON \
+     public.conversation_affinity USING btree (tenant_id, affinity_hash)",
+    "index conversation_affinity_expires_at CREATE INDEX conversation_affinity_expires_at ON \
+     public.conversation_affinity USING btree (expires_at)",
+    "column tenant_constraints.affinity_cost_aware boolean not null default false",
+    "column recommendations.affinity jsonb null",
 ];
 
 /// Catalog entries that the additive migrations replace.
@@ -222,7 +242,10 @@ async fn the_additive_migrations_add_exactly_the_spec_objects() {
         .iter()
         .filter(|line| line.starts_with("table "))
         .count();
-    assert_eq!(tables, 22, "20 Go tables plus batches and classifier_usage");
+    assert_eq!(
+        tables, 23,
+        "20 Go tables plus batches, classifier_usage, and conversation_affinity"
+    );
 }
 
 async fn history(pool: &PgPool) -> Vec<(i64, Vec<u8>)> {

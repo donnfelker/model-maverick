@@ -14,6 +14,7 @@
 
 use sqlx::migrate::Migrator;
 
+pub mod affinity;
 pub mod alerts;
 pub mod batches;
 pub mod capture;

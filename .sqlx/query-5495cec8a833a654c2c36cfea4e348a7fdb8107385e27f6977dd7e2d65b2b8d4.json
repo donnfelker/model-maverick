@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "select tenant_id, max_cost_per_run, max_latency_ms, zero_retention, updated_at,\n                telemetry_opt_out\n         from tenant_constraints\n         where tenant_id = $1",
+  "query": "select tenant_id, max_cost_per_run, max_latency_ms, zero_retention, updated_at,\n                telemetry_opt_out, affinity_cost_aware\n         from tenant_constraints\n         where tenant_id = $1",
   "describe": {
     "columns": [
       {
@@ -68,6 +68,17 @@
             "name": "telemetry_opt_out"
           }
         }
+      },
+      {
+        "ordinal": 6,
+        "name": "affinity_cost_aware",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "tenant_constraints",
+            "name": "affinity_cost_aware"
+          }
+        }
       }
     ],
     "parameters": {
@@ -81,8 +92,9 @@
       true,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "5d5d948395f33c422151b9b9c3a885f09e544c7feaa6afe086c20a395a153f99"
+  "hash": "5495cec8a833a654c2c36cfea4e348a7fdb8107385e27f6977dd7e2d65b2b8d4"
 }

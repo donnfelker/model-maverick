@@ -17,6 +17,7 @@ Migrations live in `crates/maverick-store/migrations/` and run in order through 
 | `0007_tenants_classification_quota_override.sql` | A per-tenant classifier quota override. |
 | `0008_classifier_usage.sql` | Daily per-tenant classifier quota and spend counters. |
 | `0009_tenant_constraints_telemetry_opt_out.sql` | The telemetry opt-out flag (D39). |
+| `0010_conversation_affinity.sql` | The `conversation_affinity` table, `tenant_constraints.affinity_cost_aware`, and the `recommendations.affinity` trace block (D44). |
 
 `maverick migrate` runs these, then runs `graphile_worker`'s own migrations on the same database.
 
@@ -26,7 +27,7 @@ Migrations live in `crates/maverick-store/migrations/` and run in order through 
 
 - `tenants`: the tenant record (status, the prompt HMAC key, the classifier quota override).
 - `api_keys`: public API keys (a sha256 hash, the last four characters, a status).
-- `pools`, `tenant_weights`, `tenant_constraints`: the tenant's model pools, per-capability value weights and quality bar, and the max cost, max latency, zero-retention flag, and telemetry opt-out.
+- `pools`, `tenant_weights`, `tenant_constraints`: the tenant's model pools, per-capability value weights and quality bar, and the max cost, max latency, zero-retention flag, telemetry opt-out, and cost-aware affinity setting.
 
 **The catalog and the corpus**
 
@@ -43,7 +44,8 @@ Migrations live in `crates/maverick-store/migrations/` and run in order through 
 
 **Serving and outcomes**
 
-- `recommendations`: the verbatim decision records (the candidates and the response, with the prompt text excluded).
+- `recommendations`: the verbatim decision records (the candidates and the response, with the prompt text excluded), plus the affinity block when the request sent `affinity`.
+- `conversation_affinity`: the last pick per conversation (D44), keyed by tenant and the HMAC of the caller's affinity key, never the key. A row expires a set time after its last use.
 - `outcomes`: the telemetry-derived outcome rows, each with a foreign key to a recommendation.
 - `classification_cache`: cached prompt classifications.
 

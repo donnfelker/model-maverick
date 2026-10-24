@@ -67,6 +67,8 @@ pub struct TenantConstraint {
     pub updated_at: DateTime<Utc>,
     /// Tenant telemetry opt-out (D39).
     pub telemetry_opt_out: bool,
+    /// Cost-aware conversation affinity (D44, spec §7.6). Default false.
+    pub affinity_cost_aware: bool,
 }
 
 // ---- tenants.sql ----
@@ -254,6 +256,7 @@ struct ConstraintJson {
     zero_retention: bool,
     updated_at: DateTime<Utc>,
     telemetry_opt_out: bool,
+    affinity_cost_aware: bool,
 }
 
 fn decode_error(what: &str, error: impl std::fmt::Display) -> sqlx::Error {
@@ -289,7 +292,8 @@ pub async fn get_tenant_context<'e>(
              (select json_build_object(
                    'max_cost_per_run', c.max_cost_per_run::text,
                    'max_latency_ms', c.max_latency_ms, 'zero_retention', c.zero_retention,
-                   'updated_at', c.updated_at, 'telemetry_opt_out', c.telemetry_opt_out)
+                   'updated_at', c.updated_at, 'telemetry_opt_out', c.telemetry_opt_out,
+                   'affinity_cost_aware', c.affinity_cost_aware)
                 from tenant_constraints c where c.tenant_id = $1)
                as "constraints: sqlx::types::Json<ConstraintJson>",
              (select v.version from corpus_versions v where v.active limit 1)
@@ -344,6 +348,7 @@ pub async fn get_tenant_context<'e>(
                 zero_retention: c.zero_retention,
                 updated_at: c.updated_at,
                 telemetry_opt_out: c.telemetry_opt_out,
+                affinity_cost_aware: c.affinity_cost_aware,
             })
         })
         .transpose()?;
@@ -589,7 +594,7 @@ pub async fn get_tenant_constraints<'e>(
     sqlx::query_as!(
         TenantConstraint,
         "select tenant_id, max_cost_per_run, max_latency_ms, zero_retention, updated_at,
-                telemetry_opt_out
+                telemetry_opt_out, affinity_cost_aware
          from tenant_constraints
          where tenant_id = $1",
         tenant_id
@@ -599,7 +604,9 @@ pub async fn get_tenant_constraints<'e>(
 }
 
 /// `UpsertTenantConstraints`: a conflict replaces every value and sets
-/// `updated_at = now()`. Rust adds `telemetry_opt_out` (D39).
+/// `updated_at = now()`. Rust adds `telemetry_opt_out` (D39). It writes
+/// `affinity_cost_aware` as false (D44): no constraints payload carries it yet, and a
+/// missing key is false. Bead gcd2.6 adds the value.
 pub async fn upsert_tenant_constraints<'e>(
     db: impl PgExecutor<'e>,
     tenant_id: &str,
@@ -611,16 +618,18 @@ pub async fn upsert_tenant_constraints<'e>(
     sqlx::query_as!(
         TenantConstraint,
         "insert into tenant_constraints
-           (tenant_id, max_cost_per_run, max_latency_ms, zero_retention, telemetry_opt_out)
-         values ($1, $2, $3, $4, $5)
+           (tenant_id, max_cost_per_run, max_latency_ms, zero_retention, telemetry_opt_out,
+            affinity_cost_aware)
+         values ($1, $2, $3, $4, $5, false)
          on conflict (tenant_id) do update set
            max_cost_per_run = excluded.max_cost_per_run,
            max_latency_ms = excluded.max_latency_ms,
            zero_retention = excluded.zero_retention,
            telemetry_opt_out = excluded.telemetry_opt_out,
+           affinity_cost_aware = excluded.affinity_cost_aware,
            updated_at = now()
          returning tenant_id, max_cost_per_run, max_latency_ms, zero_retention, updated_at,
-                   telemetry_opt_out",
+                   telemetry_opt_out, affinity_cost_aware",
         tenant_id,
         max_cost_per_run,
         max_latency_ms,
