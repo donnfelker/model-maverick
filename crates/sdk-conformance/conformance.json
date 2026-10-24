@@ -284,6 +284,12 @@
       "version": "v2"
     },
     {
+      "file": "vectors/features.v1.json",
+      "sha256": "f79899700b937cc5e281898441ccc2018ebbf5d009bd78a82cb838b8f002ae46",
+      "vector_set": "features",
+      "version": "v1"
+    },
+    {
       "file": "vectors/normalize.d29.json",
       "sha256": "cbccae9bd48eb3b2169ca8b711942f543664cb4df70c83043f92b747749c3d1b",
       "vector_set": "normalize",
@@ -308,5 +314,5 @@
       "version": "v1"
     }
   ],
-  "version": "2"
+  "version": "3"
 }

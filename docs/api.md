@@ -33,6 +33,12 @@ response listed its feature. Within `/v1` changes are additive only; a
 breaking change is `/v2`, served beside `/v1` for at least 12 months. The proxy
 stamps `X-Maverick-Proxy-Version` on its own responses.
 
+An SDK core or the proxy remembers the list per engine base URL, in memory. Every
+engine response replaces it, an error status included, and a response without
+the header empties it. A request that got no response keeps it. So the first
+request after a component starts sends no optional field. The conformance
+vectors are `crates/sdk-conformance/vectors/features.v1.json`.
+
 ---
 
 ## Authentication and rate limiting (public listener)

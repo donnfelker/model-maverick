@@ -1,0 +1,82 @@
+{
+  "vector_set": "features",
+  "version": "v1",
+  "source": "spec v1 §14.5 (D50); crates/maverick-core/src/recommend.rs (EngineFeatures, RecommendClient). Hand-written.",
+  "rules": {
+    "parse": [
+      "The engine lists the optional request features it accepts in the X-Maverick-API-Features response header: names separated by commas.",
+      "Each name is trimmed of spaces and tabs, and empty names are dropped. Names are case sensitive. Duplicates count once.",
+      "A response without the header, or with a value that is not text, advertises no features. That is what an engine older than D50 means."
+    ],
+    "gate": [
+      "An SDK core or the proxy sends an optional recommend request field only when the remembered list contains its feature name exactly. Otherwise the field is left out of the body, and the request is otherwise unchanged.",
+      "First-release fields (mode, pool, workload and its members) are never gated."
+    ],
+    "remember": [
+      "The list is kept in memory per engine base URL. A component that just started has none, so its first request sends no optional field.",
+      "Every engine response replaces the list with the features its header advertises, whatever its status: an error response counts too, and a response without the header empties the list.",
+      "A request that got no response (a connection failure or a timeout) leaves the list as it was."
+    ]
+  },
+  "parse_cases": [
+    { "id": "absent", "header": null, "expect": [] },
+    { "id": "empty", "header": "", "expect": [] },
+    { "id": "blank", "header": " \t ", "expect": [] },
+    { "id": "one", "header": "affinity", "expect": ["affinity"] },
+    { "id": "two", "header": "affinity,settings-header", "expect": ["affinity", "settings-header"] },
+    { "id": "unsorted", "header": "zeta,affinity", "expect": ["affinity", "zeta"] },
+    { "id": "spaces", "header": " affinity , settings-header ", "expect": ["affinity", "settings-header"] },
+    { "id": "tabs", "header": "affinity\t,\tzeta", "expect": ["affinity", "zeta"] },
+    { "id": "empty-names", "header": ",affinity,,", "expect": ["affinity"] },
+    { "id": "duplicates", "header": "affinity,affinity", "expect": ["affinity"] },
+    { "id": "case-sensitive", "header": "Affinity", "expect": ["Affinity"] }
+  ],
+  "gate_cases": [
+    { "id": "advertised", "advertised": ["affinity"], "want": ["affinity"], "send": ["affinity"] },
+    { "id": "none-advertised", "advertised": [], "want": ["affinity"], "send": [] },
+    { "id": "other-advertised", "advertised": ["settings-header"], "want": ["affinity"], "send": [] },
+    { "id": "case-differs", "advertised": ["Affinity"], "want": ["affinity"], "send": [] },
+    { "id": "subset", "advertised": ["affinity", "zeta"], "want": ["affinity", "beta"], "send": ["affinity"] },
+    { "id": "nothing-wanted", "advertised": ["affinity"], "want": [], "send": [] }
+  ],
+  "sequence_cases": [
+    {
+      "id": "first-request-sends-none",
+      "steps": [
+        { "want": ["affinity"], "send": [], "response": { "status": 200, "features": "affinity" } },
+        { "want": ["affinity"], "send": ["affinity"], "response": { "status": 200, "features": "affinity" } }
+      ]
+    },
+    {
+      "id": "downgrade-drops-the-feature",
+      "steps": [
+        { "want": ["affinity"], "send": [], "response": { "status": 200, "features": "affinity" } },
+        { "want": ["affinity"], "send": ["affinity"], "response": { "status": 200, "features": "" } },
+        { "want": ["affinity"], "send": [], "response": { "status": 200, "features": "" } }
+      ]
+    },
+    {
+      "id": "error-responses-count",
+      "steps": [
+        { "want": ["affinity"], "send": [], "response": { "status": 503, "features": "affinity" } },
+        { "want": ["affinity"], "send": ["affinity"], "response": { "status": 200, "features": "affinity" } }
+      ]
+    },
+    {
+      "id": "a-response-without-the-header-empties-the-list",
+      "steps": [
+        { "want": ["affinity"], "send": [], "response": { "status": 200, "features": "affinity" } },
+        { "want": ["affinity"], "send": ["affinity"], "response": { "status": 502, "features": null } },
+        { "want": ["affinity"], "send": [], "response": { "status": 200, "features": "affinity" } }
+      ]
+    },
+    {
+      "id": "no-response-keeps-the-list",
+      "steps": [
+        { "want": ["affinity"], "send": [], "response": { "status": 200, "features": "affinity" } },
+        { "want": ["affinity"], "send": ["affinity"], "response": null },
+        { "want": ["affinity"], "send": ["affinity"], "response": { "status": 200, "features": "affinity" } }
+      ]
+    }
+  ]
+}

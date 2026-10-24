@@ -7,8 +7,8 @@ use std::fmt::Write as _;
 use serde_json::{Map, Value};
 
 use super::{
-    ChainEntry, EngineFailure, RecommendError, RecommendRequest, Recommendation, RetentionMode,
-    Workload,
+    ChainEntry, EngineFailure, EngineFeatures, RecommendError, RecommendRequest, Recommendation,
+    RetentionMode, Workload,
 };
 use crate::alias::Mode;
 use crate::gojson::{apply_bool, apply_string, members, type_error, write_string};
@@ -18,7 +18,12 @@ use crate::gojson::{apply_bool, apply_string, members, type_error, write_string}
 
 /// The request body: compact JSON, members in lexicographic order, strings escaped as Go's
 /// `json.Marshal` escapes them (HTML-safe). `pool` is omitted when empty.
-pub(super) fn encode_request(request: &RecommendRequest) -> String {
+///
+/// Every member written today is a first-release field. An optional field added later is
+/// written only when `features.allows(<its feature>)` (spec §14.5, D50); conversation
+/// affinity (D44) adds the first, `affinity`, which sorts before `mode`.
+pub(super) fn encode_request(request: &RecommendRequest, features: &EngineFeatures) -> String {
+    let _ = features;
     let mut out = String::from("{\"mode\":");
     write_string(&mut out, engine_mode(request.mode));
     if let Some(pool) = request.pool.as_deref().filter(|pool| !pool.is_empty()) {

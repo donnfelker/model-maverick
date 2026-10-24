@@ -289,14 +289,20 @@ states its rules, and every expectation is hand-checked.
   for reference, the engine's item to outcome rules (D16).
 - `retention.v1.json`: the retention expiry rule and how a response's `retention_mode` string
   reads (spec §4.5).
+- `features.v1.json`: the `X-Maverick-API-Features` parse, the rule that an optional request
+  field is sent only when its feature is advertised, and how a core remembers the list across
+  responses (spec §14.5, D50).
 
 ## Tests in this crate
 
 - `tests/smoke.rs`: one scenario through both servers with the Rust recommend client.
 - `tests/scenarios.rs`: every scenario file loads into the harness and uses only the keys and
   checks this README defines.
-- `tests/vectors.rs`: the alias, telemetry, and retention vectors replayed against
-  `maverick-core` and the engine's rules in `maverick-domain`. The projection and
+- `tests/vectors.rs`: the alias, telemetry, retention, and features vectors replayed against
+  `maverick-core` and the engine's rules in `maverick-domain`. The features sequences run
+  the real recommend client against a scripted engine.
+- `tests/skew.rs`: the current core against a strict engine from the first release, which
+  advertises no feature. No request shape may get a 422 (spec §14.5, D50). The projection and
   normalization vectors are replayed in `maverick-core` (and the proxy).
 - `tests/manifest.rs`: `conformance.json` matches the frozen files.
 

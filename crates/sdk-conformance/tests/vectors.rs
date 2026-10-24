@@ -5,6 +5,10 @@
 //! `projection.p1.json` is replayed by `crates/maverick-core/tests/projection.rs`, and
 //! `normalize.d29.json` by `crates/maverick-core/tests/normalize_vectors.rs` and
 //! `crates/maverick-proxy/tests/normalize_vectors.rs`.
+//!
+//! DIVERGENCE: D50. `features.v1.json` (spec §14.5) is replayed here: the
+//! `X-Maverick-API-Features` parse, the send gate, and the remembered list against a scripted
+//! engine.
 
 use std::path::PathBuf;
 
@@ -12,6 +16,10 @@ use chrono::{DateTime, Utc};
 use maverick_core::alias::{AliasError, Mode, ParsedModel, parse_alias};
 use maverick_core::chain::{AttemptRecord, ErrorClass};
 use maverick_core::recommend::RetentionMode as WireRetention;
+use maverick_core::recommend::{
+    EngineFailure, EngineFeatures, RecommendClient, RecommendClientConfig, RecommendError,
+    RecommendRequest, TenantKey, Workload,
+};
 use maverick_core::telemetry::{UsageShape, parse_usage};
 use maverick_domain::policy::RetentionMode;
 use maverick_domain::telemetry::decode_item;
@@ -200,5 +208,166 @@ fn retention_parse_vectors() {
         // A null or absent member decodes as the empty string.
         let got = WireRetention::parse(case["value"].as_str().unwrap_or_default());
         assert_eq!(got.as_str(), case["expect"], "{id}");
+    }
+}
+
+fn names(value: &Value) -> Vec<String> {
+    value
+        .as_array()
+        .expect("names")
+        .iter()
+        .map(|name| name.as_str().expect("name").to_owned())
+        .collect()
+}
+
+/// The fields an SDK core would send, given what the engine advertised.
+fn gate(features: &EngineFeatures, want: &[String]) -> Vec<String> {
+    want.iter()
+        .filter(|feature| features.allows(feature))
+        .cloned()
+        .collect()
+}
+
+#[test]
+fn features_parse_vectors() {
+    let doc = vectors("features.v1.json");
+    assert_eq!(doc["version"], "v1");
+    let cases = cases(&doc, "parse_cases");
+    assert_eq!(cases.len(), 11);
+    for case in cases {
+        let id = case["id"].as_str().unwrap();
+        let got = EngineFeatures::parse(case["header"].as_str());
+        let got: Vec<String> = got.names().map(str::to_owned).collect();
+        assert_eq!(got, names(&case["expect"]), "{id}");
+    }
+}
+
+#[test]
+fn features_gate_vectors() {
+    let doc = vectors("features.v1.json");
+    let cases = cases(&doc, "gate_cases");
+    assert_eq!(cases.len(), 6);
+    for case in cases {
+        let id = case["id"].as_str().unwrap();
+        let features = EngineFeatures::parse(Some(&names(&case["advertised"]).join(",")));
+        assert_eq!(
+            gate(&features, &names(&case["want"])),
+            names(&case["send"]),
+            "{id}"
+        );
+    }
+}
+
+/// One scripted engine connection: a status and an optional features header, or `None` to
+/// close the connection without answering.
+type Scripted = Option<(u16, Option<String>)>;
+
+/// Serves `script` in order, one connection each, and closes every connection after it.
+async fn scripted_engine(script: Vec<Scripted>) -> String {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind");
+    let address = listener.local_addr().expect("address");
+    tokio::spawn(async move {
+        for step in script {
+            let (mut socket, _) = listener.accept().await.expect("accept");
+            let mut request = Vec::new();
+            let mut buffer = [0u8; 4096];
+            // Read the head, then the body its Content-Length declares.
+            let body_start = loop {
+                let n = socket.read(&mut buffer).await.expect("read");
+                assert!(n > 0, "the client closed before sending a request");
+                request.extend_from_slice(&buffer[..n]);
+                if let Some(at) = request.windows(4).position(|w| w == b"\r\n\r\n") {
+                    break at + 4;
+                }
+            };
+            let head = String::from_utf8_lossy(&request[..body_start]).to_ascii_lowercase();
+            let length: usize = head
+                .lines()
+                .find_map(|line| line.strip_prefix("content-length:"))
+                .map_or(0, |value| value.trim().parse().expect("length"));
+            while request.len() < body_start + length {
+                let n = socket.read(&mut buffer).await.expect("read body");
+                assert!(n > 0, "the client closed mid-body");
+                request.extend_from_slice(&buffer[..n]);
+            }
+            let Some((status, features)) = step else {
+                continue; // Drop the connection without a response.
+            };
+            let body = if status == 200 {
+                r#"{"recommendation_id":"rec_1","recommendations":[]}"#.to_owned()
+            } else {
+                r#"{"error":{"code":"internal_error","message":"x","details":{}}}"#.to_owned()
+            };
+            let mut response = format!(
+                "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n",
+                body.len()
+            );
+            if let Some(features) = features {
+                response.push_str(&format!("X-Maverick-API-Features: {features}\r\n"));
+            }
+            response.push_str("\r\n");
+            response.push_str(&body);
+            socket.write_all(response.as_bytes()).await.expect("write");
+            socket.shutdown().await.expect("shutdown");
+        }
+    });
+    format!("http://{address}")
+}
+
+#[tokio::test]
+async fn features_sequence_vectors() {
+    let doc = vectors("features.v1.json");
+    let cases = cases(&doc, "sequence_cases");
+    assert_eq!(cases.len(), 5);
+    let request = RecommendRequest {
+        mode: Mode::Quality,
+        pool: None,
+        workload: Workload::declared_fallback(),
+    };
+    let key = TenantKey::new("mk_test_conformance");
+    for case in cases {
+        let id = case["id"].as_str().unwrap();
+        let steps = case["steps"].as_array().expect("steps");
+        let script: Vec<Scripted> = steps
+            .iter()
+            .map(|step| {
+                let response = &step["response"];
+                (!response.is_null()).then(|| {
+                    (
+                        u16::try_from(response["status"].as_u64().expect("status")).unwrap(),
+                        response["features"].as_str().map(str::to_owned),
+                    )
+                })
+            })
+            .collect();
+        let client =
+            RecommendClient::new(RecommendClientConfig::new(scripted_engine(script).await))
+                .expect("client");
+        for (index, step) in steps.iter().enumerate() {
+            let at = format!("{id} step {index}");
+            // What the core would send before this call, from what it remembers.
+            assert_eq!(
+                gate(&client.features(), &names(&step["want"])),
+                names(&step["send"]),
+                "{at}"
+            );
+            let outcome = client.recommend(&key, &request).await;
+            match &step["response"] {
+                Value::Null => assert!(
+                    matches!(
+                        outcome,
+                        Err(RecommendError::Engine(EngineFailure::Transport(_)))
+                    ),
+                    "{at}: {outcome:?}"
+                ),
+                response if response["status"] == 200 => {
+                    assert!(outcome.is_ok(), "{at}: {outcome:?}")
+                }
+                _ => assert!(outcome.is_err(), "{at}: {outcome:?}"),
+            }
+        }
     }
 }

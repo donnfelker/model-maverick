@@ -17,15 +17,20 @@
 //! - An empty chain is not an engine error: it decodes, and the chain executor reports
 //!   `no_executable_candidates`, as Go did.
 //!
-//! The client sends only the tenant's Maverick key, never a provider credential. It keeps
-//! no state, writes nothing to disk, and logs nothing; [`Workload`] and [`TenantKey`]
-//! redact themselves in `Debug` output.
+//! - Optional request fields are sent only when the engine advertised their feature in
+//!   `X-Maverick-API-Features` on its last response (spec §14.5, D50), so a newer core never
+//!   sends a field that an older self-hosted engine rejects with `422 invalid_request`.
+//!
+//! The client sends only the tenant's Maverick key, never a provider credential. Its only
+//! state is that advertised feature list, in memory. It writes nothing to disk and logs
+//! nothing; [`Workload`] and [`TenantKey`] redact themselves in `Debug` output.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
-use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderValue};
+use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
 use serde_json::{Map, Value};
 
 use crate::alias::{Alias, Mode};
@@ -183,10 +188,65 @@ impl RecommendRequest {
         }
     }
 
-    /// The exact request body.
+    /// The exact request body for an engine that advertised no optional feature: the
+    /// first-release fields only.
     #[must_use]
     pub fn to_body(&self) -> String {
-        wire::encode_request(self)
+        self.to_body_for(&EngineFeatures::default())
+    }
+
+    /// The exact request body for an engine that advertised `features`: an optional field
+    /// is written only when its feature is listed (spec §14.5, D50).
+    #[must_use]
+    pub fn to_body_for(&self, features: &EngineFeatures) -> String {
+        wire::encode_request(self, features)
+    }
+}
+
+/// The response header that lists the optional request features the engine accepts.
+pub const API_FEATURES_HEADER: &str = "x-maverick-api-features";
+
+/// The optional request features an engine advertised in `X-Maverick-API-Features` (spec
+/// §14.5, D50). The default, no features, is what a core assumes before the engine's first
+/// response and what an engine older than D50 means by sending no header.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct EngineFeatures(BTreeSet<String>);
+
+impl EngineFeatures {
+    /// Read the header value: comma-separated names, each trimmed of spaces and tabs, with
+    /// empty names dropped. Names are case sensitive. No header means no features.
+    #[must_use]
+    pub fn parse(value: Option<&str>) -> Self {
+        Self(
+            value
+                .unwrap_or_default()
+                .split(',')
+                .map(|name| name.trim_matches([' ', '\t']))
+                .filter(|name| !name.is_empty())
+                .map(str::to_owned)
+                .collect(),
+        )
+    }
+
+    /// The features a response's headers advertise. A missing or non-text header is none.
+    #[must_use]
+    pub fn from_headers(headers: &HeaderMap) -> Self {
+        Self::parse(
+            headers
+                .get(API_FEATURES_HEADER)
+                .and_then(|value| value.to_str().ok()),
+        )
+    }
+
+    /// True when the engine advertised `feature`, so its optional field may be sent.
+    #[must_use]
+    pub fn allows(&self, feature: &str) -> bool {
+        self.0.contains(feature)
+    }
+
+    /// The advertised names, sorted.
+    pub fn names(&self) -> impl Iterator<Item = &str> {
+        self.0.iter().map(String::as_str)
     }
 }
 
@@ -390,13 +450,17 @@ impl RecommendClientConfig {
     }
 }
 
-/// The recommend client. Cheap to clone; clones share one connection pool.
+/// The recommend client. Cheap to clone; clones share one connection pool and one
+/// remembered feature list.
 #[derive(Debug, Clone)]
 pub struct RecommendClient {
     http: reqwest::Client,
     url: String,
     timeout: Duration,
     attempts: u8,
+    /// The features the engine at `url` advertised on its last response (D50). Every
+    /// response replaces it, an error status included; a call that got no response keeps it.
+    features: Arc<Mutex<EngineFeatures>>,
 }
 
 impl RecommendClient {
@@ -413,7 +477,22 @@ impl RecommendClient {
             url: format!("{}/v1/recommend", config.base_url.trim_end_matches('/')),
             timeout: config.timeout,
             attempts: 1 + config.max_retries.min(MAX_RETRIES),
+            features: Arc::default(),
         }
+    }
+
+    /// The features the engine advertised on its last response; none before the first.
+    #[must_use]
+    pub fn features(&self) -> EngineFeatures {
+        self.features
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
+    fn remember_features(&self, headers: &HeaderMap) {
+        *self.features.lock().unwrap_or_else(PoisonError::into_inner) =
+            EngineFeatures::from_headers(headers);
     }
 
     /// Call `POST /v1/recommend` with the tenant's key.
@@ -434,7 +513,7 @@ impl RecommendClient {
         request: &RecommendRequest,
         trace: &TraceHeaders,
     ) -> Result<Recommendation, RecommendError> {
-        let body = request.to_body();
+        let body = request.to_body_for(&self.features());
         let deadline = Instant::now() + self.timeout;
         let mut attempt = 1;
         loop {
@@ -477,6 +556,7 @@ impl RecommendClient {
             .send()
             .await
             .map_err(transport_failure)?;
+        self.remember_features(response.headers());
         let status = response.status().as_u16();
         let bytes = response.bytes().await.map_err(transport_failure)?;
         if !(200..300).contains(&status) {
