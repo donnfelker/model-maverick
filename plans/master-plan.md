@@ -336,7 +336,7 @@ Two tracks in parallel; M8 to M10 need their engine additions landed first withi
 
 ### 7.4 v2: enterprise and on-premises
 
-Tenant-private corpora with per-tenant schedules; an air-gapped single static binary with signed license files and local benchmark execution; self-hosted providers (Ollama, vLLM, LM Studio, TGI, NIM) with quality measured globally on reference endpoints and latency/cost measured on customer hardware; capabilities `vision`, `conversational_persona`, `long_form_writing`; Maverick Gateway as an optional companion that executes inference from recommendations and check specs (customers keep their own gateways if they prefer). v2 is vision-level and has no spec yet.
+Tenant-private corpora with per-tenant schedules; air-gapped installs, now the self-hosted replica role (`plans/self-hosted-engine-plan.md`: no license key, signed public matrix bundles, and no corpus benchmarks outside Maverick); self-hosted providers (Ollama, vLLM, LM Studio, TGI, NIM) with quality measured globally on reference endpoints and latency/cost measured on customer hardware; capabilities `vision`, `conversational_persona`, `long_form_writing`; Maverick Gateway as an optional companion that executes inference from recommendations and check specs (customers keep their own gateways if they prefer). v2 is vision-level and has no spec yet.
 
 ---
 
@@ -401,6 +401,7 @@ Consolidated from every plan. Decided items are kept for the record with their d
 | Proposed spec changes from this plan | workload projection and declared-workload header, three-valued `check_pass` and `completed_unchecked`, `retention_valid_until`, per-tenant classification quota field on tenant limits, (model, settings) chain entries, per-alias `retention_mode`, zero-retention codes and G1/G14 exceptions, `retention_mode`, classifier budget and 1.5 s deadline, availability aggregate and error-scoring fix, hosted-proxy key and tenant-header rules, `batches` table; v1.1 spec shell section aligned to the template | adopt into `specs/` as §7.0 step 0, a hard gate before port work packages are assigned | Adopted 2026-09-28 |
 | Classifier hosting | provider column vs a trained classifier from the corpus | provider column until volume justifies training | Open |
 | Commercial gate (M6b) and business model | M6b as a hard gate before N3+ SDKs and the M7 shell vs no commercial gate for now | owner: not a gate now; the goal is a working system, and the project may be open-sourced | Decided 2026-09-28 (owner): M6b is not required; revisit only if the project is sold commercially |
+| Self-hosted engine | offline license vs no license; private vs public matrix bundles | origin and replica roles, signed matrix bundles, single-tenant replicas, `maverick upgrade` with a 12-month window | Decided 2026-09-30 (roles, upgrades) and 2026-10-24 (owner: open source with no license key, bundles published publicly for free; D48 dropped). Spec §14.4 and §14.5 (D49, D50) |
 
 ---
 
@@ -437,3 +438,4 @@ Consolidated from every plan. Decided items are kept for the record with their d
 | `specs/capability-matrix-design.md` | Measurement methodology: dimensions per capability, high-stakes overlay, difficulty knobs and tiers, judge bias handling, statistics, corpus authoring guide, research grounding |
 | `specs/model-maverick-v1.1-spec.md` | Rails shell on the seam (framework-aligned), engine additions, IRT, completion, blending, panels, harness, sandbox, providers, promotion, M7 to M13 |
 | `specs/model-maverick-openrouter-execution-spec.md` | `execution_aliases`, `endpoint_used`, SDK openrouter mode, proxy variant, conformance additions |
+| `plans/self-hosted-engine-plan.md` | Self-hosted engine: origin and replica roles, public signed matrix bundles, single-tenant replicas, no license key, safe upgrades (D49, D50) |

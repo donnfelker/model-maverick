@@ -1,6 +1,6 @@
 # Self-hosted engine: deployment roles, public matrix bundles, and safe upgrades (proposed D49 and D50)
 
-Status: proposed 2026-09-30, reworked 2026-10-24 after the owner's decisions (§11). The owner asked for customers (financial and health-data companies) to run the engine inside their own networks, for the same build to run Maverick's hosted deployment, and for upgrades that do not break installs. On 2026-10-24 the owner decided that the engine is open source with no license key, so the offline license (D48) is dropped, and that the origin publishes signed matrix bundles publicly for free. The beads are under the epic model-maverick-xq7v.
+Status: proposed 2026-09-30, reworked 2026-10-24 after the owner's decisions (§11), adopted into the spec on 2026-10-24 (§14.4 and §14.5; bead xq7v.2). The owner asked for customers (financial and health-data companies) to run the engine inside their own networks, for the same build to run Maverick's hosted deployment, and for upgrades that do not break installs. On 2026-10-24 the owner decided that the engine is open source with no license key, so the offline license (D48) is dropped, and that the origin publishes signed matrix bundles publicly for free. The beads are under the epic model-maverick-xq7v.
 
 ## 1. Summary of the recommendation
 
@@ -36,7 +36,11 @@ Config `MAVERICK_ROLE`: `origin` or `replica`. There is no default; an unset val
 | `matrix_export` (new) | after each `aggregate_rebuild` | not registered |
 | `maverick matrix import` (new) | refused | yes |
 | `latency_probes` | yes | yes, for columns with a local endpoint |
-| `price_sync` | yes (models.dev) | off by default; prices come from bundles, with local overrides |
+| `price_sync` | yes (models.dev) | off unless `MAVERICK_CRON_PRICE_SYNC` is set; prices come from bundles, with local overrides |
+| `model_discovery` | yes | not registered (the catalog comes from bundles) |
+| `catalog_sync` | yes | yes, without the lifecycle transitions (bundles set column status); raises `matrix_stale` |
+| `matrix_pull` (new) | not registered | hourly, only when `MAVERICK_MATRIX_PULL_URL` is set |
+| `capture_expiry`, `history_prune` | yes | yes |
 | Judge pool, corpus spend caps | required | not used |
 | Classifier, capture, telemetry, internal API | yes | yes |
 
@@ -82,7 +86,7 @@ mmbundle1/
 
 ### 5.2 Publishing
 
-- `matrix_export` writes each bundle to `MAVERICK_MATRIX_EXPORT_DIR` on the origin as one archive file named by its format and `matrix_version`, and rewrites `index.json` in the same directory.
+- `matrix_export` writes each bundle to `MAVERICK_MATRIX_EXPORT_DIR` on the origin as one archive file named by its format and `published_at`, and rewrites `index.json` in the same directory. One `matrix_version` spans many nights, so `published_at` (the completion time of the rebuild) identifies a bundle, and a retried export writes the same file.
 - `index.json` lists the published bundles, newest first: `matrix_version`, `published_at`, format, file name, size, and SHA-256.
 - The origin's deploy pipeline copies new files from the export directory to a public, static HTTPS location: an object-storage bucket or a static site, never the engine itself. There is no account, key, or charge. `docs/self-hosted.md` gives the URL.
 - A published bundle file never changes. `index.json` is the only file that changes, and it is not signed: a replica trusts only the bundle signatures (§5.3), and the older-bundle rule (§5.4) means an edited or stale index cannot move a replica backward.
@@ -99,11 +103,11 @@ mmbundle1/
 ### 5.4 Import
 
 - `maverick matrix import <path>` verifies the signatures (§5.3), the manifest hashes, the format version, and the schema range. Then, in one transaction: upsert the catalog (columns keep their local latency data and local price overrides), append aggregates (append-only, as the spec requires, marked with the bundle's `matrix_version`), and switch the active `matrix_version`.
-- Importing the same bundle twice is a no-op. Importing an older bundle than the active one is refused unless `--allow-older` is passed (for rollback).
+- Importing the same bundle twice is a no-op. A bundle whose `published_at` is earlier than the active bundle's is refused unless `--allow-older` is passed (for rollback).
 - Connected installs can pull instead of copying files: `MAVERICK_MATRIX_PULL_URL` names the public location or a mirror. The replica reads `index.json` hourly, downloads the newest bundle in a format it reads, and imports it with the same checks. Pull never passes `--allow-older`. The setting is off by default.
 - Sealed installs leave the pull URL unset. An operator downloads the bundle on a connected machine and moves the file through their own transfer process.
 - A replica that has never imported a bundle serves cold-start recommendations (`measured: false`), exactly as a fresh origin does (G1).
-- The `matrix_stale` warning alert fires when the active matrix is older than 7 days.
+- `catalog_sync` raises the `matrix_stale` warning alert when no bundle is active or the active bundle's `published_at` is more than 7 days old.
 
 ### 5.5 Local overrides on a replica
 

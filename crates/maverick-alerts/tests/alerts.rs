@@ -545,3 +545,16 @@ fn d51_discovery_alert_kinds_have_their_stored_names() {
         );
     }
 }
+
+/// DIVERGENCE: D49. A self-hosted replica's `catalog_sync` raises `matrix_stale` when no matrix
+/// bundle is active or the active one is more than 7 days old (spec §14.4). The Go engine has no
+/// matrix bundles. The stored name is the spec's, and serde reads and writes it.
+#[test]
+fn d49_matrix_stale_alert_kind_has_its_stored_name() {
+    let kind = AlertKind::MatrixStale;
+    let stored = Value::String("matrix_stale".to_owned());
+    assert_eq!(kind.as_str(), "matrix_stale");
+    assert_eq!(kind.to_string(), "matrix_stale");
+    assert_eq!(serde_json::to_value(kind).unwrap(), stored);
+    assert_eq!(serde_json::from_value::<AlertKind>(stored).unwrap(), kind);
+}

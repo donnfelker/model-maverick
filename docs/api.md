@@ -20,7 +20,16 @@ second).
 
 `POST /v1/recommend`, `GET /v1/policies`, `GET /v1/models`, and the history
 lists carry `matrix_version`: the active corpus version, or `""` when no corpus
-is active.
+is active. On a self-hosted replica (spec §14.4, D49) it is the active matrix
+bundle's `matrix_version`, or `""` before the first import.
+
+**Version headers.** Status: specified (D50, spec §14.5), not served yet
+(bead xq7v.3). Every response on both listeners, errors and `/up` included,
+will carry `X-Maverick-Engine-Version` (the engine's SemVer) and
+`X-Maverick-API-Features` (the sorted, comma-separated optional request
+features the engine accepts, for example `affinity`). Within `/v1` changes are
+additive only; a breaking change is `/v2`, served beside `/v1` for at least 12
+months.
 
 ---
 
@@ -67,6 +76,7 @@ The code list is closed. No response carries a code outside this table:
 | 404 | `not_found` | Resource absent **or** owned by another tenant (no existence oracle) |
 | 409 | `zero_retention_conflict` | Capture window requested by a zero-retention tenant |
 | 409 | `no_compliant_columns` | Zero-retention tenant, and no pool column has valid zero-retention evidence (D1, D17) |
+| 409 | `single_tenant_install` | Self-hosted replica: tenant create, suspend, activate, or a limit override (D49; specified, not served yet) |
 | 410 | `capture_expired` | Replay or read of an expired or hard-deleted capture |
 | 413 | `payload_too_large` | Body over 2 MiB |
 | 422 | `invalid_request` | Malformed body, unknown fields or params, bad enums, bad values |
@@ -1013,6 +1023,12 @@ write"`, `audit=true`, `actor=<label>`, `action=<dotted.action>` (for example
 A route with a tenant `{id}` looks the tenant up before it reads the body. An
 unknown tenant is `404 not_found` (`tenant <id> does not exist`).
 
+On a self-hosted replica (spec §14.4, D49; specified, not served yet), tenant
+create, suspend, activate, and `PUT /internal/v1/tenants/{id}/limits` answer
+`409 single_tenant_install` (`this install has a single tenant
+(MAVERICK_ROLE=replica)`). A pricing snapshot written through the column PUT on
+a replica is local (`"source": "local"`), and bundle imports never overwrite it.
+
 All 17 routes:
 
 | Method | Path | Purpose |
@@ -1351,3 +1367,5 @@ A component's `detail` is omitted when it is empty.
   stack.
 - `last_batch_times` maps each batch kind to its newest completed batch
   (`batches.completed_at`). A kind that never completed is absent.
+- `role` (`origin` or `replica`) is specified (D49, spec §14.4) but not served
+  yet. On a replica, `active_matrix_version` is the active bundle's.

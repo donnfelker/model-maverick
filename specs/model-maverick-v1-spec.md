@@ -26,7 +26,7 @@ These invariants hold everywhere; any implementation that violates one is wrong 
 - **G4 — No empty configurations.** Configuration writes that would leave any pool with zero usable columns under standing constraints are rejected at write time. A model retirement that would do the same raises an operator alert instead of silently shrinking the pool.
 - **G5 — Prompts are never stored by default.** Only the per-tenant HMAC fingerprint is persisted. Storage of prompt content happens only inside an explicitly enabled, time-boxed, encrypted debug-capture window, and never for zero-retention tenants. A zero-retention tenant's prompt is never sent to a classifier column, and its pick never points at a column, that lacks valid zero-retention evidence (§4.5, §7.1, §8.3). Prompt text, completions, request bodies, and credentials never appear in spans, log fields, or metric labels (§14.3). (changed 2026-09-28 for the Rust port; the Go engine implements the prior rule) A conversation affinity key (§7.6) is handled like prompt text: only its per-tenant HMAC is stored, and the key itself never appears in the stored request, a span, a log field, or a metric label (added 2026-09-30 for the Rust port; D44)
 - **G6 — Every decision is auditable.** Every response carries `recommendation_id` and `matrix_version`. The full decision trace (classification, survivors with scores, exclusions with reasons, flags) is retrievable by id for as long as the tenant retains history.
-- **G7 — The corpus is private.** Task prompts, golden answers, hidden rubrics, and grader internals never leave the engine through any public API and never enter a benchmarked model's prompt beyond the task prompt itself.
+- **G7 — The corpus is private.** Task prompts, golden answers, hidden rubrics, and grader internals never leave the engine through any public API or matrix bundle (§14.4) and never enter a benchmarked model's prompt beyond the task prompt itself.
 - **G8 — Spend is capped.** Every benchmark job computes projected cost before starting and refuses to run past its configured ceiling. Request-time classifier spend is capped too: a per-tenant daily classification quota and a global daily classifier spend cap; past either limit a prompt-form request degrades to `fallback_default` instead of spending (§8.3). (changed 2026-09-28 for the Rust port; the Go engine implements the prior rule)
 
 G9 to G12 are defined in the v1.1 spec (§1.1). G13 and G14 are defined in `plans/model-maverick-integration-surfaces-plan.md` §0 and restated here because the engine contract depends on them:
@@ -36,7 +36,7 @@ G9 to G12 are defined in the v1.1 spec (§1.1). G13 and G14 are defined in `plan
 
 ### 1.2 Non-goals for v1
 
-No inference execution, no Rails/product shell (v1.1), no tenant-private corpora (v2), no IRT calibration or matrix completion (v1.1 — but the data they need is collected from day one), no per-endpoint quality columns (latency/cost only), no self-hosted providers (v2), no public leaderboard.
+No inference execution, no Rails/product shell (v1.1), no tenant-private corpora (v2), no IRT calibration or matrix completion (v1.1 — but the data they need is collected from day one), no per-endpoint quality columns (latency/cost only), no self-hosted providers (v2), no public leaderboard. The engine has no license key, no entitlement check, and no call home; a self-hosted install runs any release (§14.4, owner decision 2026-10-24).
 
 The engine has no plans, prices, billing, subscriptions, or free-period state. It knows a tenant's status (`active` or `suspended`) and its numeric limits only, and the control plane maps its plans to those (§13; added 2026-10-24).
 
@@ -64,6 +64,9 @@ One Go module, one binary.
   - `maverick migrate` — run goose migrations (also runs River's migrations).
   - `maverick corpus load --version <v>` — validate and load a corpus version (§5.6).
   - `maverick mcp-stdio --api-key <key>` — stdio MCP transport for local development (§12).
+  - `maverick upgrade [--check] [--yes] [--json]` and `maverick --version`: the operator upgrade command and the version surface (§14.5, D50). `migrate` stays the low-level command.
+  - `maverick matrix import <path> [--allow-older]` and `maverick matrix status`: matrix bundles (§14.4, D49).
+  - `maverick key create | list | revoke`: the API keys of a single-tenant replica (§14.4, D49).
 - Two listeners:
   - Public: `:8080` — `/v1/*`, `/mcp`, `/up`. This is the only listener the Kamal proxy exposes.
   - Internal: `:8081` — `/internal/v1/*` (provisioning; §13) and `/health/detail`. Never proxied publicly.
@@ -115,7 +118,7 @@ Standard library first. Approved third-party (about a dozen, per plan):
 
 Postgres 16+. All DDL below is normative. Migrations live in `crates/maverick-store/migrations` and are managed by sqlx. They are up only (D37). `0001_baseline.sql` equals the Go goose head (`parity/schema/schema.sql`, D21). Each later file is additive and names its spec section and D-row. graphile_worker manages its own schema (D22). (changed 2026-09-28 for the Rust port; the Go engine used goose, and River managed its own tables)
 
-Conventions: primary keys are prefixed ULIDs stored as `text` (`ten_`, `key_`, `col_`, `pool_`, `task_` (authored slug, see below), `run_`, `rec_`, `out_`, `cw_`, `cap_`, `alr_`, `bat_`). Timestamps are `timestamptz` UTC. Money is `numeric` USD. All tables get `created_at timestamptz not null default now()`; mutable tables also get `updated_at`.
+Conventions: primary keys are prefixed ULIDs stored as `text` (`ten_`, `key_`, `col_`, `pool_`, `task_` (authored slug, see below), `run_`, `rec_`, `out_`, `cw_`, `cap_`, `alr_`, `bat_`, `upg_`). Timestamps are `timestamptz` UTC. Money is `numeric` USD. All tables get `created_at timestamptz not null default now()`; mutable tables also get `updated_at`.
 
 ```sql
 create table tenants (
@@ -380,7 +383,8 @@ create table alerts (
   kind        text not null,
   -- 'regression','parse_failure_rate','job_failure','spend_warning',
   -- 'spend_refusal','pool_would_be_empty','classifier_degraded',
-  -- 'retention_expiring' (§4.5), 'new_model_available', 'model_withdrawn' (§4.6, D51)
+  -- 'retention_expiring' (§4.5), 'new_model_available', 'model_withdrawn' (§4.6, D51),
+  -- 'matrix_stale' (§14.4, D49)
   severity    text not null check (severity in ('info','warning','critical')),
   subject     jsonb not null,                   -- machine-readable: column/cell/job/tenant refs
   message     text not null,
@@ -443,9 +447,43 @@ create table conversation_affinity (
   primary key (tenant_id, affinity_hash)
 );
 create index conversation_affinity_expires_at on conversation_affinity (expires_at);
+
+-- One row per `maverick upgrade` run (§14.5, D50). New 2026-10-24.
+create table upgrades (
+  id             text primary key,              -- upg_<ulid>
+  from_release   text,                          -- null on a fresh database
+  to_release     text not null,
+  operator       text not null,                 -- cli:<os user>
+  migrations     text[] not null default '{}',  -- applied migration versions, in order
+  started_at     timestamptz not null,
+  finished_at    timestamptz,
+  verify_failed  text,                          -- the failing check or table; null = verified
+  created_at     timestamptz not null default now()
+);
+
+-- One row per running `serve` process (§14.5, D50). New 2026-10-24.
+create table serve_heartbeats (
+  process_id    text primary key,               -- random per process start
+  release       text not null,                  -- the process's engine version
+  host_label    text not null,
+  last_seen_at  timestamptz not null,           -- refreshed every 30 s; older than 2 min = stopped
+  created_at    timestamptz not null default now()
+);
+
+-- One row per imported matrix bundle, replica role (§14.4, D49). New 2026-10-24.
+create table matrix_imports (
+  manifest_sha256  bytea primary key,           -- identifies the bundle
+  format           text not null,               -- 'mmbundle1'
+  matrix_version   text not null,
+  published_at     timestamptz not null,
+  origin_release   text not null,
+  signing_kids     text[] not null,             -- the kids whose signatures verified
+  active           boolean not null default false,  -- exactly one active at a time
+  created_at       timestamptz not null default now()  -- import time
+);
 ```
 
-The engine has 23 tables. The Go engine has twenty. The Rust port adds `batches` (the Go engine relies on River unique jobs) and `classifier_usage` (the Go engine has no classifier budget), both on 2026-09-28, and `conversation_affinity` (the Go engine has no affinity, D44) on 2026-09-30. The window column is named `batch_window` because `window` is a reserved word in Postgres.
+The engine has 26 tables. The Go engine has twenty. The Rust port adds `batches` (the Go engine relies on River unique jobs) and `classifier_usage` (the Go engine has no classifier budget), both on 2026-09-28, and `conversation_affinity` (the Go engine has no affinity, D44) on 2026-09-30. D49 adds `matrix_imports` and D50 adds `upgrades` and `serve_heartbeats`, on 2026-10-24 (§14.4, §14.5). The window column is named `batch_window` because `window` is a reserved word in Postgres.
 
 Raw values live in `scores` and `aggregates`. Normalized scores are computed per query and never stored (plan §Data model). The `recommendations.response` jsonb is the exception by design: it snapshots what the caller actually saw.
 
@@ -835,6 +873,7 @@ Both present or both absent → `422 invalid_request`.
 - When the engine answered, the proxy sets `X-Maverick-Affinity: <status>` on the response, next to `X-Maverick-Recommendation-Id`.
 - Without the header there is no affinity, and the proxy behaves as before.
 - The shared SDK core takes a per-call `conversation_id`, which becomes `affinity.key`, and an optional `affinity_cost_aware`, which becomes `affinity.cost_aware`. It estimates `context_tokens` the same way, from the serialized request body. The conformance vectors are `crates/sdk-conformance/vectors/affinity.v1.json`.
+- Both send `affinity` only when the engine's last response listed the `affinity` feature in `X-Maverick-API-Features` (§14.5, D50). Until then a request carries no affinity, and the proxy sets no `X-Maverick-Affinity`.
 
 **Proxy behavior** (adopted 2026-09-28 by owner approval for the Rust port; `parity/DIVERGENCES.md` D26 to D31; the Go proxy implements the prior rules in `reference/engine-reference.md` Part 6):
 
@@ -928,7 +967,7 @@ Each recommendation entry carries a human-readable `reason`, generated from the 
 
 ## 9. Public API
 
-Base: `https://api.modelmaverick.dev/v1` (placeholder, plan §API). All requests `Content-Type: application/json`, body cap 2 MB (`413 payload_too_large`). All responses include `matrix_version`. Auth: `Authorization: Bearer mk_live_...` (§9.1). Full endpoint catalog with methods/codes: Appendix A. Error envelope and codes: Appendix B.
+Base: `https://api.modelmaverick.dev/v1` (placeholder, plan §API). All requests `Content-Type: application/json`, body cap 2 MB (`413 payload_too_large`). All responses include `matrix_version`. Auth: `Authorization: Bearer mk_live_...` (§9.1). Full endpoint catalog with methods/codes: Appendix A. Error envelope and codes: Appendix B. Every response on both listeners carries `X-Maverick-Engine-Version` and `X-Maverick-API-Features` (§14.5, D50).
 
 ### 9.1 Authentication and rate limiting
 
@@ -1072,7 +1111,7 @@ For a zero-retention tenant, replay sends the prompt only to `classifier.zero_re
 
 ### 9.9 Health
 
-`GET /up` → `200` when the process can reach Postgres (Kamal health check). `GET /health/detail` (internal listener only) → component statuses: db, job queue, provider client config, active matrix_version, last batch times. (changed 2026-09-28 for the Rust port, `parity/DIVERGENCES.md` D35: the component is `job_queue`, with statuses `no_workers | stale | ok`, and `unknown` when the database or the queue read fails; data comes from graphile_worker; `last_batch_times` maps job kind to the latest `batches.completed_at`. The Go engine reported `river_queues`, which also had `paused`.)
+`GET /up` → `200` when the process can reach Postgres (Kamal health check). `GET /health/detail` (internal listener only) → component statuses: db, job queue, provider client config, active matrix_version, last batch times, and the deployment `role` (§14.4, D49; on a replica the active matrix_version is the active bundle's). (changed 2026-09-28 for the Rust port, `parity/DIVERGENCES.md` D35: the component is `job_queue`, with statuses `no_workers | stale | ok`, and `unknown` when the database or the queue read fails; data comes from graphile_worker; `last_batch_times` maps job kind to the latest `batches.completed_at`. The Go engine reported `river_queues`, which also had `paused`.)
 
 ### 9.10 POST /v1/telemetry
 
@@ -1174,11 +1213,15 @@ River (Postgres-backed; no Redis). All periodic jobs use River's periodic-jobs w
 | `price_sync` | 06:00 daily | Refresh pricing snapshots (provider pricing data/config). |
 | `catalog_sync` | 06:10 daily | Refresh model statuses/deprecations; runs the pool-drift check (§7.2), including retention expiry; raises `retention_expiring` 14 days before any `retention_valid_until` (§4.5). |
 | `model_discovery` | 06:20 daily | List the text models of every provider with an operator key and compare them with the catalog; raise `new_model_available` and `model_withdrawn` (§4.6, D51). List calls cost nothing; the catalog does not change. |
+| `matrix_export` | chained after rebuild | Origin only (§14.4, D49): write the signed matrix bundle and `index.json` to `MAVERICK_MATRIX_EXPORT_DIR`. |
+| `matrix_pull` | hourly | Replica only, when `MAVERICK_MATRIX_PULL_URL` is set (§14.4, D49): import the newest readable bundle from the public location. |
 | `capture_expiry` | hourly | Hard-delete expired `debug_captures`. |
 | `affinity_prune` | hourly | Delete `conversation_affinity` rows whose `expires_at` has passed (§7.6, D44). |
 | `history_prune` | 05:00 daily | Enforce `history.retention_days` (§10.3). |
 
-**Chaining:** `nightly_smoke` and `weekly_sweep` enqueue `aggregate_rebuild` on completion, which enqueues `regression_scan` + `calibration_score`. A batch that partially fails (some runs errored) still rebuilds from what completed; the job records completion percentage and alerts (`job_failure`, warning) under 90%. The failure tail (alert row plus the follow-up rebuild job) is written in the same transaction that records the batch outcome, before the handler returns; no detached task carries durable work.
+On a replica, job registration follows the role table in §14.4 (D49).
+
+**Chaining:** `nightly_smoke` and `weekly_sweep` enqueue `aggregate_rebuild` on completion, which enqueues `regression_scan` + `calibration_score` (and `matrix_export` on an origin that exports, §14.4). A batch that partially fails (some runs errored) still rebuilds from what completed; the job records completion percentage and alerts (`job_failure`, warning) under 90%. The failure tail (alert row plus the follow-up rebuild job) is written in the same transaction that records the batch outcome, before the handler returns; no detached task carries durable work.
 
 **Spend guard (G8):** before executing, every batch computes
 
@@ -1253,6 +1296,8 @@ The Rails seam, existing before Rails does (plan M5). Internal listener only (`:
 | `PUT /internal/v1/tenants/{id}/limits` | Operator override of per-tenant limits: `{classification_daily_quota?}` (null clears the override; response echoes effective values). v1.1 §4.2 adds `rpm` and `history_retention_days` to the same endpoint and entitlement sync writes it from M8. (added 2026-09-28 for the Rust port) |
 | `POST /internal/v1/corpus/activate` | Flip active corpus version (after `maverick corpus load`). |
 
+On a replica (§14.4, D49), `POST /internal/v1/tenants`, suspend, activate, and `PUT /internal/v1/tenants/{id}/limits` answer `409 single_tenant_install`, and a pricing snapshot written through `PUT /internal/v1/columns/{id}` is local (`"source": "local"`) and survives bundle imports.
+
 All provisioning writes append structured audit log entries (slog, `audit=true`).
 
 ---
@@ -1298,16 +1343,100 @@ Env vars, prefix `MAVERICK_`, parsed and validated at boot (fail fast, print the
 | `MAVERICK_HISTORY_RETENTION_DAYS` | `365` | §10.3 |
 | `MAVERICK_SMTP_URL`, `MAVERICK_ALERTS_WEBHOOK_URL`, `MAVERICK_ALERTS_WEBHOOK_SECRET` | — | §11.1 |
 | `MAVERICK_CRON_NIGHTLY`, `MAVERICK_CRON_WEEKLY`, `MAVERICK_CRON_MODEL_DISCOVERY` (D51), ... | §11 defaults | Schedules |
+| `MAVERICK_ROLE` | — (required) | `origin` or `replica` (§14.4, D49) |
+| `MAVERICK_TENANT_NAME` | `default` | Replica: the bootstrapped tenant's name, read only at bootstrap (§14.4) |
+| `MAVERICK_BOOTSTRAP_KEY_FILE` | unset | Replica: the file that receives the bootstrapped API key, mode 0600 (§14.4) |
+| `MAVERICK_MATRIX_EXPORT_DIR` | unset (no export) | Origin: where `matrix_export` writes bundles and `index.json` (§14.4) |
+| `MAVERICK_MATRIX_SIGNING_KEYS` | unset | Origin: `kid:path,...`, Ed25519 private keys as PKCS#8 PEM files; two during a rotation (§14.4) |
+| `MAVERICK_MATRIX_PULL_URL` | unset (off) | Replica: the public bundle location or a mirror for `matrix_pull` (§14.4) |
 
 ### 14.2 Deployment
 
-Multi-stage Docker build → distroless static image (CGO off). Kamal to Hetzner (plan): one app server runs `maverick serve`; Postgres as a Kamal accessory (or managed PG) — v1 is a single-node system by design; horizontal API scaling works stateless once needed (`--api-only` replicas + one `--worker-only`). Kamal healthcheck: `GET /up`. The internal listener is reachable only over the host's private network (Kamal `options: --network`, no proxy route). A fresh database can start the engine before the catalog lists the classifier columns or the judge pool. The engine picks them up within 30 s of their creation, with no restart (D41, §8.3).
+Multi-stage Docker build → distroless static image (CGO off). Kamal to Hetzner (plan): one app server runs `maverick serve`; Postgres as a Kamal accessory (or managed PG) — v1 is a single-node system by design; horizontal API scaling works stateless once needed (`--api-only` replicas + one `--worker-only`). Kamal healthcheck: `GET /up`. The internal listener is reachable only over the host's private network (Kamal `options: --network`, no proxy route). A fresh database can start the engine before the catalog lists the classifier columns or the judge pool. The engine picks them up within 30 s of their creation, with no restart (D41, §8.3). The hosted deployment runs `MAVERICK_ROLE=origin`, and its deploy pipeline publishes the matrix bundles (§14.4, D49).
 
 ### 14.3 Observability
 
 slog JSON to stdout. Every request logs: method, path, status, ms, tenant_id, key_id, recommendation_id (when created). Every batch logs: batch_id, projected vs actual spend, runs ok/error counts, duration. Metrics endpoints: deferred (plan: "metrics can wait"). The alerts table plus logs are v1's operational surface. The engine and the proxy MAY export OTel traces, logs, and metrics to the ops-box Collector over the private network (never a public metrics endpoint), with W3C trace context propagated from proxy or SDK through the engine to the provider call; export is best-effort and fail-open. The proxy exports only its `maverick.recommendation` log record and the `maverick_proxy_recommendations_total` counter, and neither for a tenant that opted out of telemetry (§9.10, D43).
 
 **Telemetry redaction (a G5 control).** Prompt text, completions, request bodies, and credential headers (`Authorization`, `x-api-key`, `X-Maverick-API-Key`) are never span attributes, log fields, or metric labels; fingerprints only. The same holds for the affinity key and the `X-Maverick-Conversation` value, and the affinity hash is not logged either (§7.6, D44). Instrumentation records an explicit allowlist of fields, never every argument. Engine and proxy spans go to a Collector pipeline that does not export GenAI content to Langfuse. Acceptance: a prompt-form recommend and a proxy request each carrying a canary string, after which the canary appears in no exported span, log line, or metric label. (changed 2026-09-28 for the Rust port; the Go engine exports no OTel)
+
+### 14.4 Self-hosted deployment (D49)
+
+Added 2026-10-24 by owner decision (D49; design in `plans/self-hosted-engine-plan.md`). One release runs both Maverick's hosted deployment and customer installs. The engine is open source. It has no license key, no entitlement check, and no call home, and nothing it does depends on payment or a contract. (The proposed license, D48, was dropped on 2026-10-24.)
+
+**Roles.** `MAVERICK_ROLE` is `origin` or `replica`. It has no default: an unset or unknown value stops startup with a message that names both values. It ships before the first release, so the §14.5 rule for new required settings does not apply to it. The hosted deployment is the origin: the only place the corpus exists and corpus benchmarks run, and the only publisher of Maverick-signed matrix bundles. A replica holds no corpus, runs no corpus benchmark, and ranks on the bundles it imports. Classification, policy, ranking, decision traces, debug capture, and telemetry work the same on both roles.
+
+| Job or command | `origin` | `replica` |
+|---|---|---|
+| `maverick corpus load` | yes | refused: `corpus commands need MAVERICK_ROLE=origin` |
+| `prediction_lock`, `nightly_smoke`, `weekly_sweep`, `aggregate_rebuild`, `regression_scan`, `calibration_score`, `model_discovery` | registered | not registered |
+| `matrix_export` | chained after each `aggregate_rebuild` when `MAVERICK_MATRIX_EXPORT_DIR` is set | not registered |
+| `matrix_pull` | not registered | hourly, only when `MAVERICK_MATRIX_PULL_URL` is set |
+| `maverick matrix import`, `maverick key` | refused | yes |
+| `maverick matrix status` | yes | yes |
+| `price_sync` | registered | registered only when `MAVERICK_CRON_PRICE_SYNC` is set; otherwise prices come from bundles and local overrides |
+| `catalog_sync` | registered | registered; skips the lifecycle transitions (bundles set column status) and raises `matrix_stale` |
+| `latency_probes`, `capture_expiry`, `history_prune` | registered | registered |
+
+The judge pool and the corpus spend caps are not used on a replica and need no configuration there. A replica's spend is its classifier (capped, §8.3) and its latency probes (G8).
+
+**Matrix bundles.** A bundle (format `mmbundle1`) is a signed archive that the origin's `matrix_export` writes after each `aggregate_rebuild`:
+
+- `manifest.json`: format version, `matrix_version`, `published_at`, origin release, the schema range it needs, and the SHA-256 of every other file.
+- `catalog.json`: the columns, by id, with provider, model id, endpoint, settings, status, pricing snapshot, retention fields, `quality_source_column_id`, `param_constraints`, and `deprecation_date`.
+- `aggregates.jsonl`: the `aggregates` rows of the last 30 nights.
+- `calibration.json`: the Brier and overconfidence series per capability that tenants can read (§9.6).
+- `checks.json`: the check specs that recommend returns (§8.4).
+- `signatures/<kid>`: Ed25519 over the exact manifest bytes, one file per signing key.
+
+Bundles are public, so a bundle holds only global data. It never holds corpus content (task ids, prompts, golden answers, rubrics, grader specs, run outputs, or judge text; G7) or tenant data (tenant ids or names, keys, pools, constraints, traces, telemetry, outcomes, or tenant-local blends). A CI test builds a bundle from the test corpus and a populated tenant scenario and asserts that none of those strings appears in any bundle byte.
+
+**Publishing.** `published_at` is the completion time of the rebuild, so a retried export writes the same bundle. `matrix_export` writes the archive, named by its format and `published_at`, to `MAVERICK_MATRIX_EXPORT_DIR`, and rewrites `index.json` there: every published bundle, newest first, with `matrix_version`, `published_at`, format, file name, size, and SHA-256. The origin's deploy pipeline copies the directory to a public static HTTPS location, never the engine. Bundles are free and need no account. A published file never changes, and the location keeps each one for at least 12 months. `index.json` is not signed: a replica trusts only the bundle signatures, and the older-bundle rule below stops an edited index from moving it backward. The origin reads its private signing keys from `MAVERICK_MATRIX_SIGNING_KEYS` at run time; they never enter the repository.
+
+**Signing keys.** Each release compiles in the bundle public keys by `kid`: the current key, one standby key, and every older key that signed a bundle in the last 12 months. No setting adds or replaces a trusted key. A replica accepts a bundle when at least one file in `signatures/` names a compiled-in `kid` and verifies; it ignores a signature with an unknown `kid`. During a rotation the origin signs every bundle with both the old and the new key for 12 months. After a leak it signs with the standby key at once, and the next release drops the leaked key and adds a new standby key.
+
+**Import.** `maverick matrix import <path>` verifies the signatures, every manifest hash, the format version, and the schema range. Then, in one transaction, it upserts the catalog by column id (a column keeps its local latency data and a local pricing snapshot), appends the aggregates (a row whose key already exists stays as it is), records the bundle in `matrix_imports`, and makes it the active bundle. Importing the active bundle again is a no-op. A bundle whose `published_at` is earlier than the active bundle's is refused unless `--allow-older` is passed (for rollback). `matrix_pull` reads `index.json` at `MAVERICK_MATRIX_PULL_URL` hourly, downloads the newest bundle in a format this release reads, checks its SHA-256 against the index, and imports it with the same checks. It never passes `--allow-older`. `maverick matrix status` prints the active `matrix_version`, its `published_at`, the import time, and the days behind.
+
+- On a replica, `matrix_version` in responses and in health detail is the active bundle's `matrix_version`, or `""` before the first import (G6). A replica with no bundle serves cold start (`measured: false`, G1).
+- `catalog_sync` raises `matrix_stale` (warning) on a replica when no bundle is active or the active bundle's `published_at` is more than 7 days old.
+- On a replica, a pricing snapshot written through `PUT /internal/v1/columns/{id}` is stored with `"source": "local"` (negotiated rates), and imports never overwrite it. Provider base URLs (§14.1) can point at private gateways. Columns the customer cannot reach leave their pools (G2).
+
+**Single tenant.** A replica serves one organization. The engine keeps its multi-tenant data model, but on a replica:
+
+- **Bootstrap.** On the first `serve` start with no tenant, a replica creates exactly one tenant, named by `MAVERICK_TENANT_NAME` (default `default`; read only at bootstrap), with the defaults of `POST /internal/v1/tenants` (§13), and one API key. The raw key is printed once, and written with mode 0600 to `MAVERICK_BOOTSTRAP_KEY_FILE` when that is set. Concurrent first starts create one tenant (an advisory lock). Later starts create nothing.
+- **Keys.** `maverick key create | list | revoke` manage that tenant's keys with the same code and audit records as the internal API, actor `cli:<os user>`. No command takes a tenant id.
+- **Refused.** `POST /internal/v1/tenants`, `POST /internal/v1/tenants/{id}/suspend` and `/activate`, and `PUT /internal/v1/tenants/{id}/limits` answer `409 single_tenant_install` with the message `this install has a single tenant (MAVERICK_ROLE=replica)`. Every other internal route works. Nothing replaces suspension: the operator revokes a key or stops `serve`.
+- **Configuration.** Pools, constraints, weights, and zero retention are set through §9.7 with a tenant key, as on the hosted deployment. A customer who wants base-URL integration runs `maverick-proxy` in its self-hosted mode against the install (D13).
+
+**Sealed defaults.** A replica opens no outbound connection unless configured. Providers are called only at the configured endpoints (classifier, latency probes). `price_sync`, `matrix_pull`, the alert webhook, SMTP, and OTel export are off unless configured. Nothing ever reports to Maverick. A CI test starts a replica with these defaults in a network with no route out, lets it bootstrap, imports a fixture bundle, runs a declared recommend, and asserts success and no outbound connection attempt.
+
+**Release artifacts.** Each release ships a container image and a static binary tarball, signed (cosign for the image, a detached signature for the tarball), with a CycloneDX SBOM, the `cargo deny` report, and an offline install kit (the image tarball, the migrations, and checksums).
+
+### 14.5 Compatibility and upgrades (D50)
+
+Added 2026-10-24 (D50; owner decisions 2026-09-30 and 2026-10-24; `plans/self-hosted-engine-plan.md` §7). Self-hosted installs upgrade late, so a release must not break an install, an older client, or an older configuration file.
+
+**Versions.** Engine releases use SemVer. `maverick --version` prints the version, the release date (`dev` and the build date for a development build), the git commit, the minimum schema version, and the bundle formats it reads. Every response on both listeners, errors and `/up` included, carries `X-Maverick-Engine-Version: <semver>` and `X-Maverick-API-Features: <list>`: the sorted, comma-separated optional request features this engine accepts (for example `affinity`). The proxy adds `X-Maverick-Proxy-Version` to its own responses. Within `/v1`, changes are additive only: new optional request fields, new response fields, new endpoints, and new enum values only where clients already tolerate unknown values. A breaking change is `/v2`, served alongside `/v1` for at least 12 months.
+
+**Optional request fields.** Strict decoding stays (§9.2: an unknown field is `422 invalid_request`). An SDK core or the proxy sends an optional request field only when the engine's last response listed its feature in `X-Maverick-API-Features`. The first request after the component starts sends none. So a new client never breaks an older engine.
+
+**Database.** Migrations stay up only and additive (D37). A removal or a rename uses expand and contract across two minor releases. Each migration file declares `-- class: online-safe` or `-- class: needs-downtime` in its header, and CI refuses a migration without one. `serve` never migrates: it refuses to start while engine or job-queue migrations are pending, with `run maverick upgrade`. Every command refuses a database that has migrations this binary does not know, and names both versions. Rollback is a restore from backup (D37).
+
+**`maverick upgrade`** is the operator's upgrade command. It downloads nothing, so it works the same in a sealed network. It runs these steps and stops at the first failure, naming it:
+
+1. **Preflight** (read only). Print the schema version, the release that last upgraded the database, and `--version`. Refuse a newer database. Refuse a database older than the 12-month upgrade window, and name the intermediate release to run first. Check that the active bundle's format is one this release reads, or say which format to import after the upgrade. Take the Postgres advisory upgrade lock. Refuse a `needs-downtime` migration while any `serve_heartbeats` row is younger than 2 minutes.
+2. **Plan.** List each engine and job-queue migration to apply, with its class.
+3. **Apply.** The same code as `maverick migrate`, inside the lock.
+4. **Record.** Write an `upgrades` row.
+5. **Verify.** Run the preflight checks again, then read one row, every column, from each table that an applied migration created or altered. A failure exits non-zero, names the check or table, and sets `upgrades.verify_failed`.
+
+Flags: `--check` runs steps 1 and 2 only, changes nothing, and exits 0 when an upgrade would succeed. `--yes` skips the confirmation; without it the command asks in a terminal and refuses when there is none. `--json` prints every step as JSON. `maverick migrate` stays the low-level command (Go parity, development, CI) and applies only the newer-database and window checks. `serve` writes its `serve_heartbeats` row every 30 s and deletes it on a clean shutdown.
+
+**Configuration.** An unknown `MAVERICK_*` variable logs one warning with its name, never its value, and never stops startup. A renamed variable keeps its old name for 12 months, with a warning that names the new one; when both are set, the new name wins. A new required setting needs a safe default or ships only in a major release.
+
+**Version skew.** Proxy and engine, and SDK core and engine, work together within 12 months of each other. A replica reads every bundle format that `maverick --version` lists; during a format change the origin publishes the two newest formats. A replica verifies every bundle signed by a key its release carries (§14.4).
+
+**Tests.** An upgrade matrix (a populated dump from each release in the window, upgraded with `maverick upgrade --yes`, then the contract and history tests), a skew matrix (the current SDK core and proxy against the previous engine, and the previous proxy against the current engine), and one signed fixture bundle per accepted format that must keep loading.
 
 ---
 
@@ -1321,6 +1450,7 @@ slog JSON to stdout. Every request logs: method, path, status, ms, tenant_id, ke
 - **Classifier/judge fakes:** recorded structured outputs; a nightly *live* smoke test (opt-in, spend-capped) is the only test allowed to touch real providers.
 - **Privacy tests:** a declared request cannot select a `standard` or `unknown` column for a zero-retention tenant; neither classification nor recommendation sends a zero-retention tenant's prompt or pick to an unverified endpoint; retention expiry yields `409 no_compliant_columns` rather than stale compliance; the §14.3 canary test.
 - **Job tests:** the §11.2 acceptance scenarios against real Postgres.
+- **Self-hosted tests (D49, D50):** the bundle privacy test and the sealed-replica test (§14.4); the upgrade matrix, the skew matrix, and the bundle format fixtures (§14.5).
 - **CI:** `go vet`, `golangci-lint`, `go test -race ./...`, sqlc drift check (`sqlc diff`), migration up/down.
 
 ---
@@ -1364,6 +1494,7 @@ slog JSON to stdout. Every request logs: method, path, status, ms, tenant_id, ke
 | 404 | `not_found` | Resource absent or other-tenant |
 | 409 | `zero_retention_conflict` | Capture window vs zero-retention config |
 | 409 | `no_compliant_columns` | Zero-retention tenant, and no column in the pool holds valid zero-retention evidence (§7.1 step 3) |
+| 409 | `single_tenant_install` | Replica role: tenant create, suspend, activate, or a limit override (§14.4, D49) |
 | 410 | `capture_expired` | Replay on hard-deleted capture |
 | 413 | `payload_too_large` | Body > 2 MB |
 | 422 | `invalid_request` | Malformed/unknown fields, bad enums, bad weights |

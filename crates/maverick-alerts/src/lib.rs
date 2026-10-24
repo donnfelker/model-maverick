@@ -21,8 +21,8 @@ pub use webhook::{
     SIGNATURE_HEADER, Webhook, body as webhook_body, signature as webhook_signature,
 };
 
-/// The alert kinds (closed set; reference Part 3 §4.1, plus Rust `retention_expiring` and
-/// the D51 discovery kinds).
+/// The alert kinds (closed set; reference Part 3 §4.1, plus Rust `retention_expiring`, the
+/// D51 discovery kinds, and the D49 `matrix_stale`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AlertKind {
@@ -39,6 +39,9 @@ pub enum AlertKind {
     NewModelAvailable,
     /// Spec §4.6 (D51): a `direct` column's model is no longer listed (warning).
     ModelWithdrawn,
+    /// Spec §14.4 (D49): a replica has no active matrix bundle, or the active one is more than
+    /// 7 days old (warning).
+    MatrixStale,
 }
 
 impl AlertKind {
@@ -55,6 +58,7 @@ impl AlertKind {
             Self::RetentionExpiring => "retention_expiring",
             Self::NewModelAvailable => "new_model_available",
             Self::ModelWithdrawn => "model_withdrawn",
+            Self::MatrixStale => "matrix_stale",
         }
     }
 }
