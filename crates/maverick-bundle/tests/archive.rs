@@ -270,3 +270,15 @@ fn nonfinite_measurements_cannot_silently_become_json_null() {
     m.calibration[0].overconfidence = f32::INFINITY;
     assert!(build(manifest(24), &m, &keys()).is_err());
 }
+
+#[test]
+fn corrupt_retained_archive_keeps_the_previous_index_and_names_the_bad_file() {
+    let dir = Dir::new();
+    let first = build(manifest(23), &matrix(), &keys()).unwrap();
+    publish(&dir.0, &first).unwrap();
+    let index = fs::read(dir.0.join("index.json")).unwrap();
+    fs::write(dir.0.join("mmbundle1-corrupt.tar"), b"broken archive").unwrap();
+    let error = publish(&dir.0, &build(manifest(24), &matrix(), &keys()).unwrap()).unwrap_err();
+    assert!(error.to_string().contains("mmbundle1-corrupt.tar"));
+    assert_eq!(fs::read(dir.0.join("index.json")).unwrap(), index);
+}

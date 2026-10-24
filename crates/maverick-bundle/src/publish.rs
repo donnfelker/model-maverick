@@ -52,6 +52,17 @@ fn temporary(dir: &Path, name: &str, bytes: &[u8]) -> Result<TempFile, BundleErr
 }
 
 fn entry(path: &Path, bytes: &[u8]) -> Result<IndexEntry, BundleError> {
+    checked_entry(path, bytes).map_err(|source| BundleError::Retained {
+        file: path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned(),
+        source: Box::new(source),
+    })
+}
+
+fn checked_entry(path: &Path, bytes: &[u8]) -> Result<IndexEntry, BundleError> {
     let manifest = inspect(bytes)?.manifest;
     let file = filename(manifest.published_at);
     if path.file_name().and_then(|p| p.to_str()) != Some(file.as_str()) {
@@ -86,6 +97,9 @@ pub fn publish(dir: &Path, bytes: &[u8]) -> Result<IndexEntry, BundleError> {
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
         Err(error) => return Err(error.into()),
     }
+    // Make the archive link durable before an index can refer to it. A final
+    // directory sync alone cannot order the two directory changes across a crash.
+    fs::File::open(dir)?.sync_all()?;
     let stored = entry(&path, &fs::read(&path)?)?;
     if stored.matrix_version != matrix_version || stored.published_at != published_at {
         return Err(BundleError::Invalid("immutable bundle identity collision"));

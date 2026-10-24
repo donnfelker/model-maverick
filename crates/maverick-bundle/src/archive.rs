@@ -11,6 +11,12 @@ use crate::{FORMAT, Manifest, PAYLOAD_FILES, PublicMatrix};
 pub enum BundleError {
     #[error("matrix bundle I/O: {0}")]
     Io(#[from] std::io::Error),
+    #[error("retained matrix bundle {file}: {source}")]
+    Retained {
+        file: String,
+        #[source]
+        source: Box<BundleError>,
+    },
     #[error("matrix bundle JSON is invalid")]
     Json(#[from] serde_json::Error),
     #[error("invalid matrix bundle: {0}")]

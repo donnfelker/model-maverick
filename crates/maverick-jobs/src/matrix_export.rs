@@ -80,7 +80,12 @@ pub async fn matrix_export(
         let result = (|| {
             let keys = SigningKeys::from_files(&config.signing_files)?;
             let bytes = maverick_bundle::build(manifest, &matrix, &keys)?;
-            maverick_bundle::publish(&config.directory, &bytes)
+            let entry = maverick_bundle::publish(&config.directory, &bytes)?;
+            if entry.sha256 != maverick_bundle::sha256(&bytes) {
+                tracing::warn!(file = %entry.file,
+                    "matrix export retained an existing immutable bundle with different content");
+            }
+            Ok::<_, BundleError>(entry)
         })();
         drop(transaction);
         result

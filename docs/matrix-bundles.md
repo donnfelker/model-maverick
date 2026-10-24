@@ -46,7 +46,9 @@ Environment settings never add a reader trust key.
 An archive is named `mmbundle1-YYYYMMDDTHHMMSS.nnnnnnnnnZ.tar`. Its time is the
 rebuild completion time, in UTC. Publication uses an atomic hard link and never
 overwrites an existing archive. A retry keeps the original bytes even if the
-database or signing configuration changed. A Postgres transaction advisory lock
+database or signing configuration changed. A changed retry emits a warning with
+only the archive name. The directory is synced before the index can reference a
+new archive, then synced again after the index rename. A Postgres transaction advisory lock
 serializes publishers through the archive and index writes, including when a
 worker delivery times out while a filesystem write continues.
 
