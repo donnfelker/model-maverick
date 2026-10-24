@@ -23,8 +23,8 @@ use maverick_domain::gojson::match_field;
 use maverick_domain::telemetry::TelemetryItem;
 use maverick_domain::{ids, telemetry};
 use maverick_store::{JsonRawValue, affinity, decisions, is_not_found, tenancy};
-use sqlx::PgPool;
 use serde::de::{MapAccess, Visitor};
+use sqlx::PgPool;
 
 use crate::{
     ApiError, ApiState, ErrorCode, Identity, internal_error, invalid_request, not_found, read_body,
@@ -212,7 +212,10 @@ async fn follow_served_columns(
     if served.is_empty() {
         return;
     }
-    let ids: Vec<String> = served.iter().map(|item| item.recommendation_id.clone()).collect();
+    let ids: Vec<String> = served
+        .iter()
+        .map(|item| item.recommendation_id.clone())
+        .collect();
     let follows: HashMap<String, (String, Vec<ServedEntry>)> =
         match decisions::affinity_follows(pool, tenant_id, &ids).await {
             Ok(rows) => rows

@@ -83,12 +83,7 @@ async fn turn(pool: &PgPool) -> (String, String) {
     )
 }
 
-async fn report_as(
-    pool: &PgPool,
-    tenant: &str,
-    config: RecommendConfig,
-    items: Value,
-) -> String {
+async fn report_as(pool: &PgPool, tenant: &str, config: RecommendConfig, items: Value) -> String {
     let (status, text) = call(
         router_for(pool, tenant, config),
         "/v1/telemetry",
@@ -133,17 +128,30 @@ async fn database() -> Option<(TestDatabase, PgPool)> {
         tenancy::create_tenant(&pool, tenant, tenant, &key)
             .await
             .unwrap();
-        tenancy::create_api_key(&pool, &format!("key_{tenant}"), tenant, tenant.as_bytes(), "abcd", "")
-            .await
-            .unwrap();
+        tenancy::create_api_key(
+            &pool,
+            &format!("key_{tenant}"),
+            tenant,
+            tenant.as_bytes(),
+            "abcd",
+            "",
+        )
+        .await
+        .unwrap();
     }
     corpus::upsert_corpus_version(&pool, CORPUS, "", 0, false)
         .await
         .unwrap();
-    corpus::activate_corpus_version(&pool, CORPUS).await.unwrap();
+    corpus::activate_corpus_version(&pool, CORPUS)
+        .await
+        .unwrap();
     let empty = raw("{}");
     let alias = raw(r#"{"openrouter": "anthropic/weak"}"#);
-    for (id, q) in [("col_best", 0.90f32), ("col_close", 0.89), ("col_weak", 0.50)] {
+    for (id, q) in [
+        ("col_best", 0.90f32),
+        ("col_close", 0.89),
+        ("col_weak", 0.50),
+    ] {
         catalog::create_model_column(
             &pool,
             &NewModelColumn {
@@ -234,7 +242,11 @@ async fn an_alias_item_takes_the_row_to_its_entry() {
         return;
     };
     let (id, _) = turn(&pool).await;
-    report(&pool, json!([item(&id, "anthropic/weak", "openrouter", 200)])).await;
+    report(
+        &pool,
+        json!([item(&id, "anthropic/weak", "openrouter", 200)]),
+    )
+    .await;
     assert_eq!(row(&pool).await.column_id, "col_weak");
     db.close().await;
 }
@@ -304,8 +316,13 @@ async fn foreign_opted_out_and_disabled_items_move_nothing() {
         },
         ..RecommendConfig::default()
     };
-    let counts = report_as(&pool, TENANT, off, json!([item(&id, "col_close", "direct", 200)]))
-        .await;
+    let counts = report_as(
+        &pool,
+        TENANT,
+        off,
+        json!([item(&id, "col_close", "direct", 200)]),
+    )
+    .await;
     assert_eq!(counts, "{\"accepted\":1,\"dropped\":0}\n");
     assert_eq!(row(&pool).await.column_id, "col_best");
 
