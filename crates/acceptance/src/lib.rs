@@ -10,12 +10,15 @@
 //! [`Stack::proxy`] starts the proxy the way its binary does (hosted mode, from
 //! environment values) against this engine and against [`Upstream`] mocks that keep every
 //! request. [`Collector`] is a mock OTLP/HTTP collector that keeps every payload.
+//! [`Stack::set_engine_down`] makes the engine's public listener answer `503`, so a suite
+//! can show what the proxy does during an engine outage (D46).
 //!
 //! So a suite can show where a prompt went, and where it did not.
 
 use std::collections::HashMap;
 use std::io;
 use std::net::SocketAddr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
@@ -358,9 +361,20 @@ pub struct Tenant {
 pub struct Reply {
     pub status: u16,
     pub body: String,
+    /// Every header, names lowercase.
+    pub headers: Vec<(String, String)>,
 }
 
 impl Reply {
+    /// The first value of a header (names are lowercase).
+    #[must_use]
+    pub fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(key, _)| key == name)
+            .map(|(_, value)| value.as_str())
+    }
+
     /// The body as JSON (panics with the body when it is not JSON).
     #[must_use]
     pub fn json(&self) -> Value {
@@ -383,6 +397,8 @@ pub struct Stack {
     /// The provider of [`ZR_CLASSIFIER_COLUMN`].
     pub zr_classifier: Recorder,
     hits: Arc<Mutex<Vec<Hit>>>,
+    /// While set, the public listener answers every request with `503`.
+    down: Arc<AtomicBool>,
     http: reqwest::Client,
 }
 
@@ -435,9 +451,12 @@ impl Stack {
 
         let hits: Arc<Mutex<Vec<Hit>>> = Arc::default();
         let log = hits.clone();
+        let down: Arc<AtomicBool> = Arc::default();
+        let outage = down.clone();
         let public = public_router_with(auth.clone(), api.clone()).layer(middleware::from_fn(
             move |request: Request, next: Next| {
                 let log = log.clone();
+                let outage = outage.clone();
                 async move {
                     let bearer = request
                         .headers()
@@ -450,6 +469,15 @@ impl Stack {
                         path: request.uri().path().to_owned(),
                         bearer,
                     });
+                    if outage.load(Ordering::SeqCst) {
+                        return Response::builder()
+                            .status(503)
+                            .header("content-type", "application/json")
+                            .body(axum::body::Body::from(
+                                r#"{"error":{"code":"internal_error","message":"the engine is down"}}"#,
+                            ))
+                            .expect("outage response");
+                    }
                     let response: Response = next.run(request).await;
                     response
                 }
@@ -466,6 +494,7 @@ impl Stack {
             classifier,
             zr_classifier,
             hits,
+            down,
             http: reqwest::Client::builder()
                 .no_proxy()
                 .build()
@@ -546,6 +575,12 @@ impl Stack {
         let body = json!({"workload": {"prompt": prompt}}).to_string();
         self.engine("POST", "/v1/recommend", &tenant.key, &body)
             .await
+    }
+
+    /// While `down`, the public listener answers every request with `503`, as an engine
+    /// that is failing would. Requests are still counted in [`Stack::hits`].
+    pub fn set_engine_down(&self, down: bool) {
+        self.down.store(down, Ordering::SeqCst);
     }
 
     /// Every request the public listener received.
@@ -631,8 +666,22 @@ impl Stack {
 async fn reply(request: reqwest::RequestBuilder) -> Reply {
     let response = request.send().await.expect("response");
     let status = response.status().as_u16();
+    let headers = response
+        .headers()
+        .iter()
+        .map(|(name, value)| {
+            (
+                name.as_str().to_owned(),
+                String::from_utf8_lossy(value.as_bytes()).into_owned(),
+            )
+        })
+        .collect();
     let body = response.text().await.unwrap_or_default();
-    Reply { status, body }
+    Reply {
+        status,
+        body,
+        headers,
+    }
 }
 
 /// A running proxy.
@@ -673,6 +722,30 @@ impl RunningProxy {
             .body(body.to_string());
         if let Some(api_key) = api_key {
             request = request.header("x-api-key", api_key);
+        }
+        reply(request).await
+    }
+
+    /// `POST {path}` for the tenant with extra headers (the caller's provider key, the
+    /// declared workload, `X-Maverick-Settings`).
+    pub async fn post(
+        &self,
+        path: &str,
+        tenant: &Tenant,
+        headers: &[(&str, &str)],
+        body: &Value,
+    ) -> Reply {
+        let mut request = self
+            .http
+            .post(format!("{}{path}", self.url))
+            .header("x-maverick-api-key", &tenant.key)
+            .header("content-type", "application/json")
+            .body(body.to_string());
+        if path == "/v1/messages" {
+            request = request.header("anthropic-version", "2023-06-01");
+        }
+        for (name, value) in headers {
+            request = request.header(*name, *value);
         }
         reply(request).await
     }
