@@ -89,19 +89,78 @@ impl TestDatabase {
     /// version is the server version. With `MAVERICK_TEST_DATABASE_URL`, the `pg_dump` on
     /// `PATH` runs; its output can differ from the container's.
     pub async fn dump_schema(&self) -> String {
-        const FLAGS: [&str; 3] = ["--schema-only", "--no-owner", "--no-privileges"];
+        self.pg_dump(&["--schema-only", "--no-owner", "--no-privileges"])
+            .await
+    }
+
+    /// Returns a full `pg_dump --no-owner --no-privileges` of this database: schema and
+    /// data, the migration history included. [`TestDatabase::restore`] loads it.
+    pub async fn dump(&self) -> String {
+        self.pg_dump(&["--no-owner", "--no-privileges"]).await
+    }
+
+    /// Runs `sql` with `psql -v ON_ERROR_STOP=1` (in the test container when there is
+    /// one), so a plain `pg_dump` output loads as psql would load it. Panics on the first
+    /// failing statement.
+    pub async fn restore(&self, sql: &str) {
+        use tokio::io::AsyncWriteExt;
+        const FLAGS: [&str; 3] = ["--quiet", "--no-psqlrc", "-v"];
+        let mut command = match &self.container_id {
+            Some(id) => {
+                let mut command = tokio::process::Command::new("docker");
+                command
+                    .args(["exec", "-i", id.as_str(), "psql"])
+                    .args(FLAGS)
+                    .args(["ON_ERROR_STOP=1", "--username=maverick", "--dbname"])
+                    .arg(self.name.as_str());
+                command
+            }
+            None => {
+                let mut command = tokio::process::Command::new("psql");
+                command
+                    .args(FLAGS)
+                    .args(["ON_ERROR_STOP=1", "--dbname"])
+                    .arg(self.url.as_str());
+                command
+            }
+        };
+        let mut child = command
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap_or_else(|err| panic!("run psql for {}: {err}", self.name));
+        let mut stdin = child.stdin.take().expect("psql stdin");
+        stdin
+            .write_all(sql.as_bytes())
+            .await
+            .unwrap_or_else(|err| panic!("write to psql for {}: {err}", self.name));
+        drop(stdin);
+        let output = child
+            .wait_with_output()
+            .await
+            .unwrap_or_else(|err| panic!("wait for psql for {}: {err}", self.name));
+        assert!(
+            output.status.success(),
+            "psql restore into {} failed: {}",
+            self.name,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    async fn pg_dump(&self, flags: &[&str]) -> String {
         let mut command = match &self.container_id {
             Some(id) => {
                 let mut command = tokio::process::Command::new("docker");
                 command
                     .args(["exec", id.as_str(), "pg_dump"])
-                    .args(FLAGS)
+                    .args(flags)
                     .args(["--username=maverick", "--dbname", self.name.as_str()]);
                 command
             }
             None => {
                 let mut command = tokio::process::Command::new("pg_dump");
-                command.args(FLAGS).args(["--dbname", self.url.as_str()]);
+                command.args(flags).args(["--dbname", self.url.as_str()]);
                 command
             }
         };

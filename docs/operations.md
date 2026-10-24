@@ -496,6 +496,16 @@ While it runs, each `serve` process refreshes a `serve_heartbeats` row every 30 
 release and host) and removes it on a clean shutdown. A row older than 2 minutes counts as
 stopped.
 
+### The upgrade matrix
+
+`crates/maverick/tests/data/upgrade-matrix/` holds one database dump per release in the
+12-month window, each with the same populated scenario. Every CI run restores each dump,
+runs `maverick upgrade --yes` on it, and checks that the upgraded database still serves
+the dump's tenants with their old keys: history, traces, config, a recommend, and the
+internal tenant read. At each release, write that release's dump and add its row to
+`RELEASES`; the README in that directory has the command. The first dump,
+`pre-release.sql`, is the schema at migration 0012.
+
 ## Jobs and schedules
 
 The jobs run on graphile_worker, in Postgres (no Redis). The periodic jobs use five-field
