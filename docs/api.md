@@ -269,9 +269,10 @@ model_not_in_pool | unknown_pool | zero_retention_requires_declared`, `413`,
 
 ### Conversation affinity (`affinity`)
 
-Status: specified (D44, spec §7.6). The engine does not accept it yet (beads
-gcd2.3 to gcd2.7). Until then a body with `affinity` is `422 invalid_request`,
-because the field is unknown.
+D44, spec §7.6. The engine lists `affinity` in `X-Maverick-API-Features`, and
+MM components send the field only to an engine that lists it (D50). Moving the
+state to a chain entry that served the turn (see `POST /v1/telemetry`) is not
+served yet (bead gcd2.7).
 
 A multi-turn conversation calls `/v1/recommend` once per turn. `affinity` ties
 the turns together, so the engine can report whether the pick stayed on one
@@ -629,12 +630,11 @@ Exclusion reasons (a closed enum): `not_in_pool`, `not_in_allowlist`,
 Survivors carry `availability` and `low_availability` (D8). Another tenant's
 id is the same `404` as a missing one.
 
-A recommendation made with `affinity` will also carry an `affinity` block:
-the affinity hash, the stored column, the status and reason, `cache_warm`,
-`context_tokens`, `cost_aware` and its source, the bonus applied or withheld,
-and each survivor's ranking cost (spec §10.2, D44). It is `null` otherwise.
-The request snapshot never holds `affinity.key`. Not served yet (beads gcd2.3
-to gcd2.7).
+A recommendation made with `affinity` also carries an `affinity` block, after
+`response`: the affinity hash, the stored column, the status and reason,
+`cache_warm`, `context_tokens`, `cost_aware` and its source, the bonus applied
+or withheld, and each survivor's ranking cost (spec §10.2, D44). Without
+`affinity` the key is absent. The request snapshot never holds `affinity.key`.
 
 ### GET /v1/history/outcomes
 
@@ -733,7 +733,8 @@ Standing tenant constraints. They filter candidates hard on every request:
     "max_cost_per_run": 0.01,
     "max_latency_ms": 5000,
     "zero_retention": false,
-    "telemetry_opt_out": false
+    "telemetry_opt_out": false,
+    "affinity_cost_aware": false
   }
 }
 ```
@@ -755,9 +756,8 @@ model column, so it never causes `pool_would_be_empty`.
 `affinity_cost_aware` (D44, boolean, default `false`) turns on cost-aware
 conversation affinity for the tenant (see
 [Conversation affinity](#conversation-affinity-affinity)). A request's
-`affinity.cost_aware` overrides it. It filters no column either. Status:
-specified, not accepted yet (beads gcd2.4 and gcd2.6). Until then the key is
-an unknown field, so a PUT that sends it is `422 invalid_request`.
+`affinity.cost_aware` overrides it. It filters no column either. The reads
+return it after `telemetry_opt_out`.
 
 ## Debug capture
 
@@ -925,9 +925,9 @@ the three tools sorted by name.
 The tool descriptions ask agents to prefer the declared form when they know
 the capability: it is faster, and nothing leaves the session.
 
-`recommend_model` will also take the optional `affinity` object of
-`POST /v1/recommend` (D44, spec §12). That schema is then the one place where
-`tools/list` differs from the Go server's list. Not served yet (bead gcd2.6).
+`recommend_model` also takes the optional `affinity` object of
+`POST /v1/recommend` (D44, spec §12). That property and the `mode` default
+(D47) are the only places where `tools/list` differs from the Go server's list.
 
 A successful result carries the REST body twice: as one text content item and
 as `structuredContent`. A failed call is a result with `isError: true` and one
@@ -1075,7 +1075,7 @@ has **no** pool: set one with the pools PUT before the tenant calls
   "pools": [ { "name": "default", "model_column_ids": ["col_01K..."], "is_default": true } ],
   "weights": [],
   "constraints": { "max_cost_per_run": null, "max_latency_ms": null, "zero_retention": false,
-                   "telemetry_opt_out": false },
+                   "telemetry_opt_out": false, "affinity_cost_aware": false },
   "api_keys": []
 }
 ```

@@ -532,6 +532,7 @@ impl Stack {
             None,
             zero_retention,
             telemetry_opt_out,
+            false,
         )
         .await
         .expect("constraints");

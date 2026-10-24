@@ -446,7 +446,7 @@ async fn env(zero: bool) -> Option<Env> {
         .unwrap_or_else(|e| panic!("pool: {e}"));
     }
     if zero {
-        tenancy::upsert_tenant_constraints(&pool, OWNER, None, None, true, false)
+        tenancy::upsert_tenant_constraints(&pool, OWNER, None, None, true, false, false)
             .await
             .unwrap();
     }
@@ -1583,7 +1583,7 @@ async fn a_replay_for_a_zero_retention_tenant_never_reaches_an_unverified_column
         return;
     };
     let captured = env.captured().await;
-    tenancy::upsert_tenant_constraints(&env.pool, OWNER, None, None, true, false)
+    tenancy::upsert_tenant_constraints(&env.pool, OWNER, None, None, true, false, false)
         .await
         .unwrap();
     let uri = format!("/v1/debug/replay/{}", captured.id);

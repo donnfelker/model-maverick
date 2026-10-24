@@ -241,7 +241,7 @@ async fn recommendation(pool: &PgPool, tenant: &str, id: String) -> Result<Strin
         Err(error) if is_not_found(&error) => return Err(Failure::NotFound),
         Err(error) => return Err(error.into()),
     };
-    let body = JsonValue::Object(vec![
+    let mut members = vec![
         string("id", &row.id),
         string("api_key_id", &row.api_key_id),
         (
@@ -255,9 +255,17 @@ async fn recommendation(pool: &PgPool, tenant: &str, id: String) -> Result<Strin
         ),
         ("candidates".to_owned(), jsonb(row.candidates.get())?),
         ("response".to_owned(), jsonb(row.response.get())?),
+    ];
+    // D44: the affinity block, only when the request sent `affinity`, so a row without
+    // one reads exactly as Go's did.
+    if let Some(affinity) = &row.affinity {
+        members.push(("affinity".to_owned(), jsonb(affinity.get())?));
+    }
+    members.extend([
         string("matrix_version", &row.matrix_version),
         string("created_at", &rfc3339_nano(row.created_at)),
     ]);
+    let body = JsonValue::Object(members);
     Ok(document(&body))
 }
 

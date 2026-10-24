@@ -50,6 +50,7 @@ async fn recommendation(pool: &PgPool, id: &str, created_at: DateTime<Utc>) {
             candidates: &empty,
             response: &empty,
             matrix_version: "2026-07-01",
+            affinity: None,
         },
     )
     .await

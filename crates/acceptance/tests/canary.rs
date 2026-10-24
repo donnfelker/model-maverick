@@ -3,7 +3,8 @@
 //!
 //! A prompt-form recommend, a proxy chat request, a proxy messages request, and an MCP
 //! `recommend_model` call each carry their own canary: in the prompt, in the other body
-//! fields the caller controls, and in the provider credential. The engine key cannot carry
+//! fields the caller controls, and in the provider credential. A declared recommend
+//! carries one in its conversation affinity key (D44). The engine key cannot carry
 //! one (it must authenticate), so the key itself is watched. The upstream completion
 //! carries a canary too.
 //!
@@ -28,6 +29,8 @@ use tracing_subscriber::registry::LookupSpan;
 use tracing_subscriber::util::SubscriberInitExt;
 
 const ENGINE: &str = "CANARY-ENGINE-7F3A";
+/// D44: a conversation affinity key is handled like a prompt.
+const AFFINITY: &str = "CANARY-AFFINITY-2C8E";
 const CHAT: &str = "CANARY-CHAT-81B2";
 const MESSAGES: &str = "CANARY-MESSAGES-C4D9";
 const MCP: &str = "CANARY-MCP-2E6F";
@@ -147,7 +150,7 @@ async fn no_canary_reaches_a_log_a_span_or_a_metric() {
         return;
     };
     let tenant = stack.tenant("canary", &[CLAUDE, GPT], false, false).await;
-    let secrets: Vec<String> = [ENGINE, CHAT, MESSAGES, MCP, COMPLETION]
+    let secrets: Vec<String> = [ENGINE, CHAT, MESSAGES, MCP, COMPLETION, AFFINITY]
         .iter()
         .map(|canary| (*canary).to_owned())
         .chain([tenant.key.clone()])
@@ -168,6 +171,24 @@ async fn no_canary_reaches_a_log_a_span_or_a_metric() {
         .recommend_prompt(&tenant, &format!("Extract the parties from {ENGINE}."))
         .await;
     assert_eq!(reply.status, 200, "{}", reply.body);
+
+    // 1b. A declared recommend whose conversation affinity key is a canary (D44).
+    let reply = stack
+        .engine(
+            "POST",
+            "/v1/recommend",
+            &tenant.key,
+            &json!({"workload": {"capability": "structured_extraction"},
+                    "affinity": {"key": AFFINITY, "context_tokens": 1200}})
+            .to_string(),
+        )
+        .await;
+    assert_eq!(reply.status, 200, "{}", reply.body);
+    assert!(
+        reply.body.contains(r#""affinity":{"status":"new""#),
+        "{}",
+        reply.body
+    );
 
     // 2. and 3. The proxy's two surfaces.
     let upstreams = Upstreams::start(&format!("The parties are {COMPLETION}.")).await;

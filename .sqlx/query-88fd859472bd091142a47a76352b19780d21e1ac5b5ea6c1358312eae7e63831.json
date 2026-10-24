@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "insert into recommendations (\n             id, tenant_id, api_key_id, prompt_hash, request, classification, candidates,\n             response, matrix_version\n           )\n           values ($1, $2, $3, $4, $5, $6, $7, $8, $9)\n           returning id, tenant_id, api_key_id, prompt_hash, request as \"request: _\",\n                     classification as \"classification: _\", candidates as \"candidates: _\",\n                     response as \"response: _\", matrix_version, created_at",
+  "query": "insert into recommendations (\n             id, tenant_id, api_key_id, prompt_hash, request, classification, candidates,\n             response, matrix_version, affinity\n           )\n           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\n           returning id, tenant_id, api_key_id, prompt_hash, request as \"request: _\",\n                     classification as \"classification: _\", candidates as \"candidates: _\",\n                     response as \"response: _\", matrix_version, created_at,\n                     affinity as \"affinity: _\"",
   "describe": {
     "columns": [
       {
@@ -112,6 +112,17 @@
             "name": "created_at"
           }
         }
+      },
+      {
+        "ordinal": 10,
+        "name": "affinity: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "recommendations",
+            "name": "affinity"
+          }
+        }
       }
     ],
     "parameters": {
@@ -124,7 +135,8 @@
         "Jsonb",
         "Jsonb",
         "Jsonb",
-        "Text"
+        "Text",
+        "Jsonb"
       ]
     },
     "nullable": [
@@ -137,8 +149,9 @@
       false,
       false,
       false,
-      false
+      false,
+      true
     ]
   },
-  "hash": "a1722bd6ff7840a546b68671b9032c10cb0764b6155f4748718ae17b78983d8a"
+  "hash": "88fd859472bd091142a47a76352b19780d21e1ac5b5ea6c1358312eae7e63831"
 }

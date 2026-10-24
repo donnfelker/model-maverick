@@ -70,6 +70,7 @@ async fn recommendation(
             candidates: &empty,
             response: &response,
             matrix_version: "2026-07-01",
+            affinity: None,
         },
     )
     .await

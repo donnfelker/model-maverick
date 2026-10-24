@@ -25,7 +25,7 @@ pub mod version;
 
 pub use health::HealthState;
 pub use internal::InternalSettings;
-pub use recommend::{RecommendConfig, RecommendError, Recommended, recommend};
+pub use recommend::{AffinitySettings, RecommendConfig, RecommendError, Recommended, recommend};
 
 /// What the endpoint handlers read: the engine pool and the health inputs. Handlers that
 /// need the database answer `500 internal_error` on a detached state (router tests).

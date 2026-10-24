@@ -94,6 +94,7 @@ async fn tenant_context_matches_the_separate_queries() {
         Some(2000),
         true,
         true,
+        false,
     )
     .await
     .expect("constraints");

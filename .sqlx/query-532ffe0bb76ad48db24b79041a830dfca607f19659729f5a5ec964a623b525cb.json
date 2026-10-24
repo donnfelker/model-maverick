@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "insert into tenant_constraints\n           (tenant_id, max_cost_per_run, max_latency_ms, zero_retention, telemetry_opt_out,\n            affinity_cost_aware)\n         values ($1, $2, $3, $4, $5, false)\n         on conflict (tenant_id) do update set\n           max_cost_per_run = excluded.max_cost_per_run,\n           max_latency_ms = excluded.max_latency_ms,\n           zero_retention = excluded.zero_retention,\n           telemetry_opt_out = excluded.telemetry_opt_out,\n           affinity_cost_aware = excluded.affinity_cost_aware,\n           updated_at = now()\n         returning tenant_id, max_cost_per_run, max_latency_ms, zero_retention, updated_at,\n                   telemetry_opt_out, affinity_cost_aware",
+  "query": "insert into tenant_constraints\n           (tenant_id, max_cost_per_run, max_latency_ms, zero_retention, telemetry_opt_out,\n            affinity_cost_aware)\n         values ($1, $2, $3, $4, $5, $6)\n         on conflict (tenant_id) do update set\n           max_cost_per_run = excluded.max_cost_per_run,\n           max_latency_ms = excluded.max_latency_ms,\n           zero_retention = excluded.zero_retention,\n           telemetry_opt_out = excluded.telemetry_opt_out,\n           affinity_cost_aware = excluded.affinity_cost_aware,\n           updated_at = now()\n         returning tenant_id, max_cost_per_run, max_latency_ms, zero_retention, updated_at,\n                   telemetry_opt_out, affinity_cost_aware",
   "describe": {
     "columns": [
       {
@@ -87,6 +87,7 @@
         "Numeric",
         "Int4",
         "Bool",
+        "Bool",
         "Bool"
       ]
     },
@@ -100,5 +101,5 @@
       false
     ]
   },
-  "hash": "113b29e156eedd2994162a6a0444e6c72be24d0cd628509b5a60afa46633aeab"
+  "hash": "532ffe0bb76ad48db24b79041a830dfca607f19659729f5a5ec964a623b525cb"
 }

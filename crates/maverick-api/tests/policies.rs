@@ -487,7 +487,7 @@ async fn a_zero_retention_tenant_sees_only_zero_retention_columns() {
     let ids = ["col_standard", "col_expired", "col_unknown", "col_zero"];
     pool_of(&pool, TENANT, "default", &ids, true).await;
     pool_of(&pool, OTHER, "default", &ids, true).await;
-    tenancy::upsert_tenant_constraints(&pool, TENANT, None, None, true, false)
+    tenancy::upsert_tenant_constraints(&pool, TENANT, None, None, true, false, false)
         .await
         .unwrap();
 

@@ -20,7 +20,7 @@ pub const API_FEATURES_HEADER: &str = "x-maverick-api-features";
 /// The optional request features this engine accepts beyond the first release, sorted
 /// and without duplicates. The bead that makes the engine accept a new optional field
 /// adds its feature name here (conversation affinity adds `affinity`, D44).
-pub const API_FEATURES: &[&str] = &[];
+pub const API_FEATURES: &[&str] = &["affinity"];
 
 /// The `X-Maverick-API-Features` value: [`API_FEATURES`] joined with commas.
 pub fn api_features_value() -> String {

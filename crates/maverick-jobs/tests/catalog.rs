@@ -152,6 +152,7 @@ async fn constraints(pool: &PgPool, tenant_id: &str, max_cost: Option<&str>, zer
         None,
         zero_retention,
         false,
+        false,
     )
     .await
     .expect("constraints");

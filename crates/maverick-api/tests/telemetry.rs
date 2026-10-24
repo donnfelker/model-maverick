@@ -96,6 +96,7 @@ async fn recommendation(pool: &PgPool, id: &str, tenant: &str) {
             candidates: &empty,
             response: &empty,
             matrix_version: "2026-07-01",
+            affinity: None,
         },
     )
     .await
@@ -444,7 +445,7 @@ async fn an_opted_out_tenants_items_are_dropped() {
     tenant(&pool, "ten_b").await;
     recommendation(&pool, "rec_a", "ten_a").await;
     recommendation(&pool, "rec_b", "ten_b").await;
-    tenancy::upsert_tenant_constraints(&pool, "ten_a", None, None, false, true)
+    tenancy::upsert_tenant_constraints(&pool, "ten_a", None, None, false, true, false)
         .await
         .unwrap();
     let item = |rec: &str| json!({"recommendation_id": rec, "model_used": "m", "status": 200});
@@ -463,7 +464,7 @@ async fn an_opted_out_tenants_items_are_dropped() {
     assert_eq!(body, "{\"accepted\":1,\"dropped\":0}\n");
     assert_eq!(outcomes(&pool, "rec_b").await.len(), 1);
 
-    tenancy::upsert_tenant_constraints(&pool, "ten_a", None, None, false, false)
+    tenancy::upsert_tenant_constraints(&pool, "ten_a", None, None, false, false, false)
         .await
         .unwrap();
     let (_, body) = send(&pool, "ten_a", json!({"items": [item("rec_a")]})).await;

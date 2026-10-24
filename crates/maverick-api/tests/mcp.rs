@@ -298,14 +298,30 @@ async fn lists_exactly_the_spec_tools() {
     )
     .await;
     // DIVERGENCE D47: the recommend_model schema says the default mode is quality.
+    // DIVERGENCE D44: and it takes the optional affinity object after constraints.
     let expected = list["response_body_exact"].as_str().unwrap();
     assert!(
         expected.contains("; default balanced\""),
         "the Go fixture changed"
     );
+    let constraints_end = r#""additionalProperties":false}},"required":["workload"]"#;
+    assert_eq!(
+        expected.matches(constraints_end).count(),
+        1,
+        "the Go fixture changed"
+    );
+    let affinity = concat!(
+        r#""additionalProperties":false},"affinity":{"type":["null","object"],"properties":{"#,
+        r#""key":{"type":"string","description":"conversation id chosen by the caller, 1 to 256 characters; only its per-tenant HMAC is stored"},"#,
+        r#""context_tokens":{"type":["null","integer"],"description":"input tokens this turn resends, for the cache-aware turn cost","minimum":0,"maximum":10000000},"#,
+        r#""cost_aware":{"type":["null","boolean"],"description":"override the tenant cost-aware affinity setting for this request"}},"#,
+        r#""required":["key"],"additionalProperties":false}},"required":["workload"]"#,
+    );
     assert_eq!(
         reply.body,
-        expected.replace("; default balanced\"", "; default quality\"")
+        expected
+            .replace("; default balanced\"", "; default quality\"")
+            .replace(constraints_end, affinity)
     );
     let names: Vec<String> = frame(&reply)["result"]["tools"]
         .as_array()
@@ -543,7 +559,7 @@ async fn recommend_model_surfaces_the_privacy_codes() {
     let pool = db.pool().await;
     matrix(&pool).await;
     let key = tenant(&pool, "ten_zr", "default").await;
-    tenancy::upsert_tenant_constraints(&pool, "ten_zr", None, None, true, false)
+    tenancy::upsert_tenant_constraints(&pool, "ten_zr", None, None, true, false, false)
         .await
         .unwrap();
     let router = router(&pool, 1000);

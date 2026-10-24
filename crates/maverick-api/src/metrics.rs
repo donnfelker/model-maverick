@@ -50,6 +50,22 @@ pub(crate) fn recommend_finished(elapsed: Duration, succeeded: Option<(bool, &'s
     }
 }
 
+/// One conversation affinity decision (D44) by `status` and `cost_aware`. No key, hash, or
+/// column id is a label.
+pub(crate) fn affinity_decision(status: &'static str, cost_aware: bool) {
+    global::meter(METER)
+        .u64_counter("maverick_affinity_decisions_total")
+        .with_description("Conversation affinity decisions by status and cost_aware")
+        .build()
+        .add(
+            1,
+            &[
+                KeyValue::new("status", status),
+                KeyValue::new("cost_aware", if cost_aware { "true" } else { "false" }),
+            ],
+        );
+}
+
 /// One classification-cache lookup on the prompt path: `hit` or `miss`.
 pub(crate) fn classifier_cache(hit: bool) {
     global::meter(METER)

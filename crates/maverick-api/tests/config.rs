@@ -174,8 +174,8 @@ fn day(text: &str) -> NaiveDate {
 const POOLS: &str = "/v1/config/pools";
 const WEIGHTS: &str = "/v1/config/weights";
 const CONSTRAINTS: &str = "/v1/config/constraints";
-/// Go's three keys, then D39's `telemetry_opt_out`.
-const NO_CONSTRAINTS: &str = "{\"constraints\":{\"max_cost_per_run\":null,\"max_latency_ms\":null,\"zero_retention\":false,\"telemetry_opt_out\":false}}\n";
+/// Go's three keys, then D39's `telemetry_opt_out` and D44's `affinity_cost_aware`.
+const NO_CONSTRAINTS: &str = "{\"constraints\":{\"max_cost_per_run\":null,\"max_latency_ms\":null,\"zero_retention\":false,\"telemetry_opt_out\":false,\"affinity_cost_aware\":false}}\n";
 
 // parity: api.TestConfigPoolsRoundTrip
 #[tokio::test]
@@ -421,7 +421,7 @@ async fn constraints_round_trip() {
         (StatusCode::OK, NO_CONSTRAINTS.to_owned())
     );
     let full = "{\"constraints\":{\"max_cost_per_run\":0.25,\"max_latency_ms\":4000,\
-                \"zero_retention\":true,\"telemetry_opt_out\":false}}\n";
+                \"zero_retention\":true,\"telemetry_opt_out\":false,\"affinity_cost_aware\":false}}\n";
     assert_eq!(
         put(
             &pool,
@@ -620,7 +620,7 @@ async fn unmeasured_columns_survive_and_only_the_latest_aggregate_counts() {
         (
             StatusCode::OK,
             "{\"constraints\":{\"max_cost_per_run\":0.000001,\"max_latency_ms\":null,\
-             \"zero_retention\":false,\"telemetry_opt_out\":false}}\n"
+             \"zero_retention\":false,\"telemetry_opt_out\":false,\"affinity_cost_aware\":false}}\n"
                 .to_owned()
         )
     );
@@ -705,7 +705,7 @@ async fn zero_retention_is_simulated_and_telemetry_opt_out_is_replaced() {
         .execute(&pool)
         .await
         .unwrap();
-    tenancy::upsert_tenant_constraints(&pool, TENANT, None, None, false, true)
+    tenancy::upsert_tenant_constraints(&pool, TENANT, None, None, false, true, false)
         .await
         .unwrap();
     let (status, _) = put(
@@ -748,7 +748,7 @@ async fn telemetry_opt_out_round_trips() {
     .await
     .unwrap();
     let opted_out = "{\"constraints\":{\"max_cost_per_run\":null,\"max_latency_ms\":null,\
-                     \"zero_retention\":false,\"telemetry_opt_out\":true}}\n";
+                     \"zero_retention\":false,\"telemetry_opt_out\":true,\"affinity_cost_aware\":false}}\n";
     assert_eq!(
         put(
             &pool,

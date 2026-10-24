@@ -21,6 +21,7 @@ const COLUMN_LIST: &str =
     "must be a comma-separated list of column identifiers with no empty entries";
 const CRON: &str = "must be a 5-field cron expression like \"0 3 * * *\"";
 const DURATION: &str = "must be a positive duration like \"120s\"";
+const BOOLEAN: &str = "must be true or false";
 const HTTP_URL: &str = "must be an http:// or https:// URL";
 const MODELS_DEV_PRICE_MAP: &str = "must be a JSON array of mapping objects with non-empty column_provider, column_model_id, column_endpoint, models_dev_provider, and models_dev_model_id";
 const DEFAULT_MODELS_DEV_PRICE_URL: &str = "https://models.dev/api.json";
@@ -142,6 +143,16 @@ pub struct Config {
     pub ranking_band_cost: f64,
     pub ranking_noise_band: f64,
     pub ranking_availability_floor: f64,
+    /// `MAVERICK_AFFINITY_ENABLED` (spec §7.6, D44, Rust-only). False accepts and
+    /// validates `affinity` but reads and writes no row.
+    pub affinity_enabled: bool,
+    /// `MAVERICK_AFFINITY_TTL`: a conversation's row lives this long after its last use.
+    pub affinity_ttl: Duration,
+    /// `MAVERICK_AFFINITY_CACHE_WARM_SECONDS`: the warm window of the pinned column's
+    /// provider cache.
+    pub affinity_cache_warm_seconds: u32,
+    /// `MAVERICK_AFFINITY_INCUMBENT_BONUS`, in quality points.
+    pub affinity_incumbent_bonus: f64,
     pub ceiling_buffer: f64,
     pub catalog_cold_start_nights: u32,
     pub ratelimit_rpm: u32,
@@ -284,6 +295,13 @@ impl fmt::Debug for Config {
                 "ranking_availability_floor",
                 &self.ranking_availability_floor,
             )
+            .field("affinity_enabled", &self.affinity_enabled)
+            .field("affinity_ttl", &self.affinity_ttl)
+            .field(
+                "affinity_cache_warm_seconds",
+                &self.affinity_cache_warm_seconds,
+            )
+            .field("affinity_incumbent_bonus", &self.affinity_incumbent_bonus)
             .field("ceiling_buffer", &self.ceiling_buffer)
             .field("catalog_cold_start_nights", &self.catalog_cold_start_nights)
             .field("ratelimit_rpm", &self.ratelimit_rpm)
@@ -573,6 +591,26 @@ where
         0.9,
         &mut issues,
     );
+    let affinity_enabled = boolean(&lookup, "MAVERICK_AFFINITY_ENABLED", true, &mut issues);
+    let affinity_ttl = duration(
+        &lookup,
+        "MAVERICK_AFFINITY_TTL",
+        Duration::from_secs(24 * 60 * 60),
+        Duration::from_secs(30 * 24 * 60 * 60),
+        &mut issues,
+    );
+    let affinity_cache_warm_seconds = non_negative_int(
+        &lookup,
+        "MAVERICK_AFFINITY_CACHE_WARM_SECONDS",
+        300,
+        &mut issues,
+    );
+    let affinity_incumbent_bonus = non_negative_float(
+        &lookup,
+        "MAVERICK_AFFINITY_INCUMBENT_BONUS",
+        1.5,
+        &mut issues,
+    );
     let batch_lease_ttl = duration(
         &lookup,
         "MAVERICK_BATCH_LEASE_TTL",
@@ -649,6 +687,10 @@ where
             ranking_band_cost,
             ranking_noise_band,
             ranking_availability_floor,
+            affinity_enabled,
+            affinity_ttl,
+            affinity_cache_warm_seconds,
+            affinity_incumbent_bonus,
             ceiling_buffer,
             catalog_cold_start_nights,
             ratelimit_rpm,
@@ -924,6 +966,24 @@ where
         Ok(parsed) if parsed >= 0 && parsed <= i64::from(u32::MAX) => parsed as u32,
         _ => {
             issue(issues, name, NON_NEGATIVE_INT);
+            default
+        }
+    }
+}
+
+/// Go `strconv.ParseBool`: `1`, `t`, `T`, `TRUE`, `true`, `True`, and the false forms.
+fn boolean<F>(lookup: &F, name: &str, default: bool, issues: &mut Vec<ConfigIssue>) -> bool
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let Some(value) = present(lookup, name) else {
+        return default;
+    };
+    match value.as_str() {
+        "1" | "t" | "T" | "TRUE" | "true" | "True" => true,
+        "0" | "f" | "F" | "FALSE" | "false" | "False" => false,
+        _ => {
+            issue(issues, name, BOOLEAN);
             default
         }
     }
@@ -1356,6 +1416,86 @@ mod tests {
                 "{bad}: {error}"
             );
         }
+    }
+
+    /// D44: the four affinity settings, their defaults, and their startup errors.
+    #[test]
+    fn affinity_settings_parse_and_default() {
+        let base = [
+            ("MAVERICK_ROLE", "origin"),
+            ("MAVERICK_DATABASE_URL", "postgres://db"),
+            ("MAVERICK_INTERNAL_TOKENS", "ops:alpha"),
+            ("MAVERICK_CAPTURE_MASTER_KEY", "ab".repeat(32).leak()),
+        ];
+        let load = |extra: &[(&'static str, &'static str)]| {
+            load_with(|name| {
+                extra
+                    .iter()
+                    .chain(base.iter())
+                    .find(|(key, _)| *key == name)
+                    .map(|(_, value)| (*value).to_owned())
+            })
+        };
+        let config = load(&[]).expect("defaults");
+        assert!(config.affinity_enabled);
+        assert_eq!(config.affinity_ttl, Duration::from_secs(24 * 60 * 60));
+        assert_eq!(config.affinity_cache_warm_seconds, 300);
+        assert_eq!(config.affinity_incumbent_bonus, 1.5);
+
+        let config = load(&[
+            ("MAVERICK_AFFINITY_ENABLED", "false"),
+            ("MAVERICK_AFFINITY_TTL", "90m"),
+            ("MAVERICK_AFFINITY_CACHE_WARM_SECONDS", "0"),
+            ("MAVERICK_AFFINITY_INCUMBENT_BONUS", "0"),
+        ])
+        .expect("set");
+        assert!(!config.affinity_enabled);
+        assert_eq!(config.affinity_ttl, Duration::from_secs(90 * 60));
+        assert_eq!(config.affinity_cache_warm_seconds, 0);
+        assert_eq!(config.affinity_incumbent_bonus, 0.0);
+        for (value, enabled) in [("1", true), ("T", true), ("TRUE", true), ("True", true)]
+            .into_iter()
+            .chain([
+                ("0", false),
+                ("f", false),
+                ("FALSE", false),
+                ("False", false),
+            ])
+        {
+            let config = load(&[("MAVERICK_AFFINITY_ENABLED", value)]).expect(value);
+            assert_eq!(config.affinity_enabled, enabled, "{value}");
+        }
+
+        for (var, value, reason) in [
+            ("MAVERICK_AFFINITY_ENABLED", "yes", BOOLEAN),
+            ("MAVERICK_AFFINITY_TTL", "0s", DURATION),
+            (
+                "MAVERICK_AFFINITY_TTL",
+                "721h",
+                "must not exceed configured maximum",
+            ),
+            (
+                "MAVERICK_AFFINITY_CACHE_WARM_SECONDS",
+                "-1",
+                NON_NEGATIVE_INT,
+            ),
+            (
+                "MAVERICK_AFFINITY_INCUMBENT_BONUS",
+                "-0.5",
+                NON_NEGATIVE_NUMBER,
+            ),
+        ] {
+            let error = load(&[(var, value)]).expect_err(value);
+            assert!(
+                error
+                    .issues()
+                    .iter()
+                    .any(|issue| issue.var == var && issue.reason == reason),
+                "{var}={value}: {error}"
+            );
+        }
+        let config = load(&[("MAVERICK_AFFINITY_TTL", "720h")]).expect("the maximum");
+        assert_eq!(config.affinity_ttl, Duration::from_secs(720 * 60 * 60));
     }
 
     #[test]

@@ -447,7 +447,7 @@ async fn responses_carry_the_tenant_telemetry_flag() {
         "{body}"
     );
 
-    tenancy::upsert_tenant_constraints(&pool, TENANT, None, None, false, true)
+    tenancy::upsert_tenant_constraints(&pool, TENANT, None, None, false, true, false)
         .await
         .unwrap();
     let (status, opted_out) = recommend(&pool, request).await;
@@ -697,9 +697,17 @@ async fn trace_row_records_survivors_then_exclusions() {
         true,
     )
     .await;
-    tenancy::upsert_tenant_constraints(&pool, TENANT, Some(Decimal::new(1, 2)), None, false, false)
-        .await
-        .unwrap();
+    tenancy::upsert_tenant_constraints(
+        &pool,
+        TENANT,
+        Some(Decimal::new(1, 2)),
+        None,
+        false,
+        false,
+        false,
+    )
+    .await
+    .unwrap();
 
     let body = r#"{"workload":{"capability":"factual_qa","difficulty":2},"constraints":{"max_latency_ms":2000}}"#;
     let (status, text) = recommend(&pool, body).await;
@@ -817,9 +825,17 @@ async fn drift_fallback_keeps_the_least_violating_column_and_alerts() {
         cell(&pool, id, "code_generation", 3, 0.9, cost, 1000.0).await;
     }
     pool_of(&pool, "default", &["col_cheap", "col_expensive"], true).await;
-    tenancy::upsert_tenant_constraints(&pool, TENANT, Some(Decimal::new(1, 3)), None, false, false)
-        .await
-        .unwrap();
+    tenancy::upsert_tenant_constraints(
+        &pool,
+        TENANT,
+        Some(Decimal::new(1, 3)),
+        None,
+        false,
+        false,
+        false,
+    )
+    .await
+    .unwrap();
     let (status, text) = recommend(&pool, r#"{"workload":{"capability":"code_generation"}}"#).await;
     assert_eq!(status, StatusCode::OK);
     let v = parse(&text);
@@ -888,7 +904,7 @@ async fn zero_retention_filters_columns_and_fails_closed() {
     )
     .await;
     pool_of(&pool, "leaky", &["col_expired", "col_standard"], false).await;
-    tenancy::upsert_tenant_constraints(&pool, TENANT, None, None, true, false)
+    tenancy::upsert_tenant_constraints(&pool, TENANT, None, None, true, false, false)
         .await
         .unwrap();
 

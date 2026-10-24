@@ -198,6 +198,7 @@ async fn seed(pool: &PgPool, tenant: &str, seed: &Seed<'_>) -> String {
             candidates: &raw(&candidates.to_string()),
             response: &raw(&response.to_string()),
             matrix_version: CORPUS,
+            affinity: None,
         },
     )
     .await

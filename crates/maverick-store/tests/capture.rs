@@ -53,6 +53,7 @@ async fn seed(pool: &PgPool) {
                 candidates: &empty,
                 response: &empty,
                 matrix_version: "2026-07-01",
+                affinity: None,
             },
         )
         .await

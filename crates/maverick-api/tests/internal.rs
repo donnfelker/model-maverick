@@ -421,7 +421,7 @@ async fn tenant_create_defaults() {
     assert_eq!(
         body["constraints"],
         json!({"max_cost_per_run": null, "max_latency_ms": null, "zero_retention": false,
-               "telemetry_opt_out": false})
+               "telemetry_opt_out": false, "affinity_cost_aware": false})
     );
     assert_eq!(body["api_keys"], json!([]));
     let tenant = tenancy::get_tenant(&pool, id).await.unwrap();
@@ -735,14 +735,14 @@ async fn config_g4_parity_is_byte_exact() {
         (status, body.as_str()),
         (
             200,
-            "{\"constraints\":{\"max_cost_per_run\":10,\"max_latency_ms\":60000,\"zero_retention\":false,\"telemetry_opt_out\":false}}\n"
+            "{\"constraints\":{\"max_cost_per_run\":10,\"max_latency_ms\":60000,\"zero_retention\":false,\"telemetry_opt_out\":false,\"affinity_cost_aware\":false}}\n"
         )
     );
     assert_eq!(captured.audits("tenant.constraints.replace").len(), 1);
     // D39: the seam writes `telemetry_opt_out` through the same payload, the tenant reads
     // it back, and the same audit line covers it.
     let _d39 = parity_support::divergence!("D39");
-    let opted_out = "{\"constraints\":{\"max_cost_per_run\":10,\"max_latency_ms\":60000,\"zero_retention\":false,\"telemetry_opt_out\":true}}\n";
+    let opted_out = "{\"constraints\":{\"max_cost_per_run\":10,\"max_latency_ms\":60000,\"zero_retention\":false,\"telemetry_opt_out\":true,\"affinity_cost_aware\":false}}\n";
     let (status, body) = seam
         .ops(
             "PUT",
@@ -1269,7 +1269,7 @@ async fn retention_evidence_is_validated_and_downgrades_alert() {
         .await
         .unwrap();
     let tenant = seam.create_tenant("Zero").await;
-    tenancy::upsert_tenant_constraints(&pool, &tenant, None, None, true, false)
+    tenancy::upsert_tenant_constraints(&pool, &tenant, None, None, true, false, false)
         .await
         .unwrap();
     let (status, _) = seam

@@ -48,12 +48,14 @@ impl Resource {
     }
 }
 
-/// A constraints payload: the standing constraints (policy filters) and the tenant's
-/// telemetry opt-out (D39), which filters no column.
+/// A constraints payload: the standing constraints (policy filters), the tenant's
+/// telemetry opt-out (D39), and its cost-aware affinity setting (D44). The last two
+/// filter no column.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct ConstraintsInput {
     pub standing: StandingConstraints,
     pub telemetry_opt_out: bool,
+    pub affinity_cost_aware: bool,
 }
 
 /// A stored configuration after a successful replace.
@@ -357,7 +359,8 @@ fn weight_input(value: &JsonValue) -> Result<WeightInput, String> {
 }
 
 /// The constraints of a `{"constraints":{...}}` body. Missing keys are null or false, so
-/// `{"constraints":{}}` clears everything, `telemetry_opt_out` (D39) included.
+/// `{"constraints":{}}` clears everything, `telemetry_opt_out` (D39) and
+/// `affinity_cost_aware` (D44) included.
 pub fn decode_constraints(body: &[u8]) -> Result<ConstraintsInput, ApiError> {
     const STRUCT: &str = "ConstraintsRequest";
     const INNER: &str = "ConstraintsInput";
@@ -385,6 +388,7 @@ pub fn decode_constraints(body: &[u8]) -> Result<ConstraintsInput, ApiError> {
                         "max_latency_ms",
                         "zero_retention",
                         "telemetry_opt_out",
+                        "affinity_cost_aware",
                     ],
                 ) {
                     Some("max_cost_per_run") => {
@@ -409,11 +413,18 @@ pub fn decode_constraints(body: &[u8]) -> Result<ConstraintsInput, ApiError> {
                         &mut constraints.zero_retention,
                     )?,
                     // D39.
-                    Some(_) => strict::boolean(
+                    Some("telemetry_opt_out") => strict::boolean(
                         value,
                         INNER,
                         "constraints.telemetry_opt_out",
                         &mut input.telemetry_opt_out,
+                    )?,
+                    // D44.
+                    Some(_) => strict::boolean(
+                        value,
+                        INNER,
+                        "constraints.affinity_cost_aware",
+                        &mut input.affinity_cost_aware,
                     )?,
                     None => return Err(strict::unknown(key)),
                 }
@@ -529,7 +540,8 @@ pub async fn replace_weights(
 }
 
 /// Validates constraints against the stored pools (G4, including D1 zero retention) and
-/// upserts them with the payload's `telemetry_opt_out` (D39), which G4 ignores.
+/// upserts them with the payload's `telemetry_opt_out` (D39) and `affinity_cost_aware`
+/// (D44), which G4 ignores.
 pub async fn replace_constraints(
     db: &PgPool,
     tenant_id: &str,
@@ -575,6 +587,7 @@ pub async fn replace_constraints(
         constraints.max_latency_ms,
         constraints.zero_retention,
         input.telemetry_opt_out,
+        input.affinity_cost_aware,
     )
     .await?;
     tx.commit().await?;
@@ -690,7 +703,8 @@ fn weights_body(rows: &[TenantWeight]) -> Result<String, ConfigFailure> {
 }
 
 /// `{"constraints":{"max_cost_per_run","max_latency_ms","zero_retention",
-/// "telemetry_opt_out"}}` (Go's three keys, then D39); no row is all null and false.
+/// "telemetry_opt_out","affinity_cost_aware"}}` (Go's three keys, then D39 and D44); no
+/// row is all null and false.
 fn constraints_body(row: Option<&TenantConstraint>) -> Result<String, ConfigFailure> {
     let max_cost = match row.and_then(|row| row.max_cost_per_run) {
         Some(cost) => JsonValue::Number(
@@ -712,6 +726,11 @@ fn constraints_body(row: Option<&TenantConstraint>) -> Result<String, ConfigFail
             (
                 "telemetry_opt_out",
                 JsonValue::Bool(row.is_some_and(|row| row.telemetry_opt_out)),
+            ),
+            // D44.
+            (
+                "affinity_cost_aware",
+                JsonValue::Bool(row.is_some_and(|row| row.affinity_cost_aware)),
             ),
         ]),
     ))
@@ -826,7 +845,26 @@ mod tests {
                     zero_retention: true,
                 },
                 telemetry_opt_out: false,
+                affinity_cost_aware: false,
             }
+        );
+        // D44: the same rules as D39.
+        assert!(
+            decode_constraints(br#"{"constraints":{"Affinity_Cost_Aware":true}}"#)
+                .unwrap()
+                .affinity_cost_aware
+        );
+        let both = decode_constraints(
+            br#"{"constraints":{"telemetry_opt_out":true,"affinity_cost_aware":false}}"#,
+        )
+        .unwrap();
+        assert!(both.telemetry_opt_out && !both.affinity_cost_aware);
+        let (m, _) = message(decode_constraints(
+            br#"{"constraints":{"affinity_cost_aware":1}}"#,
+        ));
+        assert!(
+            m.starts_with("malformed request body: json: cannot unmarshal number 1 into Go struct field ConstraintsInput.constraints.affinity_cost_aware of type bool"),
+            "{m}"
         );
         // D39: Go-style field matching; null leaves false.
         assert!(
@@ -880,7 +918,7 @@ mod tests {
         assert_eq!(
             constraints_body(None).unwrap(),
             "{\"constraints\":{\"max_cost_per_run\":null,\"max_latency_ms\":null,\
-             \"zero_retention\":false,\"telemetry_opt_out\":false}}\n"
+             \"zero_retention\":false,\"telemetry_opt_out\":false,\"affinity_cost_aware\":false}}\n"
         );
         assert_eq!(
             referenced_ids(&[

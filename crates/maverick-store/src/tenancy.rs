@@ -604,9 +604,8 @@ pub async fn get_tenant_constraints<'e>(
 }
 
 /// `UpsertTenantConstraints`: a conflict replaces every value and sets
-/// `updated_at = now()`. Rust adds `telemetry_opt_out` (D39). It writes
-/// `affinity_cost_aware` as false (D44): no constraints payload carries it yet, and a
-/// missing key is false. Bead gcd2.6 adds the value.
+/// `updated_at = now()`. Rust adds `telemetry_opt_out` (D39) and `affinity_cost_aware`
+/// (D44).
 pub async fn upsert_tenant_constraints<'e>(
     db: impl PgExecutor<'e>,
     tenant_id: &str,
@@ -614,13 +613,14 @@ pub async fn upsert_tenant_constraints<'e>(
     max_latency_ms: Option<i32>,
     zero_retention: bool,
     telemetry_opt_out: bool,
+    affinity_cost_aware: bool,
 ) -> sqlx::Result<TenantConstraint> {
     sqlx::query_as!(
         TenantConstraint,
         "insert into tenant_constraints
            (tenant_id, max_cost_per_run, max_latency_ms, zero_retention, telemetry_opt_out,
             affinity_cost_aware)
-         values ($1, $2, $3, $4, $5, false)
+         values ($1, $2, $3, $4, $5, $6)
          on conflict (tenant_id) do update set
            max_cost_per_run = excluded.max_cost_per_run,
            max_latency_ms = excluded.max_latency_ms,
@@ -634,7 +634,8 @@ pub async fn upsert_tenant_constraints<'e>(
         max_cost_per_run,
         max_latency_ms,
         zero_retention,
-        telemetry_opt_out
+        telemetry_opt_out,
+        affinity_cost_aware
     )
     .fetch_one(db)
     .await

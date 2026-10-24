@@ -246,7 +246,7 @@ async fn env(zero: bool) -> Option<Env> {
             .unwrap();
     }
     if zero {
-        tenancy::upsert_tenant_constraints(&pool, TENANT, None, None, true, false)
+        tenancy::upsert_tenant_constraints(&pool, TENANT, None, None, true, false, false)
             .await
             .unwrap();
     }

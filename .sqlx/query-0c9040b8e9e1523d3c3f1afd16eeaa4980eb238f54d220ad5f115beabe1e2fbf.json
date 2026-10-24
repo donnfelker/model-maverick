@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "select id, tenant_id, api_key_id, prompt_hash, request as \"request: _\",\n                  classification as \"classification: _\", candidates as \"candidates: _\",\n                  response as \"response: _\", matrix_version, created_at\n           from recommendations\n           where id = $1",
+  "query": "select id, tenant_id, api_key_id, prompt_hash, request as \"request: _\",\n                  classification as \"classification: _\", candidates as \"candidates: _\",\n                  response as \"response: _\", matrix_version, created_at,\n                  affinity as \"affinity: _\"\n           from recommendations\n           where tenant_id = $1\n             and ($2::text = '' or prompt_hash = $2)\n             and ($3::text = '' or classification->>'capability' = $3)\n             and ($4::timestamptz is null or created_at >= $4)\n             and ($5::text = '' or id < $5)\n           order by id desc\n           limit $6",
   "describe": {
     "columns": [
       {
@@ -112,11 +112,27 @@
             "name": "created_at"
           }
         }
+      },
+      {
+        "ordinal": 10,
+        "name": "affinity: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "recommendations",
+            "name": "affinity"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
-        "Text"
+        "Text",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Text",
+        "Int8"
       ]
     },
     "nullable": [
@@ -129,8 +145,9 @@
       false,
       false,
       false,
-      false
+      false,
+      true
     ]
   },
-  "hash": "1565b3d5e705be58b0ab06092f4b798cbe4fec41d4c36db9e1564e56f36fdf1c"
+  "hash": "0c9040b8e9e1523d3c3f1afd16eeaa4980eb238f54d220ad5f115beabe1e2fbf"
 }

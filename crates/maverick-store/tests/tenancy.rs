@@ -363,19 +363,27 @@ async fn constraints_upsert_replaces_every_value() {
     ));
 
     let cost = Decimal::from_str("0.012345").expect("decimal");
-    let first =
-        tenancy::upsert_tenant_constraints(&pool, "ten_1", Some(cost), Some(2000), true, true)
-            .await
-            .expect("insert");
+    let first = tenancy::upsert_tenant_constraints(
+        &pool,
+        "ten_1",
+        Some(cost),
+        Some(2000),
+        true,
+        true,
+        false,
+    )
+    .await
+    .expect("insert");
     assert_eq!(first.max_cost_per_run, Some(cost));
     assert_eq!(numeric_to_f64(first.max_cost_per_run.unwrap()), 0.012345);
     assert_eq!(first.max_latency_ms, Some(2000));
     assert!(first.zero_retention && first.telemetry_opt_out);
 
     // A conflict replaces all values, including NULLs.
-    let second = tenancy::upsert_tenant_constraints(&pool, "ten_1", None, None, false, false)
-        .await
-        .expect("update");
+    let second =
+        tenancy::upsert_tenant_constraints(&pool, "ten_1", None, None, false, false, false)
+            .await
+            .expect("update");
     assert_eq!(second.max_cost_per_run, None);
     assert_eq!(second.max_latency_ms, None);
     assert!(!second.zero_retention && !second.telemetry_opt_out);
@@ -394,6 +402,7 @@ async fn constraints_upsert_replaces_every_value() {
         None,
         false,
         false,
+        false,
     )
     .await
     .expect("rounded");
@@ -406,7 +415,7 @@ async fn constraints_upsert_replaces_every_value() {
 }
 
 /// DIVERGENCE: D44. `affinity_cost_aware` defaults to false, every read returns it, and
-/// the upsert replaces it with false like every other value (no payload carries it yet).
+/// the upsert replaces it like every other value.
 #[tokio::test]
 async fn constraints_carry_affinity_cost_aware() {
     let Some(db) = maverick_testdb::database(&SCHEMA).await else {
@@ -415,16 +424,23 @@ async fn constraints_carry_affinity_cost_aware() {
     let pool = db.pool().await;
     tenant(&pool, "ten_1").await;
 
-    let first = tenancy::upsert_tenant_constraints(&pool, "ten_1", None, None, false, false)
+    let first = tenancy::upsert_tenant_constraints(&pool, "ten_1", None, None, false, false, false)
         .await
         .expect("insert");
     assert!(!first.affinity_cost_aware);
 
-    sqlx::query("update tenant_constraints set affinity_cost_aware = true where tenant_id = $1")
-        .bind("ten_1")
-        .execute(&pool)
+    let column: (bool,) =
+        sqlx::query_as("select affinity_cost_aware from tenant_constraints where tenant_id = $1")
+            .bind("ten_1")
+            .fetch_one(&pool)
+            .await
+            .expect("column");
+    assert!(!column.0);
+
+    let set = tenancy::upsert_tenant_constraints(&pool, "ten_1", None, None, false, false, true)
         .await
         .expect("set");
+    assert!(set.affinity_cost_aware && !set.telemetry_opt_out);
     let read = tenancy::get_tenant_constraints(&pool, "ten_1")
         .await
         .expect("get");
@@ -439,9 +455,10 @@ async fn constraints_carry_affinity_cost_aware() {
             .affinity_cost_aware
     );
 
-    let replaced = tenancy::upsert_tenant_constraints(&pool, "ten_1", None, None, true, false)
-        .await
-        .expect("replace");
+    let replaced =
+        tenancy::upsert_tenant_constraints(&pool, "ten_1", None, None, true, false, false)
+            .await
+            .expect("replace");
     assert!(!replaced.affinity_cost_aware);
     pool.close().await;
     db.close().await;

@@ -33,16 +33,23 @@ use axum::http::{Method, Response, StatusCode};
 use chrono::{DateTime, Duration, Utc};
 use maverick_alerts::{AlertKind, AlertNotifier, Severity};
 use maverick_config::Config;
+use maverick_domain::affinity::{
+    self as conversation, AffinityContext, AffinityDecision, AffinityStatus, BonusWithheld,
+    TurnCostSkipped, TurnPrices,
+};
+use maverick_domain::capture::affinity_hash;
 use maverick_domain::gofmt::quote;
 use maverick_domain::gojson::{self, JsonValue};
 use maverick_domain::policy::{
     self, CatalogColumn, CellAggregate, CellAggregates, ColumnStatus, PolicyError, PolicyErrorCode,
     PolicyRequest, RequestConstraints, RetentionMode, StandingConstraints, TenantConfig,
 };
+use maverick_domain::pricing::parse_pricing;
 use maverick_domain::ranking::{self, RankParams, ScoredSurvivor, Weights};
 use maverick_domain::scoring::observe::dimension;
 use maverick_domain::trace::{self, ColumnInfo, SurvivorMetrics, TraceCandidate};
 use maverick_domain::{ceilings, checks, entries, ids};
+use maverick_store::affinity::{self as affinity_store, AffinityRow};
 use maverick_store::catalog::{self, ModelColumn};
 use maverick_store::decisions::{self, NewRecommendation};
 use maverick_store::measurement::{self, Aggregate};
@@ -64,8 +71,33 @@ const DEFAULT_QUALITY_BAR: f32 = 0.80;
 /// D8: availability is averaged over this many trailing nights, today included.
 const AVAILABILITY_NIGHTS: i64 = 7;
 
+/// The conversation affinity knobs (spec §7.6, §14.1, D44).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AffinitySettings {
+    /// `MAVERICK_AFFINITY_ENABLED`. False validates `affinity` but reads and writes no
+    /// row and answers `new` with the normal ranking.
+    pub enabled: bool,
+    /// `MAVERICK_AFFINITY_TTL`: a row's lifetime after its last use.
+    pub ttl: Duration,
+    /// `MAVERICK_AFFINITY_CACHE_WARM_SECONDS`.
+    pub cache_warm: Duration,
+    /// `MAVERICK_AFFINITY_INCUMBENT_BONUS`, in quality points.
+    pub incumbent_bonus: f64,
+}
+
+impl Default for AffinitySettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            ttl: Duration::hours(24),
+            cache_warm: Duration::seconds(300),
+            incumbent_bonus: conversation::INCUMBENT_BONUS,
+        }
+    }
+}
+
 /// The recommend knobs: ranking bands, the ceiling buffer, where alerts go, the prompt
-/// path's classifier resolver, and the debug-capture hook.
+/// path's classifier resolver, the debug-capture hook, and conversation affinity.
 #[derive(Clone)]
 pub struct RecommendConfig {
     pub rank: RankParams,
@@ -78,6 +110,8 @@ pub struct RecommendConfig {
     pub classifier: Arc<Resolver>,
     /// The debug-capture hook. `None` never captures.
     pub capture: Option<Arc<Capturer>>,
+    /// D44.
+    pub affinity: AffinitySettings,
 }
 
 impl Default for RecommendConfig {
@@ -88,6 +122,7 @@ impl Default for RecommendConfig {
             alerts: None,
             classifier: Arc::new(Resolver::default()),
             capture: None,
+            affinity: AffinitySettings::default(),
         }
     }
 }
@@ -100,6 +135,7 @@ impl fmt::Debug for RecommendConfig {
             .field("alerts", &self.alerts.is_some())
             .field("classifier", &self.classifier)
             .field("capture", &self.capture)
+            .field("affinity", &self.affinity)
             .finish()
     }
 }
@@ -120,6 +156,12 @@ impl RecommendConfig {
             alerts: None,
             classifier: Arc::new(Resolver::new(ResolverSettings::from_config(config))),
             capture: Some(Arc::new(Capturer::from_config(config))),
+            affinity: AffinitySettings {
+                enabled: config.affinity_enabled,
+                ttl: Duration::from_std(config.affinity_ttl).unwrap_or(Duration::hours(24)),
+                cache_warm: Duration::seconds(i64::from(config.affinity_cache_warm_seconds)),
+                incumbent_bonus: config.affinity_incumbent_bonus,
+            },
         }
     }
 }
@@ -258,6 +300,9 @@ async fn recommend_uninstrumented(
 ) -> Result<Recommended, RecommendError> {
     let request = request::decode(body)?;
     let form = request::validate(&request)?;
+    // D44: `affinity` is validated even when the setting turns it off.
+    let affinity = request::affinity(&request)?;
+    let affinity_on = affinity.is_some() && config.affinity.enabled;
     // D47: no mode (or an empty one) ranks in quality mode, as `maverick/auto` does (D45).
     // Go defaulted to balanced.
     let mode = if request.mode.is_empty() {
@@ -272,14 +317,24 @@ async fn recommend_uninstrumented(
     // zero-retention constraint (D2) and the catalog before it classifies. The pools,
     // weights, constraints, and active corpus version come in one round trip, concurrent
     // with the catalog read (e3x).
-    let (context, columns) = tokio::try_join!(
+    // The tenant row (its prompt HMAC key) comes in the same round trip when the prompt
+    // path or the affinity hash needs it (D44).
+    let needs_tenant_row = matches!(form, Form::Prompt { .. }) || affinity_on;
+    let (context, columns, tenant_row) = tokio::try_join!(
         tenancy::get_tenant_context(pool, tenant),
         catalog::list_model_columns(pool),
+        async {
+            if needs_tenant_row {
+                tenancy::get_tenant(pool, tenant).await.map(Some)
+            } else {
+                Ok(None)
+            }
+        },
     )?;
     let pools = context.pools;
     let weights = context.weights;
     let active_corpus_version = context.active_corpus_version;
-    let (standing, telemetry_opt_out) = match context.constraints {
+    let (standing, telemetry_opt_out, tenant_cost_aware) = match context.constraints {
         Some(row) => (
             StandingConstraints {
                 max_cost_per_run: row.max_cost_per_run.map(numeric_to_f64),
@@ -287,8 +342,16 @@ async fn recommend_uninstrumented(
                 zero_retention: row.zero_retention,
             },
             row.telemetry_opt_out,
+            row.affinity_cost_aware,
         ),
-        None => (StandingConstraints::default(), false),
+        None => (StandingConstraints::default(), false, false),
+    };
+    // D44: the conversation's row is keyed by the HMAC of its key, never the key.
+    let conversation_hash = match (&affinity, &tenant_row) {
+        (Some(affinity), Some(row)) if affinity_on => {
+            Some(affinity_hash(&row.prompt_hmac_key, &affinity.key))
+        }
+        _ => None,
     };
     let zero_retention = standing.zero_retention;
 
@@ -311,7 +374,11 @@ async fn recommend_uninstrumented(
             prompt,
             projection_version,
         } => {
-            let row = tenancy::get_tenant(pool, tenant).await?;
+            let Some(row) = &tenant_row else {
+                return Err(RecommendError::Internal(
+                    "the prompt path has no tenant row".to_owned(),
+                ));
+            };
             let resolution = config
                 .classifier
                 .resolve(
@@ -395,9 +462,16 @@ async fn recommend_uninstrumented(
     // with the cells, and looked up for the survivors below (e3x).
     let pool_ids: Vec<String> = pool_columns.iter().map(|c| c.id.clone()).collect();
     let since = (now - Duration::days(AVAILABILITY_NIGHTS - 1)).date_naive();
-    let (rows, availability_rows) = tokio::try_join!(
+    // D44: the conversation's row is read at the same time.
+    let (rows, availability_rows, stored_affinity) = tokio::try_join!(
         measurement::list_latest_cell_aggregates(pool, &wanted, &workload.capability, &dimensions),
         measurement::list_trailing_availability(pool, &pool_ids, &workload.capability, tier, since),
+        async {
+            match &conversation_hash {
+                Some(hash) => affinity_store::get_affinity(pool, tenant, hash, now).await,
+                None => Ok(None),
+            }
+        },
     )?;
     let cells = Cells::new(&rows);
     let aggregates: CellAggregates = pool_columns
@@ -520,7 +594,51 @@ async fn recommend_uninstrumented(
             },
         );
     }
-    let ranking = ranking::rank(&scored, mode, tenant_weights, &config.rank);
+    // D44: with `affinity`, the ranking goes through the affinity wrapper; without it, the
+    // ranking is exactly the Go one.
+    let (ranking, affinity_outcome) = match &affinity {
+        None => (
+            ranking::rank(&scored, mode, tenant_weights, &config.rank),
+            None,
+        ),
+        Some(requested) => {
+            let context = AffinityContext {
+                previous_column_id: stored_affinity.as_ref().map(|row| row.column_id.clone()),
+                cache_warm: stored_affinity
+                    .as_ref()
+                    .is_some_and(|row| now - row.last_used_at <= config.affinity.cache_warm),
+                context_tokens: requested.context_tokens,
+                cost_aware: affinity_on && requested.cost_aware.unwrap_or(tenant_cost_aware),
+                incumbent_bonus: config.affinity.incumbent_bonus,
+            };
+            let prices: BTreeMap<String, TurnPrices> = scored
+                .iter()
+                .filter_map(|survivor| {
+                    let column = by_id.get(survivor.column_id.as_str())?;
+                    let pricing = parse_pricing(column.pricing.get()).ok()?;
+                    Some((
+                        survivor.column_id.clone(),
+                        TurnPrices::from_pricing(&pricing),
+                    ))
+                })
+                .collect();
+            let out = conversation::rank_with_affinity(
+                &scored,
+                &prices,
+                &decision.exclusions,
+                mode,
+                tenant_weights,
+                &config.rank,
+                &context,
+            );
+            let source = if requested.cost_aware.is_some() {
+                "request"
+            } else {
+                "tenant"
+            };
+            (out.ranking, Some((out.decision, prices, source)))
+        }
+    };
     let Some(pick) = ranking.ranked.first() else {
         return Err(RecommendError::Internal(
             "ranking kept no candidate".to_owned(),
@@ -557,13 +675,21 @@ async fn recommend_uninstrumented(
             execution_aliases: serde_json::Value::Null,
         })
         .collect();
-    let recommendations = entries::recommendations(
+    let mut recommendations = entries::recommendations(
         &entry_columns,
         &ranked_columns,
         mode,
         &workload.capability,
         difficulty,
     );
+    // D44: a pick that cost-aware affinity kept says so.
+    if let (Some((decision, prices, _)), Some(first)) =
+        (&affinity_outcome, recommendations.first_mut())
+    {
+        if decision.status == AffinityStatus::Kept && decision.cost_aware {
+            first.reason = kept_reason(decision, prices.get(&first.column_id));
+        }
+    }
     let violations = decision
         .survivors
         .iter()
@@ -620,6 +746,10 @@ async fn recommend_uninstrumented(
         // D39: false when the tenant opted out of telemetry.
         ("telemetry", JsonValue::Bool(!telemetry_opt_out)),
     ]);
+    // D44: only when the request sent `affinity`, before the quota flag.
+    if let Some((decision, _, _)) = &affinity_outcome {
+        members.push(("affinity", affinity_response(decision)));
+    }
     // D4: only when the budget stopped the classifier.
     if prompt_path
         .as_ref()
@@ -658,26 +788,65 @@ async fn recommend_uninstrumented(
     );
     let candidates = trace::candidates_json(&candidates).map_err(RecommendError::Internal)?;
     let body_text = String::from_utf8_lossy(body);
-    let stored_request = match &prompt_path {
+    let stored_request = match (&prompt_path, &affinity) {
+        // The affinity key is never stored either (D44).
+        (_, Some(_)) => raw(
+            prompt::exclude_affinity_key(&body_text, prompt_path.is_some())
+                .map_err(RecommendError::Internal)?,
+        )?,
         // The prompt is never stored (spec §10).
-        Some(_) => raw(prompt::exclude_prompt(&body_text).map_err(RecommendError::Internal)?)?,
-        None => raw(body_text.trim_matches([' ', '\t', '\n', '\r']).to_owned())?,
+        (Some(_), None) => {
+            raw(prompt::exclude_prompt(&body_text).map_err(RecommendError::Internal)?)?
+        }
+        (None, None) => raw(body_text.trim_matches([' ', '\t', '\n', '\r']).to_owned())?,
     };
-    decisions::create_recommendation(
-        pool,
-        &NewRecommendation {
-            id: &id,
-            tenant_id: tenant,
-            api_key_id: &identity.api_key_id,
-            prompt_hash: prompt_hash.as_deref(),
-            request: &stored_request,
-            classification: &raw(gojson::marshal(&classification))?,
-            candidates: &raw(candidates)?,
-            response: &raw(response_text.clone())?,
-            matrix_version: &matrix_version,
-        },
-    )
-    .await?;
+    let affinity_block = match &affinity_outcome {
+        Some((decision, _, source)) => Some(raw(gojson::marshal(&affinity_trace(
+            conversation_hash.as_deref(),
+            decision,
+            source,
+        )?))?),
+        None => None,
+    };
+    let classification_raw = raw(gojson::marshal(&classification))?;
+    let candidates_raw = raw(candidates)?;
+    let response_raw = raw(response_text.clone())?;
+    let new_recommendation = NewRecommendation {
+        id: &id,
+        tenant_id: tenant,
+        api_key_id: &identity.api_key_id,
+        prompt_hash: prompt_hash.as_deref(),
+        request: &stored_request,
+        classification: &classification_raw,
+        candidates: &candidates_raw,
+        response: &response_raw,
+        matrix_version: &matrix_version,
+        affinity: affinity_block.as_deref(),
+    };
+    match &conversation_hash {
+        // D44: the row commits with the trace row, in one statement.
+        Some(hash) => {
+            decisions::create_recommendation_with_affinity(
+                pool,
+                &new_recommendation,
+                &AffinityRow {
+                    tenant_id: tenant.to_owned(),
+                    affinity_hash: hash.clone(),
+                    column_id: pick.column_id.clone(),
+                    recommendation_id: id.clone(),
+                    last_used_at: now,
+                    expires_at: now + config.affinity.ttl,
+                },
+            )
+            .await?;
+        }
+        None => {
+            decisions::create_recommendation(pool, &new_recommendation).await?;
+        }
+    }
+    if let Some((decision, _, _)) = &affinity_outcome {
+        crate::metrics::affinity_decision(status_name(decision.status), decision.cost_aware);
+    }
 
     // The capture hook runs after the trace row and never fails the request.
     if let (Some((prompt, resolution)), Some(capturer)) = (&prompt_path, &config.capture) {
@@ -913,6 +1082,115 @@ fn entry_json(
         ("low_availability", JsonValue::Bool(entry.low_availability)),
         ("reason", string(&entry.reason)),
     ]))
+}
+
+/// The wire name of an affinity status (spec §7.6).
+fn status_name(status: AffinityStatus) -> &'static str {
+    match status {
+        AffinityStatus::New => "new",
+        AffinityStatus::Kept => "kept",
+        AffinityStatus::Switched => "switched",
+        AffinityStatus::Broken => "broken",
+    }
+}
+
+fn optional_text(value: Option<&str>) -> JsonValue {
+    value.map_or(JsonValue::Null, string)
+}
+
+/// The response's `affinity` block (spec §9.2, D44).
+fn affinity_response(decision: &AffinityDecision) -> JsonValue {
+    object(vec![
+        ("status", string(status_name(decision.status))),
+        (
+            "previous_column_id",
+            optional_text(decision.previous_column_id.as_deref()),
+        ),
+        (
+            "reason",
+            optional_text(decision.reason.map(|reason| reason.as_str())),
+        ),
+        ("cache_warm", JsonValue::Bool(decision.cache_warm)),
+        ("cost_aware", JsonValue::Bool(decision.cost_aware)),
+    ])
+}
+
+/// The trace's `affinity` block, in the spec §10.2 key order.
+fn affinity_trace(
+    hash: Option<&str>,
+    decision: &AffinityDecision,
+    source: &str,
+) -> Result<JsonValue, RecommendError> {
+    let ranking_costs = match &decision.ranking_costs {
+        None => JsonValue::Null,
+        Some(costs) => JsonValue::Object(
+            costs
+                .iter()
+                .map(|(column_id, cost)| {
+                    let cost = match cost {
+                        Some(cost) => number(*cost)?,
+                        None => JsonValue::Null,
+                    };
+                    Ok((column_id.clone(), cost))
+                })
+                .collect::<Result<Vec<_>, RecommendError>>()?,
+        ),
+    };
+    let skipped = decision.turn_cost_skipped.map(|skipped| match skipped {
+        TurnCostSkipped::CostAwareOff => "cost_aware_off",
+        TurnCostSkipped::NoContextTokens => "no_context_tokens",
+        TurnCostSkipped::MissingInputPrice => "missing_input_price",
+    });
+    let withheld = decision.bonus_withheld.map(|withheld| match withheld {
+        BonusWithheld::Escalation => "escalation",
+    });
+    Ok(object(vec![
+        ("affinity_hash", optional_text(hash)),
+        (
+            "previous_column_id",
+            optional_text(decision.previous_column_id.as_deref()),
+        ),
+        ("status", string(status_name(decision.status))),
+        (
+            "reason",
+            optional_text(decision.reason.map(|reason| reason.as_str())),
+        ),
+        ("cache_warm", JsonValue::Bool(decision.cache_warm)),
+        (
+            "context_tokens",
+            decision.context_tokens.map_or(JsonValue::Null, |tokens| {
+                JsonValue::Number(tokens.to_string())
+            }),
+        ),
+        ("cost_aware", JsonValue::Bool(decision.cost_aware)),
+        ("cost_aware_source", string(source)),
+        ("bonus", number(decision.bonus)?),
+        ("bonus_withheld", optional_text(withheld)),
+        ("turn_cost_skipped", optional_text(skipped)),
+        ("ranking_costs", ranking_costs),
+    ]))
+}
+
+/// The reason text of a pick that cost-aware affinity kept. With a warm cache and a
+/// turn cost, it names the saving: the cold price of the context minus the cache-read
+/// price. Informative, not contractual (spec §7.6).
+fn kept_reason(decision: &AffinityDecision, prices: Option<&TurnPrices>) -> String {
+    let mut reason = "kept for conversation continuity".to_owned();
+    let saving = match (decision.context_tokens, prices) {
+        (Some(tokens), Some(prices)) if decision.cache_warm && decision.ranking_costs.is_some() => {
+            let read = prices.cache_read_per_mtok;
+            let cold = prices.cache_write_per_mtok.or(prices.input_per_mtok);
+            read.zip(cold)
+                .map(|(read, cold)| tokens as f64 * (cold - read) / 1e6)
+        }
+        _ => None,
+    };
+    if let Some(saving) = saving.filter(|saving| *saving >= 0.005) {
+        reason.push_str(&format!(
+            "; warm cache saves an estimated ${saving:.2} this turn"
+        ));
+    }
+    reason
 }
 
 /// A stored jsonb value; SQL `null` or a JSON `null` is `{}`.

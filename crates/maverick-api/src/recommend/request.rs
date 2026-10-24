@@ -16,6 +16,12 @@ use crate::{ApiError, ErrorCode};
 /// The prompt length limit, in Unicode code points, inclusive (spec §8.1).
 pub(crate) const MAX_PROMPT_CHARS: usize = 500_000;
 
+/// The affinity key length limit, in Unicode code points, inclusive (spec §9.2, D44).
+pub(crate) const MAX_AFFINITY_KEY_CHARS: usize = 256;
+
+/// The largest `affinity.context_tokens` (spec §9.2, D44).
+pub(crate) const MAX_CONTEXT_TOKENS: u64 = 10_000_000;
+
 /// The decoded request. Absent strings are empty, as in Go.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct RecommendRequest {
@@ -24,6 +30,26 @@ pub(crate) struct RecommendRequest {
     pub allowed_models: Option<Vec<String>>,
     pub mode: String,
     pub constraints: Preferences,
+    /// D44: the conversation affinity object, its members as sent. [`affinity`]
+    /// validates them.
+    pub affinity: Option<AffinityInput>,
+}
+
+/// The `affinity` members as decoded: `null` or absent is `None`. The values stay raw so
+/// that a bad one is a field error, not a decode error.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub(crate) struct AffinityInput {
+    pub key: Option<JsonValue>,
+    pub context_tokens: Option<JsonValue>,
+    pub cost_aware: Option<JsonValue>,
+}
+
+/// A validated `affinity` object (spec §9.2, D44).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Affinity {
+    pub key: String,
+    pub context_tokens: Option<u64>,
+    pub cost_aware: Option<bool>,
 }
 
 /// The `workload` object. `prompt` keeps its presence: `""` is a present, empty prompt.
@@ -132,7 +158,14 @@ fn request(value: &JsonValue) -> Result<RecommendRequest, String> {
     for (key, value) in members {
         match match_field(
             key,
-            &["workload", "pool", "allowed_models", "mode", "constraints"],
+            &[
+                "workload",
+                "pool",
+                "allowed_models",
+                "mode",
+                "constraints",
+                "affinity",
+            ],
         ) {
             Some("workload") => out.workload = workload(value, out.workload.take())?,
             Some("pool") => string(value, STRUCT, "pool", &mut out.pool)?,
@@ -141,10 +174,94 @@ fn request(value: &JsonValue) -> Result<RecommendRequest, String> {
             }
             Some("mode") => string(value, STRUCT, "mode", &mut out.mode)?,
             Some("constraints") => preferences(value, &mut out.constraints)?,
+            Some("affinity") => out.affinity = affinity_input(value, out.affinity.take())?,
             _ => return Err(unknown(key)),
         }
     }
     Ok(out)
+}
+
+/// `affinity` decodes like `workload`: `null` clears it, and a duplicate key updates only
+/// the members it names. Unknown members fail strict decoding.
+fn affinity_input(
+    value: &JsonValue,
+    existing: Option<AffinityInput>,
+) -> Result<Option<AffinityInput>, String> {
+    const STRUCT: &str = "AffinityRequest";
+    let Some(members) = members(value, STRUCT, "affinity")? else {
+        return Ok(None);
+    };
+    let mut out = existing.unwrap_or_default();
+    let present = |value: &JsonValue| (*value != JsonValue::Null).then(|| value.clone());
+    for (key, value) in members {
+        match match_field(key, &["key", "context_tokens", "cost_aware"]) {
+            Some("key") => out.key = present(value),
+            Some("context_tokens") => out.context_tokens = present(value),
+            Some("cost_aware") => out.cost_aware = present(value),
+            _ => return Err(unknown(key)),
+        }
+    }
+    Ok(Some(out))
+}
+
+/// The `affinity` rules (spec §9.2, D44): `key` is a string of 1 to 256 characters,
+/// `context_tokens` an integer from 0 to 10,000,000, and `cost_aware` a boolean. Each
+/// failure names its field.
+pub(crate) fn affinity(request: &RecommendRequest) -> Result<Option<Affinity>, ApiError> {
+    let Some(input) = &request.affinity else {
+        return Ok(None);
+    };
+    let field = |name: &str, message: &str| invalid(message).detail("field", name);
+    let key = match &input.key {
+        None => return Err(field("affinity.key", "affinity.key is required")),
+        Some(JsonValue::String(key))
+            if (1..=MAX_AFFINITY_KEY_CHARS).contains(&key.chars().count()) =>
+        {
+            key.clone()
+        }
+        Some(_) => {
+            return Err(field(
+                "affinity.key",
+                "affinity.key must be a string of 1 to 256 characters",
+            ));
+        }
+    };
+    let context_tokens = match &input.context_tokens {
+        None => None,
+        Some(JsonValue::Number(literal)) => Some(
+            literal
+                .parse::<u64>()
+                .ok()
+                .filter(|tokens| *tokens <= MAX_CONTEXT_TOKENS)
+                .ok_or_else(|| {
+                    field(
+                        "affinity.context_tokens",
+                        "affinity.context_tokens must be an integer from 0 to 10000000",
+                    )
+                })?,
+        ),
+        Some(_) => {
+            return Err(field(
+                "affinity.context_tokens",
+                "affinity.context_tokens must be an integer from 0 to 10000000",
+            ));
+        }
+    };
+    let cost_aware = match &input.cost_aware {
+        None => None,
+        Some(JsonValue::Bool(cost_aware)) => Some(*cost_aware),
+        Some(_) => {
+            return Err(field(
+                "affinity.cost_aware",
+                "affinity.cost_aware must be true or false",
+            ));
+        }
+    };
+    Ok(Some(Affinity {
+        key,
+        context_tokens,
+        cost_aware,
+    }))
 }
 
 /// `workload` is a Go pointer: `null` clears it, and an object decodes into the existing

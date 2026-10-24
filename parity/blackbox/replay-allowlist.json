@@ -127,9 +127,10 @@
     },
     {
       "divergences": [
-        "D39"
+        "D39",
+        "D44"
       ],
-      "reason": "The tenant's constraints gain telemetry_opt_out (default false) as their last member. Additive.",
+      "reason": "The tenant's constraints gain telemetry_opt_out (D39) and affinity_cost_aware (D44), both default false, as their last members. Additive.",
       "match": [
         {
           "method": "GET",
@@ -168,7 +169,8 @@
         }
       ],
       "strip": [
-        "telemetry_opt_out"
+        "telemetry_opt_out",
+        "affinity_cost_aware"
       ]
     },
     {
@@ -284,6 +286,26 @@
         [
           "; default balanced",
           "; default quality"
+        ]
+      ]
+    },
+    {
+      "divergences": [
+        "D44"
+      ],
+      "reason": "MCP recommend_model takes the optional affinity object of POST /v1/recommend (D44), so its tools/list input schema gains an affinity property after constraints. The other tools and schema members are unchanged.",
+      "match": [
+        {
+          "method": "POST",
+          "path": "/mcp",
+          "status": 200
+        }
+      ],
+      "when": "\"name\":\"recommend_model\"",
+      "recorded_replace": [
+        [
+          "\"additionalProperties\":false\\}\\},\"required\":\\[\"workload\"\\]",
+          "\"additionalProperties\":false},\"affinity\":{\"type\":[\"null\",\"object\"],\"properties\":{\"key\":{\"type\":\"string\",\"description\":\"conversation id chosen by the caller, 1 to 256 characters; only its per-tenant HMAC is stored\"},\"context_tokens\":{\"type\":[\"null\",\"integer\"],\"description\":\"input tokens this turn resends, for the cache-aware turn cost\",\"minimum\":0,\"maximum\":10000000},\"cost_aware\":{\"type\":[\"null\",\"boolean\"],\"description\":\"override the tenant cost-aware affinity setting for this request\"}},\"required\":[\"key\"],\"additionalProperties\":false}},\"required\":[\"workload\"]"
         ]
       ]
     }

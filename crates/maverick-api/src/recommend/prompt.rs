@@ -10,6 +10,8 @@
 //!   a prompt sent as `Prompt` (which its case-insensitive decoder accepted) was stored.
 //!   The prompt is never stored here: every key that case-insensitively names the prompt
 //!   is deleted (spec §10, G5).
+//! - [`exclude_affinity_key`]: the same for the conversation affinity key, on either
+//!   workload form (D44).
 
 use std::collections::BTreeMap;
 
@@ -65,22 +67,41 @@ type Members = BTreeMap<String, Box<JsonRawValue>>;
 /// The request body as stored on the prompt path: the prompt removed, re-encoded as Go
 /// did. Fails only for a body that is not an object (the decoder already accepted it).
 pub(super) fn exclude_prompt(body: &str) -> Result<String, String> {
+    exclude(body, &[("workload", "prompt")])
+}
+
+/// The request body as stored with conversation affinity (spec §10.2, D44): the affinity
+/// key removed, like the prompt, and the prompt too on the prompt path. Re-encoded as
+/// [`exclude_prompt`] does.
+pub(super) fn exclude_affinity_key(body: &str, prompt_path: bool) -> Result<String, String> {
+    if prompt_path {
+        exclude(body, &[("workload", "prompt"), ("affinity", "key")])
+    } else {
+        exclude(body, &[("affinity", "key")])
+    }
+}
+
+/// Deletes every `inner` key of every `outer` object member, matching both names
+/// case-insensitively, and re-encodes the body.
+fn exclude(body: &str, fields: &[(&'static str, &'static str)]) -> Result<String, String> {
     let mut top: Members = serde_json::from_str(body).map_err(|error| error.to_string())?;
-    let workload = top
-        .iter()
-        .filter(|(key, _)| match_field(key, &["workload"]).is_some())
-        .map(|(key, _)| key.clone())
-        .collect::<Vec<_>>();
-    for key in workload {
-        let Some(raw) = top.get(&key) else { continue };
-        // A `workload` that is not an object carries no prompt field.
-        let Ok(mut inner) = serde_json::from_str::<Members>(raw.get()) else {
-            continue;
-        };
-        inner.retain(|key, _| match_field(key, &["prompt"]).is_none());
-        let encoded =
-            JsonRawValue::from_string(encode_object(&inner)).map_err(|error| error.to_string())?;
-        top.insert(key, encoded);
+    for &(outer, field) in fields {
+        let objects = top
+            .iter()
+            .filter(|(key, _)| match_field(key, &[outer]).is_some())
+            .map(|(key, _)| key.clone())
+            .collect::<Vec<_>>();
+        for key in objects {
+            let Some(raw) = top.get(&key) else { continue };
+            // A member that is not an object carries no such field.
+            let Ok(mut inner) = serde_json::from_str::<Members>(raw.get()) else {
+                continue;
+            };
+            inner.retain(|key, _| match_field(key, &[field]).is_none());
+            let encoded = JsonRawValue::from_string(encode_object(&inner))
+                .map_err(|error| error.to_string())?;
+            top.insert(key, encoded);
+        }
     }
     Ok(encode_object(&top))
 }

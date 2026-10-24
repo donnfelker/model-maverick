@@ -7,6 +7,7 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::PgExecutor;
 
+use crate::affinity::AffinityRow;
 use crate::{Decimal, Json, JsonRawValue};
 
 /// A `recommendations` row. `request` never holds prompt text.
@@ -22,6 +23,9 @@ pub struct Recommendation {
     pub response: Json,
     pub matrix_version: String,
     pub created_at: DateTime<Utc>,
+    /// The conversation affinity block of the trace (spec §10.2, D44). `None` when the
+    /// request sent no `affinity`.
+    pub affinity: Option<Json>,
 }
 
 /// The values of `CreateRecommendation`.
@@ -36,6 +40,8 @@ pub struct NewRecommendation<'a> {
     pub candidates: &'a JsonRawValue,
     pub response: &'a JsonRawValue,
     pub matrix_version: &'a str,
+    /// D44: the affinity trace block, `None` without `affinity`.
+    pub affinity: Option<&'a JsonRawValue>,
 }
 
 /// The filters of `ListRecommendationsPage`.
@@ -102,12 +108,13 @@ pub async fn create_recommendation<'e>(
         Recommendation,
         r#"insert into recommendations (
              id, tenant_id, api_key_id, prompt_hash, request, classification, candidates,
-             response, matrix_version
+             response, matrix_version, affinity
            )
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
            returning id, tenant_id, api_key_id, prompt_hash, request as "request: _",
                      classification as "classification: _", candidates as "candidates: _",
-                     response as "response: _", matrix_version, created_at"#,
+                     response as "response: _", matrix_version, created_at,
+                     affinity as "affinity: _""#,
         rec.id,
         rec.tenant_id,
         rec.api_key_id,
@@ -117,9 +124,56 @@ pub async fn create_recommendation<'e>(
         rec.candidates as &JsonRawValue,
         rec.response as &JsonRawValue,
         rec.matrix_version,
+        rec.affinity as Option<&JsonRawValue>,
     )
     .fetch_one(db)
     .await
+}
+
+/// Writes a recommendation and its conversation affinity row in one statement, so both
+/// commit or neither does (spec §7.6, D44). `row.recommendation_id` must be `rec.id`.
+/// The row upsert is last write wins, as in [`crate::affinity::upsert_affinity`].
+pub async fn create_recommendation_with_affinity<'e>(
+    db: impl PgExecutor<'e>,
+    rec: &NewRecommendation<'_>,
+    row: &AffinityRow,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        r#"with rec as (
+             insert into recommendations (
+               id, tenant_id, api_key_id, prompt_hash, request, classification,
+               candidates, response, matrix_version, affinity
+             )
+             values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+             returning id, tenant_id
+           )
+           insert into conversation_affinity
+             (tenant_id, affinity_hash, column_id, recommendation_id, last_used_at,
+              expires_at)
+           select rec.tenant_id, $11, $12, rec.id, $13, $14 from rec
+           on conflict (tenant_id, affinity_hash) do update set
+             column_id = excluded.column_id,
+             recommendation_id = excluded.recommendation_id,
+             last_used_at = excluded.last_used_at,
+             expires_at = excluded.expires_at"#,
+        rec.id,
+        rec.tenant_id,
+        rec.api_key_id,
+        rec.prompt_hash,
+        rec.request as &JsonRawValue,
+        rec.classification as &JsonRawValue,
+        rec.candidates as &JsonRawValue,
+        rec.response as &JsonRawValue,
+        rec.matrix_version,
+        rec.affinity as Option<&JsonRawValue>,
+        row.affinity_hash,
+        row.column_id,
+        row.last_used_at,
+        row.expires_at,
+    )
+    .execute(db)
+    .await
+    .map(|_| ())
 }
 
 /// `GetRecommendation`.
@@ -131,7 +185,8 @@ pub async fn get_recommendation<'e>(
         Recommendation,
         r#"select id, tenant_id, api_key_id, prompt_hash, request as "request: _",
                   classification as "classification: _", candidates as "candidates: _",
-                  response as "response: _", matrix_version, created_at
+                  response as "response: _", matrix_version, created_at,
+                  affinity as "affinity: _"
            from recommendations
            where id = $1"#,
         id
@@ -151,7 +206,8 @@ pub async fn get_recommendation_for_tenant<'e>(
         Recommendation,
         r#"select id, tenant_id, api_key_id, prompt_hash, request as "request: _",
                   classification as "classification: _", candidates as "candidates: _",
-                  response as "response: _", matrix_version, created_at
+                  response as "response: _", matrix_version, created_at,
+                  affinity as "affinity: _"
            from recommendations
            where id = $1 and tenant_id = $2"#,
         id,
@@ -186,7 +242,8 @@ pub async fn list_recommendations_page<'e>(
         Recommendation,
         r#"select id, tenant_id, api_key_id, prompt_hash, request as "request: _",
                   classification as "classification: _", candidates as "candidates: _",
-                  response as "response: _", matrix_version, created_at
+                  response as "response: _", matrix_version, created_at,
+                  affinity as "affinity: _"
            from recommendations
            where tenant_id = $1
              and ($2::text = '' or prompt_hash = $2)

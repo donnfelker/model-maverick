@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "select id, tenant_id, api_key_id, prompt_hash, request as \"request: _\",\n                  classification as \"classification: _\", candidates as \"candidates: _\",\n                  response as \"response: _\", matrix_version, created_at\n           from recommendations\n           where id = $1 and tenant_id = $2",
+  "query": "select id, tenant_id, api_key_id, prompt_hash, request as \"request: _\",\n                  classification as \"classification: _\", candidates as \"candidates: _\",\n                  response as \"response: _\", matrix_version, created_at,\n                  affinity as \"affinity: _\"\n           from recommendations\n           where id = $1",
   "describe": {
     "columns": [
       {
@@ -112,11 +112,21 @@
             "name": "created_at"
           }
         }
+      },
+      {
+        "ordinal": 10,
+        "name": "affinity: _",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "recommendations",
+            "name": "affinity"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
-        "Text",
         "Text"
       ]
     },
@@ -130,8 +140,9 @@
       false,
       false,
       false,
-      false
+      false,
+      true
     ]
   },
-  "hash": "60d6eebeb561e633b2840fdfb55adb36070dd76350ad1b4c8db33c688e4007f0"
+  "hash": "9e1b6aedfab0352a50962217f24972b35d80b2dff636c5c66ada62cd1bd85a5a"
 }
