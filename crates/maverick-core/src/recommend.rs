@@ -500,7 +500,10 @@ mod tests {
     use crate::alias::parse_alias;
 
     fn body(alias: &str, workload: Workload) -> String {
-        let alias = parse_alias(alias).expect("alias");
+        let alias = parse_alias(alias)
+            .expect("alias")
+            .into_route()
+            .expect("route");
         RecommendRequest::for_alias(&alias, workload).to_body()
     }
 
@@ -508,7 +511,7 @@ mod tests {
     fn bodies_sort_members_and_omit_empty_pool() {
         assert_eq!(
             body("maverick/auto", Workload::declared_fallback()),
-            r#"{"mode":"balanced","workload":{"capability":"multi_step_reasoning","difficulty":3}}"#
+            r#"{"mode":"quality","workload":{"capability":"multi_step_reasoning","difficulty":3}}"#
         );
         assert_eq!(
             body(

@@ -2,7 +2,7 @@
 //! carry settings"; `parity/DIVERGENCES.md` D14).
 //!
 //! A column is (provider, model, endpoint, settings). MM components apply the entry's
-//! settings to each attempt unless the alias ends in `?settings=caller`, and record
+//! settings to each attempt unless the caller selects `X-Maverick-Settings: caller`, and record
 //! `settings_applied` in telemetry. Settings are applied before normalization, so the
 //! final value is always one the model accepts.
 //!
@@ -19,6 +19,31 @@
 use serde_json::{Map, Value, json};
 
 use crate::normalize::{REASONING_EFFORT, WireFormat, WirePath, wire_path};
+
+/// Whether to apply the recommended entry's settings (D14, D45).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SettingsMode {
+    /// Apply the entry's settings when no option is supplied.
+    Apply,
+    /// Preserve the caller's settings.
+    Caller,
+}
+
+impl SettingsMode {
+    /// Read X-Maverick-Settings, or the equivalent SDK per-call option.
+    pub fn from_header(value: Option<&str>) -> Result<Self, InvalidSettingsMode> {
+        match value {
+            None => Ok(Self::Apply),
+            Some("caller") => Ok(Self::Caller),
+            Some(_) => Err(InvalidSettingsMode),
+        }
+    }
+}
+
+/// An unsupported settings option.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("X-Maverick-Settings must be caller")]
+pub struct InvalidSettingsMode;
 
 /// One wire field an entry's settings set.
 #[derive(Debug, Clone, PartialEq)]
@@ -141,5 +166,26 @@ mod tests {
         assert_eq!(skipped, ["reasoning", "thinking"]);
         let (fields, skipped) = wire_settings(&Map::new(), WireFormat::ChatCompletions);
         assert!(fields.is_empty() && skipped.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod mode_tests {
+    use super::*;
+
+    /// D14, D45: the opt-out is separate from the model and exact.
+    #[test]
+    fn settings_header_is_exact() {
+        assert_eq!(SettingsMode::from_header(None), Ok(SettingsMode::Apply));
+        assert_eq!(
+            SettingsMode::from_header(Some("caller")),
+            Ok(SettingsMode::Caller)
+        );
+        for value in ["", "apply", "CALLER", " caller", "caller ", "caller,caller"] {
+            assert_eq!(
+                SettingsMode::from_header(Some(value)),
+                Err(InvalidSettingsMode)
+            );
+        }
     }
 }

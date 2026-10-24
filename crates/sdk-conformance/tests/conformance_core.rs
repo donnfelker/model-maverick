@@ -27,7 +27,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use common::{Loaded, assert_recorded, config_ms, load_scenarios, refused_url, upstream_for};
-use maverick_core::alias::{Alias, AliasError, SettingsMode, parse_alias};
+use maverick_core::alias::{AliasError, ParsedModel, parse_alias};
 use maverick_core::chain::{ChainExecutor, ChainResult, LastFailure, PreparedAttempt};
 use maverick_core::failopen::{FailOpen, FailOpenConfig, LadderError, Plan, Privacy};
 use maverick_core::openrouter::{self, Eligibility, Verdict};
@@ -35,6 +35,7 @@ use maverick_core::recommend::{
     ChainEntry, RecommendClient, RecommendClientConfig, RecommendError, RecommendRequest,
     TenantKey, TraceHeaders, Workload,
 };
+use maverick_core::settings::SettingsMode;
 use maverick_core::telemetry::{
     BatcherConfig, HttpSink, Telemetry, TelemetryItem, UsageShape, parse_usage,
 };
@@ -252,13 +253,16 @@ async fn run_call(ctx: &Ctx, call: &Value, expect: &Value, where_: &str) -> Resu
     let body = serde_json::to_vec(&body_value).map_err(|e| format!("{where_}: body: {e}"))?;
 
     let alias = match parse_alias(model) {
-        Ok(alias) => alias,
+        Ok(ParsedModel::Route(alias)) => alias,
         // A concrete model is not routed: the body reaches the provider untouched (S09a).
-        Err(AliasError::NotMaverickAlias) => return passthrough(ctx, &body, expect, where_).await,
+        Ok(ParsedModel::Direct { .. }) => return passthrough(ctx, &body, expect, where_).await,
         Err(AliasError::MalformedAlias) => {
             return Err(format!("{where_}: malformed alias {model}"));
         }
     };
+
+    let settings_mode = SettingsMode::from_header(call.get("settings").and_then(Value::as_str))
+        .map_err(|e| format!("{where_}: {e}"))?;
 
     // A declared header is always honored. Otherwise the prompt is projected only when
     // privacy allows it and the tenant is not known zero retention; a zero-retention tenant
@@ -305,7 +309,7 @@ async fn run_call(ctx: &Ctx, call: &Value, expect: &Value, where_: &str) -> Resu
         Ok(Plan::Recommended(recommendation)) => {
             run_chain(
                 ctx,
-                &alias,
+                settings_mode,
                 &body,
                 &recommendation.chain,
                 recommendation.zero_retention,
@@ -320,7 +324,7 @@ async fn run_call(ctx: &Ctx, call: &Value, expect: &Value, where_: &str) -> Resu
             let zero_retention = ctx.failopen.is_zero_retention(&ctx.tenant);
             run_chain(
                 ctx,
-                &alias,
+                settings_mode,
                 &body,
                 &chain,
                 zero_retention,
@@ -333,7 +337,18 @@ async fn run_call(ctx: &Ctx, call: &Value, expect: &Value, where_: &str) -> Resu
         }
         Ok(Plan::DefaultModel(model) | Plan::OriginalModel(model)) => {
             let chain = [synth_entry(&model)];
-            run_chain(ctx, &alias, &body, &chain, false, "", false, expect, where_).await
+            run_chain(
+                ctx,
+                settings_mode,
+                &body,
+                &chain,
+                false,
+                "",
+                false,
+                expect,
+                where_,
+            )
+            .await
         }
         Err(LadderError::Terminal(RecommendError::ZeroRetentionRequiresDeclared { .. })) => {
             assert_error(expect, "zero_retention_requires_declared", where_)
@@ -367,7 +382,7 @@ fn synth_entry(model: &str) -> ChainEntry {
 #[allow(clippy::too_many_arguments)]
 async fn run_chain(
     ctx: &Ctx,
-    alias: &Alias,
+    settings_mode: SettingsMode,
     body: &[u8],
     chain: &[ChainEntry],
     zero_retention: bool,
@@ -409,7 +424,7 @@ async fn run_chain(
                 let url = ctx.upstreams.url(Surface::Chat, &entry.provider, "")?;
                 (entry.model.as_str(), key, url, "direct", false)
             };
-        let settings = match alias.settings_mode {
+        let settings = match settings_mode {
             SettingsMode::Apply => Some(&entry.settings),
             SettingsMode::Caller => None,
         };

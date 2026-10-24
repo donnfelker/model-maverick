@@ -39,12 +39,13 @@ use http_body_util::{BodyExt, LengthLimitError, Limited};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use hyper_util::server::graceful::GracefulShutdown;
 use hyper_util::service::TowerToHyperService;
-use maverick_core::alias::parse_alias;
+use maverick_core::alias::{ParsedModel, parse_alias};
 use maverick_core::gojson::{apply_string, type_error};
 use maverick_core::recommend::{
     EngineFailure, RecommendClient, RecommendClientConfig, RecommendError, RecommendRequest,
     TenantKey, TraceHeaders, Workload,
 };
+use maverick_core::settings::SettingsMode;
 use serde_json::Value;
 use tokio::net::TcpListener;
 
@@ -186,11 +187,26 @@ impl Proxy {
         };
 
         // 3. Alias.
-        let Ok(alias) = parse_alias(&model) else {
+        let Ok(ParsedModel::Route(alias)) = parse_alias(&model) else {
             return envelope::error(
                 StatusCode::BAD_REQUEST,
                 envelope::INVALID_MODEL_ALIAS,
                 envelope::INVALID_MODEL_ALIAS_MESSAGE,
+            );
+        };
+
+        // D14, D45: settings are a request option, separate from the model grammar.
+        let settings_mode = parts
+            .headers
+            .get("x-maverick-settings")
+            .map(|value| value.to_str().map_err(|_| ()))
+            .transpose()
+            .and_then(|value| SettingsMode::from_header(value).map_err(|_| ()));
+        let Ok(settings_mode) = settings_mode else {
+            return envelope::error(
+                StatusCode::BAD_REQUEST,
+                envelope::INVALID_REQUEST,
+                "X-Maverick-Settings must be caller",
             );
         };
 
@@ -278,6 +294,7 @@ impl Proxy {
                 body,
                 raw_query: parts.uri.query().unwrap_or_default().to_owned(),
                 alias,
+                settings_mode,
                 recommendation,
                 tenant_key,
                 received_at,

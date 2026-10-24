@@ -1,148 +1,138 @@
-//! The alias grammar: parse a `model` string into `{pool, mode, settings_mode}`.
+//! D45 model grammar, shared by the proxy and SDK cores (spec §8.1).
 //!
-//! Ports `ParseAlias` (reference part 6 §5; master plan §3.5; spec §7.4). The grammar
-//! lives here in `maverick-core` so the proxy, the SDK cores, and the engine all parse
-//! aliases identically.
-//!
-//! Grammar (exact, case sensitive):
-//! 1. The string must start with the exact prefix `maverick/`, else [`AliasError::NotMaverickAlias`].
-//! 2. `rest` is everything after the prefix.
-//! 3. If `rest` contains `:`, split at the FIRST `:` into `pool` and the mode word. If
-//!    either part is empty, the alias is [`AliasError::MalformedAlias`]. With no `:`,
-//!    there is no pool and the whole `rest` is the mode word.
-//! 4. The mode word is exact: `auto` is [`Mode::Balanced`], `quality` is [`Mode::Quality`],
-//!    `cost` is [`Mode::Cost`]. Anything else (including `balanced`, `AUTO`, ``, ` auto`)
-//!    is [`AliasError::MalformedAlias`].
-//!
-//! A pool is any non-empty string without `:` (spaces and `/` are allowed, nothing is
-//! trimmed). A concrete model name (no `maverick/` prefix) parses to `NotMaverickAlias`;
-//! the caller decides what to do (the proxy rejects it 400, an SDK passes it through).
-//!
-//! DIVERGENCE D14: this port also accepts a trailing `?settings=caller` suffix
-//! (`maverick/<pool>:<mode>?settings=caller`). It opts the caller out of applying the
-//! recommended entry's `settings`, recorded as [`SettingsMode::Caller`]; the default is
-//! [`SettingsMode::Apply`]. In Go this whole string is `malformed_alias` because the mode
-//! word (for example `cost?settings=caller`) is not recognized. See `parity/DIVERGENCES.md` D14.
+//! `maverick/<route>[:<variant>]` routes over a pool. `auto` selects the default
+//! pool; every other route names a pool. Variants are `quality`, `balanced`, and
+//! `cost`, with `quality` as the default. Names are case sensitive and never trimmed.
+//! Any string without the exact `maverick/` prefix is a direct provider model.
+//! Settings are a separate request option, never part of the model grammar (D14).
 
-/// The engine ranking mode an alias selects.
+/// The engine ranking mode a route selects.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
-    /// `auto`.
+    /// Balance quality and cost (`:balanced`).
     Balanced,
-    /// `quality`.
+    /// Prefer quality (the default, or `:quality`).
     Quality,
-    /// `cost`.
+    /// Prefer cost (`:cost`).
     Cost,
 }
 
-/// Whether the recommended entry's settings apply, or the caller's are left alone (D14).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SettingsMode {
-    /// Apply the recommended entry's `settings` (the default).
-    Apply,
-    /// Leave the caller's settings alone (`?settings=caller`).
-    Caller,
-}
-
-/// A parsed Maverick alias.
+/// A parsed Maverick route.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Alias {
-    /// The pool name, or `None` when the alias names no pool (`maverick/<mode>`).
+    /// The named pool, or `None` for route `auto`.
     pub pool: Option<String>,
     /// The ranking mode.
     pub mode: Mode,
-    /// The settings behavior (D14).
-    pub settings_mode: SettingsMode,
 }
 
-/// Why a `model` string is not a usable Maverick alias. Both variants surface as the
-/// identical HTTP 400 `invalid_model_alias` in the proxy.
+/// A Maverick route or a direct provider model (D45).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParsedModel<'a> {
+    /// A request for a ranked chain.
+    Route(Alias),
+    /// An explicit provider model. Split at the first `/`, preserving the remainder.
+    Direct {
+        /// Provider author, when a slash is present.
+        author: Option<&'a str>,
+        /// The model id, including any provider variant.
+        slug: &'a str,
+    },
+}
+
+impl ParsedModel<'_> {
+    /// Extract a route. Direct models never enter the recommendation pipeline.
+    #[must_use]
+    pub fn into_route(self) -> Option<Alias> {
+        match self {
+            Self::Route(alias) => Some(alias),
+            Self::Direct { .. } => None,
+        }
+    }
+}
+
+/// Why a Maverick route cannot be parsed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum AliasError {
-    /// The string is not a Maverick alias (no `maverick/` prefix).
-    #[error("not_maverick_alias")]
-    NotMaverickAlias,
-    /// The string starts with `maverick/` but the pool or mode word is malformed.
+    /// The route, variant, or removed query suffix is malformed.
     #[error("malformed_alias")]
     MalformedAlias,
 }
 
-/// The exact, case-sensitive alias prefix.
-const PREFIX: &str = "maverick/";
-/// The D14 caller settings opt-out suffix.
-const SETTINGS_CALLER_SUFFIX: &str = "?settings=caller";
-
-/// Parse a `model` string into an [`Alias`], or an [`AliasError`].
-///
-/// This function is total: it never panics on any input.
-pub fn parse_alias(model: &str) -> Result<Alias, AliasError> {
-    // D14: strip an optional trailing `?settings=caller` first; the remainder is parsed
-    // with the Go grammar. In Go the whole string is `malformed_alias`.
-    let (core, settings_mode) = match model.strip_suffix(SETTINGS_CALLER_SUFFIX) {
-        Some(head) => (head, SettingsMode::Caller),
-        None => (model, SettingsMode::Apply),
+/// Parse the exact, case-sensitive D45 grammar. This function is total.
+pub fn parse_alias(model: &str) -> Result<ParsedModel<'_>, AliasError> {
+    let Some(rest) = model.strip_prefix("maverick/") else {
+        let (author, slug) = match model.split_once('/') {
+            Some((author, slug)) => (Some(author), slug),
+            None => (None, model),
+        };
+        return Ok(ParsedModel::Direct { author, slug });
     };
-
-    // 1. Exact, case-sensitive `maverick/` prefix.
-    let rest = core
-        .strip_prefix(PREFIX)
-        .ok_or(AliasError::NotMaverickAlias)?;
-
-    // 3. Split on the FIRST `:` into pool and mode word; empty parts are malformed. With
-    //    no `:`, there is no pool and the whole rest is the mode word.
-    let (pool, mode_word) = match rest.split_once(':') {
-        Some((pool, mode_word)) => {
-            if pool.is_empty() || mode_word.is_empty() {
-                return Err(AliasError::MalformedAlias);
-            }
-            (Some(pool.to_owned()), mode_word)
-        }
-        None => (None, rest),
-    };
-
-    // 4. Mode word is exact and case sensitive.
-    let mode = match mode_word {
-        "auto" => Mode::Balanced,
+    // D14's suffix was replaced by X-Maverick-Settings. Do not treat it as a pool.
+    if rest.contains('?') {
+        return Err(AliasError::MalformedAlias);
+    }
+    let (route, variant) = rest.split_once(':').unwrap_or((rest, "quality"));
+    if route.is_empty() {
+        return Err(AliasError::MalformedAlias);
+    }
+    let mode = match variant {
         "quality" => Mode::Quality,
+        "balanced" => Mode::Balanced,
         "cost" => Mode::Cost,
         _ => return Err(AliasError::MalformedAlias),
     };
-
-    Ok(Alias {
-        pool,
+    Ok(ParsedModel::Route(Alias {
+        pool: (route != "auto").then(|| route.to_owned()),
         mode,
-        settings_mode,
-    })
+    }))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// The `parse_alias` rows recorded in `parity/fixtures/proxy/unit.json`.
-    fn parse_alias_rows() -> Vec<serde_json::Value> {
-        let path = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../parity/fixtures/proxy/unit.json"
+    #[test]
+    fn routes_can_be_extracted_and_direct_models_cannot() {
+        assert_eq!(
+            parse_alias("maverick/auto").unwrap().into_route(),
+            Some(Alias {
+                pool: None,
+                mode: Mode::Quality,
+            })
         );
-        let raw = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("read {path}: {e}"));
-        let doc: serde_json::Value = serde_json::from_str(&raw).expect("parse unit.json");
-        doc["parse_alias"]
-            .as_array()
-            .expect("parse_alias is an array")
-            .clone()
+        assert_eq!(
+            parse_alias("openai/gpt-6-astra").unwrap().into_route(),
+            None
+        );
     }
 
-    fn mode_name(mode: Mode) -> &'static str {
-        match mode {
-            Mode::Balanced => "balanced",
-            Mode::Quality => "quality",
-            Mode::Cost => "cost",
+    /// DIVERGENCE D45: every hand-checked SDK v2 vector also protects the shared parser.
+    #[test]
+    fn alias_v2_vectors() {
+        let doc: serde_json::Value =
+            serde_json::from_str(include_str!("../../sdk-conformance/vectors/alias.v2.json"))
+                .unwrap();
+        for case in doc["cases"].as_array().unwrap() {
+            let got = match parse_alias(case["model"].as_str().unwrap()) {
+                Ok(ParsedModel::Route(alias)) => serde_json::json!({
+                    "kind": "route", "pool": alias.pool,
+                    "mode": match alias.mode {
+                        Mode::Quality => "quality",
+                        Mode::Balanced => "balanced",
+                        Mode::Cost => "cost",
+                    },
+                }),
+                Ok(ParsedModel::Direct { author, slug }) => {
+                    serde_json::json!({"kind": "direct", "author": author, "slug": slug})
+                }
+                Err(AliasError::MalformedAlias) => serde_json::json!({"kind": "malformed_alias"}),
+            };
+            assert_eq!(got, case["expect"], "{}", case["id"]);
         }
     }
 
-    /// Drives every `parse_alias-*` row from the parity fixture. These are the Go-parity
-    /// rows and carry no suffix, so `settings_mode` is always `Apply` here.
+    /// DIVERGENCE D45: replay the Go parser's inputs against the approved v2 results.
     // parity: proxy.TestParseAlias
     // parity: proxy.TestParseAlias/top-level_auto
     // parity: proxy.TestParseAlias/top-level_quality
@@ -161,80 +151,63 @@ mod tests {
     // parity: proxy.TestParseAlias/double_colon
     #[test]
     fn parse_alias_parity_rows() {
-        let rows = parse_alias_rows();
-        assert!(rows.len() >= 23, "expected the recorded parse_alias rows");
-        for row in rows {
-            let model = row["model"].as_str().expect("row has a model");
-            let id = row["id"].as_str().unwrap_or("?");
-            match row.get("error").and_then(serde_json::Value::as_str) {
-                Some("not_maverick_alias") => assert_eq!(
-                    parse_alias(model),
-                    Err(AliasError::NotMaverickAlias),
-                    "{id}: {model:?}"
-                ),
-                Some("malformed_alias") => assert_eq!(
-                    parse_alias(model),
-                    Err(AliasError::MalformedAlias),
-                    "{id}: {model:?}"
-                ),
-                Some(other) => panic!("{id}: unexpected error kind {other:?}"),
-                None => {
-                    let want_mode = row["mode"].as_str().expect("row has a mode");
-                    let want_pool = row["pool"].as_str().expect("row has a pool"); // "" == none
-                    let got = parse_alias(model)
-                        .unwrap_or_else(|e| panic!("{id}: {model:?} unexpectedly errored: {e}"));
-                    assert_eq!(mode_name(got.mode), want_mode, "{id}: mode");
-                    assert_eq!(got.pool.as_deref().unwrap_or(""), want_pool, "{id}: pool");
-                    assert_eq!(
-                        got.settings_mode,
-                        SettingsMode::Apply,
-                        "{id}: settings_mode"
-                    );
-                }
-            }
+        // Hand-checked D45 replacements for all 23 recorded parse_alias inputs.
+        let route = |pool: Option<&str>, mode| {
+            Ok(ParsedModel::Route(Alias {
+                pool: pool.map(str::to_owned),
+                mode,
+            }))
+        };
+        let direct = |slug| Ok(ParsedModel::Direct { author: None, slug });
+        let malformed = Err(AliasError::MalformedAlias);
+        let cases = [
+            ("maverick/auto", route(None, Mode::Quality)),
+            ("maverick/quality", route(Some("quality"), Mode::Quality)),
+            ("maverick/cost", route(Some("cost"), Mode::Quality)),
+            ("maverick/prod-pool:auto", malformed.clone()),
+            (
+                "maverick/prod-pool:quality",
+                route(Some("prod-pool"), Mode::Quality),
+            ),
+            (
+                "maverick/prod-pool:cost",
+                route(Some("prod-pool"), Mode::Cost),
+            ),
+            ("gpt-4o", direct("gpt-4o")),
+            ("claude-sonnet-4-6", direct("claude-sonnet-4-6")),
+            ("", direct("")),
+            ("maverick/", malformed.clone()),
+            ("maverick/fast", route(Some("fast"), Mode::Quality)),
+            ("maverick/prod-pool:fast", malformed.clone()),
+            ("maverick/:auto", malformed.clone()),
+            ("maverick/prod-pool:", malformed.clone()),
+            ("maverick/prod:pool:auto", malformed.clone()),
+            ("maverick/balanced", route(Some("balanced"), Mode::Quality)),
+            (
+                "Maverick/auto",
+                Ok(ParsedModel::Direct {
+                    author: Some("Maverick"),
+                    slug: "auto",
+                }),
+            ),
+            ("maverick/AUTO", route(Some("AUTO"), Mode::Quality)),
+            ("maverick/ auto", route(Some(" auto"), Mode::Quality)),
+            ("maverick/p p:cost", route(Some("p p"), Mode::Cost)),
+            (
+                "maverick/pool/x:quality",
+                route(Some("pool/x"), Mode::Quality),
+            ),
+            ("maverick/:", malformed.clone()),
+            ("maverick/auto:auto", malformed),
+        ];
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../../../parity/fixtures/proxy/unit.json")).unwrap();
+        let rows = fixture["parse_alias"].as_array().unwrap();
+        assert_eq!(rows.len(), cases.len());
+        for (row, (model, expected)) in rows.iter().zip(cases) {
+            assert_eq!(row["model"], model);
+            assert_eq!(parse_alias(model), expected, "{model:?}");
         }
-    }
-
-    /// DIVERGENCE: D14. Rust accepts a trailing `?settings=caller`; Go treats these as
-    /// `malformed_alias`. See `parity/DIVERGENCES.md` D14 and reference part 6 §5.
-    #[test]
-    fn d14_settings_caller_suffix() {
-        // maverick/<pool>:<mode>?settings=caller
-        let with_pool =
-            parse_alias("maverick/prod-pool:cost?settings=caller").expect("valid D14 alias");
-        assert_eq!(
-            with_pool,
-            Alias {
-                pool: Some("prod-pool".to_owned()),
-                mode: Mode::Cost,
-                settings_mode: SettingsMode::Caller,
-            }
-        );
-
-        // maverick/<mode>?settings=caller (no pool)
-        let no_pool = parse_alias("maverick/auto?settings=caller").expect("valid D14 alias");
-        assert_eq!(
-            no_pool,
-            Alias {
-                pool: None,
-                mode: Mode::Balanced,
-                settings_mode: SettingsMode::Caller,
-            }
-        );
-
-        // The same base without the suffix defaults to Apply.
-        assert_eq!(
-            parse_alias("maverick/prod-pool:cost")
-                .expect("valid alias")
-                .settings_mode,
-            SettingsMode::Apply
-        );
-
-        // The suffix must be exactly `?settings=caller`; a different query is malformed.
-        assert_eq!(
-            parse_alias("maverick/auto?settings=apply"),
-            Err(AliasError::MalformedAlias)
-        );
     }
 
     /// Property (done-when): `parse_alias` is total and never panics on arbitrary input.

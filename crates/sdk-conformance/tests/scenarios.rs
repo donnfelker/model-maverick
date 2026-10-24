@@ -119,7 +119,14 @@ fn check_config(config: &Map<String, Value>, id: &str) {
 fn check_call(call: &Map<String, Value>, what: &str) {
     keys_within(
         call,
-        &["surface", "model", "workload", "original_model", "body"],
+        &[
+            "surface",
+            "model",
+            "workload",
+            "original_model",
+            "settings",
+            "body",
+        ],
         what,
     );
     assert_eq!(
@@ -127,7 +134,7 @@ fn check_call(call: &Map<String, Value>, what: &str) {
         "{what}: v1 scenarios use chat completions"
     );
     assert!(call["model"].is_string(), "{what}.model");
-    for optional in ["workload", "original_model"] {
+    for optional in ["workload", "original_model", "settings"] {
         if let Some(value) = call.get(optional) {
             assert!(value.is_string(), "{what}.{optional}");
         }

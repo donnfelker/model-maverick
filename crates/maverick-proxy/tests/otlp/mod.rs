@@ -146,10 +146,31 @@ pub fn fixture_templates(scenario: &Value) -> (Value, Value) {
 /// scenario's OTLP templates: one resource and scope named after the service, one
 /// `maverick.recommendation` record with the §12.1 attributes in order and a timestamp,
 /// and the counter's one point with the same count and (sorted) attributes.
-pub fn assert_matches_fixture(context: &str, received: &Received, scenario: &Value) {
+pub fn assert_matches_fixture(
+    context: &str,
+    received: &Received,
+    scenario: &Value,
+    route_mode: Option<&str>,
+) {
     let d31 = parity_support::divergence!("D31");
     assert_eq!(d31.id(), "D31");
-    let (want_logs, want_metrics) = fixture_templates(scenario);
+    let (mut want_logs, mut want_metrics) = fixture_templates(scenario);
+    // D45 changes the routed mode. Direct report tests retain the captured report's mode.
+    if let Some(mode) = route_mode {
+        let logs = &mut want_logs["resourceLogs"][0]["scopeLogs"][0]["logRecords"][0]["attributes"];
+        for attribute in logs.as_array_mut().expect("record attributes") {
+            if attribute["key"] == "mode" {
+                attribute["value"]["stringValue"] = mode.into();
+            }
+        }
+        let metrics = &mut want_metrics["resourceMetrics"][0]["scopeMetrics"][0]["metrics"][0]["sum"]
+            ["dataPoints"][0]["attributes"];
+        for attribute in metrics.as_array_mut().expect("counter attributes") {
+            if attribute["key"] == "mode" {
+                attribute["value"]["stringValue"] = mode.into();
+            }
+        }
+    }
     let logs = received_logs(received);
     let records: Vec<_> = logs
         .iter()

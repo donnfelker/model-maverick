@@ -159,7 +159,7 @@
             "authorization": "Bearer mk_test_conformance"
           },
           "body": {
-            "mode": "balanced",
+            "mode": "quality",
             "workload": {
               "capability": "multi_step_reasoning",
               "difficulty": 3

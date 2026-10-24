@@ -314,6 +314,7 @@ fn maverick_keys_and_client_credentials_never_go_upstream() {
             ("x-api-key", "stray"),
             ("Cookie", "session=1"),
             ("X-Maverick-Workload", "code_generation:3"),
+            ("X-Maverick-Settings", "caller"),
             ("Anthropic-Beta", "b1"),
             ("Anthropic-Beta", "b2"),
         ]
@@ -331,7 +332,7 @@ fn maverick_keys_and_client_credentials_never_go_upstream() {
             "cookie",
             "x-maverick-workload"
         ],
-        "Go forwards every other client header (QUIRK 14); D30 strips the tenant key"
+        "Go forwards every other client header (QUIRK 14); D30 strips the tenant key and D45 strips settings"
     );
     assert_eq!(as_table(&base)["anthropic-beta"], ["b1", "b2"]);
     for surface in [Surface::Chat, Surface::Messages] {

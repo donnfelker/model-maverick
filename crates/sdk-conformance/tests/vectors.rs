@@ -9,7 +9,7 @@
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
-use maverick_core::alias::{AliasError, Mode, SettingsMode, parse_alias};
+use maverick_core::alias::{AliasError, Mode, ParsedModel, parse_alias};
 use maverick_core::chain::{AttemptRecord, ErrorClass};
 use maverick_core::recommend::RetentionMode as WireRetention;
 use maverick_core::telemetry::{UsageShape, parse_usage};
@@ -39,28 +39,26 @@ fn cases<'a>(doc: &'a Value, key: &str) -> &'a [Value] {
 
 #[test]
 fn alias_vectors() {
-    let doc = vectors("alias.v1.json");
-    assert_eq!(doc["version"], "v1");
+    let doc = vectors("alias.v2.json");
+    assert_eq!(doc["version"], "v2");
     let cases = cases(&doc, "cases");
-    assert_eq!(cases.len(), 36);
+    assert_eq!(cases.len(), 49);
     for case in cases {
         let id = case["id"].as_str().unwrap();
         let model = case["model"].as_str().unwrap();
         let got = match parse_alias(model) {
-            Ok(alias) => json!({
-                "kind": "alias",
+            Ok(ParsedModel::Route(alias)) => json!({
+                "kind": "route",
                 "pool": alias.pool,
                 "mode": match alias.mode {
                     Mode::Balanced => "balanced",
                     Mode::Quality => "quality",
                     Mode::Cost => "cost",
                 },
-                "settings": match alias.settings_mode {
-                    SettingsMode::Apply => "apply",
-                    SettingsMode::Caller => "caller",
-                },
             }),
-            Err(AliasError::NotMaverickAlias) => json!({"kind": "not_maverick_alias"}),
+            Ok(ParsedModel::Direct { author, slug }) => json!({
+                "kind": "direct", "author": author, "slug": slug,
+            }),
             Err(AliasError::MalformedAlias) => json!({"kind": "malformed_alias"}),
         };
         assert_eq!(got, case["expect"], "{id}: {model:?}");

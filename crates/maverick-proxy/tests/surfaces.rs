@@ -429,18 +429,21 @@ fn without_transport(
 
 /// DIVERGENCE: D5. The recommend body carries the versioned workload projection where Go
 /// sent the last user message (or the declared fallback). The body must be exactly the
-/// Rust projection of the inbound body, and every field besides `workload` must match Go.
+/// Rust projection of the inbound body. D45 changes only the route fields below.
 fn check_d5_recommend_body(
     context: &str,
     got: &str,
     want: &str,
     inbound_body: &str,
     client_sent: &HeaderValues,
-) {
+) -> bool {
     let d5 = parity_support::divergence!("D5");
     assert_eq!(d5.id(), "D5");
     let inbound: Value = serde_json::from_str(inbound_body).expect("inbound json");
-    let alias = parse_alias(inbound["model"].as_str().expect("model")).expect("alias");
+    let alias = parse_alias(inbound["model"].as_str().expect("model"))
+        .expect("alias")
+        .into_route()
+        .expect("route");
     let header = client_sent
         .get("X-Maverick-Workload")
         .and_then(|values| values.first())
@@ -456,11 +459,23 @@ fn check_d5_recommend_body(
         body.as_object_mut().expect("object").remove("workload");
         body
     };
+    let mut want_fields = without_workload(want);
+    // D45: these legacy inputs have new route semantics. All other fields remain Go's.
+    match inbound["model"].as_str().expect("model") {
+        "maverick/auto" => want_fields["mode"] = "quality".into(),
+        "maverick/cost" => {
+            want_fields["mode"] = "quality".into();
+            want_fields["pool"] = "cost".into();
+        }
+        _ => {}
+    }
+    let changed = want_fields != without_workload(want);
     assert_eq!(
         without_workload(got),
-        without_workload(want),
-        "{context}: recommend fields besides the workload"
+        want_fields,
+        "{context}: D45 route and mode"
     );
+    changed
 }
 
 /// A proxy under test, with the reports its runner produced.
@@ -571,9 +586,24 @@ async fn replay(id: &str) -> Vec<ChainReport> {
 
 /// [`replay`], adding the D-rows a caller's own checks rely on (such as D26).
 async fn replay_noting(id: &str, extra: &[&'static str]) -> Vec<ChainReport> {
-    let scenario = scenario(id);
+    let mut scenario = scenario(id);
+    let alias_error = scenario["expected"]["response"]["body"]
+        .as_str()
+        .is_some_and(|body| body.contains("invalid_model_alias"));
+    if alias_error {
+        let body = maverick_proxy::envelope::envelope_body(
+            "invalid_model_alias",
+            "model must be a provider model id or maverick/<route>[:<variant>] with variant quality, balanced, or cost",
+        );
+        scenario["expected"]["response"]["headers"]["Content-Length"] =
+            serde_json::json!([body.len().to_string()]);
+        scenario["expected"]["response"]["body"] = body.into();
+    }
     let expected = &scenario["expected"];
     let mut used: BTreeSet<&'static str> = extra.iter().copied().collect();
+    if alias_error {
+        used.insert("D45");
+    }
     let (collector_url, collected) = otlp::collector().await;
 
     // Mocks.
@@ -797,7 +827,10 @@ async fn replay_noting(id: &str, extra: &[&'static str]) -> Vec<ChainReport> {
         let mut want_headers = expected_headers(&want["headers"]);
         let want_body = text(&want["body"]);
         if got.body_text() != want_body {
-            check_d5_recommend_body(&context, &got.body_text(), &want_body, &body, &client_sent);
+            if check_d5_recommend_body(&context, &got.body_text(), &want_body, &body, &client_sent)
+            {
+                used.insert("D45");
+            }
             used.insert("D5");
             // The body length differs with the body.
             got_headers.remove("Content-Length");
@@ -868,7 +901,8 @@ async fn replay_noting(id: &str, extra: &[&'static str]) -> Vec<ChainReport> {
 
     // OTel (D31): the telemetry flush above shut the sink down, which flushed OTLP.
     if expected.get("otlp_requests_after_forced_flush").is_some() {
-        otlp::assert_matches_fixture(&context, &collected, &scenario);
+        otlp::assert_matches_fixture(&context, &collected, &scenario, Some("quality"));
+        used.insert("D45");
         used.insert("D31");
     } else {
         assert!(
@@ -882,17 +916,17 @@ async fn replay_noting(id: &str, extra: &[&'static str]) -> Vec<ChainReport> {
     reports
 }
 
-/// Refused before the engine is called: nothing differs.
-const REJECTED_BEFORE_ENGINE: &[&str] = &[];
+/// Refused before the engine is called. D45 updates the alias grammar message.
+const REJECTED_BEFORE_ENGINE: &[&str] = &["D45"];
 /// The recommend call (D5 body, D32 transport headers), any upstream attempts (D32), and
 /// no telemetry POST.
-const ENGINE_NO_TELEMETRY: &[&str] = &["D5", "D32"];
+const ENGINE_NO_TELEMETRY: &[&str] = &["D5", "D32", "D45"];
 /// A settled chain with telemetry: D14 `settings_applied` in each item and D27 delivery.
-const FULL_CHAIN: &[&str] = &["D5", "D14", "D27", "D32"];
+const FULL_CHAIN: &[&str] = &["D5", "D14", "D27", "D32", "D45"];
 /// A settled chain with OTel export (D31).
-const OTEL: &[&str] = &["D5", "D14", "D27", "D31", "D32"];
+const OTEL: &[&str] = &["D5", "D14", "D27", "D31", "D32", "D45"];
 /// The 429 whose `Retry-After` the executor obeys (D26).
-const RETRY_AFTER: &[&str] = &["D5", "D14", "D26", "D27", "D32"];
+const RETRY_AFTER: &[&str] = &["D5", "D14", "D26", "D27", "D32", "D45"];
 
 /// The reviewed allowlist: for each scenario, the DIVERGENCES rows whose tolerances its
 /// comparison may use. D32 (transport headers) is on every scenario that reaches an

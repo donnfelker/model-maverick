@@ -15,6 +15,7 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::Response;
 use maverick_core::alias::Alias;
 use maverick_core::recommend::{Recommendation, TenantKey};
+use maverick_core::settings::SettingsMode;
 
 use crate::credentials::{CallerCredential, EnvKeys};
 use crate::envelope;
@@ -62,8 +63,10 @@ pub struct ChainRequest {
     /// The inbound raw query (without `?`), appended verbatim to every upstream URL when
     /// it is not empty.
     pub raw_query: String,
-    /// The parsed alias; `settings_mode` says whether entry settings apply (D14).
+    /// The parsed route.
     pub alias: Alias,
+    /// Whether the caller opted out of entry settings (D14).
+    pub settings_mode: SettingsMode,
     /// The engine's recommendation.
     pub recommendation: Recommendation,
     /// The tenant key used for the recommend call; telemetry goes out under it (D27).

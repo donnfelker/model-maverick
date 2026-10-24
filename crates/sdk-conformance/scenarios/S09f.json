@@ -64,7 +64,7 @@
     {
       "call": {
         "surface": "chat_completions",
-        "model": "maverick/cost",
+        "model": "maverick/auto:cost",
         "workload": "summarization_synthesis",
         "body": {
           "messages": [

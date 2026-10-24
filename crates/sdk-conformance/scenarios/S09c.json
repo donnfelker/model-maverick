@@ -1,9 +1,9 @@
 {
   "id": "S09c",
-  "name": "settings_caller_suffix_keeps_caller_values",
+  "name": "settings_caller_option_keeps_caller_values",
   "group": 9,
-  "source": "sdk-v0 plan §2.3 scenario 9; D14",
-  "summary": "With ?settings=caller the entry's settings are not applied, the suffix never reaches MM, and the item says settings_applied false.",
+  "source": "sdk-v0 plan §2.3 scenario 9; D14; D45",
+  "summary": "With the settings option caller the entry's settings are not applied, the option never reaches MM, and the item says settings_applied false.",
   "engine": {
     "recommend": [
       {
@@ -66,7 +66,8 @@
     {
       "call": {
         "surface": "chat_completions",
-        "model": "maverick/auto?settings=caller",
+        "model": "maverick/auto",
+        "settings": "caller",
         "workload": "structured_extraction:3",
         "body": {
           "messages": [
@@ -115,7 +116,7 @@
             "authorization": "Bearer mk_test_conformance"
           },
           "body": {
-            "mode": "balanced",
+            "mode": "quality",
             "workload": {
               "capability": "structured_extraction",
               "difficulty": 3

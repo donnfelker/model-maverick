@@ -3,7 +3,7 @@
   "name": "entry_settings_override_caller_values",
   "group": 9,
   "source": "sdk-v0 plan §2.3 scenario 9; D14",
-  "summary": "Without the suffix, the entry's settings replace the caller's value.",
+  "summary": "Without a settings opt-out, the entry's settings replace the caller's value.",
   "engine": {
     "recommend": [
       {
@@ -115,7 +115,7 @@
             "authorization": "Bearer mk_test_conformance"
           },
           "body": {
-            "mode": "balanced",
+            "mode": "quality",
             "workload": {
               "capability": "structured_extraction",
               "difficulty": 3

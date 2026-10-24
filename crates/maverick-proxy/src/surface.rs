@@ -39,10 +39,11 @@ use std::time::Instant;
 
 use axum::http::StatusCode;
 use axum::response::Response;
-use maverick_core::alias::{Mode, SettingsMode};
+use maverick_core::alias::Mode;
 use maverick_core::chain::{ChainExecutor, ChainResult, PreparedAttempt};
 use maverick_core::openrouter::{self, Eligibility, Verdict};
 use maverick_core::recommend::{ChainEntry, TenantKey};
+use maverick_core::settings::SettingsMode;
 use maverick_core::telemetry::TelemetryItem;
 use tokio::sync::oneshot;
 
@@ -241,6 +242,7 @@ async fn walk(
         body,
         raw_query,
         alias,
+        settings_mode,
         recommendation,
         tenant_key,
         received_at,
@@ -292,8 +294,8 @@ async fn walk(
             let url = runner.upstreams.url(surface, &entry.provider, &raw_query)?;
             (entry.model.as_str(), key, url, "direct", false)
         };
-        // D14: the entry's settings unless the alias opted out; D29: its constraints.
-        let settings = match alias.settings_mode {
+        // D14: the entry's settings unless the caller opted out; D29: its constraints.
+        let settings = match settings_mode {
             SettingsMode::Apply => Some(&entry.settings),
             SettingsMode::Caller => None,
         };

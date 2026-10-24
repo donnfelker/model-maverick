@@ -7,14 +7,14 @@
       "group": 1,
       "id": "S01a",
       "name": "declared_happy_path",
-      "sha256": "3e3c13cffc3bee1fed24fba9e0562f974cbe2331b789b5bc0021093dd07cfc29"
+      "sha256": "85f7d653eff48dd671195d14bb740169aec0fac8c4032da521c864d036392db8"
     },
     {
       "file": "scenarios/S01b.json",
       "group": 1,
       "id": "S01b",
       "name": "prompt_happy_path",
-      "sha256": "17a2020b313880cae3e3ed483cfef5ea08becb9499bc57253366e924b1db7065"
+      "sha256": "b11349124f7886ead4ce8839f7a09e70d3afeae25b69c8239e9bc362b7cb7158"
     },
     {
       "file": "scenarios/S02.json",
@@ -133,7 +133,7 @@
       "group": 6,
       "id": "S06j",
       "name": "zero_retention_switches_to_declared",
-      "sha256": "5f75274ab924562a78bdc8c638f50d9fef74991fe22cc76abaf050de3a2f7837"
+      "sha256": "837a54504fd7957f62bbe5de2dd3663b374e7098ea8d0a55aca68b115eae1aa6"
     },
     {
       "file": "scenarios/S07a.json",
@@ -203,21 +203,21 @@
       "group": 9,
       "id": "S09b",
       "name": "entry_settings_override_caller_values",
-      "sha256": "301fa1da36aa732b312a0b57af5eb71b5773a495c0e6929dd5008ce1cc0a8f36"
+      "sha256": "73f3ab8c207d7cc697fa04192d2b836b34191212f336ba1a2a01996e53ab3d39"
     },
     {
       "file": "scenarios/S09c.json",
       "group": 9,
       "id": "S09c",
-      "name": "settings_caller_suffix_keeps_caller_values",
-      "sha256": "7da7b19423bf2354afddd9dca153f13b0927dd74ab6e10e15d6a41a11522da8d"
+      "name": "settings_caller_option_keeps_caller_values",
+      "sha256": "8b71011db9c7f0cd78dd225b5800e96f9648be00b9ec5c832ccbc60fd26ea7a4"
     },
     {
       "file": "scenarios/S09d.json",
       "group": 9,
       "id": "S09d",
       "name": "workload_override_sends_declared_form",
-      "sha256": "606eb7c317737f73ae3364e8ddba81ed5306695965f9f8a45d82be3f33f4e14f"
+      "sha256": "2345c646e9bce40caab1310ed8db3779075c87025685e4c3529b4f7802ffb8b9"
     },
     {
       "file": "scenarios/S09e.json",
@@ -231,7 +231,7 @@
       "group": 9,
       "id": "S09f",
       "name": "workload_without_tier",
-      "sha256": "187b65a3faecc4f0e3050456ba3721d533f6dedf79aeeb9725570377b9b0b38f"
+      "sha256": "e3efd9d282f3dbbf2d3fd4c61908036034c13efee724be374475657e1ac8843f"
     },
     {
       "file": "scenarios/S10a.json",
@@ -278,10 +278,10 @@
   ],
   "vectors": [
     {
-      "file": "vectors/alias.v1.json",
-      "sha256": "a999aaf2503fda547abea384a3c708d6dcafc6b9e0aa87d81f94d526d1ffa6cb",
+      "file": "vectors/alias.v2.json",
+      "sha256": "7e2d0940df8dfd794976748d04e12e69f11beba66a4a05def9469c27c8e56571",
       "vector_set": "alias",
-      "version": "v1"
+      "version": "v2"
     },
     {
       "file": "vectors/normalize.d29.json",
@@ -308,5 +308,5 @@
       "version": "v1"
     }
   ],
-  "version": "1"
+  "version": "2"
 }

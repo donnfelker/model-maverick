@@ -256,6 +256,9 @@ async fn run_call(
         .post(url)
         .header("authorization", format!("Bearer {caller_key}"))
         .header("content-type", "application/json");
+    if let Some(settings) = call.get("settings").and_then(Value::as_str) {
+        request = request.header("x-maverick-settings", settings);
+    }
     if let Some(workload) = call.get("workload").and_then(Value::as_str) {
         request = request.header("x-maverick-workload", workload);
     }

@@ -85,7 +85,7 @@ async fn check_scenario(id: &str, report: ChainReport) {
         .find(|s| s["id"] == id)
         .unwrap_or_else(|| panic!("scenario {id}"))
         .clone();
-    otlp::assert_matches_fixture(id, &received, &scenario);
+    otlp::assert_matches_fixture(id, &received, &scenario, None);
     otel.shutdown();
 }
 

@@ -22,7 +22,7 @@ pub const MALFORMED_JSON: &str = "malformed JSON request body";
 pub const INVALID_MODEL_ALIAS: &str = "invalid_model_alias";
 /// The alias rejection message, exact (U+2014 is written raw; `<` and `>` are escaped by
 /// the envelope).
-pub const INVALID_MODEL_ALIAS_MESSAGE: &str = "the proxy only routes maverick/* aliases (maverick/auto | maverick/quality | maverick/cost | maverick/<pool>:<mode>) \u{2014} see docs/api.md \"SDK integration conventions\"";
+pub const INVALID_MODEL_ALIAS_MESSAGE: &str = "model must be a provider model id or maverick/<route>[:<variant>] with variant quality, balanced, or cost";
 /// The message when `X-Maverick-Workload` cannot be read (D5; Go forwarded the header).
 pub const INVALID_WORKLOAD_HEADER_MESSAGE: &str =
     "X-Maverick-Workload must be <capability>[:<tier>]";
@@ -149,7 +149,10 @@ mod tests {
             166
         );
         let alias = envelope_body(INVALID_MODEL_ALIAS, INVALID_MODEL_ALIAS_MESSAGE);
-        assert_eq!(alias.len(), 242);
-        assert!(alias.contains("maverick/\\u003cpool\\u003e:\\u003cmode\\u003e) \u{2014} see"));
+        // DIVERGENCE D45: describe the new grammar while preserving the error code.
+        assert_eq!(
+            alias,
+            "{\"error\":{\"code\":\"invalid_model_alias\",\"message\":\"model must be a provider model id or maverick/\\u003croute\\u003e[:\\u003cvariant\\u003e] with variant quality, balanced, or cost\"}}\n"
+        );
     }
 }

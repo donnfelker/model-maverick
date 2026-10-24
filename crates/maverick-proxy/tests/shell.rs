@@ -9,8 +9,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use maverick_core::alias::SettingsMode;
 use maverick_core::recommend::{RecommendClient, RecommendClientConfig};
+use maverick_core::settings::SettingsMode;
 use maverick_proxy::chain::{BoxFuture, ChainRequest, ChainRunner, NoExecutor, Surface};
 use maverick_proxy::config::{
     self, Config, ConfigError, DEFAULT_MAX_BODY_BYTES, DeploymentMode, load_config,
@@ -435,7 +435,20 @@ async fn scenario_rows() {
         );
         let response = exchange(&proxy.addr, &request).await;
 
-        let expected = &scenario["expected"]["response"];
+        let mut expected = scenario["expected"]["response"].clone();
+        // D45 replaces the grammar message while preserving the status and code.
+        if expected["body"]
+            .as_str()
+            .unwrap()
+            .contains("invalid_model_alias")
+        {
+            let body = envelope_body(
+                "invalid_model_alias",
+                "model must be a provider model id or maverick/<route>[:<variant>] with variant quality, balanced, or cost",
+            );
+            expected["headers"]["Content-Length"] = serde_json::json!([body.len().to_string()]);
+            expected["body"] = body.into();
+        }
         let context = format!("{id}\n== request ==\n{}", String::from_utf8_lossy(&request));
         assert_response(
             &context,
@@ -638,7 +651,7 @@ impl ChainRunner for Recorder {
         self.seen.lock().expect("recorder").push((
             request.surface,
             request.recommendation.recommendation_id.clone(),
-            request.alias.settings_mode,
+            request.settings_mode,
             request.tenant_key.expose().to_owned(),
             request.body.to_vec(),
         ));
@@ -660,8 +673,14 @@ async fn the_chain_runner_gets_the_request_and_the_recommendation() {
 
     let response = post(&proxy.addr, "/v1/chat/completions", &[], CHAT_HI).await;
     assert_response("chain ran (chat)", &response, 200, "chain ran");
-    let messages = r#"{"model":"maverick/p:quality?settings=caller","max_tokens":8,"messages":[{"role":"user","content":"hi"}]}"#;
-    let response = post(&proxy.addr, "/v1/messages", &[], messages).await;
+    let messages = r#"{"model":"maverick/p:quality","max_tokens":8,"messages":[{"role":"user","content":"hi"}]}"#;
+    let response = post(
+        &proxy.addr,
+        "/v1/messages",
+        &[("X-Maverick-Settings", "caller")],
+        messages,
+    )
+    .await;
     assert_response("chain ran (messages)", &response, 200, "chain ran");
 
     let sent: Vec<String> = engine
@@ -672,7 +691,7 @@ async fn the_chain_runner_gets_the_request_and_the_recommendation() {
     assert_eq!(
         sent,
         [
-            r#"{"mode":"balanced","workload":{"projection_version":"p1","prompt":"[conversation]\nuser: hi"}}"#,
+            r#"{"mode":"quality","workload":{"projection_version":"p1","prompt":"[conversation]\nuser: hi"}}"#,
             r#"{"mode":"quality","pool":"p","workload":{"projection_version":"p1","prompt":"[conversation]\nuser: hi"}}"#,
         ]
     );
@@ -698,6 +717,43 @@ async fn the_chain_runner_gets_the_request_and_the_recommendation() {
         (seen[1].0, seen[1].2),
         (Surface::Messages, SettingsMode::Caller)
     );
+    proxy.stop().await.expect("clean shutdown");
+}
+
+/// D14, D45: settings are an exact request header; the retired suffix is malformed.
+#[tokio::test]
+async fn invalid_settings_and_retired_suffix_never_call_the_engine() {
+    let engine = MockEngine::start(Vec::new()).await;
+    let proxy = start(self_hosted(&engine.url)).await;
+    for path in ["/v1/chat/completions", "/v1/messages"] {
+        for value in ["", "apply", "CALLER", "caller,caller"] {
+            let response = post(
+                &proxy.addr,
+                path,
+                &[("X-Maverick-Settings", value)],
+                CHAT_HI,
+            )
+            .await;
+            assert_response(
+                "invalid settings",
+                &response,
+                400,
+                &envelope_body("invalid_request", "X-Maverick-Settings must be caller"),
+            );
+        }
+        let body = CHAT_HI.replace("maverick/auto", "maverick/auto?settings=caller");
+        let response = post(&proxy.addr, path, &[], &body).await;
+        assert_response(
+            "retired suffix",
+            &response,
+            400,
+            &envelope_body(
+                "invalid_model_alias",
+                "model must be a provider model id or maverick/<route>[:<variant>] with variant quality, balanced, or cost",
+            ),
+        );
+    }
+    assert!(engine.requests().is_empty());
     proxy.stop().await.expect("clean shutdown");
 }
 
@@ -771,7 +827,7 @@ async fn workload_header_selects_the_declared_form() {
         .collect();
     assert_eq!(
         sent,
-        [r#"{"mode":"balanced","workload":{"capability":"code_generation","difficulty":4}}"#],
+        [r#"{"mode":"quality","workload":{"capability":"code_generation","difficulty":4}}"#],
         "the malformed header never reached the engine"
     );
     proxy.stop().await.expect("clean shutdown");

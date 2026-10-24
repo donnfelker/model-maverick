@@ -154,7 +154,10 @@ fn key() -> TenantKey {
 
 fn prompt_request(alias: &str, prompt: &str) -> RecommendRequest {
     RecommendRequest::for_alias(
-        &parse_alias(alias).expect("alias"),
+        &parse_alias(alias)
+            .expect("alias")
+            .into_route()
+            .expect("route"),
         Workload::Prompt {
             prompt: prompt.to_owned(),
             projection_version: Some("p1".to_owned()),
@@ -182,21 +185,22 @@ fn entry(provider: &str, model: &str) -> ChainEntry {
 // scenarios.json rows that exercise the engine call.
 
 /// The exact Rust request body for each row's inbound request, computed by hand.
+/// D45: auto selects quality; the old cost alias names pool cost.
 /// D5: the prompt is projection p1 with `projection_version`; Go sent the last user text.
 /// `chat_declared_fallback` has a system message only: p1 projects it, so Rust sends the
 /// prompt form where Go sent the declared fallback.
 const SCENARIO_BODIES: [(&str, &str); 7] = [
     (
         "chat_declared_fallback",
-        r#"{"mode":"balanced","workload":{"projection_version":"p1","prompt":"[system]\nsys only, no user turn"}}"#,
+        r#"{"mode":"quality","workload":{"projection_version":"p1","prompt":"[system]\nsys only, no user turn"}}"#,
     ),
     (
         "chat_prompt_last_user",
-        r#"{"mode":"balanced","workload":{"projection_version":"p1","prompt":"[system]\nsys\n\n[conversation]\nuser: first question\nassistant: answer\nuser: second question, the real one"}}"#,
+        r#"{"mode":"quality","workload":{"projection_version":"p1","prompt":"[system]\nsys\n\n[conversation]\nuser: first question\nassistant: answer\nuser: second question, the real one"}}"#,
     ),
     (
         "x_chat_prompt_escaping_and_array",
-        "{\"mode\":\"cost\",\"workload\":{\"projection_version\":\"p1\",\"prompt\":\"[conversation]\\nuser: a\\u003cb \\u0026 \\nc\\u003ed\"}}",
+        "{\"mode\":\"quality\",\"pool\":\"cost\",\"workload\":{\"projection_version\":\"p1\",\"prompt\":\"[conversation]\\nuser: a\\u003cb \\u0026 \\nc\\u003ed\"}}",
     ),
     (
         "chat_pool_mode_alias",
@@ -204,15 +208,15 @@ const SCENARIO_BODIES: [(&str, &str); 7] = [
     ),
     (
         "chat_engine_error_502",
-        r#"{"mode":"balanced","workload":{"projection_version":"p1","prompt":"[conversation]\nuser: hi"}}"#,
+        r#"{"mode":"quality","workload":{"projection_version":"p1","prompt":"[conversation]\nuser: hi"}}"#,
     ),
     (
         "x_engine_malformed_json_502",
-        r#"{"mode":"balanced","workload":{"projection_version":"p1","prompt":"[conversation]\nuser: hi"}}"#,
+        r#"{"mode":"quality","workload":{"projection_version":"p1","prompt":"[conversation]\nuser: hi"}}"#,
     ),
     (
         "x_engine_empty_chain_502",
-        r#"{"mode":"balanced","workload":{"projection_version":"p1","prompt":"[conversation]\nuser: hi"}}"#,
+        r#"{"mode":"quality","workload":{"projection_version":"p1","prompt":"[conversation]\nuser: hi"}}"#,
     ),
 ];
 
@@ -270,7 +274,10 @@ async fn scenario_engine_calls() {
             .as_str()
             .expect("inbound body");
         let inbound_json: Value = serde_json::from_str(inbound).expect("inbound json");
-        let alias = parse_alias(inbound_json["model"].as_str().expect("model")).expect("alias");
+        let alias = parse_alias(inbound_json["model"].as_str().expect("model"))
+            .expect("alias")
+            .into_route()
+            .expect("route");
         let workload_header = scenario["inbound_request"]["headers"]
             .as_array()
             .expect("headers")
@@ -322,11 +329,15 @@ async fn scenario_engine_calls() {
         );
         assert_eq!(sent.body, want_body, "{id}: body");
 
-        // Against the Go-recorded body: mode and pool match; only the workload moved (D5).
+        // D45 changes the route fields; D5 changes the workload. The oracle stays frozen.
         let rust: Value = serde_json::from_str(&sent.body).expect("rust body json");
-        let go_body: Value =
+        let mut go_body: Value =
             serde_json::from_str(go["body"].as_str().expect("go body")).expect("go json");
-        assert_eq!(rust["mode"], go_body["mode"], "{id}: mode");
+        go_body["mode"] = "quality".into();
+        if id == "x_chat_prompt_escaping_and_array" {
+            go_body["pool"] = "cost".into();
+        }
+        assert_eq!(rust["mode"], go_body["mode"], "{id}: D45 mode");
         assert_eq!(rust["pool"], go_body["pool"], "{id}: pool");
 
         assert_outcome(id, &outcome);
@@ -344,8 +355,13 @@ async fn nothing_to_project_sends_the_go_declared_fallback_body() {
     let inbound = br#"{"model":"maverick/auto","messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"x"}}]}]}"#;
     let workload = Workload::for_chat_request(inbound, None).expect("workload");
     assert_eq!(workload, Workload::declared_fallback());
-    let request =
-        RecommendRequest::for_alias(&parse_alias("maverick/auto").expect("alias"), workload);
+    let request = RecommendRequest::for_alias(
+        &parse_alias("maverick/auto")
+            .expect("alias")
+            .into_route()
+            .expect("route"),
+        workload,
+    );
     let outcome = client(&engine.url, Duration::from_secs(5), 0)
         .recommend(&key(), &request)
         .await
@@ -353,7 +369,7 @@ async fn nothing_to_project_sends_the_go_declared_fallback_body() {
     assert_eq!(outcome.chain, vec![entry("openai", "gpt-a")]);
     assert_eq!(
         engine.requests()[0].body,
-        r#"{"mode":"balanced","workload":{"capability":"multi_step_reasoning","difficulty":3}}"#
+        r#"{"mode":"quality","workload":{"capability":"multi_step_reasoning","difficulty":3}}"#
     );
 }
 
@@ -364,8 +380,13 @@ async fn workload_header_sends_the_declared_form_and_a_bad_one_sends_nothing() {
     let engine = MockEngine::start(vec![reply(200, r#"{"recommendations":[]}"#)]).await;
     let workload =
         Workload::for_chat_request(inbound, Some("code_generation:4")).expect("workload");
-    let request =
-        RecommendRequest::for_alias(&parse_alias("maverick/cost").expect("alias"), workload);
+    let request = RecommendRequest::for_alias(
+        &parse_alias("maverick/auto:cost")
+            .expect("alias")
+            .into_route()
+            .expect("route"),
+        workload,
+    );
     client(&engine.url, Duration::from_secs(5), 0)
         .recommend(&key(), &request)
         .await

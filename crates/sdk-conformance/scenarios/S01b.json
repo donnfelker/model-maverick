@@ -113,7 +113,7 @@
           "checks": [
             {
               "pointer": "/mode",
-              "equals": "balanced"
+              "equals": "quality"
             },
             {
               "pointer": "/workload/projection_version",

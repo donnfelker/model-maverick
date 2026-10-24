@@ -126,7 +126,7 @@
             "authorization": "Bearer mk_test_conformance"
           },
           "body": {
-            "mode": "balanced",
+            "mode": "quality",
             "workload": {
               "capability": "structured_extraction",
               "difficulty": 3
