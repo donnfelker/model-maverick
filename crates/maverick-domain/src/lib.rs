@@ -8,6 +8,7 @@
 //!
 //! Package 2a fills this in, one module per work package.
 
+pub mod affinity;
 pub mod capture;
 pub mod catalog;
 pub mod ceilings;
