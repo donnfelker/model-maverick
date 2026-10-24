@@ -2,23 +2,31 @@
 //! and Part 3 §5).
 //!
 //! Each column snapshots its list price per million tokens. A run's cost comes from the
-//! snapshot at execution time and is never restated.
+//! snapshot at execution time and is never restated. The optional cache prices (D44) are
+//! read only by conversation affinity (spec §7.6), never by a run's cost.
 
 use crate::gojson::{self, JsonValue};
 
 /// `catalog.Pricing`: prices in USD per million tokens.
+///
+/// D44 adds the two cache prices. They are `None` when the snapshot has no such field,
+/// never 0.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Pricing {
     pub input_per_mtok: f64,
     pub output_per_mtok: f64,
+    pub cache_read_per_mtok: Option<f64>,
+    pub cache_write_per_mtok: Option<f64>,
     pub currency: String,
     pub as_of: String,
     pub source: String,
 }
 
-const FIELDS: [&str; 5] = [
+const FIELDS: [&str; 7] = [
     "input_per_mtok",
     "output_per_mtok",
+    "cache_read_per_mtok",
+    "cache_write_per_mtok",
     "currency",
     "as_of",
     "source",
@@ -30,7 +38,8 @@ const FIELDS: [&str; 5] = [
 /// unknown fields are ignored, a `null` field keeps its zero value, and the last
 /// duplicate wins. A decode error is `parsing pricing snapshot: <json error>`, where the
 /// text after the prefix is library wording (D36). A negative price is
-/// `pricing snapshot has a negative price`.
+/// `pricing snapshot has a negative price`. The cache prices (D44) parse the same way; the
+/// Go engine ignored them as unknown fields.
 pub fn parse_pricing(raw: &str) -> Result<Pricing, String> {
     let mut pricing = Pricing::default();
     if raw.is_empty() {
@@ -57,12 +66,23 @@ pub fn parse_pricing(raw: &str) -> Result<Pricing, String> {
         match field {
             "input_per_mtok" => pricing.input_per_mtok = price(field, value).map_err(error)?,
             "output_per_mtok" => pricing.output_per_mtok = price(field, value).map_err(error)?,
+            "cache_read_per_mtok" => {
+                pricing.cache_read_per_mtok = Some(price(field, value).map_err(error)?);
+            }
+            "cache_write_per_mtok" => {
+                pricing.cache_write_per_mtok = Some(price(field, value).map_err(error)?);
+            }
             "currency" => pricing.currency = text(field, value).map_err(error)?,
             "as_of" => pricing.as_of = text(field, value).map_err(error)?,
             _ => pricing.source = text(field, value).map_err(error)?,
         }
     }
-    if pricing.input_per_mtok < 0.0 || pricing.output_per_mtok < 0.0 {
+    let negative = |price: Option<f64>| price.is_some_and(|price| price < 0.0);
+    if pricing.input_per_mtok < 0.0
+        || pricing.output_per_mtok < 0.0
+        || negative(pricing.cache_read_per_mtok)
+        || negative(pricing.cache_write_per_mtok)
+    {
         return Err("pricing snapshot has a negative price".to_owned());
     }
     Ok(pricing)
@@ -124,6 +144,8 @@ mod tests {
             Pricing {
                 input_per_mtok: 2.0,
                 output_per_mtok: 4.0,
+                cache_read_per_mtok: None,
+                cache_write_per_mtok: None,
                 currency: "USD".to_owned(),
                 as_of: "d".to_owned(),
                 source: "s".to_owned(),
@@ -178,6 +200,56 @@ mod tests {
         let zero = parse_pricing(r#"{"input_per_mtok": -0, "output_per_mtok": -0.0}"#)
             .expect("negative zero is not negative");
         assert_eq!(zero.input_per_mtok, 0.0);
+    }
+
+    /// DIVERGENCE: D44. Both cache prices, one, null, and absent. A null or absent cache
+    /// price is `None`, never 0, and a zero price is `Some(0.0)`.
+    #[test]
+    fn cache_prices_are_optional() {
+        let both = parse_pricing(
+            r#"{"input_per_mtok": 3, "output_per_mtok": 15, "Cache_Read_Per_Mtok": 0.3, "cache_write_per_mtok": 3.75}"#,
+        )
+        .expect("parses");
+        assert_eq!(both.cache_read_per_mtok, Some(0.3));
+        assert_eq!(both.cache_write_per_mtok, Some(3.75));
+        assert_eq!(both.input_per_mtok, 3.0);
+
+        let read_only = parse_pricing(r#"{"cache_read_per_mtok": 0}"#).expect("parses");
+        assert_eq!(read_only.cache_read_per_mtok, Some(0.0));
+        assert_eq!(read_only.cache_write_per_mtok, None);
+
+        let null = parse_pricing(r#"{"cache_read_per_mtok": null, "cache_write_per_mtok": 1}"#)
+            .expect("parses");
+        assert_eq!(null.cache_read_per_mtok, None);
+        assert_eq!(null.cache_write_per_mtok, Some(1.0));
+
+        let absent = parse_pricing(r#"{"input_per_mtok": 1}"#).expect("parses");
+        assert_eq!(absent.cache_read_per_mtok, None);
+        assert_eq!(absent.cache_write_per_mtok, None);
+    }
+
+    /// DIVERGENCE: D44. A negative cache price is a negative price, and a wrong type is a
+    /// decode error naming the field. Negative zero is not negative.
+    #[test]
+    fn cache_prices_are_checked() {
+        for raw in [
+            r#"{"cache_read_per_mtok": -0.1}"#,
+            r#"{"cache_write_per_mtok": -2}"#,
+        ] {
+            assert_eq!(
+                parse_pricing(raw),
+                Err("pricing snapshot has a negative price".to_owned()),
+                "{raw}"
+            );
+        }
+        assert_eq!(
+            parse_pricing(r#"{"cache_write_per_mtok": "1"}"#),
+            Err("parsing pricing snapshot: json: cannot unmarshal string into Go struct field Pricing.cache_write_per_mtok of type float64".to_owned())
+        );
+        let zero = parse_pricing(r#"{"cache_read_per_mtok": -0.0, "cache_write_per_mtok": -0}"#)
+            .expect("negative zero is not negative");
+        assert_eq!(zero.cache_read_per_mtok, Some(0.0));
+        assert_eq!(zero.cache_write_per_mtok, Some(0.0));
     }
 
     #[test]

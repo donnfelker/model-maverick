@@ -266,6 +266,10 @@ refresh them from models.dev (bead 7.15):
   model. There is no fuzzy matching. Unmapped columns count as `missing_from_source`.
 - Without a map, `price_sync` changes nothing, and the internal API is the way prices
   change. A change of more than 10 times the stored price is refused.
+- The snapshot can also hold `cache_read_per_mtok` and `cache_write_per_mtok` (D44).
+  `price_sync` copies them from the models.dev `cache_read` and `cache_write` fields, and a
+  change to one of them alone is a price change. A source entry with a negative cache
+  price is skipped. Only cost-aware conversation affinity reads them; run cost never does.
 
 A price edit never restates the cost of past runs.
 

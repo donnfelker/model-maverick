@@ -201,6 +201,8 @@ struct ModelsDevModel {
 struct ModelsDevCost {
     input: Option<f64>,
     output: Option<f64>,
+    cache_read: Option<f64>,
+    cache_write: Option<f64>,
 }
 
 pub fn models_dev_prices_from_str(
@@ -264,7 +266,13 @@ pub fn models_dev_prices_from_str(
             );
             continue;
         };
-        if !valid_price(input_per_mtok) || !valid_price(output_per_mtok) {
+        // D44: a cache price is optional, but one that is present must be valid too.
+        let invalid_cache = |price: Option<f64>| price.is_some_and(|price| !valid_price(price));
+        if !valid_price(input_per_mtok)
+            || !valid_price(output_per_mtok)
+            || invalid_cache(cost.cache_read)
+            || invalid_cache(cost.cache_write)
+        {
             tracing::warn!(
                 provider = %mapping.column.provider,
                 model_id = %mapping.column.model_id,
@@ -282,6 +290,8 @@ pub fn models_dev_prices_from_str(
             Pricing {
                 input_per_mtok,
                 output_per_mtok,
+                cache_read_per_mtok: cost.cache_read,
+                cache_write_per_mtok: cost.cache_write,
                 currency: MODELS_DEV_CURRENCY.to_owned(),
                 as_of: model.last_updated.clone().unwrap_or_default(),
                 source: MODELS_DEV_SOURCE.to_owned(),
@@ -448,6 +458,8 @@ pub async fn price_sync(
 fn same_price(current: &Pricing, entry: &Pricing) -> bool {
     current.input_per_mtok == entry.input_per_mtok
         && current.output_per_mtok == entry.output_per_mtok
+        && current.cache_read_per_mtok == entry.cache_read_per_mtok
+        && current.cache_write_per_mtok == entry.cache_write_per_mtok
         && current.currency == entry.currency
 }
 
@@ -472,12 +484,21 @@ fn price_ratio_too_large(current: f64, next: f64) -> bool {
 }
 
 /// The snapshot in Go `json.Marshal` form, keys in order: `input_per_mtok`,
-/// `output_per_mtok`, `currency`, `as_of`, `source`.
+/// `output_per_mtok`, `cache_read_per_mtok` and `cache_write_per_mtok` when set (D44),
+/// `currency`, `as_of`, `source`.
 fn snapshot_json(pricing: &Pricing) -> Result<String, String> {
     let mut out = String::from("{\"input_per_mtok\":");
     out.push_str(&gojson::encode_f64(pricing.input_per_mtok)?);
     out.push_str(",\"output_per_mtok\":");
     out.push_str(&gojson::encode_f64(pricing.output_per_mtok)?);
+    if let Some(price) = pricing.cache_read_per_mtok {
+        out.push_str(",\"cache_read_per_mtok\":");
+        out.push_str(&gojson::encode_f64(price)?);
+    }
+    if let Some(price) = pricing.cache_write_per_mtok {
+        out.push_str(",\"cache_write_per_mtok\":");
+        out.push_str(&gojson::encode_f64(price)?);
+    }
     out.push_str(",\"currency\":");
     gojson::write_string(&mut out, &pricing.currency);
     out.push_str(",\"as_of\":");
@@ -827,6 +848,8 @@ mod tests {
         let pricing = Pricing {
             input_per_mtok: 4.0,
             output_per_mtok: 0.25,
+            cache_read_per_mtok: None,
+            cache_write_per_mtok: None,
             currency: "USD".to_owned(),
             as_of: "2031-07-01".to_owned(),
             source: "list <a&b>".to_owned(),
@@ -840,5 +863,69 @@ mod tests {
             ..pricing
         };
         assert!(snapshot_json(&nan).is_err());
+    }
+
+    /// DIVERGENCE: D44. Set cache prices follow the output price; an unset one is left out.
+    #[test]
+    fn snapshot_json_writes_set_cache_prices_only() {
+        let base = Pricing {
+            input_per_mtok: 3.0,
+            output_per_mtok: 15.0,
+            currency: "USD".to_owned(),
+            as_of: "2031-07-01".to_owned(),
+            source: "models.dev".to_owned(),
+            ..Pricing::default()
+        };
+        let both = Pricing {
+            cache_read_per_mtok: Some(0.3),
+            cache_write_per_mtok: Some(3.75),
+            ..base.clone()
+        };
+        assert_eq!(
+            snapshot_json(&both).unwrap(),
+            r#"{"input_per_mtok":3,"output_per_mtok":15,"cache_read_per_mtok":0.3,"cache_write_per_mtok":3.75,"currency":"USD","as_of":"2031-07-01","source":"models.dev"}"#
+        );
+        let write_only = Pricing {
+            cache_write_per_mtok: Some(0.0),
+            ..base.clone()
+        };
+        assert_eq!(
+            snapshot_json(&write_only).unwrap(),
+            r#"{"input_per_mtok":3,"output_per_mtok":15,"cache_write_per_mtok":0,"currency":"USD","as_of":"2031-07-01","source":"models.dev"}"#
+        );
+        for bad in [
+            Pricing {
+                cache_read_per_mtok: Some(f64::NAN),
+                ..base.clone()
+            },
+            Pricing {
+                cache_write_per_mtok: Some(f64::INFINITY),
+                ..base
+            },
+        ] {
+            assert!(snapshot_json(&bad).is_err(), "{bad:?}");
+        }
+    }
+
+    /// DIVERGENCE: D44. A cache price change alone is a price change.
+    #[test]
+    fn same_price_compares_cache_prices() {
+        let base = Pricing {
+            input_per_mtok: 3.0,
+            output_per_mtok: 15.0,
+            currency: "USD".to_owned(),
+            ..Pricing::default()
+        };
+        assert!(same_price(&base, &base.clone()));
+        let read = Pricing {
+            cache_read_per_mtok: Some(0.3),
+            ..base.clone()
+        };
+        let write = Pricing {
+            cache_write_per_mtok: Some(3.75),
+            ..base.clone()
+        };
+        assert!(!same_price(&base, &read));
+        assert!(!same_price(&base, &write));
     }
 }

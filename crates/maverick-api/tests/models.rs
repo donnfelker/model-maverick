@@ -463,3 +463,33 @@ async fn param_constraints_are_returned_verbatim() {
     );
     db.close().await;
 }
+
+/// DIVERGENCE: D44. The pricing snapshot shows the cache prices as stored.
+#[tokio::test]
+async fn the_pricing_snapshot_shows_cache_prices() {
+    let Some((db, pool)) = database().await else {
+        return;
+    };
+    column(
+        &pool,
+        Col {
+            id: "col_cache",
+            model: "claude-cache-prices",
+            endpoint: "direct",
+            status: "active",
+            pricing: r#"{"input_per_mtok": 3, "output_per_mtok": 15, "cache_read_per_mtok": 0.3, "cache_write_per_mtok": 3.75}"#,
+            ..Col::default()
+        },
+    )
+    .await;
+
+    let (status, text) = models(&pool).await;
+    assert_eq!(status, StatusCode::OK);
+    let body = parse(&text);
+    assert_eq!(
+        entries(&body)[0]["pricing"],
+        serde_json::json!({"input_per_mtok": 3, "output_per_mtok": 15,
+                           "cache_read_per_mtok": 0.3, "cache_write_per_mtok": 3.75})
+    );
+    db.close().await;
+}

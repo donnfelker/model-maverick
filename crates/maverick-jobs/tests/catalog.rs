@@ -180,6 +180,7 @@ fn list_price(input: f64, output: f64, as_of: &str) -> Pricing {
         currency: "USD".to_owned(),
         as_of: as_of.to_owned(),
         source: "list".to_owned(),
+        ..Pricing::default()
     }
 }
 
@@ -340,6 +341,13 @@ fn models_dev_payload_uses_explicit_mapping_and_validation() {
                 "anthropic",
                 "not-present",
             ),
+            ModelsDevPriceMapping::new(
+                "anthropic",
+                "invalid-cache",
+                "direct",
+                "anthropic",
+                "negative-cache-price",
+            ),
         ],
     );
 
@@ -355,6 +363,8 @@ fn models_dev_payload_uses_explicit_mapping_and_validation() {
         &Pricing {
             input_per_mtok: 3.0,
             output_per_mtok: 15.0,
+            cache_read_per_mtok: Some(0.3),
+            cache_write_per_mtok: Some(3.75),
             currency: "USD".to_owned(),
             as_of: String::new(),
             source: "models.dev".to_owned(),
@@ -375,6 +385,15 @@ fn models_dev_payload_uses_explicit_mapping_and_validation() {
         "2031-07-01"
     );
     assert!(!prices.contains_key(&PriceKey::new("anthropic", "invalid-negative", "direct")));
+    // D44: a present cache price must be valid too.
+    assert!(!prices.contains_key(&PriceKey::new("anthropic", "invalid-cache", "direct")));
+    assert_eq!(
+        prices
+            .get(&PriceKey::new("openai", "chat-default", "direct"))
+            .expect("openai")
+            .cache_read_per_mtok,
+        Some(0.5)
+    );
     assert!(!prices.contains_key(&PriceKey::new(
         "anthropic",
         "missing-source-model",
@@ -456,6 +475,8 @@ async fn price_sync_uses_models_dev_mapping_and_endpoint() {
         Pricing {
             input_per_mtok: 3.0,
             output_per_mtok: 15.0,
+            cache_read_per_mtok: Some(0.3),
+            cache_write_per_mtok: Some(3.75),
             currency: "USD".to_owned(),
             as_of: "2031-07-10".to_owned(),
             source: "models.dev".to_owned(),
@@ -470,6 +491,7 @@ async fn price_sync_uses_models_dev_mapping_and_endpoint() {
             currency: "USD".to_owned(),
             as_of: "2031-07-10".to_owned(),
             source: "models.dev".to_owned(),
+            ..Pricing::default()
         }
     );
     let unmapped = get_model_column(pool, "col_unmapped").await.unwrap();
@@ -481,6 +503,7 @@ async fn price_sync_uses_models_dev_mapping_and_endpoint() {
             currency: "USD".to_owned(),
             as_of: "2031-07-09".to_owned(),
             source: "old".to_owned(),
+            ..Pricing::default()
         }
     );
 }
@@ -508,6 +531,7 @@ async fn price_sync_rejects_absurd_daily_change() {
             currency: "USD".to_owned(),
             as_of: "2031-07-10".to_owned(),
             source: "models.dev".to_owned(),
+            ..Pricing::default()
         },
     )]));
 

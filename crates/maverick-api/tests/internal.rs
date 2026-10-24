@@ -1486,3 +1486,40 @@ async fn param_constraints_are_validated_stored_and_logged() {
             )
     );
 }
+
+/// DIVERGENCE: D44. A column write keeps both cache prices as sent, and a negative cache
+/// price is not a valid snapshot.
+#[tokio::test]
+async fn column_pricing_keeps_cache_prices() {
+    let db = db!();
+    let pool = db.pool().await;
+    let seam = seam(&pool);
+    seam.column("col_cache", "active").await;
+    let (status, body) = seam
+        .ops_json(
+            "PUT",
+            "/internal/v1/columns/col_cache",
+            r#"{"pricing":{"input_per_mtok":3,"output_per_mtok":15,"cache_read_per_mtok":0.3,"cache_write_per_mtok":3.75}}"#,
+        )
+        .await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(
+        body["pricing"],
+        json!({"input_per_mtok": 3, "output_per_mtok": 15,
+               "cache_read_per_mtok": 0.3, "cache_write_per_mtok": 3.75})
+    );
+    let (status, body) = seam
+        .ops_json(
+            "PUT",
+            "/internal/v1/columns/col_cache",
+            r#"{"pricing":{"input_per_mtok":3,"output_per_mtok":15,"cache_write_per_mtok":-1}}"#,
+        )
+        .await;
+    assert_eq!(status, 422, "{body}");
+    assert_eq!(body["error"]["code"], "invalid_request");
+    assert_eq!(
+        body["error"]["message"],
+        "pricing is not a valid snapshot: pricing snapshot has a negative price"
+    );
+    assert_eq!(body["error"]["details"], json!({"field": "pricing"}));
+}

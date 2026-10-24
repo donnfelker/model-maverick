@@ -9,7 +9,8 @@
         "cost": {
           "input": 3,
           "output": 15,
-          "cache_read": 0.3
+          "cache_read": 0.3,
+          "cache_write": 3.75
         },
         "limit": {
           "context": 200000,
@@ -21,6 +22,14 @@
         "cost": {
           "input": -1,
           "output": 2
+        }
+      },
+      "negative-cache-price": {
+        "id": "negative-cache-price",
+        "cost": {
+          "input": 1,
+          "output": 2,
+          "cache_write": -1
         }
       }
     }
