@@ -479,6 +479,84 @@ The worker registers its cron triggers in graphile_worker. The schedules are in 
 
 The first live nightly under the spend cap is bead 9.6.
 
+## 10. Public matrix bundles [owner]
+
+The hosted engine is the **origin** (D49). After each `aggregate_rebuild` it exports a
+signed matrix bundle, and self-hosted replicas import those bundles
+(`docs/self-hosted.md` section 6). This section turns the export on and publishes the
+bundles. It can run after go-live, because no replica depends on it until the first
+release.
+
+**Gates:**
+
+| Gate | Where |
+|---|---|
+| The current and standby signing key pairs, and a release whose trust table holds their public keys | bead `model-maverick-tgm2` |
+| The public bundle location and how files reach it | bead `model-maverick-xq7v.25` |
+
+1. **The signing key.** Custody, the key commands, rotation, and compromise are in
+   `docs/operations.md` "Bundle signing keys".
+   - Put the **current** private key on the host, outside any checkout and outside the
+     export directory, readable only by the image's `nonroot` user (uid 65532):
+
+     ```sh
+     sudo install -d -m 0700 -o 65532 -g 65532 /srv/maverick-signing
+     sudo install -m 0400 -o 65532 -g 65532 <kid>.pem /srv/maverick-signing/<kid>.pem
+     ```
+
+   - The **standby** private key never goes on the host. It stays offline.
+2. **The export directory.** It must be one filesystem with hard links and atomic rename,
+   writable by uid 65532:
+
+   ```sh
+   sudo install -d -m 0755 -o 65532 -g 65532 /srv/maverick-exports
+   ```
+
+3. **The configuration.** In `config/deploy.yml`, mount both directories and set the two
+   settings. Only the worker role runs the export job.
+
+   ```yaml
+   volumes:
+     - /srv/maverick-exports:/exports
+     - /srv/maverick-signing:/run/maverick-signing:ro
+   env:
+     clear:
+       MAVERICK_MATRIX_EXPORT_DIR: /exports
+       MAVERICK_MATRIX_SIGNING_KEYS: <kid>:/run/maverick-signing/<kid>.pem
+   ```
+
+   With the export directory set, startup refuses an unset `MAVERICK_MATRIX_SIGNING_KEYS`.
+   Deploy with `kamal deploy`.
+4. **The first export.** After the next `aggregate_rebuild`, check the directory on the
+   host:
+
+   ```sh
+   ls -l /srv/maverick-exports    # mmbundle1-<published_at>.tar files and index.json
+   ```
+
+   If no new bundle appears after a rebuild, look for `matrix_export` in
+   `kamal app logs --roles=worker`. The job queue retries a failed export.
+5. **Publishing.** Copy new files to the public location. The copy never overwrites or
+   deletes a published bundle, skips the export job's temporary files (their names start
+   with a dot), and uploads `index.json` last. Until bead xq7v.25 picks the tool, this
+   rclone shape does it:
+
+   ```sh
+   rclone copy --ignore-existing --exclude index.json --exclude '.*' \
+     /srv/maverick-exports <remote>:<bucket>
+   rclone copyto /srv/maverick-exports/index.json <remote>:<bucket>/index.json
+   ```
+
+   The remote's credential may write but never delete. Run the copy after each export, or
+   hourly. Keep every bundle at the location for at least 12 months.
+6. **Check from outside:**
+
+   ```sh
+   curl -fsS https://bundles.example.com/index.json
+   curl -fsSO https://bundles.example.com/<file from the index>
+   sha256sum <file>    # equals the entry's sha256
+   ```
+
 ## Rollback
 
 There is no Go fallback. A failed step is fixed forward in Rust, and then deployed again.
