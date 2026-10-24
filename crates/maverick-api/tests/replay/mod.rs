@@ -74,6 +74,8 @@ pub struct Diff {
     pub part: String,
     pub expected: String,
     pub actual: String,
+    /// The recorded request body, for rules that depend on what the caller sent.
+    pub request: String,
 }
 
 impl Diff {
@@ -364,6 +366,7 @@ fn compare(
         part: part.to_owned(),
         expected,
         actual,
+        request: String::from_utf8_lossy(&exchange.body).into_owned(),
     };
     let mut diffs = Vec::new();
     if sent.status != exchange.status {

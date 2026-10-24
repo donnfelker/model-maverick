@@ -258,8 +258,10 @@ async fn recommend_uninstrumented(
 ) -> Result<Recommended, RecommendError> {
     let request = request::decode(body)?;
     let form = request::validate(&request)?;
+    // D47: no mode (or an empty one) ranks in quality mode, as `maverick/auto` does (D45).
+    // Go defaulted to balanced.
     let mode = if request.mode.is_empty() {
-        "balanced"
+        "quality"
     } else {
         request.mode.as_str()
     };

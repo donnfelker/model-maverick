@@ -346,7 +346,8 @@ async fn difficulty_defaults_on_cold_start() {
     assert_eq!(v["measured"], false);
     assert_eq!(v["constraints_met"], true);
     assert_eq!(v["violations"], json!([]));
-    assert_eq!(v["mode"], "balanced");
+    // DIVERGENCE D47: a request without mode ranks in quality mode; Go answered balanced.
+    assert_eq!(v["mode"], "quality");
     assert_eq!(v["matrix_version"], "");
     assert!(v.get("prompt_hash").is_none());
     db.close().await;
@@ -987,6 +988,71 @@ async fn low_availability_ranks_last() {
         "{flaky}"
     );
     assert_eq!(flaky["low_availability"], true);
+    db.close().await;
+}
+
+/// DIVERGENCE D47: a request without `mode`, or with an empty one, ranks like
+/// `mode: "quality"`, and an explicit `balanced` keeps the balanced ranking (Go: no mode was
+/// balanced). The cheap column is 1 point behind: inside the balanced band (1.5) and outside
+/// the quality band (0) and the noise band (0.75), so the two modes order the chain apart.
+#[tokio::test]
+async fn no_mode_ranks_in_quality_mode() {
+    let Some((db, pool)) = database().await else {
+        return;
+    };
+    let cap = "factual_qa";
+    for (id, q, c, l) in [
+        ("col_best", 0.90f32, 1.0f32, 1000.0f32),
+        ("col_cheap", 0.89, 0.1, 100.0),
+        ("col_weak", 0.50, 10.0, 10000.0),
+    ] {
+        column(&pool, id, "anthropic", id, None, None).await;
+        cell(&pool, id, cap, 3, q, c, l).await;
+        aggregate(&pool, id, cap, 3, "availability", 1.0, night()).await;
+    }
+    pool_of(
+        &pool,
+        "default",
+        &["col_best", "col_cheap", "col_weak"],
+        true,
+    )
+    .await;
+
+    let quality = ["col_best", "col_cheap", "col_weak"];
+    for (body, mode, chain) in [
+        (
+            r#"{"workload":{"capability":"factual_qa"}}"#,
+            "quality",
+            quality,
+        ),
+        (
+            r#"{"workload":{"capability":"factual_qa"},"mode":""}"#,
+            "quality",
+            quality,
+        ),
+        (
+            r#"{"workload":{"capability":"factual_qa"},"mode":"quality"}"#,
+            "quality",
+            quality,
+        ),
+        (
+            r#"{"workload":{"capability":"factual_qa"},"mode":"balanced"}"#,
+            "balanced",
+            ["col_cheap", "col_best", "col_weak"],
+        ),
+    ] {
+        let (status, text) = recommend(&pool, body).await;
+        assert_eq!(status, StatusCode::OK, "{body}: {text}");
+        let v = parse(&text);
+        assert_eq!(v["mode"], mode, "{body}");
+        let got: Vec<&str> = v["recommendations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry["column_id"].as_str().unwrap())
+            .collect();
+        assert_eq!(got, chain, "{body}");
+    }
     db.close().await;
 }
 

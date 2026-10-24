@@ -1,7 +1,8 @@
 //! `parity/blackbox/replay-allowlist.json`: the reviewed differences, each tied to a
 //! DIVERGENCES row.
 //!
-//! - A **rule** matches exchanges by method, path, and recorded status, and turns an
+//! - A **rule** matches exchanges by method, path, and recorded status (and optionally
+//!   by what the recorded body or request does or does not contain), and turns an
 //!   approved difference into an exact comparison: `strip` removes the Rust-only members
 //!   (additive rows such as D8) from our body, `recorded_replace` rewrites the recorded
 //!   body where a row changes a value (such as D16), and `mask` rewrites both where a row
@@ -36,6 +37,10 @@ pub struct Rule {
     /// A regex the recorded body must match for the rule to apply.
     #[serde(default)]
     pub when: Option<String>,
+    /// A regex the recorded request body must not match for the rule to apply, for a row
+    /// that changes what an omitted request field means (D47).
+    #[serde(default)]
+    pub unless_request: Option<String>,
     #[serde(default)]
     pub strip: Vec<String>,
     #[serde(default)]
@@ -243,6 +248,10 @@ impl Allowlist {
                     Regex::new(when)
                         .unwrap_or_else(|e| panic!("allowlist regex {when}: {e}"))
                         .is_match(&diff.expected)
+                }) && rule.unless_request.as_ref().is_none_or(|unless| {
+                    !Regex::new(unless)
+                        .unwrap_or_else(|e| panic!("allowlist regex {unless}: {e}"))
+                        .is_match(&diff.request)
                 })
             })
             .collect();

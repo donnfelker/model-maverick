@@ -252,6 +252,35 @@
           "\"job_queue\":{\"status\":\"no_workers\",\"detail\":\"no graphile_worker worker is registered\"},\"provider_client_config\":$1"
         ]
       ]
+    },
+    {
+      "divergences": [
+        "D47"
+      ],
+      "reason": "A recommend request without mode ranks in quality mode (D47), so the response's mode is quality where Go said balanced, and the MCP recommend_model schema says default quality. The request decides it, so the rule skips any recorded request that names a mode.",
+      "match": [
+        {
+          "method": "POST",
+          "path": "/v1/recommend",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "path": "/mcp",
+          "status": 200
+        }
+      ],
+      "unless_request": "\"mode\"\\s*:\\s*\"[a-z]+\"",
+      "recorded_replace": [
+        [
+          "(\\\\?\"mode\\\\?\":\\\\?\")balanced",
+          "${1}quality"
+        ],
+        [
+          "; default balanced",
+          "; default quality"
+        ]
+      ]
     }
   ],
   "entries": [

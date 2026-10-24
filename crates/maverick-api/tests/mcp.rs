@@ -297,7 +297,16 @@ async fn lists_exactly_the_spec_tools() {
         list["request_body_exact"].as_str().unwrap(),
     )
     .await;
-    assert_eq!(reply.body, list["response_body_exact"].as_str().unwrap());
+    // DIVERGENCE D47: the recommend_model schema says the default mode is quality.
+    let expected = list["response_body_exact"].as_str().unwrap();
+    assert!(
+        expected.contains("; default balanced\""),
+        "the Go fixture changed"
+    );
+    assert_eq!(
+        reply.body,
+        expected.replace("; default balanced\"", "; default quality\"")
+    );
     let names: Vec<String> = frame(&reply)["result"]["tools"]
         .as_array()
         .unwrap()
