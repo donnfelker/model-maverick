@@ -1,0 +1,110 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select id, from_release, to_release, operator, migrations, started_at,\n                finished_at, verify_failed\n         from upgrades order by started_at desc, id desc limit 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "upgrades",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "from_release",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "upgrades",
+            "name": "from_release"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "to_release",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "upgrades",
+            "name": "to_release"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "operator",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "upgrades",
+            "name": "operator"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "migrations",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "upgrades",
+            "name": "migrations"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "started_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "upgrades",
+            "name": "started_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "finished_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "upgrades",
+            "name": "finished_at"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "verify_failed",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "upgrades",
+            "name": "verify_failed"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "54c35ea74b4344322c82732e0b72e44195dfcbcc9d65856fe518aa86d22f0560"
+}

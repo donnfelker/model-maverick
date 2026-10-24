@@ -210,6 +210,35 @@ impl Status {
     }
 }
 
+/// An engine migration's file name, `NNNN_<description>.sql`, as `migrate` logs it.
+#[must_use]
+pub fn migration_name(version: i64) -> String {
+    MIGRATOR.iter().find(|m| m.version == version).map_or_else(
+        || format!("{version:04}"),
+        |m| format!("{:04}_{}.sql", m.version, m.description.replace(' ', "_")),
+    )
+}
+
+/// A graphile_worker migration's name in a plan, `graphile_worker NNNNNN`.
+#[must_use]
+pub fn queue_migration_name(number: i64) -> String {
+    format!("graphile_worker {number:06}")
+}
+
+/// A graphile_worker migration's class: the library marks the ones that break a running
+/// worker, and those need downtime.
+#[must_use]
+pub fn queue_class(number: i64) -> Class {
+    let breaking = graphile_worker_migrations::sql::GRAPHILE_WORKER_MIGRATIONS
+        .iter()
+        .any(|m| i64::from(m.migration_number()) == number && m.is_breaking());
+    if breaking {
+        Class::NeedsDowntime
+    } else {
+        Class::OnlineSafe
+    }
+}
+
 /// The newest engine migration this binary ships.
 #[must_use]
 pub fn binary_schema_version() -> i64 {

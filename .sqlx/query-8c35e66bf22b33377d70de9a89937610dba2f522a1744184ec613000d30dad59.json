@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "update upgrades set migrations = $2, finished_at = $3, verify_failed = $4\n         where id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "TextArray",
+        "Timestamptz",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8c35e66bf22b33377d70de9a89937610dba2f522a1744184ec613000d30dad59"
+}

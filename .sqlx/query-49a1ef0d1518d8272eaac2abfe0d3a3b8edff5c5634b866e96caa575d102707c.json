@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "delete from serve_heartbeats where process_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "49a1ef0d1518d8272eaac2abfe0d3a3b8edff5c5634b866e96caa575d102707c"
+}

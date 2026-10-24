@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "insert into serve_heartbeats (process_id, release, host_label, last_seen_at)\n         values ($1, $2, $3, $4)\n         on conflict (process_id) do update\n           set release = excluded.release, host_label = excluded.host_label,\n               last_seen_at = excluded.last_seen_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "614c693df8335da2a73616ed3c79f41e9806d8abf59257dcb245c472a8b8bff7"
+}

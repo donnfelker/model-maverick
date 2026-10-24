@@ -331,3 +331,54 @@ async fn replica_starts_without_resolving_the_judge_pool() {
     );
     db.close().await;
 }
+
+/// DIVERGENCE: D50. `serve` never migrates: a database with pending migrations is refused
+/// at startup, before any listener, with `run maverick upgrade` (spec §14.5).
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn serve_refuses_a_database_with_pending_migrations() {
+    let Some(db) = maverick_testdb::database(&Schema::empty()).await else {
+        return;
+    };
+    let mut engine = Engine::start(db.url(), &[], free_port(), free_port());
+    let refused = engine.wait_for("refusing to start", None);
+    let error = refused["error"].as_str().expect("error");
+    assert!(
+        error.starts_with("the database has ") && error.ends_with("; run maverick upgrade"),
+        "{error}"
+    );
+    assert_eq!(engine.wait(), 1, "{}", engine.output());
+    assert!(!engine.messages().iter().any(|m| m == "listening"));
+    db.close().await;
+}
+
+/// DIVERGENCE: D50. A running `serve` keeps a heartbeat row with its release, and removes
+/// it on a clean shutdown (spec §14.5), so `maverick upgrade` can see it.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn serve_keeps_a_heartbeat_and_removes_it_on_shutdown() {
+    let Some(db) = maverick_testdb::database(&SCHEMA).await else {
+        return;
+    };
+    let mut engine = Engine::start(db.url(), &["--api-only"], free_port(), free_port());
+    engine.wait_for("listening", Some("public"));
+    let pool = db.pool().await;
+    let deadline = Instant::now() + Duration::from_secs(20);
+    let beats = loop {
+        let beats = maverick_store::upgrade::live_heartbeats(&pool, chrono::Utc::now())
+            .await
+            .expect("heartbeats");
+        if !beats.is_empty() || Instant::now() > deadline {
+            break beats;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    };
+    assert_eq!(beats.len(), 1, "{}", engine.output());
+    assert!(beats[0].process_id.starts_with("srv_"));
+    assert_eq!(beats[0].release, env!("CARGO_PKG_VERSION"));
+    assert!(!beats[0].host_label.is_empty());
+    assert_eq!(engine.terminate(), 0, "{}", engine.output());
+    let left = maverick_store::upgrade::live_heartbeats(&pool, chrono::Utc::now())
+        .await
+        .expect("heartbeats");
+    assert!(left.is_empty(), "{left:?}");
+    db.close().await;
+}

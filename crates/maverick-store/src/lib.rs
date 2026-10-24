@@ -28,6 +28,7 @@ pub mod migrate;
 pub mod schema;
 pub mod simulation;
 pub mod tenancy;
+pub mod upgrade;
 
 pub use rust_decimal::Decimal;
 pub use sqlx::types::JsonRawValue;

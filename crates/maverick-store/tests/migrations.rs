@@ -120,6 +120,28 @@ const ADDED: &[&str] = &[
      public.matrix_imports USING btree (manifest_sha256)",
     "index matrix_imports_one_active CREATE UNIQUE INDEX matrix_imports_one_active ON \
      public.matrix_imports USING btree (active) WHERE active",
+    // 0012_upgrades.sql (D50)
+    "table upgrades",
+    "column upgrades.id text not null",
+    "column upgrades.from_release text null",
+    "column upgrades.to_release text not null",
+    "column upgrades.operator text not null",
+    "column upgrades.migrations text[] not null default '{}'::text[]",
+    "column upgrades.started_at timestamp with time zone not null",
+    "column upgrades.finished_at timestamp with time zone null",
+    "column upgrades.verify_failed text null",
+    "column upgrades.created_at timestamp with time zone not null default now()",
+    "constraint upgrades.upgrades_pkey PRIMARY KEY (id)",
+    "index upgrades_pkey CREATE UNIQUE INDEX upgrades_pkey ON public.upgrades USING btree (id)",
+    "table serve_heartbeats",
+    "column serve_heartbeats.process_id text not null",
+    "column serve_heartbeats.release text not null",
+    "column serve_heartbeats.host_label text not null",
+    "column serve_heartbeats.last_seen_at timestamp with time zone not null",
+    "column serve_heartbeats.created_at timestamp with time zone not null default now()",
+    "constraint serve_heartbeats.serve_heartbeats_pkey PRIMARY KEY (process_id)",
+    "index serve_heartbeats_pkey CREATE UNIQUE INDEX serve_heartbeats_pkey ON \
+     public.serve_heartbeats USING btree (process_id)",
 ];
 
 /// Catalog entries that the additive migrations replace.
@@ -258,8 +280,9 @@ async fn the_additive_migrations_add_exactly_the_spec_objects() {
         .filter(|line| line.starts_with("table "))
         .count();
     assert_eq!(
-        tables, 24,
-        "20 Go tables plus batches, classifier_usage, conversation_affinity, and matrix_imports (D49)"
+        tables, 26,
+        "20 Go tables plus batches, classifier_usage, conversation_affinity, matrix_imports \
+         (D49), upgrades, and serve_heartbeats (D50)"
     );
 }
 

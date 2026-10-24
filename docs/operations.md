@@ -413,7 +413,7 @@ Every migration from 0012 on starts with two header lines:
 - `needs-downtime`: the previous release can fail against the new schema, so every
   `serve` stops before it is applied.
 - `tables`: every table the migration creates or alters. `maverick upgrade` reads one row
-  of each after it applies them (bead xq7v.16).
+  of each after it applies them.
 
 The test `every_migration_declares_its_class_and_tables` in `maverick-store` refuses a
 migration without them. Migrations 0001 to 0011 predate the header and are never edited,
@@ -431,6 +431,44 @@ adds a `not null` column with no default to `debug_captures`.
   data: `RELEASES` in the same file lists each release's name, date, and newest migration,
   and the release pipeline appends one row per release. A fresh database is always
   accepted, and the table is empty until the first release.
+
+### `maverick upgrade`
+
+The operator's upgrade command. Install the new release by your normal process, run
+`maverick upgrade` from it against the database, then restart (or roll) `serve`. It
+downloads nothing, so it works the same in a sealed network.
+
+```sh
+maverick upgrade --check   # preflight and plan only: what change control reviews
+maverick upgrade           # asks before it applies (in a terminal)
+maverick upgrade --yes     # applies without asking (automation)
+maverick upgrade --json    # the same report as one JSON object
+```
+
+It stops at the first failure and names it:
+
+1. **Preflight** (read only): the schema state and the release that last upgraded the
+   database, then the checks in order: newer database, upgrade window, the active
+   bundle's format (a warning, not a stop), the upgrade lock (a Postgres advisory lock,
+   so two runs never overlap), and serve processes (a `needs-downtime` migration is
+   refused while any `serve` heartbeat is younger than 2 minutes).
+2. **Plan**: every pending engine and job-queue migration with its class.
+3. **Apply**: the same code as `maverick migrate`, while the run holds the lock.
+4. **Record**: an `upgrades` row (from and to release, operator `cli:<os user>`, the
+   migrations, start and finish times).
+5. **Verify**: the checks again with nothing pending, then one row from each table an
+   applied migration created or altered. A failure exits 1 and is recorded in the row's
+   `verify_failed`.
+
+Without `--yes` and without a terminal, it applies nothing and exits 1. It exits 0 when
+the database is upgraded, already current, or (with `--check`) would upgrade.
+
+`serve` never migrates. At startup it refuses a database with pending engine or
+job-queue migrations (`run maverick upgrade`) or one newer than the release. When it
+cannot reach the database within 5 s it starts anyway, with lazy connections, as before.
+While it runs, each `serve` process refreshes a `serve_heartbeats` row every 30 s (its
+release and host) and removes it on a clean shutdown. A row older than 2 minutes counts as
+stopped.
 
 ## Jobs and schedules
 

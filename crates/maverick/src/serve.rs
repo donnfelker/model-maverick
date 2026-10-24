@@ -6,6 +6,11 @@
 //! Rust design under D10/D11 replaces Go's hard cancel, QUIRK J9: an unfinished batch is
 //! never marked completed and resumes under its lease). Then in-flight alert deliveries
 //! drain.
+//!
+//! D50 (spec §14.5): `serve` never migrates. At startup it refuses a database with pending
+//! engine or job-queue migrations (`run maverick upgrade`) or one newer than this release;
+//! a database it cannot reach within 5 s starts lazily, as before. While it runs it
+//! refreshes a `serve_heartbeats` row every 30 s and removes the row on a clean shutdown.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -242,6 +247,11 @@ async fn run(config: &Config, api_only: bool, worker_only: bool) -> i32 {
     );
     let mut signal = ShutdownSignal::install();
 
+    if let Some(refusal) = schema_gate(&config.database_url).await {
+        tracing::error!(error = %refusal, "refusing to start");
+        return EXIT_FAILURE;
+    }
+
     // Connections are lazy: an unreachable database does not fail startup.
     let max_connections = std::thread::available_parallelism()
         .map_or(4, |n| u32::try_from(n.get()).unwrap_or(4))
@@ -279,6 +289,13 @@ async fn run(config: &Config, api_only: bool, worker_only: bool) -> i32 {
     let mut workers: Option<RunningWorker> = None;
     // D41: background re-resolution of the judge pool and the classifier columns.
     let mut watchers: Vec<JoinHandle<()>> = Vec::new();
+    // D50: this process's heartbeat, so `maverick upgrade` sees which releases run.
+    let process_id = maverick_store::upgrade::new_process_id();
+    watchers.push(tokio::spawn(heartbeat(
+        pool.clone(),
+        process_id.clone(),
+        host_label(),
+    )));
     if !api_only {
         let graders = if config.role == maverick_config::Role::Origin {
             let graders = grader_registry(config, &pool, &providers).await;
@@ -401,10 +418,72 @@ async fn run(config: &Config, api_only: bool, worker_only: bool) -> i32 {
     for watcher in watchers {
         watcher.abort();
     }
+    let _ = tokio::time::timeout(
+        Duration::from_secs(2),
+        maverick_store::upgrade::stop_beating(&pool, &process_id),
+    )
+    .await;
     fanout.wait().await;
     pool.close().await;
     tracing::info!("stopped");
     code
+}
+
+/// D50: the schema check before anything starts. `None` lets startup go on: the schema is
+/// current, or the database cannot be reached within 5 s (connections stay lazy).
+async fn schema_gate(database_url: &str) -> Option<String> {
+    let read = async {
+        let mut conn = PgConnection::connect(database_url).await.ok()?;
+        let status = maverick_store::schema::status(&mut conn).await.ok();
+        let _ = conn.close().await;
+        status
+    };
+    let status = tokio::time::timeout(Duration::from_secs(5), read)
+        .await
+        .ok()
+        .flatten()?;
+    if let Err(error) = maverick_store::schema::check(&status) {
+        return Some(error.to_string());
+    }
+    if status.pending.is_empty() && status.queue_pending.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "the database has {} pending engine and {} pending job-queue migrations; run maverick upgrade",
+        status.pending.len(),
+        status.queue_pending.len()
+    ))
+}
+
+/// D50: refreshes this process's heartbeat every 30 s. A failed write is logged at debug
+/// and tried again on the next tick.
+async fn heartbeat(pool: PgPool, process_id: String, host: String) {
+    let mut every = tokio::time::interval(Duration::from_secs(
+        maverick_store::upgrade::HEARTBEAT_EVERY_SECS,
+    ));
+    loop {
+        every.tick().await;
+        let beat = maverick_store::upgrade::beat(
+            &pool,
+            &process_id,
+            crate::version::VERSION,
+            &host,
+            chrono::Utc::now(),
+        );
+        if let Err(error) = beat.await {
+            tracing::debug!(error = %error, "serve heartbeat");
+        }
+    }
+}
+
+/// The host this process runs on, for the heartbeat: `HOSTNAME`, else `/etc/hostname`.
+fn host_label() -> String {
+    std::env::var("HOSTNAME")
+        .ok()
+        .or_else(|| std::fs::read_to_string("/etc/hostname").ok())
+        .map(|host| host.trim().to_owned())
+        .filter(|host| !host.is_empty())
+        .unwrap_or_else(|| "unknown".to_owned())
 }
 
 /// A pooled connection idle at least this long is pinged before use (e3x).

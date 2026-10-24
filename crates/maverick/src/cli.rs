@@ -1,6 +1,6 @@
 //! Command dispatch and exit codes (reference Part 1 §7.1).
 
-use std::io::Write;
+use std::io::{IsTerminal, Write};
 
 use maverick_config::{Config, ConfigError};
 use maverick_domain::gofmt::quote;
@@ -8,13 +8,14 @@ use maverick_domain::gofmt::quote;
 use crate::flags::{FlagSet, Parsed};
 use crate::logging::{Output, with_logger};
 
-/// The main usage text (Go's exact text plus the D50 `--version` flag; `demo-run` and
-/// `spend` are hidden).
+/// The main usage text (Go's text plus the D50 `upgrade` command and `--version` flag;
+/// `demo-run` and `spend` are hidden).
 pub const MAIN_USAGE: &str = "Usage: maverick <command> [flags]
 
 Commands:
   serve       run the HTTP API, MCP server, and workers (--api-only | --worker-only)
-  migrate     run database migrations
+  upgrade     check and apply the schema for this release (--check | --yes | --json)
+  migrate     run database migrations (low level; operators use upgrade)
   corpus      load, activate, and inspect corpus versions, and print the tier
               calibration report (load | activate | status | calibrate)
   mcp-stdio   stdio MCP transport for local development (--api-key mk_live_...)
@@ -72,6 +73,7 @@ pub fn run(
     match command.as_str() {
         "serve" => serve(rest, lookup, stdout, stderr),
         "migrate" => migrate(rest, lookup, stdout, stderr),
+        "upgrade" => upgrade(rest, lookup, stdout, stderr),
         "demo-run" => demo_run(rest, lookup, stdout, stderr),
         "corpus" => corpus(rest, lookup, stdout, stderr),
         "spend" => spend(rest, lookup, stdout, stderr),
@@ -178,6 +180,65 @@ fn migrate(
             };
         tracing::error!(error = %error, "migrate failed");
         EXIT_FAILURE
+    })
+}
+
+/// `upgrade [--check] [--yes] [--json]` (spec §14.5, D50). The report goes to stdout;
+/// log lines and the confirmation prompt go to stderr.
+fn upgrade(
+    args: &[String],
+    lookup: &dyn Fn(&str) -> Option<String>,
+    mut stdout: Output,
+    mut stderr: Output,
+) -> i32 {
+    let set = FlagSet::new("upgrade")
+        .bool(
+            "check",
+            "run the preflight and the plan only, and change nothing",
+        )
+        .bool("yes", "apply without asking")
+        .bool("json", "print the report as one JSON object");
+    let Some(flags) = parse_flags(&set, args, &mut stderr) else {
+        return EXIT_USAGE;
+    };
+    if !flags.args().is_empty() {
+        let _ = write!(
+            stderr,
+            "maverick: upgrade takes no arguments\n\n{MAIN_USAGE}"
+        );
+        return EXIT_USAGE;
+    }
+    let options = crate::upgrade::Options {
+        check: flags.bool("check"),
+        yes: flags.bool("yes"),
+        json: flags.bool("json"),
+        interactive: std::io::stdin().is_terminal(),
+    };
+    let operator = format!(
+        "cli:{}",
+        lookup("USER")
+            .filter(|user| !user.is_empty())
+            .unwrap_or_else(|| "unknown".to_owned())
+    );
+    let mut prompt = stderr.clone();
+    with_logger(stderr, || {
+        let Ok(config) = load_config(lookup) else {
+            return EXIT_FAILURE;
+        };
+        let stdin = std::io::stdin();
+        let mut input = stdin.lock();
+        let ran = block_on(crate::upgrade::run(
+            &config.database_url,
+            &operator,
+            options,
+            &mut input,
+            &mut prompt,
+            &mut stdout,
+        ));
+        ran.unwrap_or_else(|error| {
+            tracing::error!(error = %error, "upgrade failed");
+            EXIT_FAILURE
+        })
     })
 }
 
