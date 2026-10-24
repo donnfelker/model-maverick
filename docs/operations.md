@@ -134,8 +134,9 @@ release table refuses it.
 
 **Release check.** `scripts/release-artifacts.sh` runs the trust table test with
 `MAVERICK_RELEASE_BUILD=1`, which requires exactly one `Current` and one `Standby` key
-and no test key. A fork that runs its own origin changes the table in source and builds
-its own release.
+and no test key. A tag that fails the check builds nothing. A manual dry run of the release
+workflow reports the failure and builds the rest (`MAVERICK_RELEASE_DRY_RUN=1`). A fork that
+runs its own origin changes the table in source and builds its own release.
 
 ## Configuration compatibility (D50)
 

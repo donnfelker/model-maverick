@@ -69,6 +69,8 @@ jobs:
       - name: Build the artifacts
         env:
           MAVERICK_RELEASE_COMMIT: ${{ github.sha }}
+          # A dry run goes past a trust table that is not ready for a release; a tag stops.
+          MAVERICK_RELEASE_DRY_RUN: ${{ github.ref_type != 'tag' && '1' || '' }}
           VERSION: ${{ steps.release.outputs.version }}
         run: scripts/release-artifacts.sh "$VERSION" dist
 

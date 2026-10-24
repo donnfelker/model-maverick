@@ -23,6 +23,9 @@
 # are committed). The script checks the version, date, and commit in the tarball's binary,
 # and that the image runs the same binary. Signing and publishing are the workflow's.
 #
+# MAVERICK_RELEASE_DRY_RUN=1 (the workflow's manual run) builds even when the bundle trust
+# table is not ready for a release, and says so. A tag never sets it.
+#
 # Needs docker, cargo-deny, and cargo-cyclonedx.
 set -Eeuo pipefail
 
@@ -80,9 +83,16 @@ fi
 
 # A release trusts exactly one current and one standby bundle signing key, and no test key
 # (D49, bead xq7v.5; crates/maverick-bundle/src/trust.rs; docs/operations.md "Bundle
-# signing keys"). Until the owner's public keys are in the table, no release builds.
+# signing keys"). Until the owner's public keys are in the table, no release builds. A dry
+# run reports the failure and goes on, so the rest of the pipeline still gets checked.
 log "checking the bundle trust table"
-MAVERICK_RELEASE_BUILD=1 cargo test -p maverick-bundle --lib --locked -q -- trust::
+if ! MAVERICK_RELEASE_BUILD=1 cargo test -p maverick-bundle --lib --locked -q -- trust::; then
+    if [[ ${MAVERICK_RELEASE_DRY_RUN:-} != 1 ]]; then
+        echo "the bundle trust table is not ready for a release" >&2
+        exit 1
+    fi
+    echo "dry run: the bundle trust table is not ready for a release; a tag stops here" >&2
+fi
 
 # One fixed time for every archive member, so the same inputs give the same bytes.
 EPOCH=$(date -u -d "$RELEASE_DATE" +%s)

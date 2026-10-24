@@ -133,7 +133,9 @@ the same binary. It leaves the images tagged `maverick:<v>` and `maverick-proxy:
    bundles. The release notes list the image digests.
 
 A manual run of the workflow (`workflow_dispatch`) is a dry run: it attaches the unsigned
-files to the run and pushes nothing.
+files to the run and pushes nothing. A dry run also builds when the bundle trust table is not
+ready for a release (docs/operations.md "Release check"), and its log says so. A tag stops
+there.
 
 **Verifying** (the identity is the release workflow at a tag):
 
