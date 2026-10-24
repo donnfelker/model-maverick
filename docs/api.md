@@ -993,16 +993,18 @@ not part of the engine's own wire contract.
   executed) on the response. A caller can then tie a provider response to its
   recommendation without parsing a body. The engine does not set these
   headers: `POST /v1/recommend` returns `recommendation_id` in the body.
-- **Conversation header** (D44, not served yet; beads gcd2.9 and gcd2.10). A
-  proxy caller MAY send `X-Maverick-Conversation: <id>`, 1 to 256 printable
-  ASCII characters. The proxy sends it to the engine as `affinity.key`, with
+- **Conversation header** (D44). A proxy caller MAY send
+  `X-Maverick-Conversation: <id>`, 1 to 256 printable ASCII characters. The
+  proxy sends it to the engine as `affinity.key`, with
   `affinity.context_tokens` estimated as the body's length in bytes divided by
   4, rounded up. It strips the header from every upstream request and sets
   `X-Maverick-Affinity: <status>` on the response. A present but malformed
   value is `400 invalid_request` (`X-Maverick-Conversation must be 1 to 256
   printable ASCII characters`), and the engine is not called. The SDK cores
   take a per-call `conversation_id` and an optional `affinity_cost_aware`
-  instead.
+  instead. A proxy or SDK core sends `affinity` only after an engine response
+  has listed `affinity` in `X-Maverick-API-Features` (D50). Until then it
+  serves the turn without affinity and sets no `X-Maverick-Affinity`.
 
 ---
 
