@@ -45,7 +45,7 @@ use maverick_core::telemetry::{BatcherConfig, HttpSink, Telemetry};
 use maverick_proxy::config::{Config, load_config};
 use maverick_proxy::otel::ProxyOtel;
 use maverick_proxy::reports::ProxyReports;
-use maverick_proxy::server::{Proxy, ServeSettings, serve};
+use maverick_proxy::server::{PROXY_VERSION, Proxy, ServeSettings, serve};
 use maverick_proxy::surface::{ChainReport, ExecutorRunner, ReportSink, Upstreams};
 use serde_json::Value;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -753,6 +753,13 @@ async fn replay_noting(id: &str, extra: &[&'static str]) -> Vec<ChainReport> {
     let mut got_headers = header_map(&response.headers);
     got_headers.remove("Date");
     got_headers.remove("Transfer-Encoding");
+    // DIVERGENCE: D50. The proxy stamps its release on every response (spec §14.5). Go
+    // sent none, so the header is checked here and left out of the Go comparison.
+    assert_eq!(
+        got_headers.remove("X-Maverick-Proxy-Version"),
+        Some(vec![PROXY_VERSION.to_owned()]),
+        "{context}: proxy version"
+    );
     assert_eq!(
         got_headers,
         expected_headers(&want["headers"]),

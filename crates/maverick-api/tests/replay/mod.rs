@@ -39,6 +39,21 @@ const IGNORED_HEADERS: [&str; 4] = [
     "x-request-id",
 ];
 
+/// DIVERGENCE: D50. The version headers the Rust engine adds to every response (spec
+/// §14.5), with their values. Go wrote none, so they are checked instead of compared.
+fn version_headers() -> [(&'static str, String); 2] {
+    [
+        (
+            maverick_api::version::ENGINE_VERSION_HEADER,
+            maverick_api::version::ENGINE_VERSION.to_owned(),
+        ),
+        (
+            maverick_api::version::API_FEATURES_HEADER,
+            maverick_api::version::api_features_value(),
+        ),
+    ]
+}
+
 /// Request values the Go test read back from rows its own seed statements returned
 /// (README §5 `since=`): (test, statement, occurrence in the test, 1-based).
 const SEED_RETURNED: [(&str, &str, usize); 4] = [
@@ -435,9 +450,19 @@ fn compare(
             "absent".into(),
         ));
     }
+    let version = version_headers();
+    for (name, expected) in &version {
+        let actual = header(&sent.headers, name).join(", ");
+        if actual != *expected {
+            diffs.push(diff(&format!("header {name}"), expected.clone(), actual));
+        }
+    }
     for (name, value) in &sent.headers {
         let lower = name.to_ascii_lowercase();
-        if !recorded_names.contains_key(&lower) && !IGNORED_HEADERS.contains(&lower.as_str()) {
+        if !recorded_names.contains_key(&lower)
+            && !IGNORED_HEADERS.contains(&lower.as_str())
+            && !version.iter().any(|(name, _)| *name == lower)
+        {
             diffs.push(diff(
                 &format!("header {lower}"),
                 "absent".into(),

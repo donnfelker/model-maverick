@@ -24,6 +24,18 @@ const OTHER_BEADS: [(&str, &str); 0] = [];
 const GO_TESTDATA: &str = "../../internal/tasks/testdata";
 const RUST_TESTDATA: &str = "../../parity/fixtures/measurement-io/testdata/internal/tasks/testdata";
 
+/// DIVERGENCE: D50. Go's main usage text. The Rust text adds the `--version` flag (spec
+/// §14.5), so a recorded stream that prints it expects [`maverick_cli::MAIN_USAGE`].
+const GO_MAIN_USAGE: &str = "Usage: maverick <command> [flags]
+
+Commands:
+  serve       run the HTTP API, MCP server, and workers (--api-only | --worker-only)
+  migrate     run database migrations
+  corpus      load, activate, and inspect corpus versions, and print the tier
+              calibration report (load | activate | status | calibrate)
+  mcp-stdio   stdio MCP transport for local development (--api-key mk_live_...)
+";
+
 fn field<'a>(value: &'a JsonValue, key: &str) -> &'a JsonValue {
     match value {
         JsonValue::Object(members) => members
@@ -180,6 +192,7 @@ fn cli_rows_match_go() {
     }
 
     let mut checked = 0;
+    let mut usage_rows = 0;
     for case in cases {
         let id = text(field(case, "id"));
         if OTHER_BEADS.iter().any(|(other, _)| *other == id) {
@@ -210,14 +223,23 @@ fn cli_rows_match_go() {
             mask(&text(field(case, "stdout")).replace(GO_TESTDATA, RUST_TESTDATA)),
             "{id}: stdout was {stdout}"
         );
+        let recorded = text(field(case, "stderr"));
+        if recorded.contains(GO_MAIN_USAGE) {
+            usage_rows += 1;
+        }
+        let recorded = recorded
+            .replace(GO_TESTDATA, RUST_TESTDATA)
+            .replace(GO_MAIN_USAGE, maverick_cli::MAIN_USAGE);
         assert_eq!(
             mask(&mask_times(&stderr)),
-            mask(&text(field(case, "stderr")).replace(GO_TESTDATA, RUST_TESTDATA)),
+            mask(&recorded),
             "{id}: stderr was {stderr}"
         );
         checked += 1;
     }
     assert_eq!(checked, 24);
+    // `no-command` and `unknown-command` print the main usage.
+    assert_eq!(usage_rows, 2);
 }
 
 fn strings(args: &[&str]) -> Vec<String> {

@@ -16,6 +16,7 @@ pub mod otel;
 mod rewatch;
 mod serve;
 mod spend;
+pub mod version;
 
 pub use cli::{CORPUS_USAGE, MAIN_USAGE, SPEND_USAGE, run};
 pub use logging::Output;

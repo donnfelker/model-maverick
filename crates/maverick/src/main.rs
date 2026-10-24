@@ -2,7 +2,8 @@
 //!
 //! One binary, three shapes: `serve` (everything), `serve --api-only` (stateless
 //! replica), `serve --worker-only` (exactly one). Subcommands: `migrate`,
-//! `corpus load | activate | status | calibrate`, `mcp-stdio --api-key`, `demo-run`.
+//! `corpus load | activate | status | calibrate`, `mcp-stdio --api-key`, `demo-run`,
+//! and the `--version` flag (D50).
 //! Postgres is the whole state, including the job queue.
 
 use maverick_cli::{Output, run};

@@ -8,7 +8,8 @@ use maverick_domain::gofmt::quote;
 use crate::flags::{FlagSet, Parsed};
 use crate::logging::{Output, with_logger};
 
-/// The main usage text (exact; `demo-run` and `spend` are hidden).
+/// The main usage text (Go's exact text plus the D50 `--version` flag; `demo-run` and
+/// `spend` are hidden).
 pub const MAIN_USAGE: &str = "Usage: maverick <command> [flags]
 
 Commands:
@@ -17,6 +18,9 @@ Commands:
   corpus      load, activate, and inspect corpus versions, and print the tier
               calibration report (load | activate | status | calibrate)
   mcp-stdio   stdio MCP transport for local development (--api-key mk_live_...)
+
+Flags:
+  --version   print the release, build, schema, and bundle formats
 ";
 
 /// The `corpus` usage text (exact).
@@ -72,6 +76,7 @@ pub fn run(
         "corpus" => corpus(rest, lookup, stdout, stderr),
         "spend" => spend(rest, lookup, stdout, stderr),
         "mcp-stdio" => mcp_stdio(rest, lookup, stderr),
+        "--version" => version(rest, stdout, stderr),
         other => {
             let _ = write!(
                 stderr,
@@ -81,6 +86,19 @@ pub fn run(
             EXIT_USAGE
         }
     }
+}
+
+/// `--version` (spec §14.5, D50): prints the version text to stdout. It takes no arguments.
+fn version(args: &[String], mut stdout: Output, mut stderr: Output) -> i32 {
+    if !args.is_empty() {
+        let _ = write!(
+            stderr,
+            "maverick: --version takes no arguments\n\n{MAIN_USAGE}"
+        );
+        return EXIT_USAGE;
+    }
+    let _ = stdout.write_all(crate::version::text().as_bytes());
+    0
 }
 
 /// Parses a command's flags; any error or `-h` is exit 2 (the usage is already printed).

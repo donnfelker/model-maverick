@@ -23,13 +23,15 @@ lists carry `matrix_version`: the active corpus version, or `""` when no corpus
 is active. On a self-hosted replica (spec §14.4, D49) it is the active matrix
 bundle's `matrix_version`, or `""` before the first import.
 
-**Version headers.** Status: specified (D50, spec §14.5), not served yet
-(bead xq7v.3). Every response on both listeners, errors and `/up` included,
-will carry `X-Maverick-Engine-Version` (the engine's SemVer) and
-`X-Maverick-API-Features` (the sorted, comma-separated optional request
-features the engine accepts, for example `affinity`). Within `/v1` changes are
-additive only; a breaking change is `/v2`, served beside `/v1` for at least 12
-months.
+**Version headers** (D50, spec §14.5). Every response on both listeners,
+errors and `/up` included, carries `X-Maverick-Engine-Version` (the engine's
+SemVer, for example `0.1.0`) and `X-Maverick-API-Features`: the sorted,
+comma-separated optional request features the engine accepts beyond the first
+release. The list is empty today; conversation affinity adds `affinity`. An SDK
+core or the proxy sends an optional request field only when the engine's last
+response listed its feature. Within `/v1` changes are additive only; a
+breaking change is `/v2`, served beside `/v1` for at least 12 months. The proxy
+stamps `X-Maverick-Proxy-Version` on its own responses.
 
 ---
 

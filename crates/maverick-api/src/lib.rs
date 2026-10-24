@@ -21,6 +21,7 @@ mod query;
 mod recommend;
 mod strict;
 mod telemetry;
+pub mod version;
 
 pub use health::HealthState;
 pub use internal::InternalSettings;
@@ -998,13 +999,15 @@ fn internal_v1_router(state: AuthState, api: ApiState) -> Router {
 }
 
 fn with_outer_middleware(router: Router) -> Router {
-    // Axum applies the last layer first. This produces TraceContext -> RequestID ->
-    // Logger -> Recoverer -> router: the engine contract, inside the request span.
+    // Axum applies the last layer first. This produces VersionHeaders -> TraceContext ->
+    // RequestID -> Logger -> Recoverer -> router: the engine contract, inside the request
+    // span, and the D50 version headers on every response.
     router
         .layer(middleware::from_fn(recoverer))
         .layer(middleware::from_fn(request_logger))
         .layer(middleware::from_fn(request_id))
         .layer(middleware::from_fn(observe::trace_context))
+        .layer(middleware::from_fn(version::version_headers))
 }
 
 /// Build the public listener router.

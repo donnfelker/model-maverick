@@ -4,7 +4,8 @@
 //!
 //! `GET /up` (also `HEAD`), `POST /v1/chat/completions`, `POST /v1/messages`. A wrong method
 //! on a known path is Go's 405 with `Allow`; any other path is Go's 404. Paths match exactly
-//! and the query string never affects routing.
+//! and the query string never affects routing. Every response carries
+//! `X-Maverick-Proxy-Version` (spec §14.5, D50).
 //!
 //! # Pipeline (the first failing step decides)
 //!
@@ -33,7 +34,7 @@ use axum::Router;
 use axum::body::{Body, Bytes};
 use axum::extract::{Request, State};
 use axum::http::header::CONTENT_LENGTH;
-use axum::http::{HeaderMap, HeaderName, StatusCode};
+use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::Response;
 use axum::routing::{get, post};
 use http_body_util::{BodyExt, LengthLimitError, Limited};
@@ -68,6 +69,12 @@ pub const TENANT_KEY_HEADER: HeaderName = HeaderName::from_static("x-maverick-ap
 
 /// Every Maverick API key starts with this prefix (spec §9.1).
 pub const TENANT_KEY_PREFIX: &str = "mk_live_";
+
+/// The proxy release (the workspace version), on every proxy response (spec §14.5, D50).
+pub const PROXY_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// The response header that carries [`PROXY_VERSION`].
+pub const PROXY_VERSION_HEADER: HeaderName = HeaderName::from_static("x-maverick-proxy-version");
 
 /// The proxy: configuration, the engine client, the chain runner, and the rate limiter.
 pub struct Proxy {
@@ -131,6 +138,7 @@ impl Proxy {
             )
             .fallback(|| async { envelope::not_found() })
             .with_state(proxy)
+            .layer(axum::middleware::map_response(stamp_version))
     }
 
     async fn handle(&self, surface: Surface, request: Request) -> Response {
@@ -339,6 +347,16 @@ impl Proxy {
             ),
         )
     }
+}
+
+/// Stamps [`PROXY_VERSION_HEADER`] on a response: errors, `/up`, and relayed provider
+/// responses alike.
+async fn stamp_version(mut response: Response) -> Response {
+    response.headers_mut().insert(
+        PROXY_VERSION_HEADER,
+        HeaderValue::from_static(PROXY_VERSION),
+    );
+    response
 }
 
 async fn chat(State(proxy): State<Arc<Proxy>>, request: Request) -> Response {
