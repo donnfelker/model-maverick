@@ -555,9 +555,12 @@ stopped.
 12-month window, each with the same populated scenario. Every CI run restores each dump,
 runs `maverick upgrade --yes` on it, and checks that the upgraded database still serves
 the dump's tenants with their old keys: history, traces, config, a recommend, and the
-internal tenant read. At each release, write that release's dump and add its row to
-`RELEASES`; the README in that directory has the command. The first dump,
-`pre-release.sql`, is the schema at migration 0012.
+internal tenant read. A `<release>.replica.sql` dump does the same for a single-tenant
+replica: after the upgrade its bootstrapped tenant and keys still work, tenant
+administration still answers 409, and a second bootstrap creates nothing. At each
+release, write that release's two dumps and add its row to `RELEASES`; the README in
+that directory has the command. The first dumps, `pre-release.sql` and
+`pre-release.replica.sql`, are the schema at migration 0012.
 
 ## Jobs and schedules
 

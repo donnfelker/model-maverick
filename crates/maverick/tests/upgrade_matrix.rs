@@ -4,16 +4,21 @@
 //! checks that the upgraded database still serves: the tenants' keys, the recommendation
 //! history and its traces, the config, a declared recommend, and the internal tenant read.
 //!
-//! `write_the_dump_for_this_release` (ignored) builds the scenario on this release and
-//! writes its dump. The release pipeline runs it once per release; see the README in the
-//! data directory.
+//! `<name>.replica.sql` dumps are a single-tenant replica (D49): the bootstrapped tenant
+//! with a fixed app key. After `maverick upgrade --yes` on a replica, the key still serves,
+//! `maverick key list` shows both keys, the tenant-admin routes still answer 409, and a
+//! second bootstrap creates nothing.
+//!
+//! `write_the_dump_for_this_release` and `write_the_replica_dump_for_this_release`
+//! (ignored) build the scenarios on this release and write their dumps. The release
+//! pipeline runs them once per release; see the README in the data directory.
 
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use chrono::Utc;
-use maverick_api::{ApiState, AuthState, internal_router_with, public_router_with};
+use maverick_api::{ApiState, AuthState, internal_router_with, provision, public_router_with};
 use maverick_cli::version::VERSION;
 use maverick_cli::{Output, run};
 use maverick_domain::keys::{KEY_PREFIX, encode_base62, key_hash};
@@ -22,6 +27,7 @@ use maverick_store::measurement::{self, AggregateUpsert};
 use maverick_store::{JsonRawValue, corpus, tenancy};
 use maverick_testdb::{Schema, TestDatabase};
 use serde_json::{Value, json};
+use sqlx::{Connection, PgConnection};
 use tokio::net::TcpListener;
 
 const DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/upgrade-matrix");
@@ -39,14 +45,18 @@ const TENANTS: [(&str, &str, u8); 2] = [
     ("ten_matrix_two", "matrix-two", 2),
 ];
 
+/// The replica scenario: the bootstrapped tenant's name, and its fixed app key.
+const REPLICA_TENANT: &str = "matrix-replica";
+const REPLICA_KEY: (&str, u8) = ("matrix-app", 9);
+
 /// A tenant's fixed API key: `mk_live_` and 43 base62 digits of 32 equal bytes.
 fn key_of(byte: u8) -> String {
     format!("{KEY_PREFIX}{}", encode_base62(&[byte; 32]))
 }
 
-fn env(database_url: &str) -> Vec<(String, String)> {
+fn env(database_url: &str, role: &str) -> Vec<(String, String)> {
     [
-        ("MAVERICK_ROLE", "origin"),
+        ("MAVERICK_ROLE", role),
         ("MAVERICK_DATABASE_URL", database_url),
         ("MAVERICK_INTERNAL_TOKENS", INTERNAL_TOKEN),
         ("MAVERICK_CAPTURE_MASTER_KEY", &"ab".repeat(32)),
@@ -71,29 +81,48 @@ impl Write for Shared {
     }
 }
 
-/// `maverick upgrade --yes --json` against `db`, on a blocking thread (the command runs
-/// its own runtime). Returns the exit code and the JSON report.
-async fn upgrade(db: &TestDatabase) -> (i32, Value) {
-    let env = env(db.url());
+/// `maverick <args>` against `db` as `role`, on a blocking thread (the command runs its
+/// own runtime). Returns the exit code, stdout, and stderr.
+async fn cli(db: &TestDatabase, role: &str, args: &[&str]) -> (i32, String, String) {
+    let env = env(db.url(), role);
+    let args: Vec<String> = args.iter().map(|arg| (*arg).to_owned()).collect();
     tokio::task::spawn_blocking(move || {
         let out = Arc::new(Mutex::new(Vec::new()));
         let err = Arc::new(Mutex::new(Vec::new()));
-        let args = ["upgrade", "--yes", "--json"].map(str::to_owned);
         let code = run(
             &args,
             &|name| env.iter().find(|(k, _)| k == name).map(|(_, v)| v.clone()),
             Output::new(Shared(out.clone())),
             Output::new(Shared(err.clone())),
         );
-        let stdout = String::from_utf8(out.lock().expect("lock").clone()).expect("utf8");
-        let report = serde_json::from_str(stdout.trim()).unwrap_or_else(|e| {
-            let stderr = String::from_utf8_lossy(&err.lock().expect("lock")).into_owned();
-            panic!("{e}: {stdout}\n{stderr}")
-        });
-        (code, report)
+        let read = |buffer: &Arc<Mutex<Vec<u8>>>| {
+            String::from_utf8(buffer.lock().expect("lock").clone()).expect("utf8")
+        };
+        (code, read(&out), read(&err))
     })
     .await
     .expect("join")
+}
+
+/// `maverick upgrade --yes --json` against `db` as `role`: the exit code and the report.
+async fn upgrade(db: &TestDatabase, role: &str) -> (i32, Value) {
+    let (code, stdout, stderr) = cli(db, role, &["upgrade", "--yes", "--json"]).await;
+    let report =
+        serde_json::from_str(stdout.trim()).unwrap_or_else(|e| panic!("{e}: {stdout}\n{stderr}"));
+    (code, report)
+}
+
+/// The upgrade succeeded: upgraded or already current, and verified.
+fn assert_upgraded(name: &str, code: i32, report: &Value) {
+    assert_eq!(code, 0, "{name}: {report}");
+    assert!(
+        report["result"] == "upgraded" || report["result"] == "up_to_date",
+        "{name}: {report}"
+    );
+    assert!(
+        report["verify"].is_null() || report["verify"]["ok"] == true,
+        "{name}: {report}"
+    );
 }
 
 /// The engine's two listeners on `db`, served locally.
@@ -104,8 +133,8 @@ struct Engine {
 }
 
 impl Engine {
-    async fn start(db: &TestDatabase) -> Engine {
-        let env = env(db.url());
+    async fn start(db: &TestDatabase, role: &str) -> Engine {
+        let env = env(db.url(), role);
         let config = maverick_config::load_with(|name| {
             env.iter().find(|(k, _)| k == name).map(|(_, v)| v.clone())
         })
@@ -156,12 +185,15 @@ fn declared() -> Value {
     json!({"mode": "quality", "workload": {"capability": CAPABILITY, "difficulty": 3}})
 }
 
-/// Every dump file, sorted by name.
-fn dumps() -> Vec<PathBuf> {
+/// The origin dumps (`<name>.sql`) or the replica dumps (`<name>.replica.sql`), sorted.
+fn dumps(replica: bool) -> Vec<PathBuf> {
     let mut dumps: Vec<PathBuf> = std::fs::read_dir(DIR)
         .expect("the upgrade-matrix directory")
         .map(|entry| entry.expect("entry").path())
-        .filter(|path| path.extension().is_some_and(|ext| ext == "sql"))
+        .filter(|path| {
+            let name = path.file_name().unwrap_or_default().to_string_lossy();
+            name.ends_with(".sql") && name.ends_with(".replica.sql") == replica
+        })
         .collect();
     dumps.sort();
     dumps
@@ -169,7 +201,7 @@ fn dumps() -> Vec<PathBuf> {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn every_dump_upgrades_and_the_database_still_serves() {
-    let dumps = dumps();
+    let dumps = dumps(false);
     assert!(!dumps.is_empty(), "no dump under {DIR}");
     for dump in dumps {
         let name = dump.file_name().unwrap().to_string_lossy().into_owned();
@@ -179,16 +211,8 @@ async fn every_dump_upgrades_and_the_database_still_serves() {
         db.restore(&std::fs::read_to_string(&dump).expect("read dump"))
             .await;
 
-        let (code, report) = upgrade(&db).await;
-        assert_eq!(code, 0, "{name}: {report}");
-        assert!(
-            report["result"] == "upgraded" || report["result"] == "up_to_date",
-            "{name}: {report}"
-        );
-        assert!(
-            report["verify"].is_null() || report["verify"]["ok"] == true,
-            "{name}: {report}"
-        );
+        let (code, report) = upgrade(&db, "origin").await;
+        assert_upgraded(&name, code, &report);
         assert_still_serves(&db, &name).await;
         db.close().await;
     }
@@ -196,7 +220,7 @@ async fn every_dump_upgrades_and_the_database_still_serves() {
 
 /// The upgraded database answers for the scenario's tenants with their old keys.
 async fn assert_still_serves(db: &TestDatabase, name: &str) {
-    let engine = Engine::start(db).await;
+    let engine = Engine::start(db, "origin").await;
     for (tenant, tenant_name, byte) in TENANTS {
         let key = key_of(byte);
         let at = format!("{name} {tenant}");
@@ -292,11 +316,17 @@ async fn seed(db: &TestDatabase) {
     corpus::activate_corpus_version(&pool, CORPUS)
         .await
         .expect("activate");
+    seed_catalog(&pool).await;
+    seed_tenants(db, &pool).await;
+}
+
+/// Two active columns with measured aggregates.
+async fn seed_catalog(pool: &sqlx::PgPool) {
     let empty = raw("{}");
     let pricing = raw(r#"{"input_per_mtok": 1.0, "output_per_mtok": 2.0}"#);
     for (id, provider, model) in COLUMNS {
         catalog::create_model_column(
-            &pool,
+            pool,
             &NewModelColumn {
                 id,
                 provider,
@@ -327,7 +357,7 @@ async fn seed(db: &TestDatabase) {
                 ("latency_p95_ms", 800.0),
             ] {
                 measurement::upsert_aggregate(
-                    &pool,
+                    pool,
                     &AggregateUpsert {
                         model_column_id: id,
                         capability: CAPABILITY,
@@ -346,6 +376,11 @@ async fn seed(db: &TestDatabase) {
             }
         }
     }
+}
+
+/// The origin's tenants, keys, pools, constraints, and recommendation traces.
+async fn seed_tenants(db: &TestDatabase, pool: &sqlx::PgPool) {
+    let pool = pool.clone();
     let all: Vec<String> = COLUMNS.iter().map(|(id, _, _)| (*id).to_owned()).collect();
     for (tenant, name, byte) in TENANTS {
         tenancy::create_tenant(&pool, tenant, name, &[byte; 32])
@@ -388,7 +423,7 @@ async fn seed(db: &TestDatabase) {
         .expect("constraints");
 
     // Recommendation traces, written by the real handler.
-    let engine = Engine::start(db).await;
+    let engine = Engine::start(db, "origin").await;
     for (_, _, byte) in TENANTS {
         for _ in 0..2 {
             let (status, body) = engine
@@ -413,12 +448,195 @@ async fn write_the_dump_for_this_release() {
     let db = maverick_testdb::database(&Schema::empty())
         .await
         .expect("a test database");
-    let (code, report) = upgrade(&db).await;
+    let (code, report) = upgrade(&db, "origin").await;
     assert_eq!(code, 0, "{report}");
     seed(&db).await;
     assert_still_serves(&db, "fresh").await;
     let name = std::env::var("MAVERICK_MATRIX_DUMP_NAME").unwrap_or_else(|_| VERSION.to_owned());
     let path = Path::new(DIR).join(format!("{name}.sql"));
+    std::fs::write(&path, db.dump().await).expect("write dump");
+    eprintln!("wrote {}", path.display());
+    db.close().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn every_replica_dump_upgrades_and_the_install_still_serves() {
+    let dumps = dumps(true);
+    assert!(!dumps.is_empty(), "no replica dump under {DIR}");
+    for dump in dumps {
+        let name = dump.file_name().unwrap().to_string_lossy().into_owned();
+        let Some(db) = maverick_testdb::database(&Schema::empty()).await else {
+            return;
+        };
+        db.restore(&std::fs::read_to_string(&dump).expect("read dump"))
+            .await;
+        let (code, report) = upgrade(&db, "replica").await;
+        assert_upgraded(&name, code, &report);
+        assert_replica_still_serves(&db, &name).await;
+        db.close().await;
+    }
+}
+
+/// The upgraded replica keeps its one tenant, its keys, and its single-tenant rules.
+async fn assert_replica_still_serves(db: &TestDatabase, name: &str) {
+    let pool = db.pool().await;
+    let tenants = tenancy::list_tenants(&pool).await.expect("tenants");
+    assert_eq!(tenants.len(), 1, "{name}: {tenants:?}");
+    assert_eq!(tenants[0].name, REPLICA_TENANT, "{name}");
+    let tenant = tenants[0].id.clone();
+
+    let engine = Engine::start(db, "replica").await;
+    let key = key_of(REPLICA_KEY.1);
+    let (status, history) = engine
+        .call(
+            &engine.public,
+            "GET",
+            "/v1/history/recommendations",
+            &key,
+            None,
+        )
+        .await;
+    assert_eq!(status, 200, "{name}: {history}");
+    assert!(
+        !history["recommendations"]
+            .as_array()
+            .expect("history")
+            .is_empty(),
+        "{name}: the dump's recommendation is gone"
+    );
+    let (status, recommended) = engine
+        .call(
+            &engine.public,
+            "POST",
+            "/v1/recommend",
+            &key,
+            Some(declared()),
+        )
+        .await;
+    assert_eq!(status, 200, "{name}: {recommended}");
+    assert!(
+        !recommended["recommendations"]
+            .as_array()
+            .expect("chain")
+            .is_empty(),
+        "{name}: {recommended}"
+    );
+
+    // Both keys survive: the bootstrap's own and the fixed app key.
+    let (code, stdout, stderr) = cli(db, "replica", &["key", "list"]).await;
+    assert_eq!(code, 0, "{name}: {stderr}");
+    let listed: Value = serde_json::from_str(stdout.trim()).expect("key list JSON");
+    let mut names: Vec<&str> = listed
+        .as_array()
+        .expect("keys")
+        .iter()
+        .map(|key| key["name"].as_str().expect("name"))
+        .collect();
+    names.sort_unstable();
+    assert_eq!(
+        names,
+        [provision::BOOTSTRAP_KEY_NAME, REPLICA_KEY.0],
+        "{name}: {stdout}"
+    );
+
+    // Tenant administration is still refused.
+    for (method, path, body) in [
+        (
+            "POST",
+            "/internal/v1/tenants".to_owned(),
+            Some(json!({"name": "second"})),
+        ),
+        (
+            "POST",
+            format!("/internal/v1/tenants/{tenant}/suspend"),
+            None,
+        ),
+        (
+            "POST",
+            format!("/internal/v1/tenants/{tenant}/activate"),
+            None,
+        ),
+        (
+            "PUT",
+            format!("/internal/v1/tenants/{tenant}/limits"),
+            Some(json!({})),
+        ),
+    ] {
+        let (status, body) = engine
+            .call(&engine.internal, method, &path, INTERNAL_TOKEN, body)
+            .await;
+        assert_eq!(status, 409, "{name} {method} {path}: {body}");
+        assert_eq!(
+            body["error"]["code"], "single_tenant_install",
+            "{name} {path}"
+        );
+    }
+
+    // A later start bootstraps nothing.
+    let mut conn = PgConnection::connect(db.url()).await.expect("connect");
+    let again = provision::bootstrap(&mut conn, "again")
+        .await
+        .expect("bootstrap");
+    assert!(
+        again.is_none(),
+        "{name}: a second bootstrap created {again:?}"
+    );
+    conn.close().await.expect("close");
+    assert_eq!(
+        tenancy::list_tenants(&pool).await.expect("tenants").len(),
+        1
+    );
+}
+
+/// The replica scenario on a database this release just upgraded: the catalog, the first
+/// start's bootstrap, a fixed app key, and one recommendation trace.
+async fn seed_replica(db: &TestDatabase) {
+    let pool = db.pool().await;
+    seed_catalog(&pool).await;
+    let mut conn = PgConnection::connect(db.url()).await.expect("connect");
+    let booted = provision::bootstrap(&mut conn, REPLICA_TENANT)
+        .await
+        .expect("bootstrap")
+        .expect("an empty database bootstraps");
+    conn.close().await.expect("close");
+    let key = key_of(REPLICA_KEY.1);
+    tenancy::create_api_key(
+        &pool,
+        "key_matrix_replica_app",
+        &booted.tenant.id,
+        &key_hash(&key),
+        &key[key.len() - 4..],
+        REPLICA_KEY.0,
+    )
+    .await
+    .expect("app key");
+    let engine = Engine::start(db, "replica").await;
+    let (status, body) = engine
+        .call(
+            &engine.public,
+            "POST",
+            "/v1/recommend",
+            &key,
+            Some(declared()),
+        )
+        .await;
+    assert_eq!(status, 200, "{body}");
+}
+
+/// Builds the replica scenario on this release and writes its dump, as
+/// `MAVERICK_MATRIX_DUMP_NAME` (default: the release version) plus `.replica.sql`.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "run once per release; it writes a fixture file"]
+async fn write_the_replica_dump_for_this_release() {
+    let db = maverick_testdb::database(&Schema::empty())
+        .await
+        .expect("a test database");
+    let (code, report) = upgrade(&db, "replica").await;
+    assert_eq!(code, 0, "{report}");
+    seed_replica(&db).await;
+    assert_replica_still_serves(&db, "fresh").await;
+    let name = std::env::var("MAVERICK_MATRIX_DUMP_NAME").unwrap_or_else(|_| VERSION.to_owned());
+    let path = Path::new(DIR).join(format!("{name}.replica.sql"));
     std::fs::write(&path, db.dump().await).expect("write dump");
     eprintln!("wrote {}", path.display());
     db.close().await;
