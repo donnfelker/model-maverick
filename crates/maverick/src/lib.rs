@@ -19,5 +19,5 @@ mod spend;
 pub mod upgrade;
 pub mod version;
 
-pub use cli::{CORPUS_USAGE, MAIN_USAGE, SPEND_USAGE, run};
+pub use cli::{CORPUS_USAGE, MAIN_USAGE, SPEND_USAGE, run, run_with_env};
 pub use logging::Output;

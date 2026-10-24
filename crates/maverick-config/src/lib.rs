@@ -10,6 +10,12 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::time::Duration;
 
+mod compat;
+
+pub use compat::{
+    CompatWarning, RENAME_WINDOW_DAYS, RENAMED, Rename, compatibility_warnings, known_settings,
+};
+
 const POSITIVE_INT: &str = "must be a positive integer";
 const NON_NEGATIVE_INT: &str = "must be a non-negative integer";
 const FINITE_NUMBER: &str = "must be a finite number";
@@ -399,6 +405,8 @@ pub fn load_with<F>(lookup: F) -> Result<Config, ConfigError>
 where
     F: Fn(&str) -> Option<String>,
 {
+    // D50: a renamed setting still reads under its old name for 12 months.
+    let lookup = compat::with_renames(lookup, compat::RENAMED);
     let mut issues = Vec::new();
     let role = match lookup("MAVERICK_ROLE").as_deref() {
         Some("origin") => Role::Origin,

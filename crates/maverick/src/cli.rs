@@ -1,8 +1,9 @@
 //! Command dispatch and exit codes (reference Part 1 §7.1).
 
+use std::cell::RefCell;
 use std::io::{IsTerminal, Write};
 
-use maverick_config::{Config, ConfigError};
+use maverick_config::{CompatWarning, Config, ConfigError};
 use maverick_domain::gofmt::quote;
 
 use crate::flags::{FlagSet, Parsed};
@@ -58,6 +59,28 @@ const EXIT_FAILURE: i32 = 1;
 /// Exit code for a usage or flag error.
 const EXIT_USAGE: i32 = 2;
 
+thread_local! {
+    /// The process environment's variable names while [`run_with_env`] runs (D50). Empty
+    /// under [`run`], so a test that calls `run` sees no compatibility warning.
+    static ENV_NAMES: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+}
+
+/// [`run`] for the binary. `env_names` are the process environment's variable names, so a
+/// command that loads the configuration warns once about each unknown or renamed
+/// `MAVERICK_*` setting (spec §14.5, D50).
+pub fn run_with_env(
+    args: &[String],
+    lookup: &dyn Fn(&str) -> Option<String>,
+    env_names: Vec<String>,
+    stdout: Output,
+    stderr: Output,
+) -> i32 {
+    ENV_NAMES.with(|names| *names.borrow_mut() = env_names);
+    let code = run(args, lookup, stdout, stderr);
+    ENV_NAMES.with(|names| names.borrow_mut().clear());
+    code
+}
+
 /// Go `run(args, lookup, stdout, stderr)`: runs one command and returns its exit code.
 pub fn run(
     args: &[String],
@@ -108,8 +131,33 @@ fn parse_flags(set: &FlagSet, args: &[String], stderr: &mut Output) -> Option<Pa
     set.parse(args, stderr).ok()
 }
 
-/// Loads the configuration, logging one ERROR line per issue on failure (§7.2).
+/// Loads the configuration, logging one ERROR line per issue on failure (§7.2), and one
+/// WARN line per unknown or renamed setting (D50). A warning names variables only, never a
+/// value, and never stops the command.
 pub(crate) fn load_config(lookup: &dyn Fn(&str) -> Option<String>) -> Result<Config, ConfigError> {
+    ENV_NAMES.with(|names| {
+        for warning in maverick_config::compatibility_warnings(&names.borrow(), lookup) {
+            match warning {
+                CompatWarning::Unknown { name } => {
+                    tracing::warn!(var = name.as_str(), "unknown setting ignored");
+                }
+                CompatWarning::Renamed { old, new } => {
+                    tracing::warn!(
+                        var = old,
+                        replacement = new,
+                        "renamed setting, use the new name"
+                    );
+                }
+                CompatWarning::OldIgnored { old, new } => {
+                    tracing::warn!(
+                        var = old,
+                        replacement = new,
+                        "renamed setting ignored, the new name is set"
+                    );
+                }
+            }
+        }
+    });
     let loaded = maverick_config::load_with(lookup);
     if let Err(error) = &loaded {
         for issue in error.issues() {

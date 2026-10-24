@@ -26,6 +26,31 @@ when the active bundle is absent or more than seven days old. Health detail repo
 `role` and the active bundle version, or `""` before the first import. Probe clients
 use the configured provider endpoints on both roles.
 
+## Configuration compatibility (D50)
+
+A new release must start with an older environment file. Three rules make sure it does:
+
+- **Unknown settings.** Every command that loads the configuration logs one `WARN` line,
+  `unknown setting ignored`, for each `MAVERICK_*` variable that no setting reads. The
+  line names the variable in `var`. It never has the value, because a value can be a
+  secret. The command still runs. A warning usually means a typo, or a setting that only
+  an older release reads. These names never warn: the proxy's settings
+  (`MAVERICK_ENGINE_URL`, `MAVERICK_API_KEY`, `MAVERICK_PROXY_*`, `MAVERICK_UPSTREAM_*`),
+  the release stamp (`MAVERICK_RELEASE_DATE`, `MAVERICK_RELEASE_COMMIT`), and the test
+  harness's `MAVERICK_TEST_*`.
+- **Renamed settings.** A renamed setting keeps its old name for at least 12 months after
+  the release that renamed it. When only the old name is set, the engine uses its value
+  and warns `renamed setting, use the new name`, with the new name in `replacement`. When
+  both are set, the new name wins, and the warning is `renamed setting ignored, the new
+  name is set`. The renames are the `RENAMED` table in
+  `crates/maverick-config/src/compat.rs`, which is empty today. A test fails when a row
+  is past its window, so a row is removed on purpose.
+- **New required settings.** A new setting needs a safe default, or it ships only in a
+  major release. Today both roles need only `MAVERICK_ROLE`, `MAVERICK_DATABASE_URL`,
+  `MAVERICK_INTERNAL_TOKENS`, and `MAVERICK_CAPTURE_MASTER_KEY`. The test
+  `todays_required_settings_are_enough` in `crates/maverick/tests/config_compat.rs`
+  starts with only these, so a release that adds a required setting fails it.
+
 ## Alerts
 
 Alert rows are the durable operational signal. Every alert is first written to the
