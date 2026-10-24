@@ -1,6 +1,7 @@
 //! OTel emission (D31; reference part 6 §12; spec v1 §8.1 and §14.3): one
 //! `maverick.recommendation` log record per settled request and the cumulative counter
-//! `maverick_proxy_recommendations_total`, over OTLP/HTTP to
+//! `maverick_proxy_recommendations_total`, plus the fail-open counter
+//! `maverick_proxy_fallbacks_total` by `step` (D46), over OTLP/HTTP to
 //! `{MAVERICK_PROXY_OTLP_ENDPOINT}/v1/logs` and `/v1/metrics`.
 //!
 //! Enabled only when the endpoint is set: otherwise nothing is built, no task runs, and
@@ -29,7 +30,7 @@ use opentelemetry_sdk::metrics::periodic_reader_with_async_runtime::PeriodicRead
 use opentelemetry_sdk::propagation::TraceContextPropagator;
 use opentelemetry_sdk::runtime::Tokio;
 
-use crate::chain::Surface;
+use crate::chain::{FallbackStep, Surface};
 use crate::config::Config;
 use crate::surface::ChainReport;
 
@@ -37,6 +38,8 @@ use crate::surface::ChainReport;
 pub const RECORD_BODY: &str = "maverick.recommendation";
 /// The counter name.
 pub const COUNTER: &str = "maverick_proxy_recommendations_total";
+/// The fail-open counter name (D46). Its only label is `step`.
+pub const FALLBACK_COUNTER: &str = "maverick_proxy_fallbacks_total";
 /// Log records are sent every 5 s, as Go flushed its queue.
 pub const LOG_INTERVAL: Duration = Duration::from_secs(5);
 /// The counter is exported every 15 s, as in Go.
@@ -53,6 +56,7 @@ pub struct ProxyOtel {
     meter_provider: SdkMeterProvider,
     logger: SdkLogger,
     counter: Counter<u64>,
+    fallbacks: Counter<u64>,
 }
 
 impl fmt::Debug for ProxyOtel {
@@ -138,15 +142,15 @@ impl ProxyOtel {
     ) -> ProxyOtel {
         let name: Cow<'static, str> = Cow::Owned(service_name.to_owned());
         let logger = logger_provider.logger(name.clone());
-        let counter = meter_provider
-            .meter_with_scope(InstrumentationScope::builder(name).build())
-            .u64_counter(COUNTER)
-            .build();
+        let meter = meter_provider.meter_with_scope(InstrumentationScope::builder(name).build());
+        let counter = meter.u64_counter(COUNTER).build();
+        let fallbacks = meter.u64_counter(FALLBACK_COUNTER).build();
         ProxyOtel {
             logger_provider,
             meter_provider,
             logger,
             counter,
+            fallbacks,
         }
     }
 
@@ -182,6 +186,13 @@ impl ProxyOtel {
                 ),
             ],
         );
+    }
+
+    /// Counts one request the fail-open ladder handled (D46). No tenant, key, or model
+    /// label: only the step.
+    pub fn fallback(&self, step: FallbackStep) {
+        self.fallbacks
+            .add(1, &[KeyValue::new("step", step.as_str())]);
     }
 
     /// Sends every queued record and the counter now. It blocks until the exporters'

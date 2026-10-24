@@ -12,11 +12,16 @@
 //! tenant's request (D43): it exports no `maverick.recommendation` log record and is not
 //! counted. A request that failed before the engine answered carries no opt-out flag and
 //! is recorded.
+//!
+//! The fail-open counter `maverick_proxy_fallbacks_total` (D46) counts each request the
+//! ladder handled, by step only. The proxy leaves out a last good list whose cached
+//! recommendation opted out (D43).
 
 use std::sync::Arc;
 
 use maverick_core::telemetry::{BatcherConfig, HttpSink, Telemetry};
 
+use crate::chain::FallbackStep;
 use crate::config::Config;
 use crate::otel::{ProxyOtel, SHUTDOWN_TIMEOUT};
 use crate::surface::{ChainReport, ReportSink};
@@ -88,5 +93,11 @@ impl ReportSink for ProxyReports {
         }
         self.telemetry
             .record(report.tenant_key.expose(), report.items);
+    }
+
+    fn fallback(&self, step: FallbackStep) {
+        if let Some(otel) = &self.otel {
+            otel.fallback(step);
+        }
     }
 }

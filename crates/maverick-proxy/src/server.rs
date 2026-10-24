@@ -18,14 +18,21 @@
 //! 3. Parse the model: `400 invalid_model_alias` on a malformed route or empty model.
 //!    A direct model calls its provider without entering steps 4 to 6 (D45).
 //! 4. Choose the workload (D5): a malformed `X-Maverick-Workload` is `400 invalid_request`.
-//! 5. Recommend. Terminal privacy errors are relayed as `422`/`409` with their code (D17).
-//!    Hosted mode maps an engine 401 to `401 unauthorized` and relays a 403 with its code
-//!    (D13). Any other failure is `502 engine_error` and one ERROR log line.
+//! 5. Recommend. Terminal privacy errors are relayed as `422`/`409` with their code and
+//!    purge the tenant key's last good lists (D17, D46). Hosted mode maps an engine 401 to
+//!    `401 unauthorized` and relays a 403 with its code (D13). An engine failure (a
+//!    timeout, a connect error, a 5xx, or a malformed answer) falls open (D46): the last
+//!    good list for the tenant key and route, then the surface's default model called
+//!    directly, then `503 engine_unavailable`. A fallback response carries
+//!    `X-Maverick-Fallback`. Any other engine status is `502 engine_error`. Every engine
+//!    failure logs one ERROR line.
 //! 6. Hand the chain to the [`ChainRunner`].
 //!
 //! Logs never carry a body, a prompt, or a credential.
 
+use std::collections::BTreeSet;
 use std::future::Future;
+use std::hash::{BuildHasher, RandomState};
 use std::io;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -41,7 +48,8 @@ use http_body_util::{BodyExt, LengthLimitError, Limited};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use hyper_util::server::graceful::GracefulShutdown;
 use hyper_util::service::TowerToHyperService;
-use maverick_core::alias::{ParsedModel, parse_alias};
+use maverick_core::alias::{Alias, Mode, ParsedModel, parse_alias};
+use maverick_core::failopen::{FailOpen, FailOpenConfig, Fallback};
 use maverick_core::gojson::{apply_string, type_error};
 use maverick_core::recommend::{
     EngineFailure, RecommendClient, RecommendClientConfig, RecommendError, RecommendRequest,
@@ -51,12 +59,13 @@ use maverick_core::settings::SettingsMode;
 use serde_json::Value;
 use tokio::net::TcpListener;
 
-use crate::chain::{ChainRequest, ChainRunner, Surface};
+use crate::chain::{ChainRequest, ChainRunner, FallbackStep, Surface};
 use crate::config::{Config, DeploymentMode};
 use crate::credentials::{self, CallerCredential, EnvKeys};
 use crate::direct::DirectRequest;
 use crate::envelope;
 use crate::ratelimit::{self, RateLimiter};
+use crate::rewrite::{Normalizer, rewrite_model};
 
 /// The engine client's total timeout per call (Go constant).
 pub const ENGINE_TIMEOUT: Duration = Duration::from_secs(10);
@@ -76,12 +85,19 @@ pub const PROXY_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The response header that carries [`PROXY_VERSION`].
 pub const PROXY_VERSION_HEADER: HeaderName = HeaderName::from_static("x-maverick-proxy-version");
 
-/// The proxy: configuration, the engine client, the chain runner, and the rate limiter.
+/// At most this many last good lists per replica; the least recently used goes (D46).
+pub const LAST_GOOD_CAPACITY: usize = 10_000;
+
+/// The proxy: configuration, the engine client, the chain runner, the rate limiter, and
+/// the fail-open ladder's in-memory state (D46).
 pub struct Proxy {
     config: Config,
     engine: RecommendClient,
     chain: Arc<dyn ChainRunner>,
     limiter: RateLimiter,
+    failopen: FailOpen,
+    /// Seeds for the ladder's tenant id: a 128-bit hash, so no tenant key is stored.
+    tenant_seeds: [RandomState; 2],
 }
 
 impl Proxy {
@@ -104,11 +120,32 @@ impl Proxy {
         chain: Arc<dyn ChainRunner>,
     ) -> Self {
         let limiter = RateLimiter::new(config.ratelimit_rpm);
+        // D46: the default models are verified zero retention only when the operator says
+        // so, and only then may a zero-retention tenant fall open to them.
+        let zero_retention_verified: BTreeSet<String> = if config.default_model_zero_retention {
+            [&config.default_model_messages, &config.default_model_chat]
+                .into_iter()
+                .flatten()
+                .cloned()
+                .collect()
+        } else {
+            BTreeSet::new()
+        };
+        let failopen = FailOpen::with_ttl(
+            FailOpenConfig {
+                default_model: None,
+                zero_retention_verified,
+            },
+            config.lkg_max_age,
+        )
+        .with_capacity(LAST_GOOD_CAPACITY);
         Self {
             config,
             engine,
             chain,
             limiter,
+            failopen,
+            tenant_seeds: [RandomState::new(), RandomState::new()],
         }
     }
 
@@ -259,6 +296,8 @@ impl Proxy {
         };
 
         // 5. Recommend.
+        let tenant = self.ladder_tenant(&tenant_key);
+        let route = route_key(&alias);
         let request = RecommendRequest::for_alias(&alias, workload);
         // D31: the caller's W3C trace context continues into the engine. Providers get it
         // too: tracing headers are among the inbound headers Go forwards upstream.
@@ -266,13 +305,17 @@ impl Proxy {
             traceparent: first_header(&parts.headers, "traceparent"),
             tracestate: first_header(&parts.headers, "tracestate"),
         };
-        let recommendation = match self
+        let (recommendation, fallback) = match self
             .engine
             .recommend_traced(&tenant_key, &request, &trace)
             .await
         {
-            Ok(recommendation) => recommendation,
+            Ok(recommendation) => {
+                self.failopen.record(&tenant, &route, &recommendation);
+                (recommendation, None)
+            }
             Err(RecommendError::ZeroRetentionRequiresDeclared { message, .. }) => {
+                self.failopen.refuse(&tenant);
                 return relay_terminal(
                     StatusCode::UNPROCESSABLE_ENTITY,
                     envelope::ZERO_RETENTION_REQUIRES_DECLARED,
@@ -280,6 +323,7 @@ impl Proxy {
                 );
             }
             Err(RecommendError::NoCompliantColumns { message, .. }) => {
+                self.failopen.refuse(&tenant);
                 return relay_terminal(
                     StatusCode::CONFLICT,
                     envelope::NO_COMPLIANT_COLUMNS,
@@ -308,6 +352,55 @@ impl Proxy {
                 };
                 return envelope::error(StatusCode::FORBIDDEN, code, message);
             }
+            Err(RecommendError::Engine(failure)) if fails_open(&failure) => {
+                // D46: the fail-open ladder.
+                let default_model = match surface {
+                    Surface::Chat => self.config.default_model_chat.as_deref(),
+                    Surface::Messages => self.config.default_model_messages.as_deref(),
+                };
+                match self.failopen.fall_back(&tenant, &route, default_model) {
+                    Some(Fallback::LastKnownGood(cached)) => {
+                        let step = FallbackStep::LastKnownGood;
+                        tracing::error!(error = %failure, fallback = step.as_str(), "maverick-proxy: engine recommend failed");
+                        // D43: an opted-out tenant's request is not counted.
+                        if !cached.telemetry_opt_out {
+                            self.chain.record_fallback(step);
+                        }
+                        (cached, Some(step))
+                    }
+                    Some(Fallback::DefaultModel(model)) => {
+                        let step = FallbackStep::DefaultModel;
+                        tracing::error!(error = %failure, fallback = step.as_str(), "maverick-proxy: engine recommend failed");
+                        self.chain.record_fallback(step);
+                        let Ok(body) = rewrite_model(&body, &model, Normalizer::None) else {
+                            return envelope::error(
+                                StatusCode::BAD_REQUEST,
+                                envelope::INVALID_REQUEST,
+                                envelope::MALFORMED_JSON,
+                            );
+                        };
+                        let response = self
+                            .chain
+                            .run_direct(DirectRequest {
+                                surface,
+                                model,
+                                credential,
+                                upstream_headers,
+                                env_keys: EnvKeys::from_config(&self.config),
+                                body: body.into(),
+                                raw_query: parts.uri.query().unwrap_or_default().to_owned(),
+                            })
+                            .await;
+                        return with_fallback(response, step);
+                    }
+                    None => {
+                        let step = FallbackStep::Unavailable;
+                        tracing::error!(error = %failure, fallback = step.as_str(), "maverick-proxy: engine recommend failed");
+                        self.chain.record_fallback(step);
+                        return envelope::engine_unavailable();
+                    }
+                }
+            }
             Err(RecommendError::Engine(failure)) => {
                 tracing::error!(error = %failure, "maverick-proxy: engine recommend failed");
                 return envelope::error(
@@ -319,7 +412,8 @@ impl Proxy {
         };
 
         // 6. Chain walk, with the caller's credential and the upstream base headers (D12, D30).
-        self.chain
+        let response = self
+            .chain
             .run(ChainRequest {
                 surface,
                 credential,
@@ -334,7 +428,22 @@ impl Proxy {
                 tenant_key,
                 received_at,
             })
-            .await
+            .await;
+        match fallback {
+            Some(step) => with_fallback(response, step),
+            None => response,
+        }
+    }
+
+    /// The ladder's id for a tenant key: a 128-bit keyed hash, so the in-memory store
+    /// never holds a key (D46).
+    fn ladder_tenant(&self, tenant_key: &TenantKey) -> String {
+        let [first, second] = &self.tenant_seeds;
+        format!(
+            "{:016x}{:016x}",
+            first.hash_one(tenant_key.expose()),
+            second.hash_one(tenant_key.expose())
+        )
     }
 
     fn too_large(&self) -> Response {
@@ -425,6 +534,36 @@ fn decode_model(body: &[u8]) -> Result<String, String> {
         other => return Err(type_error("request body", other, "object")),
     }
     Ok(model)
+}
+
+/// The ladder's key for a route: the pool (`auto` for the tenant default) and the variant.
+/// A pool cannot be named `auto` or contain `:` (D45), so keys never collide.
+fn route_key(alias: &Alias) -> String {
+    let mode = match alias.mode {
+        Mode::Quality => "quality",
+        Mode::Balanced => "balanced",
+        Mode::Cost => "cost",
+    };
+    format!("{}:{mode}", alias.pool.as_deref().unwrap_or("auto"))
+}
+
+/// D46: the engine failures that fall open. No answer, a 5xx, or an answer that cannot
+/// be read. A 4xx is the engine answering, so it keeps its own mapping.
+fn fails_open(failure: &EngineFailure) -> bool {
+    match failure {
+        EngineFailure::Transport(_) | EngineFailure::Timeout | EngineFailure::Decode(_) => true,
+        EngineFailure::Status { status, .. } => *status >= 500,
+        EngineFailure::InvalidTenantKey => false,
+    }
+}
+
+/// `response` marked as served by the fail-open ladder (D46).
+fn with_fallback(mut response: Response, step: FallbackStep) -> Response {
+    response.headers_mut().insert(
+        envelope::FALLBACK_HEADER,
+        HeaderValue::from_static(step.as_str()),
+    );
+    response
 }
 
 /// A terminal privacy error from the engine, relayed with its status and code (D17). The
@@ -524,6 +663,35 @@ pub async fn shutdown_signal() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn route_keys_name_the_pool_and_the_variant() {
+        let key = |pool: Option<&str>, mode| {
+            route_key(&Alias {
+                pool: pool.map(str::to_owned),
+                mode,
+            })
+        };
+        assert_eq!(key(None, Mode::Quality), "auto:quality");
+        assert_eq!(key(None, Mode::Cost), "auto:cost");
+        assert_eq!(key(Some("team/a"), Mode::Balanced), "team/a:balanced");
+    }
+
+    /// D46: only an engine that did not answer, answered 5xx, or answered garbage falls
+    /// open.
+    #[test]
+    fn engine_failures_that_fall_open() {
+        let status = |status| EngineFailure::Status { status, code: None };
+        assert!(fails_open(&EngineFailure::Transport("refused".to_owned())));
+        assert!(fails_open(&EngineFailure::Timeout));
+        assert!(fails_open(&EngineFailure::Decode("eof".to_owned())));
+        assert!(fails_open(&status(500)));
+        assert!(fails_open(&status(503)));
+        for code in [400, 401, 403, 404, 422, 429, 499] {
+            assert!(!fails_open(&status(code)), "{code}");
+        }
+        assert!(!fails_open(&EngineFailure::InvalidTenantKey));
+    }
 
     #[test]
     fn model_decoding_follows_go() {

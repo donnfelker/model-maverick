@@ -5,7 +5,7 @@ use std::cell::Cell;
 use std::collections::BTreeSet;
 use std::time::Duration;
 
-use maverick_core::failopen::{FailOpen, FailOpenConfig, LadderError, Plan, Privacy};
+use maverick_core::failopen::{FailOpen, FailOpenConfig, Fallback, LadderError, Plan, Privacy};
 use maverick_core::recommend::{
     ChainEntry, EngineFailure, RecommendError, Recommendation, RetentionMode,
 };
@@ -335,4 +335,153 @@ async fn zero_retention_state_follows_the_engine() {
     .expect("recommended");
     assert!(!ladder.is_zero_retention("ten_a"));
     assert!(!ladder.is_zero_retention("ten_never_seen"));
+}
+
+fn with_id(id: &str, zero_retention: bool, chain: Vec<ChainEntry>) -> Recommendation {
+    Recommendation {
+        recommendation_id: id.to_owned(),
+        ..recommendation(zero_retention, chain)
+    }
+}
+
+fn fallback_models(fallback: Option<Fallback>) -> Option<(String, Vec<String>)> {
+    fallback.map(|fallback| match fallback {
+        Fallback::LastKnownGood(rec) => (
+            rec.recommendation_id,
+            rec.chain.iter().map(|e| e.model.clone()).collect(),
+        ),
+        Fallback::DefaultModel(model) => ("default".to_owned(), vec![model]),
+    })
+}
+
+/// D46: the proxy's steps. A recorded recommendation is the key's last good one, with
+/// its id; another key gets the default it passes; no default means nothing usable.
+#[tokio::test]
+async fn the_proxy_falls_back_to_the_last_good_recommendation_then_its_default() {
+    let ladder = ladder(None, &[]);
+    let chain = vec![
+        entry("claude-sonnet-4-6", RetentionMode::Standard),
+        entry("claude-opus-4-8", RetentionMode::Unknown),
+    ];
+    ladder.record("ten_a", "auto:quality", &with_id("rec_9", false, chain));
+    assert_eq!(
+        fallback_models(ladder.fall_back("ten_a", "auto:quality", Some("claude-haiku-4-5"))),
+        Some((
+            "rec_9".to_owned(),
+            vec!["claude-sonnet-4-6".to_owned(), "claude-opus-4-8".to_owned()]
+        ))
+    );
+    assert_eq!(
+        ladder.fall_back("ten_a", "auto:cost", Some("claude-haiku-4-5")),
+        Some(Fallback::DefaultModel("claude-haiku-4-5".to_owned()))
+    );
+    assert_eq!(ladder.fall_back("ten_b", "auto:quality", None), None);
+    // An empty chain is never a last good list.
+    ladder.record(
+        "ten_c",
+        "auto:quality",
+        &with_id("rec_e", false, Vec::new()),
+    );
+    assert_eq!(ladder.fall_back("ten_c", "auto:quality", None), None);
+}
+
+/// D46: a terminal privacy error purges the tenant and marks it zero retention, so only
+/// a verified default is allowed afterwards; a zero-retention tenant's last good list
+/// keeps only its `zero` entries.
+#[tokio::test]
+async fn the_proxy_fall_back_follows_the_zero_retention_rule() {
+    let chain = vec![
+        entry("claude-sonnet-4-6", RetentionMode::Standard),
+        entry("claude-opus-4-8", RetentionMode::Zero),
+    ];
+    let unverified = ladder(None, &[]);
+    unverified.record(
+        "ten_zr",
+        "auto:quality",
+        &with_id("rec_z", true, chain.clone()),
+    );
+    assert_eq!(
+        fallback_models(unverified.fall_back("ten_zr", "auto:quality", Some("claude-haiku-4-5"))),
+        Some(("rec_z".to_owned(), vec!["claude-opus-4-8".to_owned()]))
+    );
+    unverified.record(
+        "ten_zr",
+        "auto:cost",
+        &with_id("rec_s", true, chain[..1].to_vec()),
+    );
+    assert_eq!(
+        unverified.fall_back("ten_zr", "auto:cost", Some("claude-haiku-4-5")),
+        None
+    );
+    unverified.refuse("ten_zr");
+    assert!(unverified.is_zero_retention("ten_zr"));
+    assert_eq!(
+        unverified.fall_back("ten_zr", "auto:quality", Some("claude-haiku-4-5")),
+        None
+    );
+
+    let verified = ladder(None, &["claude-haiku-4-5"]);
+    verified.record("ten_ok", "auto:quality", &with_id("rec_o", false, chain));
+    verified.refuse("ten_zr");
+    assert_eq!(
+        verified.fall_back("ten_zr", "auto:quality", Some("claude-haiku-4-5")),
+        Some(Fallback::DefaultModel("claude-haiku-4-5".to_owned()))
+    );
+    assert_eq!(
+        verified.fall_back("ten_zr", "auto:quality", Some("gpt-5.5")),
+        None
+    );
+    // Another tenant keeps its list.
+    assert!(matches!(
+        verified.fall_back("ten_ok", "auto:quality", None),
+        Some(Fallback::LastKnownGood(_))
+    ));
+}
+
+/// D46: the store is bounded; storing past the bound evicts the least recently used list,
+/// and a read counts as a use. Zero means unbounded.
+#[tokio::test]
+async fn the_store_evicts_the_least_recently_used_list() {
+    let chain = vec![entry("claude-sonnet-4-6", RetentionMode::Standard)];
+    let bounded = ladder(None, &[]).with_capacity(2);
+    bounded.record("ten_a", "k1", &with_id("rec_1", false, chain.clone()));
+    bounded.record("ten_a", "k2", &with_id("rec_2", false, chain.clone()));
+    assert!(bounded.fall_back("ten_a", "k1", None).is_some());
+    bounded.record("ten_a", "k3", &with_id("rec_3", false, chain.clone()));
+    assert!(bounded.fall_back("ten_a", "k2", None).is_none());
+    assert!(bounded.fall_back("ten_a", "k1", None).is_some());
+    assert!(bounded.fall_back("ten_a", "k3", None).is_some());
+    // Replacing a stored key evicts nothing.
+    bounded.record("ten_a", "k3", &with_id("rec_3b", false, chain.clone()));
+    assert!(bounded.fall_back("ten_a", "k1", None).is_some());
+    assert_eq!(
+        fallback_models(bounded.fall_back("ten_a", "k3", None)).map(|(id, _)| id),
+        Some("rec_3b".to_owned())
+    );
+
+    let unbounded = ladder(None, &[]).with_capacity(0);
+    for key in ["k1", "k2", "k3"] {
+        unbounded.record("ten_a", key, &with_id(key, false, chain.clone()));
+    }
+    for key in ["k1", "k2", "k3"] {
+        assert!(unbounded.fall_back("ten_a", key, None).is_some(), "{key}");
+    }
+}
+
+/// D46: the proxy's last good list expires after the ladder's max age.
+#[tokio::test]
+async fn the_proxy_last_good_list_expires() {
+    let ladder = FailOpen::with_ttl(FailOpenConfig::default(), Duration::from_millis(50));
+    ladder.record(
+        "ten_a",
+        "auto:quality",
+        &with_id(
+            "rec_1",
+            false,
+            vec![entry("claude-sonnet-4-6", RetentionMode::Standard)],
+        ),
+    );
+    assert!(ladder.fall_back("ten_a", "auto:quality", None).is_some());
+    tokio::time::sleep(Duration::from_millis(80)).await;
+    assert_eq!(ladder.fall_back("ten_a", "auto:quality", None), None);
 }

@@ -8,12 +8,15 @@
 //! open only to `zero`-stamped cached entries or to models configured as verified
 //! zero-retention, and otherwise fails closed. All state is in memory.
 //!
-//! The proxy is exempt from fail-open today (an engine failure is its
-//! `502 engine_error`); it still obeys the zero-retention rules.
-//! `plans/production-proxy-plan.md` §4 (proposed D46) moves the proxy onto this ladder.
+//! The proxy runs the same ladder (D46, spec §8.1) around its own engine call:
+//! [`FailOpen::record`] after a recommendation, [`FailOpen::refuse`] after a terminal
+//! privacy error, and [`FailOpen::fall_back`] after an engine failure. It has no caller
+//! model to fall back to, keeps the whole recommendation (its id goes into telemetry),
+//! and bounds the store with [`FailOpen::with_capacity`].
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::future::Future;
+use std::num::NonZeroUsize;
 use std::sync::{Mutex, PoisonError};
 use std::time::Duration;
 
@@ -59,6 +62,17 @@ pub enum Plan {
     OriginalModel(String),
 }
 
+/// Where a failed engine call falls open to, for a caller with no model of its own (the
+/// proxy's route, D46).
+#[derive(Debug, Clone, PartialEq)]
+pub enum Fallback {
+    /// The last good recommendation for the key, with its id. For a zero-retention tenant
+    /// the chain holds only its `zero`-stamped entries.
+    LastKnownGood(Recommendation),
+    /// The default model the caller passed, allowed for this tenant.
+    DefaultModel(String),
+}
+
 /// Why nothing may be called.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum LadderError {
@@ -76,10 +90,26 @@ pub enum LadderError {
     NoModel,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct Cached {
-    chain: Vec<ChainEntry>,
+    recommendation: Recommendation,
     stored_at: Instant,
+    /// The store's clock at the last read or write, for least-recently-used eviction.
+    used: u64,
+}
+
+/// The last-known-good recommendations by (tenant, key), and a use counter.
+#[derive(Debug, Default)]
+struct Store {
+    entries: HashMap<(String, String), Cached>,
+    clock: u64,
+}
+
+impl Store {
+    fn tick(&mut self) -> u64 {
+        self.clock += 1;
+        self.clock
+    }
 }
 
 /// The ladder and its in-memory state: last-known-good chains by (tenant, workload key)
@@ -88,7 +118,9 @@ struct Cached {
 pub struct FailOpen {
     config: FailOpenConfig,
     ttl: Duration,
-    chains: Mutex<HashMap<(String, String), Cached>>,
+    /// At most this many cached chains; `None` is unbounded.
+    capacity: Option<NonZeroUsize>,
+    chains: Mutex<Store>,
     zero_retention: Mutex<HashSet<String>>,
 }
 
@@ -101,9 +133,18 @@ impl FailOpen {
         FailOpen {
             config,
             ttl,
+            capacity: None,
             chains: Mutex::default(),
             zero_retention: Mutex::default(),
         }
+    }
+
+    /// Keeps at most `capacity` cached chains: storing another evicts the least recently
+    /// used one. Zero means unbounded, the default.
+    #[must_use]
+    pub fn with_capacity(mut self, capacity: usize) -> Self {
+        self.capacity = NonZeroUsize::new(capacity);
+        self
     }
 
     /// True once MM said the tenant is zero retention: the core must send the declared
@@ -131,22 +172,74 @@ impl FailOpen {
         self.chains
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
+            .entries
             .retain(|(t, _), _| t != tenant);
     }
 
-    /// The fresh cached chain for the workload, if any.
-    fn cached(&self, tenant: &str, workload: &str) -> Option<Vec<ChainEntry>> {
-        let mut chains = self.chains.lock().unwrap_or_else(PoisonError::into_inner);
-        let key = (tenant.to_owned(), workload.to_owned());
-        let fresh = chains
+    /// Records a recommendation MM answered: the tenant's zero-retention state, and the
+    /// recommendation as the key's last good one when its chain is not empty.
+    pub fn record(&self, tenant: &str, key: &str, recommendation: &Recommendation) {
+        self.set_zero_retention(tenant, recommendation.zero_retention);
+        if recommendation.chain.is_empty() {
+            return;
+        }
+        let mut store = self.chains.lock().unwrap_or_else(PoisonError::into_inner);
+        let key = (tenant.to_owned(), key.to_owned());
+        if let Some(capacity) = self.capacity
+            && !store.entries.contains_key(&key)
+            && store.entries.len() >= capacity.get()
+        {
+            let oldest = store
+                .entries
+                .iter()
+                .min_by_key(|(_, cached)| cached.used)
+                .map(|(key, _)| key.clone());
+            if let Some(oldest) = oldest {
+                store.entries.remove(&oldest);
+            }
+        }
+        let used = store.tick();
+        store.entries.insert(
+            key,
+            Cached {
+                recommendation: recommendation.clone(),
+                stored_at: Instant::now(),
+                used,
+            },
+        );
+    }
+
+    /// Records a terminal privacy error: only zero-retention tenants get one, so the
+    /// tenant is zero retention from now on, and its cached chains are purged.
+    pub fn refuse(&self, tenant: &str) {
+        self.set_zero_retention(tenant, true);
+        self.purge(tenant);
+    }
+
+    /// The fresh last good recommendation for the key, if any. For a zero-retention tenant
+    /// it keeps only the `zero`-stamped entries, and none left means none.
+    fn last_good(&self, tenant: &str, key: &str) -> Option<Recommendation> {
+        let zero_retention = self.is_zero_retention(tenant);
+        let mut store = self.chains.lock().unwrap_or_else(PoisonError::into_inner);
+        let key = (tenant.to_owned(), key.to_owned());
+        let fresh = store
+            .entries
             .get(&key)
             .is_some_and(|cached| cached.stored_at.elapsed() < self.ttl);
-        if fresh {
-            chains.get(&key).map(|cached| cached.chain.clone())
-        } else {
-            chains.remove(&key);
-            None
+        if !fresh {
+            store.entries.remove(&key);
+            return None;
         }
+        let used = store.tick();
+        let cached = store.entries.get_mut(&key)?;
+        cached.used = used;
+        let mut recommendation = cached.recommendation.clone();
+        if zero_retention {
+            recommendation
+                .chain
+                .retain(|entry| entry.retention_mode == RetentionMode::Zero);
+        }
+        (!recommendation.chain.is_empty()).then_some(recommendation)
     }
 
     /// A model the ladder may fall open to: any model for an ordinary tenant, only a
@@ -155,6 +248,23 @@ impl FailOpen {
         model
             .filter(|m| !zero_retention || self.config.zero_retention_verified.contains(*m))
             .map(str::to_owned)
+    }
+
+    /// Where an engine failure falls open to, for a caller with no model of its own: the
+    /// key's last good recommendation, then `default_model` when it is allowed for the
+    /// tenant. `None` means nothing is usable, and the caller fails closed.
+    pub fn fall_back(
+        &self,
+        tenant: &str,
+        key: &str,
+        default_model: Option<&str>,
+    ) -> Option<Fallback> {
+        self.last_good(tenant, key)
+            .map(Fallback::LastKnownGood)
+            .or_else(|| {
+                self.allowed(default_model, self.is_zero_retention(tenant))
+                    .map(Fallback::DefaultModel)
+            })
     }
 
     /// Resolves one call: asks MM through `fetch` unless privacy is off, records the
@@ -180,28 +290,14 @@ impl FailOpen {
         }
         match fetch().await {
             Ok(recommendation) => {
-                self.set_zero_retention(tenant, recommendation.zero_retention);
-                if !recommendation.chain.is_empty() {
-                    self.chains
-                        .lock()
-                        .unwrap_or_else(PoisonError::into_inner)
-                        .insert(
-                            (tenant.to_owned(), workload.to_owned()),
-                            Cached {
-                                chain: recommendation.chain.clone(),
-                                stored_at: Instant::now(),
-                            },
-                        );
-                }
+                self.record(tenant, workload, &recommendation);
                 Ok(Plan::Recommended(recommendation))
             }
             Err(RecommendError::Engine(failure)) => {
                 self.fall_open(tenant, workload, original_model, failure)
             }
             Err(terminal) => {
-                // Only zero-retention tenants get the privacy errors.
-                self.set_zero_retention(tenant, true);
-                self.purge(tenant);
+                self.refuse(tenant);
                 tracing::warn!(error = %terminal, "maverick refused the workload; not failing open");
                 Err(LadderError::Terminal(terminal))
             }
@@ -216,21 +312,15 @@ impl FailOpen {
         failure: EngineFailure,
     ) -> Result<Plan, LadderError> {
         let zero_retention = self.is_zero_retention(tenant);
-        let chain: Vec<ChainEntry> = self
-            .cached(tenant, workload)
-            .unwrap_or_default()
-            .into_iter()
-            .filter(|entry| !zero_retention || entry.retention_mode == RetentionMode::Zero)
-            .collect();
-        let plan = if chain.is_empty() {
-            self.allowed(self.config.default_model.as_deref(), zero_retention)
+        let plan = match self.last_good(tenant, workload) {
+            Some(recommendation) => Some(Plan::LastKnownGood(recommendation.chain)),
+            None => self
+                .allowed(self.config.default_model.as_deref(), zero_retention)
                 .map(Plan::DefaultModel)
                 .or_else(|| {
                     self.allowed(original_model, zero_retention)
                         .map(Plan::OriginalModel)
-                })
-        } else {
-            Some(Plan::LastKnownGood(chain))
+                }),
         };
         match plan {
             Some(plan) => {

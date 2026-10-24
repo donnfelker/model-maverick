@@ -31,11 +31,11 @@ sequenceDiagram
 
 ## Alias and workload
 
-The model field selects behavior through the alias grammar (`maverick-core::alias`). `maverick/auto`, `maverick/quality`, and `maverick/cost` map to the balanced, quality, and cost ranking modes. `maverick/<pool>:<mode>` selects a pool. A suffix `?settings=caller` (D14) tells the proxy to keep the caller's parameters instead of applying the entry's settings. A concrete model name (no `maverick/` prefix) is not routed: the proxy answers `400 invalid_model_alias`, and an SDK core passes it straight through to the provider.
+The model field selects behavior through the model grammar (`maverick-core::alias`, D45). `maverick/auto` is the tenant's default pool in quality mode, `maverick/<pool>` names a pool, and a `:quality`, `:balanced`, or `:cost` variant picks the mode. The header `X-Maverick-Settings: caller` (D14) tells the component to keep the caller's parameters instead of applying the entry's settings. Any other model name is a direct call: the proxy and the SDK cores send it to the provider without routing.
 
 The workload (D5) is either declared or projected. A present `X-Maverick-Workload` header (`capability:tier`) selects the declared form, and nothing about the prompt leaves the process. Without the header, the body is projected into a short classification text (`projection_version` `p1`).
 
-An SDK core that knows a tenant is zero retention never projects. It sends the declared fallback, so the prompt stays local. The proxy keeps no such memory and sends the projection. The engine then classifies a zero-retention tenant's prompt only on a classifier column with valid zero-retention evidence (D2). Without one, it answers `422 zero_retention_requires_declared` before the prompt is hashed, and the proxy relays that error.
+An SDK core that knows a tenant is zero retention never projects. It sends the declared fallback, so the prompt stays local. The proxy remembers zero-retention tenants only for its fail-open ladder (D46), and it still sends the projection. The engine then classifies a zero-retention tenant's prompt only on a classifier column with valid zero-retention evidence (D2). Without one, it answers `422 zero_retention_requires_declared` before the prompt is hashed, and the proxy relays that error.
 
 ## Recommend
 
@@ -69,7 +69,7 @@ Fail-open (G14) is the SDK core's behavior when the engine itself is unreachable
 
 Privacy outranks G14. A terminal privacy error from the engine (`422 zero_retention_requires_declared`, `409 no_compliant_columns`) is surfaced unchanged, never failed open, and it purges the tenant's cached chains. A zero-retention tenant with no compliant fallback fails closed.
 
-The proxy is exempt from fail-open today: it maps an engine failure to `502 engine_error`. It still obeys the zero-retention rules. `plans/production-proxy-plan.md` §4 (proposed D46) gives the proxy the same ladder as the SDK cores.
+The proxy runs the same ladder (D46): its last good list for the tenant key and route, then the surface's configured default model, then `503 engine_unavailable`. It has no caller model to fall back to. See [Proxy](proxy.md#fail-open-d46).
 
 ## Where this is verified
 

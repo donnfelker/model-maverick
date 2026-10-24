@@ -316,6 +316,8 @@ fn hosted_mode_reads_no_provider_or_tenant_keys() {
             config::MODE_VAR => Some("hosted".to_owned()),
             config::MAX_BODY_BYTES_VAR => Some("1024".to_owned()),
             config::RATELIMIT_RPM_VAR => Some("5".to_owned()),
+            config::LKG_MAX_AGE_VAR => Some("1h".to_owned()),
+            config::DEFAULT_MODEL_ZERO_RETENTION_VAR => Some("false".to_owned()),
             _ => Some(format!("value-of-{name}")),
         }
     })
@@ -563,8 +565,10 @@ async fn body_cap_rejects_declared_and_chunked_bodies() {
 
 const CHAT_HI: &str = r#"{"model":"maverick/auto","messages":[{"role":"user","content":"hi"}]}"#;
 
+/// DIVERGENCE D46: an engine 500 falls open; with no last good list and no default model
+/// the answer is `503 engine_unavailable` (Go: `502 engine_error`), with one ERROR line.
 #[tokio::test(flavor = "current_thread")]
-async fn engine_failure_is_502_engine_error_and_one_log_line() {
+async fn engine_failure_with_no_fallback_is_503_and_one_log_line() {
     let logs =
         test_support::init_test_tracing_with_secrets(&["secret-prompt-text", "mk_live_test"]);
     let engine = MockEngine::start(vec![(500, "{\"error\":{\"code\":\"internal_error\"}}")]).await;
@@ -581,9 +585,10 @@ async fn engine_failure_is_502_engine_error_and_one_log_line() {
     assert_response(
         "engine 500",
         &response,
-        502,
-        "{\"error\":{\"code\":\"engine_error\",\"message\":\"the engine's POST /v1/recommend call failed\"}}\n",
+        503,
+        "{\"error\":{\"code\":\"engine_unavailable\",\"message\":\"the engine is unavailable and no fallback model is configured\"}}\n",
     );
+    assert_eq!(response.header_values("retry-after"), ["5"]);
     let sent = engine.requests();
     assert_eq!(sent.len(), 1);
     assert_eq!(
@@ -601,7 +606,8 @@ async fn engine_failure_is_502_engine_error_and_one_log_line() {
         .collect();
     assert_eq!(failures.len(), 1, "{lines:?}");
     assert!(
-        failures[0].to_string().contains("status 500"),
+        failures[0].to_string().contains("status 500")
+            && failures[0].to_string().contains("unavailable"),
         "{:?}",
         failures[0]
     );
@@ -1138,7 +1144,8 @@ async fn keys_never_reach_the_logs() {
         CHAT_HI,
     )
     .await;
-    assert_eq!(response.status(), 502);
+    // D46: the engine 500 falls open, and nothing is usable.
+    assert_eq!(response.status(), 503);
     assert!(
         !logs.captured_lines().is_empty(),
         "the engine failure was logged"

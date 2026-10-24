@@ -16,10 +16,16 @@
 //!
 //! - Group 5: chain exhaustion relays the last upstream error unchanged. The proxy answers
 //!   `502 no_executable_candidates` instead (reference part 6 §4), so this is core only.
-//! - Group 6: the fail-open ladder (last-known-good, default model, original model). The
-//!   proxy is exempt from fail-open today (G14): it maps a failed recommend to `502
-//!   engine_error`. Core only. `plans/production-proxy-plan.md` §4
-//!   changes this.
+//! - Group 6: the fail-open ladder. Since D46 the proxy runs the same ladder, so the
+//!   scenarios it shares with the SDK cores run here too: [`PROXY_FAIL_OPEN`] (the warm
+//!   and cold outage, the two terminal privacy codes, and the zero-retention warm outage).
+//!   The rest stay core only: the proxy has no caller model to fall back to (S06c), no
+//!   privacy-off mode (S06d), answers a zero-retention cold outage with
+//!   `503 engine_unavailable` (S06h), and does not switch to the declared form (S06j).
+//!   S06i makes the cache cold with another declared workload, but the proxy keys its
+//!   lists by tenant key and route, not by workload (D46), so it serves the cached `zero`
+//!   entry there. The scenario's `default_model` is the chat surface's default, verified
+//!   zero retention when `zero_retention_verified` lists it.
 //! - Groups 10 to 12: OpenRouter execution (D15) needs an `sk-or-` caller key, which the
 //!   proxy recognizes only in hosted mode. Hosted mode reads the tenant key from
 //!   `X-Maverick-API-Key`, which must start with `mk_live_`, but these scenarios expect the
@@ -59,6 +65,9 @@ const CALLER_KEY: &str = "sk-caller-openai";
 /// The groups this proxy runner serves. The rest are core only (see the module docs).
 const PROXY_GROUPS: [u64; 7] = [1, 2, 3, 4, 7, 8, 9];
 
+/// The group 6 scenarios the proxy shares with the SDK cores (D46).
+const PROXY_FAIL_OPEN: [&str; 5] = ["S06a", "S06b", "S06e", "S06f", "S06g"];
+
 /// Run one scenario through the proxy. Returns the first assertion failure, if any.
 async fn run_scenario(loaded: &Loaded) -> Result<(), String> {
     let doc = &loaded.doc;
@@ -79,6 +88,17 @@ async fn run_scenario(loaded: &Loaded) -> Result<(), String> {
         .unwrap_or(DEFAULT_TENANT_KEY)
         .to_owned();
     let telemetry_off = config.get("telemetry").and_then(Value::as_str) == Some("off");
+    // D46: the scenario's default model is the chat surface's fail-open default.
+    let default_model = config
+        .get("default_model")
+        .and_then(Value::as_str)
+        .map(str::to_owned);
+    let default_verified = default_model.as_deref().is_some_and(|model| {
+        config
+            .get("zero_retention_verified")
+            .and_then(Value::as_array)
+            .is_some_and(|verified| verified.iter().any(|m| m.as_str() == Some(model)))
+    });
 
     let lookup = {
         let engine_url = engine_url.clone();
@@ -114,6 +134,8 @@ async fn run_scenario(loaded: &Loaded) -> Result<(), String> {
                 "GEMINI_API_KEY" => Some("sk-env-google".to_owned()),
                 "XAI_API_KEY" => Some("sk-env-xai".to_owned()),
                 "MAVERICK_PROXY_TELEMETRY" => telemetry_off.then(|| "off".to_owned()),
+                "MAVERICK_PROXY_DEFAULT_MODEL_CHAT" => default_model.clone(),
+                "MAVERICK_PROXY_DEFAULT_MODEL_ZERO_RETENTION" => Some(default_verified.to_string()),
                 _ => None,
             }
         }
@@ -333,7 +355,7 @@ async fn proxy_conformance_scenarios() {
     let mut skipped = Vec::new();
 
     for loaded in &scenarios {
-        if !covered.contains(&loaded.group) {
+        if !covered.contains(&loaded.group) && !PROXY_FAIL_OPEN.contains(&loaded.id.as_str()) {
             skipped.push((loaded.id.clone(), loaded.group));
             continue;
         }

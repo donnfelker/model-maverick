@@ -28,8 +28,17 @@ pub const INVALID_WORKLOAD_HEADER_MESSAGE: &str =
     "X-Maverick-Workload must be <capability>[:<tier>]";
 /// `engine_error`.
 pub const ENGINE_ERROR: &str = "engine_error";
-/// The message for every non-terminal recommend failure.
+/// The message for an engine answer that is neither relayed nor a fail-open trigger
+/// (D17, D46).
 pub const ENGINE_ERROR_MESSAGE: &str = "the engine's POST /v1/recommend call failed";
+/// `engine_unavailable` (D46): the engine failed and the fail-open ladder had nothing to
+/// use.
+pub const ENGINE_UNAVAILABLE: &str = "engine_unavailable";
+/// The `engine_unavailable` message (spec §8.1).
+pub const ENGINE_UNAVAILABLE_MESSAGE: &str =
+    "the engine is unavailable and no fallback model is configured";
+/// The `Retry-After` seconds on `503 engine_unavailable` (D46).
+pub const ENGINE_UNAVAILABLE_RETRY_AFTER: u32 = 5;
 /// `no_executable_candidates`.
 pub const NO_EXECUTABLE_CANDIDATES: &str = "no_executable_candidates";
 /// The chat surface's exhausted-chain message.
@@ -69,6 +78,10 @@ pub const RECOMMENDATION_ID_HEADER: HeaderName =
 /// The correlation header naming the executed model on relayed responses.
 pub const MODEL_USED_HEADER: HeaderName = HeaderName::from_static("x-maverick-model-used");
 
+/// The header on a response the fail-open ladder served: `last_known_good` or
+/// `default_model` (D46).
+pub const FALLBACK_HEADER: HeaderName = HeaderName::from_static("x-maverick-fallback");
+
 /// The exact envelope bytes: `{"error":{"code":..,"message":..}}` and one newline.
 #[must_use]
 pub fn envelope_body(code: &str, message: &str) -> String {
@@ -83,6 +96,22 @@ pub fn envelope_body(code: &str, message: &str) -> String {
 #[must_use]
 pub fn error(status: StatusCode, code: &str, message: &str) -> Response {
     fixed(status, "application/json", envelope_body(code, message))
+}
+
+/// `503 engine_unavailable` with `Retry-After: 5`: the engine failed and the fail-open
+/// ladder had no last good list and no usable default model (D46).
+#[must_use]
+pub fn engine_unavailable() -> Response {
+    let mut response = error(
+        StatusCode::SERVICE_UNAVAILABLE,
+        ENGINE_UNAVAILABLE,
+        ENGINE_UNAVAILABLE_MESSAGE,
+    );
+    response.headers_mut().insert(
+        axum::http::header::RETRY_AFTER,
+        HeaderValue::from(ENGINE_UNAVAILABLE_RETRY_AFTER),
+    );
+    response
 }
 
 /// `200 {"status":"ok"}`, no trailing newline (Content-Length 15).

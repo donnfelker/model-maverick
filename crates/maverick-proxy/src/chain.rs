@@ -44,6 +44,30 @@ impl Surface {
     }
 }
 
+/// The fail-open ladder's step that served a request (D46): the `X-Maverick-Fallback`
+/// value and the `step` label of `maverick_proxy_fallbacks_total`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FallbackStep {
+    /// The tenant key's last good list for the route.
+    LastKnownGood,
+    /// The surface's configured default model, called directly.
+    DefaultModel,
+    /// Nothing usable: `503 engine_unavailable`.
+    Unavailable,
+}
+
+impl FallbackStep {
+    /// The header and label value.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::LastKnownGood => "last_known_good",
+            Self::DefaultModel => "default_model",
+            Self::Unavailable => "unavailable",
+        }
+    }
+}
+
 /// Everything the chain walk needs from one inbound request. `Debug` output shows no
 /// header value, body byte, or key.
 pub struct ChainRequest {
@@ -109,6 +133,9 @@ pub trait ChainRunner: Send + Sync + 'static {
     fn run_direct(&self, request: DirectRequest) -> BoxFuture<'_, Response> {
         Box::pin(async move { exhausted(request.surface, "") })
     }
+
+    /// Count one request the fail-open ladder handled (D46). Must not block.
+    fn record_fallback(&self, _step: FallbackStep) {}
 }
 
 /// A runner that attempts nothing: every chain is treated as exhausted.

@@ -27,9 +27,23 @@ flowchart LR
 - **Auth.** Hosted mode reads and validates the tenant key before the body is read, so an unauthenticated caller cannot make the proxy buffer a body.
 - **Rate limit (D28).** Per tenant key, `MAVERICK_PROXY_RATELIMIT_RPM` requests per minute (default 60). Over the limit is `429 rate_limited`, and neither the engine nor a provider is called.
 - **Body cap (D38).** Over `MAVERICK_PROXY_MAX_BODY_BYTES` (default 32 MiB), by the declared `Content-Length` or the bytes read, is `413 payload_too_large`.
-- **Decode and alias.** A malformed body is `400 invalid_request`. A model that is not a `maverick/*` alias is `400 invalid_model_alias`.
-- **Recommend.** A terminal privacy error is relayed as `422` or `409` with its code. In hosted mode an engine `401` becomes `401 unauthorized` and a `403` is relayed with its code (D13). Any other engine failure is `502 engine_error` and one ERROR log line. The proxy does not fail open (G14 is the SDK core's job by position).
+- **Decode and model name.** A malformed body is `400 invalid_request`. A malformed `maverick/*` route or an empty model is `400 invalid_model_alias`. Any other model is a direct call to the surface's provider, with no engine call (D45).
+- **Recommend.** A terminal privacy error is relayed as `422` or `409` with its code. In hosted mode an engine `401` becomes `401 unauthorized` and a `403` is relayed with its code (D13). An engine failure falls open (below). Any other engine answer is `502 engine_error`. Every engine failure logs one ERROR line.
 - **Chain walk.** The chain executor relays the settled attempt, or answers `502 no_executable_candidates` on exhaustion.
+
+## Fail-open (D46)
+
+When the engine times out, cannot be reached, answers 5xx, or answers something unreadable, `Proxy::handle` uses the `maverick-core` ladder (`FailOpen::fall_back`):
+
+1. The last good recommendation for the tenant key and route (pool and variant), when it is younger than `MAVERICK_PROXY_LKG_MAX_AGE` (default 24 h). The chain walk runs it as usual, and telemetry carries the cached recommendation id.
+2. Else the surface's default model (`MAVERICK_PROXY_DEFAULT_MODEL_MESSAGES` or `MAVERICK_PROXY_DEFAULT_MODEL_CHAT`), called directly with the body's `model` replaced.
+3. Else `503 engine_unavailable` with `Retry-After: 5`.
+
+A response from step 1 or 2 carries `X-Maverick-Fallback: last_known_good` or `default_model`. The counter `maverick_proxy_fallbacks_total` counts each step by `step` only.
+
+The store is in memory, per replica, and holds at most 10,000 lists (the least recently used goes). It is keyed by a hash of the tenant key, so it never holds a key, and it holds ranked lists, never prompts.
+
+Privacy comes first. The terminal privacy errors are relayed and purge the tenant key's lists, and the tenant counts as zero retention from then on, as it does after a `zero_retention: true` answer. A zero-retention tenant falls open only to `zero` entries, or to a default model when `MAVERICK_PROXY_DEFAULT_MODEL_ZERO_RETENTION=true`. Engine `401` and `403` keep the D13 mapping and never fall open.
 
 ## Credentials
 
@@ -49,4 +63,4 @@ The proxy's OTel record follows the same opt-out: an opted-out tenant's request 
 
 ## Configuration
 
-The proxy reads its configuration once at startup from `maverick-proxy/src/config.rs`. Key variables: `MAVERICK_PROXY_MODE`, `MAVERICK_ENGINE_URL`, `MAVERICK_API_KEY` (self-hosted), `MAVERICK_UPSTREAM_{OPENAI,ANTHROPIC,GOOGLE,XAI,OPENROUTER}`, `MAVERICK_PROXY_ADDR` (default `:8090`), `MAVERICK_PROXY_MAX_BODY_BYTES`, `MAVERICK_PROXY_RATELIMIT_RPM`, `MAVERICK_PROXY_TELEMETRY`, and `MAVERICK_PROXY_OTLP_ENDPOINT`.
+The proxy reads its configuration once at startup from `maverick-proxy/src/config.rs`. Key variables: `MAVERICK_PROXY_MODE`, `MAVERICK_ENGINE_URL`, `MAVERICK_API_KEY` (self-hosted), `MAVERICK_UPSTREAM_{OPENAI,ANTHROPIC,GOOGLE,XAI,OPENROUTER}`, `MAVERICK_PROXY_ADDR` (default `:8090`), `MAVERICK_PROXY_MAX_BODY_BYTES`, `MAVERICK_PROXY_RATELIMIT_RPM`, `MAVERICK_PROXY_TELEMETRY`, `MAVERICK_PROXY_OTLP_ENDPOINT`, and the fail-open settings `MAVERICK_PROXY_LKG_MAX_AGE`, `MAVERICK_PROXY_DEFAULT_MODEL_MESSAGES`, `MAVERICK_PROXY_DEFAULT_MODEL_CHAT`, and `MAVERICK_PROXY_DEFAULT_MODEL_ZERO_RETENTION`. A default model that names a `maverick/*` route is a startup error.

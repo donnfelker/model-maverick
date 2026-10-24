@@ -148,6 +148,9 @@ pub struct ChainReport {
 pub trait ReportSink: Send + Sync + 'static {
     /// Take one report. Must not block.
     fn report(&self, report: ChainReport);
+
+    /// Count one request the fail-open ladder handled (D46). Must not block.
+    fn fallback(&self, _step: crate::chain::FallbackStep) {}
 }
 
 /// A sink that drops every report.
@@ -207,6 +210,10 @@ impl ExecutorRunner {
 }
 
 impl ChainRunner for ExecutorRunner {
+    fn record_fallback(&self, step: crate::chain::FallbackStep) {
+        self.reports.fallback(step);
+    }
+
     fn run_direct(&self, request: crate::direct::DirectRequest) -> BoxFuture<'_, Response> {
         Box::pin(crate::direct::execute(
             &self.executor,

@@ -616,8 +616,32 @@ async fn replay_noting(id: &str, extra: &[&'static str]) -> Vec<ChainReport> {
             serde_json::json!([body.len().to_string()]);
         scenario["expected"]["response"]["body"] = body.into();
     }
+    // D46: an engine that fails (a 5xx, or JSON it cannot read) falls open. These scenarios
+    // have no last good list and no default model, so `503 engine_unavailable` with
+    // `Retry-After: 5` replaces Go's `502 engine_error`.
+    let engine_down = matches!(id, "chat_engine_error_502" | "x_engine_malformed_json_502");
+    if engine_down {
+        assert!(
+            scenario["expected"]["response"]["body"]
+                .as_str()
+                .is_some_and(|body| body.contains("engine_error")),
+            "{id}: the Go answer is engine_error"
+        );
+        let body = maverick_proxy::envelope::envelope_body(
+            "engine_unavailable",
+            "the engine is unavailable and no fallback model is configured",
+        );
+        scenario["expected"]["response"]["status"] = 503.into();
+        scenario["expected"]["response"]["headers"]["Content-Length"] =
+            serde_json::json!([body.len().to_string()]);
+        scenario["expected"]["response"]["headers"]["Retry-After"] = serde_json::json!(["5"]);
+        scenario["expected"]["response"]["body"] = body.into();
+    }
     let expected = &scenario["expected"];
     let mut used: BTreeSet<&'static str> = extra.iter().copied().collect();
+    if engine_down {
+        used.insert("D46");
+    }
     if alias_error
         || matches!(
             id,
@@ -950,6 +974,8 @@ const REJECTED_BEFORE_ENGINE: &[&str] = &["D45"];
 /// The recommend call (D5 body, D32 transport headers), any upstream attempts (D32), and
 /// no telemetry POST.
 const ENGINE_NO_TELEMETRY: &[&str] = &["D5", "D32", "D45"];
+/// The engine failed, and the fail-open ladder had nothing to use (D46).
+const ENGINE_DOWN: &[&str] = &["D5", "D32", "D45", "D46"];
 /// A settled chain with telemetry: D14 `settings_applied` in each item and D27 delivery.
 const FULL_CHAIN: &[&str] = &["D5", "D14", "D27", "D32", "D45"];
 /// A settled chain with OTel export (D31).
@@ -964,7 +990,7 @@ const RETRY_AFTER: &[&str] = &["D5", "D14", "D26", "D27", "D32", "D45"];
 /// `Retry-After` scenario; D31 on the OTel scenarios.
 const ALLOWLIST: &[(&str, &[&str])] = &[
     ("up", REJECTED_BEFORE_ENGINE),
-    ("chat_engine_error_502", ENGINE_NO_TELEMETRY),
+    ("chat_engine_error_502", ENGINE_DOWN),
     ("chat_concrete_model_rejected", REJECTED_BEFORE_ENGINE),
     ("chat_malformed_alias_rejected", REJECTED_BEFORE_ENGINE),
     ("chat_happy_path", FULL_CHAIN),
@@ -1007,7 +1033,7 @@ const ALLOWLIST: &[(&str, &[&str])] = &[
     ("x_chat_model_not_string_400", REJECTED_BEFORE_ENGINE),
     ("x_chat_missing_model_400_alias", REJECTED_BEFORE_ENGINE),
     ("x_messages_concrete_model_400", REJECTED_BEFORE_ENGINE),
-    ("x_engine_malformed_json_502", ENGINE_NO_TELEMETRY),
+    ("x_engine_malformed_json_502", ENGINE_DOWN),
     ("x_engine_empty_chain_502", ENGINE_NO_TELEMETRY),
     ("x_chat_prompt_escaping_and_array", FULL_CHAIN),
     ("x_chat_body_reencoding", FULL_CHAIN),
