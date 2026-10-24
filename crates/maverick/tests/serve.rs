@@ -50,12 +50,23 @@ struct Engine {
 
 impl Engine {
     fn start(database_url: &str, flags: &[&str], public: u16, internal: u16) -> Engine {
+        Self::start_role(database_url, flags, public, internal, "origin")
+    }
+
+    fn start_role(
+        database_url: &str,
+        flags: &[&str],
+        public: u16,
+        internal: u16,
+        role: &str,
+    ) -> Engine {
         let mut child = Command::new(env!("CARGO_BIN_EXE_maverick"))
             .arg("serve")
             .args(flags)
             .env_clear()
             .env("PATH", std::env::var("PATH").unwrap_or_default())
             .env("TZ", "UTC")
+            .env("MAVERICK_ROLE", role)
             .env("MAVERICK_DATABASE_URL", database_url)
             .env("MAVERICK_INTERNAL_TOKENS", INTERNAL_TOKEN)
             .env("MAVERICK_CAPTURE_MASTER_KEY", "ab".repeat(32))
@@ -288,4 +299,35 @@ async fn a_busy_port_is_a_listener_failure() {
         Some("stopped")
     );
     drop(busy);
+}
+
+/// DIVERGENCE: D49. A replica starts both listeners and maintenance workers without judges.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn replica_starts_without_resolving_the_judge_pool() {
+    let Some(db) = maverick_testdb::database(&SCHEMA).await else {
+        return;
+    };
+    let mut engine = Engine::start_role(db.url(), &[], free_port(), free_port(), "replica");
+    engine.wait_for("workers started", None);
+    engine.wait_for("listening", Some("public"));
+    let (status, body) = get(
+        &format!("http://127.0.0.1:{}/health/detail", engine.internal),
+        Some(INTERNAL_TOKEN),
+    )
+    .await
+    .unwrap();
+    assert_eq!(status, 200, "{body}");
+    let health: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(health["role"], "replica");
+    assert_eq!(health["active_matrix_version"], "");
+    assert_eq!(engine.terminate(), 0, "{}", engine.output());
+    assert!(
+        !engine
+            .messages()
+            .iter()
+            .any(|m| m.starts_with("judge pool unavailable")),
+        "{}",
+        engine.output()
+    );
+    db.close().await;
 }

@@ -117,6 +117,7 @@ The deploying machine needs:
 
    No placeholder is left, and no app role has a `publish` option. With these files, the
    output lists the secret names but not their values (checked with Kamal 2.12).
+   The engine's clear environment has `MAVERICK_ROLE=origin` (D49).
 
 ## 2. Postgres [owner]
 

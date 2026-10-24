@@ -89,6 +89,7 @@ fn fixtures() -> Vec<FixtureSpec> {
 /// The engine's environment: only what `maverick` reads.
 fn engine_env(db: &str, fake: &str, public: u16, internal: u16) -> Vec<(String, String)> {
     [
+        ("MAVERICK_ROLE", "origin".to_owned()),
         ("MAVERICK_DATABASE_URL", db.to_owned()),
         ("MAVERICK_INTERNAL_TOKENS", INTERNAL_TOKEN.to_owned()),
         ("MAVERICK_CAPTURE_MASTER_KEY", "c4".repeat(32)),

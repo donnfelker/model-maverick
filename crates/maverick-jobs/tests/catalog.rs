@@ -951,3 +951,82 @@ async fn run_wrappers_validate_the_day() {
         .expect("catalog_sync");
     assert_eq!(output, CatalogSyncOutput::default());
 }
+
+/// DIVERGENCE: D49. Bundle status owns the lifecycle on replicas. Maintenance still runs.
+#[tokio::test]
+async fn replica_catalog_preserves_lifecycle_and_warns_only_on_stale_active_bundles() {
+    let Some(db) = maverick_testdb::database(&SCHEMA).await else {
+        return;
+    };
+    let pool = &db.pool().await;
+    let day = date("2031-08-10");
+    let now = at(day);
+    Column {
+        cold_start_until: Some(day - Duration::days(3)),
+        ..Column::new("ready", "cold_start")
+    }
+    .create(pool)
+    .await;
+    aggregate(pool, "ready", "quality", 0.9, true, day - Duration::days(1)).await;
+    Column {
+        deprecation_date: Some(day - Duration::days(3)),
+        retention_mode: "zero",
+        retention_valid_until: Some(now + Duration::days(2)),
+        ..Column::new("sunset", "deprecated")
+    }
+    .create(pool)
+    .await;
+    tenant(pool, "ten_replica").await;
+    stored_pool(pool, "ten_replica", "one", &["ready"]).await;
+    // An inactive bundle must not hide a missing active bundle.
+    sqlx::query("insert into matrix_imports (manifest_sha256, format, matrix_version, published_at, origin_release, signing_kids) values ($1, 'mmbundle1', 'inactive', $2, '1.0', array['current'])")
+        .bind(vec![1_u8; 32]).bind(now).execute(pool).await.unwrap();
+    // Store dependencies must outlive the returned future.
+    let dependencies = deps(pool, None);
+    let output =
+        catalog::catalog_sync_for_role(&dependencies, day, now, maverick_config::Role::Replica)
+            .await
+            .unwrap();
+    assert_eq!(
+        (output.activated, output.retired, output.retirement_blocked),
+        (0, 0, 0)
+    );
+    assert_eq!(output.drift_alerts, 1);
+    assert_eq!(output.retention_alerts, 1);
+    assert_eq!(
+        get_model_column(pool, "ready").await.unwrap().status,
+        "cold_start"
+    );
+    assert_eq!(
+        get_model_column(pool, "sunset").await.unwrap().status,
+        "deprecated"
+    );
+    let written = alerts(pool, "matrix_stale").await;
+    assert_eq!(written.len(), 1);
+    assert_eq!(subject(&written[0])["matrix_version"], "");
+    assert_eq!(written[0].severity, "warning");
+    sqlx::query("update matrix_imports set active=true, published_at=$1")
+        .bind(now - Duration::days(7))
+        .execute(pool)
+        .await
+        .unwrap();
+    catalog::catalog_sync_for_role(&dependencies, day, now, maverick_config::Role::Replica)
+        .await
+        .unwrap();
+    assert_eq!(
+        alerts(pool, "matrix_stale").await.len(),
+        1,
+        "exactly seven days is current"
+    );
+    sqlx::query("update matrix_imports set published_at=$1")
+        .bind(now - Duration::days(7) - Duration::milliseconds(1))
+        .execute(pool)
+        .await
+        .unwrap();
+    catalog::catalog_sync_for_role(&dependencies, day, now, maverick_config::Role::Replica)
+        .await
+        .unwrap();
+    let written = alerts(pool, "matrix_stale").await;
+    assert_eq!(written.len(), 2);
+    assert_eq!(subject(&written[1])["matrix_version"], "inactive");
+}

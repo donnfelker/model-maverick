@@ -113,6 +113,7 @@ Engine:
 
 | Variable | Purpose | Default |
 |---|---|---|
+| `MAVERICK_ROLE` | `origin` for corpus benchmarks, `replica` for imported matrix bundles (D49). | required |
 | `MAVERICK_DATABASE_URL` | Postgres connection string. | required |
 | `MAVERICK_PUBLIC_ADDR` | The public API listen address. | `:8080` |
 | `MAVERICK_INTERNAL_ADDR` | The internal (operator) API listen address. | `:8081` |
@@ -136,6 +137,9 @@ Proxy:
 ### Run
 
 ```bash
+# Choose the origin for local corpus and benchmark work.
+export MAVERICK_ROLE=origin
+
 # Apply the database migrations.
 MAVERICK_DATABASE_URL=postgres://localhost/maverick cargo run -p maverick -- migrate
 

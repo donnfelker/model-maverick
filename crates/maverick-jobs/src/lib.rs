@@ -321,6 +321,7 @@ pub async fn run_with_timeout<E: fmt::Display>(
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JobClientConfig {
+    pub role: maverick_config::Role,
     pub batch_job_timeout: Duration,
     pub batch_lease_ttl: Duration,
     pub batch_heartbeat_interval: Duration,
@@ -340,6 +341,7 @@ pub struct JobClientConfig {
 impl Default for JobClientConfig {
     fn default() -> Self {
         Self {
+            role: maverick_config::Role::Origin,
             batch_job_timeout: DEFAULT_BATCH_JOB_TIMEOUT,
             batch_lease_ttl: DEFAULT_BATCH_LEASE_TTL,
             batch_heartbeat_interval: DEFAULT_BATCH_HEARTBEAT_INTERVAL,
@@ -361,6 +363,7 @@ impl Default for JobClientConfig {
 impl From<&maverick_config::Config> for JobClientConfig {
     fn from(config: &maverick_config::Config) -> Self {
         Self {
+            role: config.role,
             batch_job_timeout: config.batch_job_timeout,
             batch_lease_ttl: config.batch_lease_ttl,
             batch_heartbeat_interval: config.batch_heartbeat_interval,
@@ -375,6 +378,28 @@ impl From<&maverick_config::Config> for JobClientConfig {
             cron_capture_expiry: config.cron_capture_expiry.clone(),
             cron_history_prune: config.cron_history_prune.clone(),
             recovery_sweep_threshold: GRAPHILE_RECOVERY_SWEEP_THRESHOLD,
+        }
+    }
+}
+
+impl JobClientConfig {
+    /// D49: a replica cannot claim corpus jobs, even when one is already queued.
+    pub fn registers(&self, kind: JobKind) -> bool {
+        match kind {
+            JobKind::PredictionLock
+            | JobKind::NightlySmoke
+            | JobKind::WeeklySweep
+            | JobKind::AggregateRebuild
+            | JobKind::RegressionScan
+            | JobKind::CalibrationScore
+            | JobKind::ModelDiscovery => self.role == maverick_config::Role::Origin,
+            JobKind::PriceSync => {
+                self.role == maverick_config::Role::Origin || !self.cron_price_sync.is_empty()
+            }
+            JobKind::LatencyProbes
+            | JobKind::CatalogSync
+            | JobKind::CaptureExpiry
+            | JobKind::HistoryPrune => true,
         }
     }
 }
@@ -1038,6 +1063,7 @@ fn validate_schedules(config: &JobClientConfig) -> Result<Vec<SchedulePlan>, Job
         ),
     ]
     .into_iter()
+    .filter(|(_, kind, _)| config.registers(*kind))
     .map(|(env_var, kind, expression)| {
         let expression =
             parse_cron(expression).map_err(|source| JobsError::InvalidCron { env_var, source })?;

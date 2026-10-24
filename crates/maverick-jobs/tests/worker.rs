@@ -31,6 +31,7 @@ static SCHEMA: LazyLock<Schema> = LazyLock::new(|| {
 
 fn config() -> maverick_config::Config {
     let vars = [
+        ("MAVERICK_ROLE", "origin".to_owned()),
         ("MAVERICK_DATABASE_URL", "postgres://u:p@h/db".to_owned()),
         ("MAVERICK_INTERNAL_TOKENS", "ops:s".to_owned()),
         ("MAVERICK_CAPTURE_MASTER_KEY", "ab".repeat(32)),
@@ -214,4 +215,76 @@ async fn a_started_worker_stops_on_request() {
         .stop(std::time::Duration::from_secs(10))
         .await
         .expect("stopped");
+}
+
+/// DIVERGENCE: D49. Check the handlers graphile actually registered, not just crons.
+#[tokio::test]
+async fn deployment_role_limits_registered_jobs_and_crons() {
+    use maverick_config::Role;
+    for (role, prices) in [
+        (Role::Origin, true),
+        (Role::Replica, false),
+        (Role::Replica, true),
+    ] {
+        let Some(db) = maverick_testdb::database(&SCHEMA).await else {
+            return;
+        };
+        let pool = db.pool().await;
+        let mut config = config();
+        config.role = role;
+        if !prices {
+            config.cron_price_sync.clear();
+        }
+        let client = JobClient::from_config(&config).unwrap();
+        let worker = worker::worker_options(&client, &config, deps())
+            .pg_pool(pool.clone())
+            .init()
+            .await
+            .unwrap();
+        let actual: Vec<String> = sqlx::query_scalar(
+            "select identifier from graphile_worker._private_tasks order by identifier",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let mut expected = vec![
+            "latency_probes",
+            "catalog_sync",
+            "capture_expiry",
+            "history_prune",
+        ];
+        if role == Role::Origin {
+            expected.extend([
+                "prediction_lock",
+                "nightly_smoke",
+                "weekly_sweep",
+                "aggregate_rebuild",
+                "regression_scan",
+                "calibration_score",
+                "model_discovery",
+            ]);
+        }
+        if prices {
+            expected.push("price_sync");
+        }
+        let mut handlers: Vec<String> = expected.iter().map(|s| (*s).to_owned()).collect();
+        let mut crons: Vec<String> = expected
+            .iter()
+            .filter(|s| !["aggregate_rebuild", "regression_scan", "calibration_score"].contains(s))
+            .map(|s| format!("cron.{s}"))
+            .collect();
+        handlers.extend(crons.clone());
+        handlers.sort();
+        assert_eq!(actual, handlers, "{role:?}, prices={prices}");
+        let mut actual_crons: Vec<_> = worker::cron_triggers(&client)
+            .into_iter()
+            .map(|c| c.task_identifier)
+            .collect();
+        actual_crons.sort();
+        crons.sort();
+        assert_eq!(actual_crons, crons);
+        drop(worker);
+        pool.close().await;
+        db.close().await;
+    }
 }

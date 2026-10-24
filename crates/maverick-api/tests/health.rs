@@ -155,7 +155,7 @@ async fn health_detail_accepts_each_rotation_token() {
 }
 
 // parity: api.TestInternalHealthDetailShape
-// D35: `job_queue` replaces Go's `river_queues`; the rest of the recorded body is Go's.
+// D35: `job_queue` replaces River. DIVERGENCE: D49 adds the deployment role.
 #[tokio::test]
 async fn health_detail_shape_matches_the_recorded_body() {
     let Some(db) = maverick_testdb::database(&SCHEMA).await else {
@@ -173,7 +173,7 @@ async fn health_detail_shape_matches_the_recorded_body() {
     assert_eq!(
         body,
         concat!(
-            r#"{"status":"ok","components":{"db":{"status":"ok"},"#,
+            r#"{"status":"ok","role":"origin","components":{"db":{"status":"ok"},"#,
             r#""job_queue":{"status":"no_workers","detail":"no graphile_worker worker is registered"},"#,
             r#""provider_client_config":{"status":"none_configured","detail":"no provider API keys set"}},"#,
             r#""active_matrix_version":"2026-07-01","last_batch_times":{}}"#,
@@ -285,7 +285,8 @@ async fn health_detail_is_degraded_when_the_database_is_down() {
     assert_eq!(detail["active_matrix_version"], Value::Null, "{body}");
     assert_eq!(detail["last_batch_times"], Value::Null, "{body}");
     let keys: Vec<&String> = detail.as_object().unwrap().keys().collect();
-    assert_eq!(keys.len(), 4, "{body}");
+    assert_eq!(keys.len(), 5, "{body}");
+    assert_eq!(detail["role"], "origin", "{body}");
     db.close().await;
 }
 
@@ -311,5 +312,47 @@ async fn a_failed_queue_read_is_unknown_but_the_service_stays_ok() {
     );
     assert_eq!(detail["last_batch_times"], Value::Null, "{body}");
     pool.close().await;
+    db.close().await;
+}
+
+/// DIVERGENCE: D49. Replica health reads only the active bundle, never corpus metadata.
+#[tokio::test]
+async fn health_reports_the_role_and_active_bundle_version() {
+    let Some(db) = maverick_testdb::database(&SCHEMA).await else {
+        return;
+    };
+    let pool = db.pool().await;
+    activate_corpus(&pool, "private-origin-version").await;
+    let app = || {
+        let health = HealthState::with_providers(pool.clone(), vec![])
+            .with_role(maverick_config::Role::Replica);
+        internal_router_with(auth(), ApiState::with_health(pool.clone(), health))
+    };
+    let (status, body, _) = get(app(), "/health/detail", Some("ops:alpha")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(parse(&body)["role"], "replica");
+    assert_eq!(parse(&body)["active_matrix_version"], "");
+    sqlx::query("insert into matrix_imports (manifest_sha256, format, matrix_version, published_at, origin_release, signing_kids, active) values ($1, 'mmbundle1', 'bundle-v1', now(), '1.0', array['current'], true), ($2, 'mmbundle1', 'inactive-newer', now(), '1.0', array['current'], false)")
+        .bind(vec![1_u8;32]).bind(vec![2_u8;32]).execute(&pool).await.unwrap();
+    let (_, body, _) = get(app(), "/health/detail", Some("ops:alpha")).await;
+    assert_eq!(parse(&body)["active_matrix_version"], "bundle-v1");
+    let active = maverick_store::matrix::active_bundle(&pool)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(active.matrix_version, "bundle-v1");
+    assert!(active.created_at <= chrono::Utc::now());
+    // The database enforces one active bundle.
+    let error =
+        sqlx::query("update matrix_imports set active=true where matrix_version='inactive-newer'")
+            .execute(&pool)
+            .await
+            .unwrap_err();
+    assert_eq!(maverick_store::sqlstate(&error).as_deref(), Some("23505"));
+    pool.close().await;
+    let (status, body, _) = get(app(), "/health/detail", Some("ops:alpha")).await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(parse(&body)["role"], "replica");
+    assert_eq!(parse(&body)["active_matrix_version"], Value::Null);
     db.close().await;
 }

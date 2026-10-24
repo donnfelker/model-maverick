@@ -236,9 +236,10 @@
     },
     {
       "divergences": [
-        "D35"
+        "D35",
+        "D49"
       ],
-      "reason": "The job-queue component is job_queue (graphile_worker), not river_queues; with no worker registered it reads no_workers with graphile_worker wording. Component keys stay sorted.",
+      "reason": "The job-queue component is job_queue (graphile_worker), not river_queues; with no worker registered it reads no_workers with graphile_worker wording. Component keys stay sorted. D49 adds role=origin to the hosted response.",
       "match": [
         {
           "method": "GET",
@@ -250,6 +251,10 @@
         [
           "\"provider_client_config\":(\\{[^{}]*\\}),\"river_queues\":\\{\"status\":\"no_workers\",\"detail\":\"no River worker has registered a queue\"\\}",
           "\"job_queue\":{\"status\":\"no_workers\",\"detail\":\"no graphile_worker worker is registered\"},\"provider_client_config\":$1"
+        ],
+        [
+          "^([{]\"status\":\"ok\",)",
+          "${1}\"role\":\"origin\","
         ]
       ]
     },

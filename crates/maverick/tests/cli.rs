@@ -89,7 +89,11 @@ impl Write for Shared {
 fn invoke(args: &[String], env: &[(String, String)]) -> (i32, String, String) {
     let out = Arc::new(Mutex::new(Vec::new()));
     let err = Arc::new(Mutex::new(Vec::new()));
+    // DIVERGENCE: D49. Go CLI recordings run with the hosted origin role.
     let lookup = |name: &str| {
+        if name == "MAVERICK_ROLE" {
+            return Some("origin".to_owned());
+        }
         env.iter()
             .find(|(key, _)| key == name)
             .map(|(_, value)| value.clone())

@@ -27,6 +27,10 @@ The engine image runs every process shape through its arguments: `serve` (the de
 `serve --api-only`, `serve --worker-only`, and `migrate`. The proxy image runs
 `maverick-proxy`, configured by its environment (reference part 6 §2).
 
+The engine requires `MAVERICK_ROLE=origin` or `MAVERICK_ROLE=replica` (D49).
+The hosted Kamal deployment and the local smoke set `origin`. A replica runs
+maintenance and latency probes, with no corpus benchmarks or model discovery.
+
 ## The local smoke
 
 ```sh

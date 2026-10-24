@@ -1349,6 +1349,7 @@ Component health, behind the same internal bearer auth:
 ```json
 {
   "status": "ok",
+  "role": "origin",
   "components": {
     "db": { "status": "ok" },
     "job_queue": { "status": "ok", "detail": "graphile_worker queues: default" },
@@ -1371,9 +1372,9 @@ A component's `detail` is omitted when it is empty.
   called this component `river_queues` and also had `paused`.
 - `provider_client_config` is `none_configured` when no provider API key is
   set.
-- `active_matrix_version` is the active corpus version, or `null` on a cold
-  stack.
+- `active_matrix_version` is the active corpus version on an origin, or `null`
+  on a cold stack. On a replica it is the active bundle's version, or `""`
+  before the first import.
 - `last_batch_times` maps each batch kind to its newest completed batch
   (`batches.completed_at`). A kind that never completed is absent.
-- `role` (`origin` or `replica`) is specified (D49, spec §14.4) but not served
-  yet. On a replica, `active_matrix_version` is the active bundle's.
+- `role` is `origin` or `replica` (D49, spec §14.4).

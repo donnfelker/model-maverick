@@ -6,6 +6,7 @@
 # you provide, or have Docker running — the script then boots a throwaway
 # postgres:16-alpine container and removes it on exit.
 set -euo pipefail
+export MAVERICK_ROLE=origin
 cd "$(dirname "$0")/.."
 
 if [[ -z "${MAVERICK_DATABASE_URL:-}" ]]; then

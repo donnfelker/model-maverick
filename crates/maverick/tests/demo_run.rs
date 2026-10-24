@@ -56,6 +56,7 @@ async fn cli(args: &[&str], env: Vec<(String, String)>) -> (i32, String, String)
 
 fn env(db: &TestDatabase) -> Vec<(String, String)> {
     vec![
+        ("MAVERICK_ROLE".to_owned(), "origin".to_owned()),
         ("MAVERICK_DATABASE_URL".to_owned(), db.url().to_owned()),
         ("MAVERICK_CAPTURE_MASTER_KEY".to_owned(), "ab".repeat(32)),
         (

@@ -25,6 +25,23 @@ const HTTP_URL: &str = "must be an http:// or https:// URL";
 const MODELS_DEV_PRICE_MAP: &str = "must be a JSON array of mapping objects with non-empty column_provider, column_model_id, column_endpoint, models_dev_provider, and models_dev_model_id";
 const DEFAULT_MODELS_DEV_PRICE_URL: &str = "https://models.dev/api.json";
 
+/// Deployment role (spec §14.4, D49). Startup requires an explicit choice.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Role {
+    Origin,
+    Replica,
+}
+
+impl Role {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Origin => "origin",
+            Self::Replica => "replica",
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InternalToken {
     pub label: String,
@@ -83,6 +100,7 @@ pub struct ModelsDevPriceMapEntry {
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Config {
+    pub role: Role,
     pub database_url: String,
     pub public_addr: String,
     pub internal_addr: String,
@@ -209,6 +227,7 @@ impl fmt::Debug for Config {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Config")
+            .field("role", &self.role)
             .field("database_url", &redact_credentials(&self.database_url))
             .field("public_addr", &self.public_addr)
             .field("internal_addr", &self.internal_addr)
@@ -363,6 +382,14 @@ where
     F: Fn(&str) -> Option<String>,
 {
     let mut issues = Vec::new();
+    let role = match lookup("MAVERICK_ROLE").as_deref() {
+        Some("origin") => Role::Origin,
+        Some("replica") => Role::Replica,
+        _ => {
+            issue(&mut issues, "MAVERICK_ROLE", "must be origin or replica");
+            Role::Replica // Used only to collect further issues; no Config is returned.
+        }
+    };
     let database_url = required(&lookup, "MAVERICK_DATABASE_URL", &mut issues);
     let public_addr = listen_addr(&lookup, "MAVERICK_PUBLIC_ADDR", ":8080", &mut issues);
     let internal_addr = listen_addr(&lookup, "MAVERICK_INTERNAL_ADDR", ":8081", &mut issues);
@@ -381,12 +408,16 @@ where
         "MAVERICK_CLASSIFIER_COLUMN",
         "claude-haiku-4-5/direct",
     );
-    let judge_pool = column_list(
-        &lookup,
-        "MAVERICK_JUDGE_POOL",
-        &["gemini-3.1-pro/direct", "gpt-5.5/direct"],
-        &mut issues,
-    );
+    let judge_pool = if role == Role::Origin {
+        column_list(
+            &lookup,
+            "MAVERICK_JUDGE_POOL",
+            &["gemini-3.1-pro/direct", "gpt-5.5/direct"],
+            &mut issues,
+        )
+    } else {
+        Vec::new()
+    };
     let runner_repeats = positive_int(&lookup, "MAVERICK_RUNNER_REPEATS", 3, &mut issues);
     let runner_timeout = duration(
         &lookup,
@@ -407,14 +438,21 @@ where
         Duration::from_secs(24 * 60 * 60),
         &mut issues,
     );
-    let spend_nightly_cap_usd = non_negative_float(
-        &lookup,
-        "MAVERICK_SPEND_NIGHTLY_CAP_USD",
-        100.0,
-        &mut issues,
-    );
-    let spend_weekly_cap_usd =
-        non_negative_float(&lookup, "MAVERICK_SPEND_WEEKLY_CAP_USD", 500.0, &mut issues);
+    let spend_nightly_cap_usd = if role == Role::Origin {
+        non_negative_float(
+            &lookup,
+            "MAVERICK_SPEND_NIGHTLY_CAP_USD",
+            100.0,
+            &mut issues,
+        )
+    } else {
+        0.0
+    };
+    let spend_weekly_cap_usd = if role == Role::Origin {
+        non_negative_float(&lookup, "MAVERICK_SPEND_WEEKLY_CAP_USD", 500.0, &mut issues)
+    } else {
+        0.0
+    };
     let scoring_alpha = unit_interval(&lookup, "MAVERICK_SCORING_ALPHA", 0.3, &mut issues);
     let scoring_lambda_var =
         non_negative_float(&lookup, "MAVERICK_SCORING_LAMBDA_VAR", 0.5, &mut issues);
@@ -464,12 +502,17 @@ where
         "0 * * * *",
         &mut issues,
     );
-    let cron_price_sync = cron(
-        &lookup,
-        "MAVERICK_CRON_PRICE_SYNC",
-        "0 6 * * *",
-        &mut issues,
-    );
+    let cron_price_sync =
+        if role == Role::Replica && present(&lookup, "MAVERICK_CRON_PRICE_SYNC").is_none() {
+            String::new()
+        } else {
+            cron(
+                &lookup,
+                "MAVERICK_CRON_PRICE_SYNC",
+                "0 6 * * *",
+                &mut issues,
+            )
+        };
     let cron_catalog_sync = cron(
         &lookup,
         "MAVERICK_CRON_CATALOG_SYNC",
@@ -562,6 +605,7 @@ where
 
     if issues.is_empty() {
         Ok(Config {
+            role,
             database_url,
             public_addr,
             internal_addr,
@@ -1141,6 +1185,77 @@ where
 mod tests {
     use super::*;
 
+    // DIVERGENCE: D49. Recorded Go scenarios describe the hosted origin.
+    fn load_origin(lookup: impl Fn(&str) -> Option<String>) -> Result<Config, ConfigError> {
+        super::load_with(|name| {
+            if name == "MAVERICK_ROLE" {
+                Some("origin".to_owned())
+            } else {
+                lookup(name)
+            }
+        })
+    }
+
+    /// DIVERGENCE: D49. No startup silently chooses a role.
+    #[test]
+    fn role_is_required_and_names_both_choices() {
+        for role in [None, Some(""), Some("Origin"), Some("other")] {
+            let error = super::load_with(|name| match name {
+                "MAVERICK_ROLE" => role.map(str::to_owned),
+                "MAVERICK_DATABASE_URL" => Some("postgres://db".to_owned()),
+                "MAVERICK_INTERNAL_TOKENS" => Some("ops:s".to_owned()),
+                "MAVERICK_CAPTURE_MASTER_KEY" => Some("ab".repeat(32)),
+                _ => None,
+            })
+            .unwrap_err();
+            assert_eq!(
+                error.issues(),
+                &[ConfigIssue {
+                    var: "MAVERICK_ROLE".to_owned(),
+                    reason: "must be origin or replica".to_owned(),
+                }]
+            );
+        }
+    }
+
+    /// DIVERGENCE: D49. Replica startup needs no corpus settings or price source.
+    #[test]
+    fn replica_ignores_corpus_settings_and_opts_in_to_prices() {
+        let load = |cron: Option<&str>| {
+            super::load_with(|name| match name {
+                "MAVERICK_ROLE" => Some("replica".to_owned()),
+                "MAVERICK_DATABASE_URL" => Some("postgres://db".to_owned()),
+                "MAVERICK_INTERNAL_TOKENS" => Some("ops:s".to_owned()),
+                "MAVERICK_CAPTURE_MASTER_KEY" => Some("ab".repeat(32)),
+                "MAVERICK_JUDGE_POOL" => Some("not,a,valid,pool,".to_owned()),
+                "MAVERICK_SPEND_NIGHTLY_CAP_USD" | "MAVERICK_SPEND_WEEKLY_CAP_USD" => {
+                    Some("unused".to_owned())
+                }
+                "MAVERICK_CRON_PRICE_SYNC" => cron.map(str::to_owned),
+                _ => None,
+            })
+        };
+        let config = load(None).unwrap();
+        assert_eq!(config.role, Role::Replica);
+        assert!(config.judge_pool.is_empty());
+        assert_eq!(
+            (config.spend_nightly_cap_usd, config.spend_weekly_cap_usd),
+            (0.0, 0.0)
+        );
+        assert!(config.cron_price_sync.is_empty());
+        assert!(load(Some("")).unwrap().cron_price_sync.is_empty());
+        assert_eq!(
+            load(Some("5 6 * * *")).unwrap().cron_price_sync,
+            "5 6 * * *"
+        );
+        assert!(
+            load(Some("bad"))
+                .unwrap_err()
+                .issues()
+                .iter()
+                .any(|i| i.var == "MAVERICK_CRON_PRICE_SYNC")
+        );
+    }
     #[test]
     fn debug_output_never_prints_credentials() {
         let vars = [
@@ -1169,7 +1284,7 @@ mod tests {
                 "https://gw:gwhunter2@gateway.example.com/v1",
             ),
         ];
-        let config = Config::load_with(|name| {
+        let config = load_origin(|name| {
             vars.iter()
                 .find(|(key, _)| *key == name)
                 .map(|(_, value)| (*value).to_owned())
@@ -1204,7 +1319,7 @@ mod tests {
             ("MAVERICK_CAPTURE_MASTER_KEY", "ab".repeat(32).leak()),
         ];
         let load = |extra: &[(&'static str, &'static str)]| {
-            load_with(|name| {
+            load_origin(|name| {
                 base.iter()
                     .chain(extra)
                     .find(|(key, _)| *key == name)
@@ -1315,7 +1430,7 @@ mod tests {
                 env.insert(key.clone(), value.clone());
             }
             let result =
-                load_with(|name| env.get(name).and_then(Value::as_str).map(str::to_string));
+                load_origin(|name| env.get(name).and_then(Value::as_str).map(str::to_string));
             match (case["ok"].as_bool().expect("ok"), result) {
                 (true, Ok(config)) => assert_eq!(parity_view(&config), case["config"]),
                 (false, Err(error)) => {
@@ -1356,7 +1471,7 @@ mod tests {
                 json!("0.95"),
             ),
         ]);
-        let config = load_with(|name| env.get(name).and_then(Value::as_str).map(str::to_string))
+        let config = load_origin(|name| env.get(name).and_then(Value::as_str).map(str::to_string))
             .expect("rust config");
         assert_eq!(config.classifier_deadline, Duration::from_millis(1500));
         assert_eq!(config.ranking_availability_floor, 0.95);
@@ -1407,7 +1522,7 @@ mod tests {
             ("MAVERICK_MODELS_DEV_PRICE_MAP".to_string(), json!(map)),
         ]);
 
-        let config = load_with(|name| env.get(name).and_then(Value::as_str).map(str::to_string))
+        let config = load_origin(|name| env.get(name).and_then(Value::as_str).map(str::to_string))
             .expect("rust config");
 
         assert_eq!(
@@ -1464,8 +1579,9 @@ mod tests {
                 ("MAVERICK_MODELS_DEV_PRICE_MAP".to_string(), json!(value)),
             ]);
 
-            let error = load_with(|name| env.get(name).and_then(Value::as_str).map(str::to_string))
-                .expect_err("invalid config");
+            let error =
+                load_origin(|name| env.get(name).and_then(Value::as_str).map(str::to_string))
+                    .expect_err("invalid config");
             assert!(
                 error
                     .issues()

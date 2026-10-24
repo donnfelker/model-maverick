@@ -280,16 +280,20 @@ async fn run(config: &Config, api_only: bool, worker_only: bool) -> i32 {
     // D41: background re-resolution of the judge pool and the classifier columns.
     let mut watchers: Vec<JoinHandle<()>> = Vec::new();
     if !api_only {
-        let graders = grader_registry(config, &pool, &providers).await;
-        watchers.push(tokio::spawn(rewatch::watch_judge(
-            Arc::clone(&graders.judge),
-            config.judge_pool.clone(),
-            pool.clone(),
-            graders.judges,
-            graders.families,
-            Rewatch::DEFAULT,
-        )));
-        let graders = graders.registry;
+        let graders = if config.role == maverick_config::Role::Origin {
+            let graders = grader_registry(config, &pool, &providers).await;
+            watchers.push(tokio::spawn(rewatch::watch_judge(
+                Arc::clone(&graders.judge),
+                config.judge_pool.clone(),
+                pool.clone(),
+                graders.judges,
+                graders.families,
+                Rewatch::DEFAULT,
+            )));
+            graders.registry
+        } else {
+            maverick_domain::graders::Registry::new()
+        };
         let client = match JobClient::from_config(config) {
             Ok(client) => client,
             Err(error) => {
@@ -760,6 +764,7 @@ mod tests {
         tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
 
         let config = Config::load_with(|name| match name {
+            "MAVERICK_ROLE" => Some("origin".to_owned()),
             "MAVERICK_DATABASE_URL" => Some("postgres://db".to_owned()),
             "MAVERICK_INTERNAL_TOKENS" => Some("ops:alpha".to_owned()),
             "MAVERICK_CAPTURE_MASTER_KEY" => Some("ab".repeat(32)),

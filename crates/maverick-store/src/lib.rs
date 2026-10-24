@@ -22,6 +22,7 @@ pub mod catalog;
 pub mod corpus;
 pub mod decisions;
 pub mod health;
+pub mod matrix;
 pub mod measurement;
 pub mod migrate;
 pub mod simulation;

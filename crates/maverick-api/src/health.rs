@@ -12,7 +12,7 @@ use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::http::{Method, Response, StatusCode};
 use chrono::{DateTime, Timelike, Utc};
-use maverick_config::Config;
+use maverick_config::{Config, Role};
 use maverick_store::health::{GRAPHILE_WORKER_SCHEMA, WorkerHeartbeat, list_worker_heartbeats};
 use maverick_store::{batches, corpus};
 use serde::Serialize;
@@ -30,6 +30,7 @@ const QUEUE_NAMES: &str = "default";
 /// What the health endpoints read.
 #[derive(Clone)]
 pub struct HealthState {
+    role: Role,
     pool: Option<PgPool>,
     providers: Vec<&'static str>,
     queue_schema: String,
@@ -48,23 +49,30 @@ impl HealthState {
         .filter(|(_, key)| !key.is_empty())
         .map(|(name, _)| name)
         .collect();
-        Self::with_providers(pool, providers)
+        Self::with_providers(pool, providers).with_role(config.role)
     }
 
     /// A state with an explicit provider list, in the order anthropic, openai, google,
     /// xai.
     pub fn with_providers(pool: PgPool, providers: Vec<&'static str>) -> Self {
         Self {
+            role: Role::Origin,
             pool: Some(pool),
             providers,
             queue_schema: GRAPHILE_WORKER_SCHEMA.to_owned(),
         }
     }
 
+    pub fn with_role(mut self, role: Role) -> Self {
+        self.role = role;
+        self
+    }
+
     /// No database: `/up` answers ok and `/health/detail` reports the database as an
     /// error. For router tests that do not start Postgres.
     pub fn detached() -> Self {
         Self {
+            role: Role::Origin,
             pool: None,
             providers: Vec::new(),
             queue_schema: GRAPHILE_WORKER_SCHEMA.to_owned(),
@@ -133,6 +141,7 @@ pub fn provider_client_config_component(providers: &[&str]) -> Component {
 #[derive(Serialize)]
 struct Detail {
     status: &'static str,
+    role: Role,
     components: BTreeMap<&'static str, Component>,
     active_matrix_version: Option<String>,
     last_batch_times: Option<BTreeMap<String, String>>,
@@ -185,12 +194,22 @@ pub(crate) async fn detail(State(state): State<HealthState>, request: Request) -
                 .as_ref()
                 .expect("a ping succeeded, so there is a pool");
             components.insert("db", Component::new("ok", ""));
-            let active = match corpus::get_active_corpus_version(pool).await {
-                Ok(version) => Some(version.version),
-                Err(err) if maverick_store::is_not_found(&err) => None,
-                Err(err) => {
-                    tracing::warn!(error = %err, "health: reading the active corpus version failed");
-                    None
+            let active = if state.role == Role::Replica {
+                match maverick_store::matrix::active_bundle(pool).await {
+                    Ok(bundle) => Some(bundle.map_or_else(String::new, |b| b.matrix_version)),
+                    Err(err) => {
+                        tracing::warn!(error = %err, "health: reading active matrix bundle failed");
+                        None
+                    }
+                }
+            } else {
+                match corpus::get_active_corpus_version(pool).await {
+                    Ok(version) => Some(version.version),
+                    Err(err) if maverick_store::is_not_found(&err) => None,
+                    Err(err) => {
+                        tracing::warn!(error = %err, "health: reading the active corpus version failed");
+                        None
+                    }
                 }
             };
             match maverick_store::health::queue_stats(pool, &state.queue_schema).await {
@@ -226,6 +245,7 @@ pub(crate) async fn detail(State(state): State<HealthState>, request: Request) -
 
     let body = Detail {
         status,
+        role: state.role,
         components,
         active_matrix_version,
         last_batch_times,

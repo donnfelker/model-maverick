@@ -74,6 +74,7 @@ pub struct WorkerDeps {
 /// The configuration of the catalog tasks.
 #[derive(Clone)]
 pub struct CatalogConfig {
+    pub role: maverick_config::Role,
     pub notifier: Option<Arc<dyn AlertNotifier>>,
     pub price_source: Option<Arc<dyn PriceSource>>,
 }
@@ -81,6 +82,7 @@ pub struct CatalogConfig {
 impl std::fmt::Debug for CatalogConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CatalogConfig")
+            .field("role", &self.role)
             .field("notifier", &self.notifier.is_some())
             .field("price_source", &self.price_source.is_some())
             .finish()
@@ -162,11 +164,16 @@ pub fn worker_options(
         lease: lease.clone(),
         notifier: deps.notifier.clone(),
     };
-    let price_source = deps.price_source.or_else(|| {
-        ModelsDevPriceSource::from_config(config)
-            .map(|source| Arc::new(source) as Arc<dyn PriceSource>)
-    });
+    let price_source = if client.config().registers(JobKind::PriceSync) {
+        deps.price_source.or_else(|| {
+            ModelsDevPriceSource::from_config(config)
+                .map(|source| Arc::new(source) as Arc<dyn PriceSource>)
+        })
+    } else {
+        None
+    };
     let catalog = CatalogConfig {
+        role: config.role,
         notifier: deps.notifier.clone(),
         price_source,
     };
@@ -180,7 +187,7 @@ pub fn worker_options(
         capture_retention: Duration::from_secs(u64::from(config.capture_retention_hours) * 3600),
         history_retention_days: config.history_retention_days,
     };
-    WorkerOptions::default()
+    let options = WorkerOptions::default()
         .schema(GRAPHILE_WORKER_SCHEMA)
         .concurrency(WORKER_CONCURRENCY)
         .worker_recovery(client.recovery_config())
@@ -198,28 +205,38 @@ pub fn worker_options(
         .add_extension(catalog)
         .add_extension(discovery)
         .add_extension(retention)
-        .define_job::<PredictionLockJob>()
-        .define_job::<NightlySmokeJob>()
-        .define_job::<WeeklySweepJob>()
-        .define_job::<AggregateRebuildJob>()
-        .define_job::<RegressionScanJob>()
-        .define_job::<CalibrationScoreJob>()
         .define_job::<LatencyProbesJob>()
-        .define_job::<PriceSyncJob>()
         .define_job::<CatalogSyncJob>()
-        .define_job::<ModelDiscoveryJob>()
         .define_job::<CaptureExpiryJob>()
         .define_job::<HistoryPruneJob>()
-        .define_job::<CronPredictionLock>()
-        .define_job::<CronNightlySmoke>()
-        .define_job::<CronWeeklySweep>()
         .define_job::<CronLatencyProbes>()
-        .define_job::<CronPriceSync>()
         .define_job::<CronCatalogSync>()
-        .define_job::<CronModelDiscovery>()
         .define_job::<CronCaptureExpiry>()
-        .define_job::<CronHistoryPrune>()
-        .with_crons(cron_triggers(client))
+        .define_job::<CronHistoryPrune>();
+    let options = if config.role == maverick_config::Role::Origin {
+        options
+            .define_job::<PredictionLockJob>()
+            .define_job::<NightlySmokeJob>()
+            .define_job::<WeeklySweepJob>()
+            .define_job::<AggregateRebuildJob>()
+            .define_job::<RegressionScanJob>()
+            .define_job::<CalibrationScoreJob>()
+            .define_job::<ModelDiscoveryJob>()
+            .define_job::<CronPredictionLock>()
+            .define_job::<CronNightlySmoke>()
+            .define_job::<CronWeeklySweep>()
+            .define_job::<CronModelDiscovery>()
+    } else {
+        options
+    };
+    let options = if client.config().registers(JobKind::PriceSync) {
+        options
+            .define_job::<PriceSyncJob>()
+            .define_job::<CronPriceSync>()
+    } else {
+        options
+    };
+    options.with_crons(cron_triggers(client))
 }
 
 /// One crontab per [`SCHEDULED`] kind, firing its `cron.<kind>` trigger with payload `{}`.
@@ -407,9 +424,14 @@ impl TaskHandler for CatalogSyncJob {
             return Err(missing(JobKind::CatalogSync, "CatalogConfig"));
         };
         with_job_timeout(&ctx, JobKind::CatalogSync, async {
-            catalog::run_catalog_sync(&catalog_deps(&ctx, config), &self.0, Utc::now())
-                .await
-                .map(|_| ())
+            catalog::run_catalog_sync_for_role(
+                &catalog_deps(&ctx, config),
+                &self.0,
+                Utc::now(),
+                config.role,
+            )
+            .await
+            .map(|_| ())
         })
         .await
     }

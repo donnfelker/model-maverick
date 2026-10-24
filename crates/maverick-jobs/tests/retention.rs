@@ -372,6 +372,7 @@ fn retention_jobs_are_unique_per_window() {
 
 fn valid_client_config() -> JobClientConfig {
     let vars = [
+        ("MAVERICK_ROLE", "origin".to_owned()),
         ("MAVERICK_DATABASE_URL", "postgres://u:p@h/db".to_owned()),
         ("MAVERICK_INTERNAL_TOKENS", "ops:s".to_owned()),
         ("MAVERICK_CAPTURE_MASTER_KEY", "ab".repeat(32)),

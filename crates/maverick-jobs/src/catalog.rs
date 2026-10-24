@@ -589,43 +589,77 @@ pub async fn catalog_sync(
     day: NaiveDate,
     now: DateTime<Utc>,
 ) -> Result<CatalogSyncOutput, CatalogError> {
+    catalog_sync_for_role(deps, day, now, maverick_config::Role::Origin).await
+}
+
+/// D49: bundle status owns the lifecycle on replicas; drift and retention still run.
+pub async fn catalog_sync_for_role(
+    deps: &CatalogDeps<'_>,
+    day: NaiveDate,
+    now: DateTime<Utc>,
+    role: maverick_config::Role,
+) -> Result<CatalogSyncOutput, CatalogError> {
     let job = JobKind::CatalogSync;
     let mut output = CatalogSyncOutput::default();
 
-    let measured: HashSet<String> = measurement::list_measured_column_ids(deps.pool)
-        .await
-        .map_err(store_error(job, "listing measured columns"))?
-        .into_iter()
-        .collect();
-    let statuses = ["cold_start".to_owned(), "deprecated".to_owned()];
-    let columns = list_model_columns_by_statuses(deps.pool, &statuses)
-        .await
-        .map_err(store_error(job, "listing lifecycle columns"))?;
-    for column in &columns {
-        if column.status == "cold_start" {
-            if lifecycle::should_activate(
-                column.cold_start_until,
-                day,
-                measured.contains(&column.id),
-            ) {
-                set_status(deps.pool, column, "active").await?;
-                output.activated += 1;
-            }
-        } else if matches!(column.deprecation_date, Some(date) if day >= date) {
-            if let Some(blocked) = guard_retirement(deps, &column.id, now).await? {
-                tracing::warn!(
-                    column_id = %column.id,
-                    error = %blocked.message(),
-                    "catalog_sync: retirement blocked"
-                );
-                output.retirement_blocked += 1;
-            } else {
-                set_status(deps.pool, column, "retired").await?;
-                output.retired += 1;
+    if role == maverick_config::Role::Origin {
+        let measured: HashSet<String> = measurement::list_measured_column_ids(deps.pool)
+            .await
+            .map_err(store_error(job, "listing measured columns"))?
+            .into_iter()
+            .collect();
+        let statuses = ["cold_start".to_owned(), "deprecated".to_owned()];
+        let columns = list_model_columns_by_statuses(deps.pool, &statuses)
+            .await
+            .map_err(store_error(job, "listing lifecycle columns"))?;
+        for column in &columns {
+            if column.status == "cold_start" {
+                if lifecycle::should_activate(
+                    column.cold_start_until,
+                    day,
+                    measured.contains(&column.id),
+                ) {
+                    set_status(deps.pool, column, "active").await?;
+                    output.activated += 1;
+                }
+            } else if matches!(column.deprecation_date, Some(date) if day >= date) {
+                if let Some(blocked) = guard_retirement(deps, &column.id, now).await? {
+                    tracing::warn!(
+                        column_id = %column.id,
+                        error = %blocked.message(),
+                        "catalog_sync: retirement blocked"
+                    );
+                    output.retirement_blocked += 1;
+                } else {
+                    set_status(deps.pool, column, "retired").await?;
+                    output.retired += 1;
+                }
             }
         }
+    } else {
+        let bundle = maverick_store::matrix::active_bundle(deps.pool)
+            .await
+            .map_err(store_error(job, "reading active matrix bundle"))?;
+        if bundle
+            .as_ref()
+            .is_none_or(|b| now - b.published_at > Duration::days(7))
+        {
+            let subject = serde_json::json!({
+                "matrix_version": bundle.as_ref().map_or("", |b| b.matrix_version.as_str()),
+                "published_at": bundle.as_ref().map(|b| b.published_at),
+            });
+            insert_alert(
+                deps.pool,
+                deps.notifier,
+                AlertKind::MatrixStale,
+                Severity::Warning,
+                &subject,
+                "matrix bundle is missing or more than 7 days old",
+            )
+            .await
+            .map_err(CatalogError::Alert)?;
+        }
     }
-
     output.drift_alerts = drift_check(deps, day, now).await?;
     output.retention_alerts = retention_expiring(deps, day, now).await?;
     Ok(output)
@@ -837,6 +871,16 @@ pub async fn run_catalog_sync(
 ) -> Result<CatalogSyncOutput, CatalogError> {
     let day = job_day(JobArgs::CatalogSync(args.clone()))?;
     catalog_sync(deps, day, now).await
+}
+
+pub async fn run_catalog_sync_for_role(
+    deps: &CatalogDeps<'_>,
+    args: &DayArgs,
+    now: DateTime<Utc>,
+    role: maverick_config::Role,
+) -> Result<CatalogSyncOutput, CatalogError> {
+    let day = job_day(JobArgs::CatalogSync(args.clone()))?;
+    catalog_sync_for_role(deps, day, now, role).await
 }
 
 #[cfg(test)]

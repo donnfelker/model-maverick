@@ -118,6 +118,7 @@ done
 docker exec "${PREFIX}-pg" pg_isready -U maverick -h 127.0.0.1 >/dev/null || fail "Postgres is not ready"
 
 ENGINE_ENV=(
+    -e MAVERICK_ROLE=origin
     -e "MAVERICK_DATABASE_URL=$DB_URL"
     -e "MAVERICK_INTERNAL_TOKENS=$INTERNAL_TOKEN"
     -e "MAVERICK_CAPTURE_MASTER_KEY=$MASTER_KEY"

@@ -79,6 +79,7 @@ env:
     - MAVERICK_SMTP_URL # optional; carries SMTP credentials
     - MAVERICK_ALERTS_WEBHOOK_SECRET # required when the webhook URL is set
   clear:
+    MAVERICK_ROLE: origin
     MAVERICK_PUBLIC_ADDR: ":8080"
     MAVERICK_INTERNAL_ADDR: ":8081"
     MAVERICK_CAPTURE_MASTER_KEY_VERSION: "1"

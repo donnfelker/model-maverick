@@ -105,6 +105,21 @@ const ADDED: &[&str] = &[
      public.conversation_affinity USING btree (expires_at)",
     "column tenant_constraints.affinity_cost_aware boolean not null default false",
     "column recommendations.affinity jsonb null",
+    // 0011_matrix_imports.sql (D49)
+    "table matrix_imports",
+    "column matrix_imports.manifest_sha256 bytea not null",
+    "column matrix_imports.format text not null",
+    "column matrix_imports.matrix_version text not null",
+    "column matrix_imports.published_at timestamp with time zone not null",
+    "column matrix_imports.origin_release text not null",
+    "column matrix_imports.signing_kids text[] not null",
+    "column matrix_imports.active boolean not null default false",
+    "column matrix_imports.created_at timestamp with time zone not null default now()",
+    "constraint matrix_imports.matrix_imports_pkey PRIMARY KEY (manifest_sha256)",
+    "index matrix_imports_pkey CREATE UNIQUE INDEX matrix_imports_pkey ON \
+     public.matrix_imports USING btree (manifest_sha256)",
+    "index matrix_imports_one_active CREATE UNIQUE INDEX matrix_imports_one_active ON \
+     public.matrix_imports USING btree (active) WHERE active",
 ];
 
 /// Catalog entries that the additive migrations replace.
@@ -243,8 +258,8 @@ async fn the_additive_migrations_add_exactly_the_spec_objects() {
         .filter(|line| line.starts_with("table "))
         .count();
     assert_eq!(
-        tables, 23,
-        "20 Go tables plus batches, classifier_usage, and conversation_affinity"
+        tables, 24,
+        "20 Go tables plus batches, classifier_usage, conversation_affinity, and matrix_imports (D49)"
     );
 }
 

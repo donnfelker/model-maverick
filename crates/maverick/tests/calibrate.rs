@@ -188,6 +188,7 @@ async fn calibrate_names_the_inversion_and_the_outlier_and_nothing_else() {
     }
 
     let env = vec![
+        ("MAVERICK_ROLE".to_owned(), "origin".to_owned()),
         ("MAVERICK_DATABASE_URL".to_owned(), db.url().to_owned()),
         ("MAVERICK_CAPTURE_MASTER_KEY".to_owned(), "ab".repeat(32)),
         (

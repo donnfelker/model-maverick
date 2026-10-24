@@ -396,6 +396,7 @@ impl Stack {
         seed(&pool).await;
 
         let mut env: HashMap<&str, String> = HashMap::from([
+            ("MAVERICK_ROLE", "origin".to_owned()),
             ("MAVERICK_DATABASE_URL", db.url().to_owned()),
             ("MAVERICK_INTERNAL_TOKENS", OPS_TOKEN.to_owned()),
             ("MAVERICK_CAPTURE_MASTER_KEY", MASTER_KEY_HEX.to_owned()),

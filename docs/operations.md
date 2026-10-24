@@ -11,6 +11,21 @@ and deployment.
 - The deploy images, the Kamal files, and the backup scripts are described in
   [`docker/README.md`](../docker/README.md).
 
+## Deployment role (D49)
+
+Set `MAVERICK_ROLE=origin` for the hosted deployment and `MAVERICK_ROLE=replica`
+for a customer install. There is no default. Startup refuses an unset or unknown role.
+
+An origin keeps the corpus and runs the benchmark and discovery jobs. A replica
+registers `catalog_sync`, `latency_probes`, `capture_expiry`, and `history_prune`.
+Its `price_sync` is off unless `MAVERICK_CRON_PRICE_SYNC` has a schedule. Corpus
+commands refuse on a replica. Judge pool and corpus spend caps are unused there.
+
+Replica `catalog_sync` preserves bundle column statuses and warns with `matrix_stale`
+when the active bundle is absent or more than seven days old. Health detail reports
+`role` and the active bundle version, or `""` before the first import. Probe clients
+use the configured provider endpoints on both roles.
+
 ## Alerts
 
 Alert rows are the durable operational signal. Every alert is first written to the

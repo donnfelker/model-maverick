@@ -117,6 +117,7 @@ async fn preview_reports_the_cold_start_projection_and_the_refusal() {
     .expect("column");
 
     let env = vec![
+        ("MAVERICK_ROLE".to_owned(), "origin".to_owned()),
         ("MAVERICK_DATABASE_URL".to_owned(), db.url().to_owned()),
         ("MAVERICK_CAPTURE_MASTER_KEY".to_owned(), "ab".repeat(32)),
         (

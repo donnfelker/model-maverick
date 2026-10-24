@@ -30,6 +30,16 @@ const OUTLIER_THRESHOLD: f64 = 15.0;
 
 type Lookup<'a> = &'a dyn Fn(&str) -> Option<String>;
 
+/// D49: refuse before reading task files, connecting, or writing corpus state.
+fn refused_on_replica(lookup: Lookup<'_>, stderr: &mut Output) -> bool {
+    if lookup("MAVERICK_ROLE").as_deref() == Some("replica") {
+        let _ = writeln!(stderr, "corpus commands need MAVERICK_ROLE=origin");
+        true
+    } else {
+        false
+    }
+}
+
 /// Open an eager pool. An unreachable database fails here: log `connecting to database` (JSON,
 /// stdout) and return `None`.
 async fn open_pool(url: &str) -> Option<PgPool> {
@@ -52,7 +62,10 @@ pub(crate) fn load(
     stdout: Output,
     mut stderr: Output,
 ) -> i32 {
-    // Validation runs before config and the database, so it works with no env set.
+    if refused_on_replica(lookup, &mut stderr) {
+        return EXIT_FAILURE;
+    }
+    // On an origin, validation runs before config and the database.
     let corpus = match tasks::load(Path::new(dir)) {
         Ok(corpus) => corpus,
         Err(error) => {
@@ -120,6 +133,9 @@ pub(crate) fn activate(
     stdout: Output,
     mut stderr: Output,
 ) -> i32 {
+    if refused_on_replica(lookup, &mut stderr) {
+        return EXIT_FAILURE;
+    }
     let mut plain_out = stdout.clone();
     with_logger(stdout, || {
         let Ok(config) = load_config(lookup) else {
@@ -146,6 +162,9 @@ pub(crate) fn activate(
 
 /// `corpus status`: list versions and the active flag through the tabwriter.
 pub(crate) fn status(lookup: Lookup<'_>, stdout: Output, mut stderr: Output) -> i32 {
+    if refused_on_replica(lookup, &mut stderr) {
+        return EXIT_FAILURE;
+    }
     let mut plain_out = stdout.clone();
     with_logger(stdout, || {
         let Ok(config) = load_config(lookup) else {
@@ -186,6 +205,9 @@ pub(crate) fn status(lookup: Lookup<'_>, stdout: Output, mut stderr: Output) -> 
 
 /// `corpus calibrate`: the tier calibration report. Exit 0 whenever the database is reachable.
 pub(crate) fn calibrate(lookup: Lookup<'_>, stdout: Output, mut stderr: Output) -> i32 {
+    if refused_on_replica(lookup, &mut stderr) {
+        return EXIT_FAILURE;
+    }
     let mut plain_out = stdout.clone();
     with_logger(stdout, || {
         let Ok(config) = load_config(lookup) else {
