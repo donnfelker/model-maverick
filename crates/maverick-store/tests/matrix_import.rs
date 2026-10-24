@@ -13,6 +13,173 @@ use maverick_testdb::Schema;
 use serde_json::json;
 use std::{collections::BTreeMap, sync::LazyLock};
 static SCHEMA: LazyLock<Schema> = LazyLock::new(|| Schema::sqlx(&MIGRATOR));
+
+#[tokio::test]
+async fn an_import_waits_for_bootstrap_before_completing_the_default_pool() {
+    let Some(db) = maverick_testdb::database(&SCHEMA).await else {
+        return;
+    };
+    let pool = db.pool().await;
+    let mut bootstrap = pool.begin().await.unwrap();
+    sqlx::query("select pg_advisory_xact_lock($1)")
+        .bind(matrix_import::REPLICA_BOOTSTRAP_LOCK_KEY)
+        .execute(&mut *bootstrap)
+        .await
+        .unwrap();
+    maverick_store::tenancy::create_tenant(&mut *bootstrap, "replica", "replica", &[1; 32])
+        .await
+        .unwrap();
+    let other = pool.clone();
+    let bundle = verified(23, data());
+    let mut pending =
+        tokio::spawn(async move { matrix_import::import(&other, &bundle, false).await });
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(50), &mut pending)
+            .await
+            .is_err()
+    );
+    bootstrap.commit().await.unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(5), pending)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let pools = maverick_store::tenancy::list_pools_by_tenant(&pool, "replica")
+        .await
+        .unwrap();
+    assert_eq!(pools.len(), 1);
+    assert_eq!(pools[0].model_column_ids, vec!["public"]);
+    pool.close().await;
+    db.close().await;
+}
+
+#[tokio::test]
+async fn an_import_waits_for_an_operator_pool_write_and_preserves_it() {
+    let Some(db) = maverick_testdb::database(&SCHEMA).await else {
+        return;
+    };
+    let pool = db.pool().await;
+    matrix_import::import(&pool, &verified(23, data()), false)
+        .await
+        .unwrap();
+    maverick_store::tenancy::create_tenant(&pool, "replica", "replica", &[1; 32])
+        .await
+        .unwrap();
+    let mut operator = pool.begin().await.unwrap();
+    matrix_import::lock_pool_configuration(&mut operator, "replica")
+        .await
+        .unwrap();
+    maverick_store::tenancy::create_pool(
+        &mut *operator,
+        "team",
+        "replica",
+        "team",
+        &["public".into()],
+        true,
+    )
+    .await
+    .unwrap();
+    let other = pool.clone();
+    let mut next = data();
+    next.catalog.push(column("other"));
+    let bundle = verified(24, next);
+    let mut pending =
+        tokio::spawn(async move { matrix_import::import(&other, &bundle, false).await });
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(50), &mut pending)
+            .await
+            .is_err()
+    );
+    operator.commit().await.unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(5), pending)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let pools = maverick_store::tenancy::list_pools_by_tenant(&pool, "replica")
+        .await
+        .unwrap();
+    assert_eq!(pools.len(), 1);
+    assert_eq!(pools[0].id, "team");
+    assert_eq!(pools[0].model_column_ids, vec!["public"]);
+    pool.close().await;
+    db.close().await;
+}
+
+/// xq7v.26: deferred defaults are created once and never widen an existing pool.
+#[tokio::test]
+async fn first_import_completes_missing_defaults_and_later_imports_preserve_membership() {
+    let Some(db) = maverick_testdb::database(&SCHEMA).await else {
+        return;
+    };
+    let pool = db.pool().await;
+    maverick_store::tenancy::create_tenant(&pool, "replica", "replica", &[1; 32])
+        .await
+        .unwrap();
+    let mut initial = data();
+    initial.catalog.push(column("second"));
+    matrix_import::import(&pool, &verified(23, initial), false)
+        .await
+        .unwrap();
+    let pools = maverick_store::tenancy::list_pools_by_tenant(&pool, "replica")
+        .await
+        .unwrap();
+    assert_eq!(pools.len(), 1);
+    assert_eq!(pools[0].name, "default");
+    assert!(pools[0].is_default);
+    assert_eq!(pools[0].model_column_ids, vec!["public", "second"]);
+    let id = pools[0].id.clone();
+    let mut next = data();
+    next.catalog.extend([column("second"), column("third")]);
+    matrix_import::import(&pool, &verified(24, next), false)
+        .await
+        .unwrap();
+    let pools = maverick_store::tenancy::list_pools_by_tenant(&pool, "replica")
+        .await
+        .unwrap();
+    assert_eq!(pools.len(), 1);
+    assert_eq!(pools[0].id, id);
+    assert_eq!(pools[0].model_column_ids, vec!["public", "second"]);
+    pool.close().await;
+    db.close().await;
+}
+
+#[tokio::test]
+async fn an_existing_custom_pool_prevents_any_automatic_default() {
+    let Some(db) = maverick_testdb::database(&SCHEMA).await else {
+        return;
+    };
+    let pool = db.pool().await;
+    matrix_import::import(&pool, &verified(23, data()), false)
+        .await
+        .unwrap();
+    maverick_store::tenancy::create_tenant(&pool, "replica", "replica", &[1; 32])
+        .await
+        .unwrap();
+    maverick_store::tenancy::create_pool(
+        &pool,
+        "team",
+        "replica",
+        "team",
+        &["public".into()],
+        true,
+    )
+    .await
+    .unwrap();
+    let mut next = data();
+    next.catalog.push(column("other"));
+    matrix_import::import(&pool, &verified(24, next), false)
+        .await
+        .unwrap();
+    let pools = maverick_store::tenancy::list_pools_by_tenant(&pool, "replica")
+        .await
+        .unwrap();
+    assert_eq!(pools.len(), 1);
+    assert_eq!(pools[0].id, "team");
+    assert_eq!(pools[0].model_column_ids, vec!["public"]);
+    pool.close().await;
+    db.close().await;
+}
 fn column(id: &str) -> CatalogColumn {
     CatalogColumn {
         id: id.into(),

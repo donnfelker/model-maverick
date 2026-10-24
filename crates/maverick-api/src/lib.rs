@@ -28,6 +28,24 @@ pub use health::HealthState;
 pub use internal::InternalSettings;
 pub use recommend::{AffinitySettings, RecommendConfig, RecommendError, Recommended, recommend};
 
+/// D49: replicas report their imported matrix, origins their active corpus.
+pub(crate) async fn active_matrix_version(
+    pool: &PgPool,
+    role: maverick_config::Role,
+) -> sqlx::Result<String> {
+    if role == maverick_config::Role::Replica {
+        return Ok(maverick_store::matrix::active_bundle(pool)
+            .await?
+            .map(|b| b.matrix_version)
+            .unwrap_or_default());
+    }
+    match maverick_store::corpus::get_active_corpus_version(pool).await {
+        Ok(version) => Ok(version.version),
+        Err(error) if maverick_store::is_not_found(&error) => Ok(String::new()),
+        Err(error) => Err(error),
+    }
+}
+
 /// What the endpoint handlers read: the engine pool and the health inputs. Handlers that
 /// need the database answer `500 internal_error` on a detached state (router tests).
 #[derive(Clone)]

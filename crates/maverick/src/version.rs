@@ -18,9 +18,8 @@ pub const COMMIT: &str = match option_env!("MAVERICK_RELEASE_COMMIT") {
     None => "unknown",
 };
 
-/// The matrix bundle formats this release imports (spec §14.4). Bundle import (bead
-/// xq7v.10) adds `mmbundle1`.
-pub const BUNDLE_FORMATS: &[&str] = &[];
+/// The matrix bundle formats this release imports (spec §14.4, D49).
+pub const BUNDLE_FORMATS: &[&str] = &[maverick_bundle::FORMAT];
 
 /// The newest engine migration this binary ships: the schema version a database needs
 /// before `serve` runs on it.

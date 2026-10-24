@@ -22,7 +22,13 @@ path = "src/main.rs"
 [lints]
 workspace = true
 
+# Used only by the sealed test harness, never from a normal dependency.
+# Release binaries always use real trust keys.
+[features]
+test-keys = ["maverick-bundle/test-keys"]
+
 [dependencies]
+maverick-bundle = { workspace = true }
 maverick-domain = { workspace = true }
 maverick-config = { workspace = true }
 maverick-store = { workspace = true }
@@ -48,5 +54,6 @@ opentelemetry_sdk = { workspace = true }
 opentelemetry-otlp = { workspace = true }
 
 [dev-dependencies]
+maverick-bundle = { workspace = true, features = ["test-keys"] }
 maverick-testdb = { workspace = true }
 reqwest = { workspace = true }

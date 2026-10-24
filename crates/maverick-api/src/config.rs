@@ -455,6 +455,7 @@ pub async fn replace_pools(
         return Err(config_error(first).into());
     }
     let mut tx = db.begin().await?;
+    maverick_store::matrix_import::lock_pool_configuration(&mut tx, tenant_id).await?;
     let constraints = stored_constraints(&mut tx, tenant_id)
         .await?
         .map_or_else(StandingConstraints::default, |row| standing(&row));

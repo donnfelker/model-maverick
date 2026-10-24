@@ -18,6 +18,38 @@ const FIXTURE: &str = include_str!("../../../parity/fixtures/store/cli.json");
 /// Rows whose command body is another bead's.
 const OTHER_BEADS: [(&str, &str); 0] = [];
 
+/// DIVERGENCE: D49. Import accepts one path and an explicit rollback flag.
+#[test]
+fn matrix_import_rejects_missing_extra_and_unknown_arguments_before_loading_config() {
+    for args in [
+        vec!["matrix", "import"],
+        vec!["matrix", "import", "--allow-older"],
+        vec!["matrix", "import", "one", "two"],
+        vec!["matrix", "import", "one", "--unknown"],
+    ] {
+        let args: Vec<String> = args.into_iter().map(str::to_owned).collect();
+        let (code, out, err) = invoke(&args, &[]);
+        assert_eq!(code, 2, "{err}");
+        assert!(out.is_empty());
+        assert!(err.contains("matrix import"));
+        assert!(!err.contains("invalid configuration"));
+    }
+    assert!(maverick_cli::MATRIX_USAGE.contains("import <path> [--allow-older]"));
+    for args in [
+        vec!["matrix", "import", "file.tar", "--allow-older"],
+        vec!["matrix", "import", "--allow-older", "file.tar"],
+        vec!["matrix", "import", "file.tar", "--allow-older=false"],
+    ] {
+        let args: Vec<String> = args.into_iter().map(str::to_owned).collect();
+        let (code, _, err) = invoke(&args, &[]);
+        assert_eq!(
+            code, 1,
+            "valid syntax must reach configuration loading: {err}"
+        );
+        assert!(err.contains("invalid configuration"));
+    }
+}
+
 /// The Go `corpus load` cases point `--dir` at the Go task testdata; the Rust tree keeps that
 /// testdata under `parity/fixtures/measurement-io/testdata/`. Rewrite the path in both the args
 /// and the expected output so the `rejected <dir>` line still matches.

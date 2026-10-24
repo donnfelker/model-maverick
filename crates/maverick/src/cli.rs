@@ -21,7 +21,7 @@ Commands:
               calibration report (load | activate | status | calibrate)
   mcp-stdio   stdio MCP transport for local development (--api-key mk_live_...)
   key         the API keys of a single-tenant replica (create | list | revoke)
-  matrix      the active matrix bundle (status)
+  matrix      import a matrix bundle or print its status
 
 Flags:
   --version   print the release, build, schema, and bundle formats
@@ -61,7 +61,7 @@ Subcommands:
 pub const MATRIX_USAGE: &str = "Usage: maverick matrix <subcommand> [flags]
 
 Subcommands:
-  status  print the active matrix bundle: its matrix_version, when it was
+  import <path> [--allow-older]\n          verify and install a signed bundle on a replica\n  status  print the active matrix bundle: its matrix_version, when it was
           published and imported, and how many days behind it is
 ";
 
@@ -386,6 +386,32 @@ fn matrix(
     };
     let rest = &args[1..];
     match sub.as_str() {
+        "import" => {
+            // The path precedes flags in the documented command; also accept flags
+            // before the path, with the same bool syntax as other subcommands.
+            let (path, flags) = match rest.first() {
+                Some(path) if !path.starts_with('-') => (Some(path.as_str()), &rest[1..]),
+                _ => (None, rest),
+            };
+            let set = FlagSet::new("matrix import")
+                .bool("allow-older", "allow an older signed bundle for rollback");
+            let Some(parsed) = parse_flags(&set, flags, &mut stderr) else {
+                return EXIT_USAGE;
+            };
+            let paths = parsed.args();
+            let path = match (path, paths) {
+                (Some(path), []) => path,
+                (None, [path]) => path,
+                _ => {
+                    let _ = write!(
+                        stderr,
+                        "maverick matrix import: expected one path\n\n{MATRIX_USAGE}"
+                    );
+                    return EXIT_USAGE;
+                }
+            };
+            crate::matrix::import(lookup, path, parsed.bool("allow-older"), stdout, stderr)
+        }
         "status" => {
             let set = FlagSet::new("matrix status");
             if parse_flags(&set, rest, &mut stderr).is_none() {

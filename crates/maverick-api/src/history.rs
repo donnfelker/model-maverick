@@ -39,7 +39,7 @@ use maverick_store::decisions::{
 use maverick_store::measurement::{
     self, Aggregate, AggregateCursor, AggregateHistoryQuery, Calibration, CalibrationPageQuery,
 };
-use maverick_store::{catalog, corpus, is_not_found};
+use maverick_store::{catalog, is_not_found};
 use sqlx::PgPool;
 
 use crate::health::rfc3339_nano;
@@ -103,7 +103,7 @@ pub(crate) async fn recommendations_handler(
         request.method(),
         &api,
         "/v1/history/recommendations",
-        |pool| recommendations(pool, &identity.tenant_id, query),
+        |pool| recommendations(pool, &identity.tenant_id, query, api.recommend().role),
     )
     .await
 }
@@ -132,7 +132,7 @@ pub(crate) async fn outcomes_handler(
 ) -> Response<Body> {
     let query = query_of(&request);
     serve(request.method(), &api, "/v1/history/outcomes", |pool| {
-        outcomes(pool, &identity.tenant_id, query)
+        outcomes(pool, &identity.tenant_id, query, api.recommend().role)
     })
     .await
 }
@@ -148,7 +148,7 @@ pub(crate) async fn model_handler(
         request.method(),
         &api,
         "/v1/history/models/{column_id}",
-        |pool| model_series(pool, column_id, query),
+        |pool| model_series(pool, column_id, query, api.recommend().role),
     )
     .await
 }
@@ -160,7 +160,7 @@ pub(crate) async fn calibration_handler(
 ) -> Response<Body> {
     let query = query_of(&request);
     serve(request.method(), &api, "/v1/history/calibration", |pool| {
-        calibration(pool, query)
+        calibration(pool, query, api.recommend().role)
     })
     .await
 }
@@ -199,7 +199,12 @@ where
 
 // ---- endpoints ----
 
-async fn recommendations(pool: &PgPool, tenant: &str, query: String) -> Result<String, Failure> {
+async fn recommendations(
+    pool: &PgPool,
+    tenant: &str,
+    query: String,
+    role: maverick_config::Role,
+) -> Result<String, Failure> {
     let params = Params::parse(
         &query,
         &["prompt_hash", "capability", "since", "limit", "cursor"],
@@ -232,7 +237,7 @@ async fn recommendations(pool: &PgPool, tenant: &str, query: String) -> Result<S
         .map(summary)
         .collect::<Result<Vec<_>, _>>()
         .map_err(Failure::Internal)?;
-    listing(pool, "recommendations", items, next).await
+    listing(pool, "recommendations", items, next, role).await
 }
 
 async fn recommendation(pool: &PgPool, tenant: &str, id: String) -> Result<String, Failure> {
@@ -269,7 +274,12 @@ async fn recommendation(pool: &PgPool, tenant: &str, id: String) -> Result<Strin
     Ok(document(&body))
 }
 
-async fn outcomes(pool: &PgPool, tenant: &str, query: String) -> Result<String, Failure> {
+async fn outcomes(
+    pool: &PgPool,
+    tenant: &str,
+    query: String,
+    role: maverick_config::Role,
+) -> Result<String, Failure> {
     let params = Params::parse(
         &query,
         &["recommendation_id", "outcome", "since", "limit", "cursor"],
@@ -303,10 +313,15 @@ async fn outcomes(pool: &PgPool, tenant: &str, query: String) -> Result<String, 
         .iter()
         .map(outcome_entry)
         .collect::<Result<Vec<_>, _>>()?;
-    listing(pool, "outcomes", items, next).await
+    listing(pool, "outcomes", items, next, role).await
 }
 
-async fn model_series(pool: &PgPool, column_id: String, query: String) -> Result<String, Failure> {
+async fn model_series(
+    pool: &PgPool,
+    column_id: String,
+    query: String,
+    role: maverick_config::Role,
+) -> Result<String, Failure> {
     let params = Params::parse(
         &query,
         &[
@@ -389,12 +404,19 @@ async fn model_series(pool: &PgPool, column_id: String, query: String) -> Result
         string("dimension", dimension),
         ("series".to_owned(), JsonValue::Array(series)),
         ("next_cursor".to_owned(), next),
-        string("matrix_version", &active_version(pool).await?),
+        string(
+            "matrix_version",
+            &crate::active_matrix_version(pool, role).await?,
+        ),
     ]);
     Ok(document(&body))
 }
 
-async fn calibration(pool: &PgPool, query: String) -> Result<String, Failure> {
+async fn calibration(
+    pool: &PgPool,
+    query: String,
+    role: maverick_config::Role,
+) -> Result<String, Failure> {
     let params = Params::parse(&query, &["capability", "since", "limit", "cursor"])?;
     let limit = limit(params.get("limit"))?;
     let since = since(params.get("since"))?;
@@ -429,7 +451,7 @@ async fn calibration(pool: &PgPool, query: String) -> Result<String, Failure> {
         .map(calibration_entry)
         .collect::<Result<Vec<_>, _>>()
         .map_err(Failure::Internal)?;
-    listing(pool, "calibration", items, next).await
+    listing(pool, "calibration", items, next, role).await
 }
 
 // ---- query parameters ----
@@ -578,22 +600,17 @@ async fn listing(
     key: &str,
     items: Vec<JsonValue>,
     next: JsonValue,
+    role: maverick_config::Role,
 ) -> Result<String, Failure> {
     let body = JsonValue::Object(vec![
         (key.to_owned(), JsonValue::Array(items)),
         ("next_cursor".to_owned(), next),
-        string("matrix_version", &active_version(pool).await?),
+        string(
+            "matrix_version",
+            &crate::active_matrix_version(pool, role).await?,
+        ),
     ]);
     Ok(document(&body))
-}
-
-/// The active corpus version, or `""` when none is active.
-async fn active_version(pool: &PgPool) -> Result<String, Failure> {
-    match corpus::get_active_corpus_version(pool).await {
-        Ok(version) => Ok(version.version),
-        Err(error) if is_not_found(&error) => Ok(String::new()),
-        Err(error) => Err(error.into()),
-    }
 }
 
 /// One audit-log summary, from the stored classification and response: `pick` is the

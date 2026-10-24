@@ -100,6 +100,7 @@ impl Default for AffinitySettings {
 /// path's classifier resolver, the debug-capture hook, and conversation affinity.
 #[derive(Clone)]
 pub struct RecommendConfig {
+    pub role: maverick_config::Role,
     pub rank: RankParams,
     pub ceiling_buffer: f64,
     /// Notified after a `pool_would_be_empty` alert row is written. `None` writes the row
@@ -117,6 +118,7 @@ pub struct RecommendConfig {
 impl Default for RecommendConfig {
     fn default() -> Self {
         Self {
+            role: maverick_config::Role::Origin,
             rank: RankParams::default(),
             ceiling_buffer: ceilings::DEFAULT_CEILING_BUFFER,
             alerts: None,
@@ -130,6 +132,7 @@ impl Default for RecommendConfig {
 impl fmt::Debug for RecommendConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RecommendConfig")
+            .field("role", &self.role)
             .field("rank", &self.rank)
             .field("ceiling_buffer", &self.ceiling_buffer)
             .field("alerts", &self.alerts.is_some())
@@ -145,6 +148,7 @@ impl RecommendConfig {
     /// the classifier without clients; serve connects them.
     pub fn from_config(config: &Config) -> Self {
         Self {
+            role: config.role,
             rank: RankParams {
                 band_quality: config.ranking_band_quality,
                 band_balanced: config.ranking_band_balanced,
@@ -333,7 +337,11 @@ async fn recommend_uninstrumented(
     )?;
     let pools = context.pools;
     let weights = context.weights;
-    let active_corpus_version = context.active_corpus_version;
+    let active_corpus_version = if config.role == maverick_config::Role::Replica {
+        Some(crate::active_matrix_version(pool, config.role).await?)
+    } else {
+        context.active_corpus_version
+    };
     let (standing, telemetry_opt_out, tenant_cost_aware) = match context.constraints {
         Some(row) => (
             StandingConstraints {

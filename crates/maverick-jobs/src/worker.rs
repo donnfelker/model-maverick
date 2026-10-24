@@ -43,7 +43,8 @@ use crate::{
 /// The kinds that get a cron trigger, in schedule order: every scheduled kind. The
 /// chained kinds (aggregate_rebuild, regression_scan, calibration_score) are enqueued by
 /// the jobs before them.
-pub const SCHEDULED: [JobKind; 10] = [
+pub const SCHEDULED: [JobKind; 11] = [
+    JobKind::MatrixPull,
     JobKind::PredictionLock,
     JobKind::NightlySmoke,
     JobKind::WeeklySweep,
@@ -248,6 +249,16 @@ pub fn worker_options(
     } else {
         options
     };
+    let options = if client.config().registers(JobKind::MatrixPull) {
+        options
+            .add_extension(crate::matrix_pull::MatrixPullConfig::new(
+                &config.matrix_pull_url,
+            ))
+            .define_job::<crate::matrix_pull::MatrixPullJob>()
+            .define_job::<CronMatrixPull>()
+    } else {
+        options
+    };
     options.with_crons(cron_triggers(client))
 }
 
@@ -363,6 +374,7 @@ cron_trigger!(
     JobKind::LatencyProbes,
     "cron.latency_probes"
 );
+cron_trigger!(CronMatrixPull, JobKind::MatrixPull, "cron.matrix_pull");
 cron_trigger!(CronPriceSync, JobKind::PriceSync, "cron.price_sync");
 cron_trigger!(CronCatalogSync, JobKind::CatalogSync, "cron.catalog_sync");
 cron_trigger!(
@@ -598,8 +610,12 @@ mod tests {
     fn triggers_cover_the_scheduled_kinds_with_an_empty_payload() {
         let client = JobClient::new(crate::JobClientConfig::default()).expect("client");
         let crons = cron_triggers(&client);
-        assert_eq!(crons.len(), SCHEDULED.len());
-        for (crontab, kind) in crons.iter().zip(SCHEDULED) {
+        let enabled: Vec<_> = SCHEDULED
+            .into_iter()
+            .filter(|kind| client.config().registers(*kind))
+            .collect();
+        assert_eq!(crons.len(), enabled.len());
+        for (crontab, kind) in crons.iter().zip(enabled) {
             let trigger = trigger_identifier(kind);
             assert_eq!(crontab.task_identifier, trigger);
             // The crontab id stays the kind, so graphile's backfill bookkeeping carries over.

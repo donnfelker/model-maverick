@@ -221,11 +221,11 @@ async fn a_started_worker_stops_on_request() {
 #[tokio::test]
 async fn deployment_role_limits_registered_jobs_and_crons() {
     use maverick_config::Role;
-    for (role, prices, export) in [
-        (Role::Origin, true, false),
-        (Role::Origin, true, true),
-        (Role::Replica, false, true),
-        (Role::Replica, true, false),
+    for (role, prices, export, pull) in [
+        (Role::Origin, true, false, false),
+        (Role::Origin, true, true, true),
+        (Role::Replica, false, true, true),
+        (Role::Replica, true, false, false),
     ] {
         let Some(db) = maverick_testdb::database(&SCHEMA).await else {
             return;
@@ -233,6 +233,9 @@ async fn deployment_role_limits_registered_jobs_and_crons() {
         let pool = db.pool().await;
         let mut config = config();
         config.role = role;
+        if pull {
+            config.matrix_pull_url = "http://127.0.0.1/bundles".into();
+        }
         if export {
             config.matrix_export_dir = "/unused/export".into();
             config.matrix_signing_keys = "test:/unused/key".into();
@@ -273,6 +276,9 @@ async fn deployment_role_limits_registered_jobs_and_crons() {
         }
         if export && role == Role::Origin {
             expected.push("matrix_export");
+        }
+        if pull && role == Role::Replica {
+            expected.push("matrix_pull");
         }
         if prices {
             expected.push("price_sync");

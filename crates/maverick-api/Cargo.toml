@@ -45,6 +45,7 @@ sqlx = { workspace = true }
 chrono = { workspace = true }
 
 [dev-dependencies]
+maverick-bundle = { workspace = true, features = ["test-keys"] }
 maverick-testdb = { workspace = true }
 parity-support = { path = "../parity-support" }
 # Log capture with a secret-leak guard (G5): the classifier log redaction test.

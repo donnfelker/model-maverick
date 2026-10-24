@@ -318,6 +318,7 @@ async fn call_tool(
             match crate::policies::policies(
                 pool,
                 api.recommend().ceiling_buffer,
+                api.recommend().role,
                 &identity.tenant_id,
                 &query.join("&"),
             )
@@ -330,7 +331,7 @@ async fn call_tool(
                 Err(crate::policies::Failure::Internal(error)) => internal(name, &error),
             }
         }
-        _ => match crate::models::models(pool, Utc::now()).await {
+        _ => match crate::models::models(pool, Utc::now(), api.recommend().role).await {
             Ok(body) => tool_success(&body),
             Err(error) => internal(name, &error),
         },

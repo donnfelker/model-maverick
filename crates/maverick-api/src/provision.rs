@@ -12,7 +12,7 @@ use sqlx::{Connection, PgConnection, PgExecutor, PgPool};
 use crate::audit;
 
 /// The advisory lock that serializes replica bootstraps: `0x6d76626f6f74` ("mvboot").
-const BOOTSTRAP_LOCK_KEY: i64 = 0x6d76_626f_6f74;
+const BOOTSTRAP_LOCK_KEY: i64 = maverick_store::matrix_import::REPLICA_BOOTSTRAP_LOCK_KEY;
 
 /// The audit actor of a replica's bootstrap.
 pub const BOOTSTRAP_ACTOR: &str = "bootstrap";

@@ -25,7 +25,7 @@ use chrono::{DateTime, Utc};
 use maverick_domain::gojson::{self, JsonValue};
 use maverick_domain::policy::RetentionMode;
 use maverick_store::catalog::{self, ModelColumn};
-use maverick_store::{corpus, is_not_found, measurement};
+use maverick_store::measurement;
 use sqlx::PgPool;
 
 use crate::health::rfc3339_nano;
@@ -45,7 +45,7 @@ pub(crate) async fn models_handler(
     let Some(pool) = api.pool() else {
         return internal_error();
     };
-    match models(pool, Utc::now()).await {
+    match models(pool, Utc::now(), api.recommend().role).await {
         Ok(body) => crate::response_with_json(StatusCode::OK, body.into_bytes()),
         Err(error) => {
             tracing::error!(
@@ -60,7 +60,11 @@ pub(crate) async fn models_handler(
 }
 
 /// The response body: compact JSON and one `\n` (also the MCP `list_models` tool).
-pub(crate) async fn models(pool: &PgPool, now: DateTime<Utc>) -> Result<String, String> {
+pub(crate) async fn models(
+    pool: &PgPool,
+    now: DateTime<Utc>,
+    role: maverick_config::Role,
+) -> Result<String, String> {
     let statuses: Vec<String> = LISTED_STATUSES.iter().map(|s| (*s).to_owned()).collect();
     let columns = catalog::list_model_columns_by_statuses(pool, &statuses)
         .await
@@ -70,11 +74,9 @@ pub(crate) async fn models(pool: &PgPool, now: DateTime<Utc>) -> Result<String, 
         .map_err(|error| error.to_string())?
         .into_iter()
         .collect();
-    let matrix_version = match corpus::get_active_corpus_version(pool).await {
-        Ok(version) => version.version,
-        Err(error) if is_not_found(&error) => String::new(),
-        Err(error) => return Err(error.to_string()),
-    };
+    let matrix_version = crate::active_matrix_version(pool, role)
+        .await
+        .map_err(|error| error.to_string())?;
     let entries = columns
         .iter()
         .map(|column| entry(column, measured.contains(&column.id), now))

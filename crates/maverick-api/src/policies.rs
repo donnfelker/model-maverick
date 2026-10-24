@@ -33,7 +33,7 @@ use maverick_domain::scoring::observe::dimension;
 use maverick_domain::tasks::CAPABILITIES;
 use maverick_store::catalog::{self, ModelColumn};
 use maverick_store::measurement::{self, Aggregate};
-use maverick_store::{corpus, is_not_found, tenancy};
+use maverick_store::{is_not_found, tenancy};
 use sqlx::PgPool;
 
 use crate::recommend::{effective_retention, policy_error};
@@ -75,6 +75,7 @@ pub(crate) async fn policies_handler(
     match policies(
         pool,
         api.recommend().ceiling_buffer,
+        api.recommend().role,
         &identity.tenant_id,
         &query,
     )
@@ -99,6 +100,7 @@ pub(crate) async fn policies_handler(
 pub(crate) async fn policies(
     pool: &PgPool,
     buffer: f64,
+    role: maverick_config::Role,
     tenant: &str,
     query: &str,
 ) -> Result<String, Failure> {
@@ -254,11 +256,7 @@ pub(crate) async fn policies(
     } else {
         DEFAULT_QUALITY_BAR
     };
-    let matrix_version = match corpus::get_active_corpus_version(pool).await {
-        Ok(version) => version.version,
-        Err(error) if is_not_found(&error) => String::new(),
-        Err(error) => return Err(error.into()),
-    };
+    let matrix_version = crate::active_matrix_version(pool, role).await?;
     let buffer = gojson::encode_f64(buffer).map_err(Failure::Internal)?;
     let body = object(vec![
         ("pool", string(&resolved.name)),

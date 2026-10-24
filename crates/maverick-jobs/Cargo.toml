@@ -36,6 +36,8 @@ tracing = { workspace = true }
 ulid = { workspace = true }
 
 [dev-dependencies]
+axum = { workspace = true }
+maverick-bundle = { workspace = true, features = ["test-keys"] }
 opentelemetry_sdk = { workspace = true, features = ["testing"] }
 maverick-testdb = { workspace = true }
 parity-support = { path = "../parity-support" }

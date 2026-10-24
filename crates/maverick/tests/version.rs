@@ -51,15 +51,12 @@ fn version_prints_five_lines_and_needs_no_configuration() {
             format!("release date: {RELEASE_DATE}"),
             format!("commit: {COMMIT}"),
             format!("minimum schema: {}", schema_version()),
-            "bundle formats: none".to_owned(),
+            "bundle formats: mmbundle1".to_owned(),
         ],
         "{stdout}"
     );
     assert!(stdout.ends_with('\n'));
-    assert!(
-        BUNDLE_FORMATS.is_empty(),
-        "update the line above with the formats"
-    );
+    assert_eq!(BUNDLE_FORMATS, &["mmbundle1"]);
 }
 
 #[test]

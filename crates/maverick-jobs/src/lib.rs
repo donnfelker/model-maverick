@@ -8,6 +8,7 @@ pub mod catalog;
 pub mod discovery;
 pub mod fold;
 pub mod matrix_export;
+pub mod matrix_pull;
 mod metrics;
 pub mod predictions;
 pub mod probes;
@@ -60,6 +61,7 @@ pub enum JobKind {
     RegressionScan,
     CalibrationScore,
     MatrixExport,
+    MatrixPull,
     LatencyProbes,
     PriceSync,
     CatalogSync,
@@ -71,7 +73,7 @@ pub enum JobKind {
 }
 
 impl JobKind {
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 15] = [
         Self::PredictionLock,
         Self::NightlySmoke,
         Self::WeeklySweep,
@@ -79,6 +81,7 @@ impl JobKind {
         Self::RegressionScan,
         Self::CalibrationScore,
         Self::MatrixExport,
+        Self::MatrixPull,
         Self::LatencyProbes,
         Self::PriceSync,
         Self::CatalogSync,
@@ -97,6 +100,7 @@ impl JobKind {
             Self::RegressionScan => "regression_scan",
             Self::CalibrationScore => "calibration_score",
             Self::MatrixExport => "matrix_export",
+            Self::MatrixPull => "matrix_pull",
             Self::LatencyProbes => "latency_probes",
             Self::PriceSync => "price_sync",
             Self::CatalogSync => "catalog_sync",
@@ -118,6 +122,7 @@ impl JobKind {
                 | Self::RegressionScan
                 | Self::CalibrationScore
                 | Self::MatrixExport
+                | Self::MatrixPull
                 | Self::LatencyProbes
         )
     }
@@ -197,6 +202,7 @@ pub enum JobArgs {
     RegressionScan(BatchFollowupArgs),
     CalibrationScore(BatchFollowupArgs),
     MatrixExport(matrix_export::MatrixExportArgs),
+    MatrixPull(HourArgs),
     LatencyProbes(HourArgs),
     PriceSync(DayArgs),
     CatalogSync(DayArgs),
@@ -216,6 +222,7 @@ impl JobArgs {
             Self::RegressionScan(_) => JobKind::RegressionScan,
             Self::CalibrationScore(_) => JobKind::CalibrationScore,
             Self::MatrixExport(_) => JobKind::MatrixExport,
+            Self::MatrixPull(_) => JobKind::MatrixPull,
             Self::LatencyProbes(_) => JobKind::LatencyProbes,
             Self::PriceSync(_) => JobKind::PriceSync,
             Self::CatalogSync(_) => JobKind::CatalogSync,
@@ -237,7 +244,10 @@ impl JobArgs {
             | Self::CalibrationScore(args) => {
                 json!({ "night": args.night, "batch_id": args.batch_id })
             }
-            Self::LatencyProbes(args) | Self::CaptureExpiry(args) | Self::AffinityPrune(args) => {
+            Self::LatencyProbes(args)
+            | Self::CaptureExpiry(args)
+            | Self::AffinityPrune(args)
+            | Self::MatrixPull(args) => {
                 json!({ "hour": args.hour })
             }
             Self::PriceSync(args)
@@ -274,7 +284,10 @@ impl JobArgs {
                 parse_night(self.kind(), &args.night)?;
                 Ok(args.batch_id.clone())
             }
-            Self::LatencyProbes(args) | Self::CaptureExpiry(args) | Self::AffinityPrune(args) => {
+            Self::LatencyProbes(args)
+            | Self::CaptureExpiry(args)
+            | Self::AffinityPrune(args)
+            | Self::MatrixPull(args) => {
                 parse_hour(self.kind(), &args.hour)?;
                 Ok(args.hour.clone())
             }
@@ -341,6 +354,7 @@ pub async fn run_with_timeout<E: fmt::Display>(
 pub struct JobClientConfig {
     pub role: maverick_config::Role,
     pub matrix_export_enabled: bool,
+    pub matrix_pull_enabled: bool,
     pub batch_job_timeout: Duration,
     pub batch_lease_ttl: Duration,
     pub batch_heartbeat_interval: Duration,
@@ -364,6 +378,7 @@ impl Default for JobClientConfig {
         Self {
             role: maverick_config::Role::Origin,
             matrix_export_enabled: false,
+            matrix_pull_enabled: false,
             batch_job_timeout: DEFAULT_BATCH_JOB_TIMEOUT,
             batch_lease_ttl: DEFAULT_BATCH_LEASE_TTL,
             batch_heartbeat_interval: DEFAULT_BATCH_HEARTBEAT_INTERVAL,
@@ -388,6 +403,7 @@ impl From<&maverick_config::Config> for JobClientConfig {
         Self {
             role: config.role,
             matrix_export_enabled: !config.matrix_export_dir.is_empty(),
+            matrix_pull_enabled: !config.matrix_pull_url.is_empty(),
             batch_job_timeout: config.batch_job_timeout,
             batch_lease_ttl: config.batch_lease_ttl,
             batch_heartbeat_interval: config.batch_heartbeat_interval,
@@ -420,6 +436,9 @@ impl JobClientConfig {
             | JobKind::ModelDiscovery => self.role == maverick_config::Role::Origin,
             JobKind::MatrixExport => {
                 self.role == maverick_config::Role::Origin && self.matrix_export_enabled
+            }
+            JobKind::MatrixPull => {
+                self.role == maverick_config::Role::Replica && self.matrix_pull_enabled
             }
             JobKind::PriceSync => {
                 self.role == maverick_config::Role::Origin || !self.cron_price_sync.is_empty()
@@ -1045,6 +1064,7 @@ pub fn iso_week(day: NaiveDate) -> String {
 
 fn validate_schedules(config: &JobClientConfig) -> Result<Vec<SchedulePlan>, JobsError> {
     [
+        ("MAVERICK_MATRIX_PULL_URL", JobKind::MatrixPull, "0 * * * *"),
         (
             "MAVERICK_CRON_PREDICTION_LOCK",
             JobKind::PredictionLock,
@@ -1132,6 +1152,7 @@ fn scheduled_args(kind: JobKind, at: DateTime<Utc>) -> JobArgs {
             week: iso_week(day),
             night,
         }),
+        JobKind::MatrixPull => JobArgs::MatrixPull(HourArgs { hour }),
         JobKind::LatencyProbes => JobArgs::LatencyProbes(HourArgs { hour }),
         JobKind::PriceSync => JobArgs::PriceSync(DayArgs { day: night }),
         JobKind::CatalogSync => JobArgs::CatalogSync(DayArgs { day: night }),

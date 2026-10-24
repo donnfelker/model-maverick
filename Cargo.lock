@@ -2354,6 +2354,7 @@ dependencies = [
  "hyper-util",
  "maverick-alerts",
  "maverick-api",
+ "maverick-bundle",
  "maverick-config",
  "maverick-domain",
  "maverick-jobs",
@@ -2430,6 +2431,7 @@ dependencies = [
  "http-body-util",
  "jsonschema",
  "maverick-alerts",
+ "maverick-bundle",
  "maverick-config",
  "maverick-domain",
  "maverick-jobs",
@@ -2547,6 +2549,7 @@ dependencies = [
 name = "maverick-jobs"
 version = "0.1.0"
 dependencies = [
+ "axum",
  "chrono",
  "ed25519-dalek",
  "graphile_worker",

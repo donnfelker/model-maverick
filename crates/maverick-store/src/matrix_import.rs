@@ -4,6 +4,47 @@ use maverick_domain::pricing::{is_local, parse_pricing};
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 
+/// Shared with first-start provisioning, so import and bootstrap cannot miss each
+/// other's committed tenant/catalog rows.
+pub const REPLICA_BOOTSTRAP_LOCK_KEY: i64 = 0x6d76_626f_6f74;
+
+/// Serialize an operator's pool replacement with deferred first-import defaults.
+pub async fn lock_pool_configuration(
+    conn: &mut sqlx::PgConnection,
+    tenant_id: &str,
+) -> sqlx::Result<()> {
+    sqlx::query!("select id from tenants where id=$1 for update", tenant_id)
+        .fetch_optional(conn)
+        .await?;
+    Ok(())
+}
+
+async fn initialize_default_pool(
+    conn: &mut sqlx::PgConnection,
+) -> sqlx::Result<Option<(String, usize)>> {
+    let tenants = sqlx::query_scalar!("select id from tenants order by id for update")
+        .fetch_all(&mut *conn)
+        .await?;
+    let [tenant] = tenants.as_slice() else {
+        return Ok(None);
+    };
+    if !crate::tenancy::list_pools_by_tenant(&mut *conn, tenant)
+        .await?
+        .is_empty()
+    {
+        return Ok(None);
+    }
+    let columns =
+        crate::catalog::list_model_columns_by_statuses(&mut *conn, &["active".to_owned()]).await?;
+    let ids: Vec<String> = columns.into_iter().map(|column| column.id).collect();
+    if ids.is_empty() {
+        return Ok(None);
+    }
+    let id = maverick_domain::ids::new(maverick_domain::ids::prefix::POOL);
+    crate::tenancy::create_pool(&mut *conn, &id, tenant, "default", &ids, true).await?;
+    Ok(Some((tenant.clone(), ids.len())))
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ImportOutcome {
     Imported,
@@ -48,6 +89,10 @@ pub async fn import(
     let mut tx = pool.begin().await?;
     // Read committed plus a transaction lock makes a waiter see the preceding import.
     sqlx::query("select pg_advisory_xact_lock(5570194218848332)")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("select pg_advisory_xact_lock($1)")
+        .bind(REPLICA_BOOTSTRAP_LOCK_KEY)
         .execute(&mut *tx)
         .await?;
     let active =
@@ -136,6 +181,7 @@ pub async fn import(
         .execute(&mut *tx)
         .await?;
     }
+    let initialized = initialize_default_pool(&mut tx).await?;
     sqlx::query!("insert into matrix_imports (manifest_sha256,format,matrix_version,published_at,origin_release,signing_kids)
         values ($1,$2,$3,$4,$5,$6) on conflict (manifest_sha256) do nothing",hash,manifest.format,manifest.matrix_version,
         manifest.published_at,manifest.origin_release,&bundle.signing_kids).execute(&mut *tx).await?;
@@ -149,5 +195,15 @@ pub async fn import(
     .execute(&mut *tx)
     .await?;
     tx.commit().await?;
+    if let Some((tenant_id, default_pool_columns)) = initialized {
+        tracing::info!(
+            audit = true,
+            actor = "matrix_import",
+            action = "pool.initialize",
+            tenant_id,
+            default_pool_columns,
+            "internal provisioning write"
+        );
+    }
     Ok(ImportOutcome::Imported)
 }

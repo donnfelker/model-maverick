@@ -109,6 +109,7 @@ pub struct ModelsDevPriceMapEntry {
 pub struct Config {
     pub role: Role,
     pub matrix_export_dir: String,
+    pub matrix_pull_url: String,
     pub matrix_signing_keys: String,
     pub database_url: String,
     pub public_addr: String,
@@ -256,6 +257,7 @@ impl fmt::Debug for Config {
             .debug_struct("Config")
             .field("role", &self.role)
             .field("matrix_export_dir", &self.matrix_export_dir)
+            .field("matrix_pull_enabled", &!self.matrix_pull_url.is_empty())
             .field("matrix_signing_keys", &"<redacted>")
             .field("database_url", &redact_credentials(&self.database_url))
             .field("public_addr", &self.public_addr)
@@ -438,6 +440,11 @@ where
     };
     let matrix_signing_keys = if !matrix_export_dir.is_empty() {
         required(&lookup, "MAVERICK_MATRIX_SIGNING_KEYS", &mut issues)
+    } else {
+        String::new()
+    };
+    let matrix_pull_url = if role == Role::Replica {
+        optional(&lookup, "MAVERICK_MATRIX_PULL_URL", "")
     } else {
         String::new()
     };
@@ -686,6 +693,7 @@ where
         Ok(Config {
             role,
             matrix_export_dir,
+            matrix_pull_url,
             matrix_signing_keys,
             database_url,
             public_addr,
@@ -1300,6 +1308,33 @@ mod tests {
                 lookup(name)
             }
         })
+    }
+
+    #[test]
+    fn matrix_pull_is_opt_in_and_only_read_on_replicas() {
+        for role in ["origin", "replica"] {
+            for location in [None, Some("https://mirror.example/bundles")] {
+                let config = super::load_with(|name| match name {
+                    "MAVERICK_ROLE" => Some(role.into()),
+                    "MAVERICK_DATABASE_URL" => Some("postgres://db".into()),
+                    "MAVERICK_INTERNAL_TOKENS" => Some("ops:s".into()),
+                    "MAVERICK_CAPTURE_MASTER_KEY" => Some("ab".repeat(32)),
+                    "MAVERICK_MATRIX_PULL_URL" => location.map(str::to_owned),
+                    _ => None,
+                })
+                .unwrap();
+                assert_eq!(
+                    config.matrix_pull_url,
+                    if role == "replica" {
+                        location.unwrap_or_default()
+                    } else {
+                        ""
+                    }
+                );
+                assert!(!format!("{config:?}").contains("mirror.example"));
+            }
+        }
+        assert!(crate::compat::known_settings().contains("MAVERICK_MATRIX_PULL_URL"));
     }
 
     #[test]
