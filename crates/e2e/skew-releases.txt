@@ -1,0 +1,16 @@
+# The skew matrix (D50, spec §14.5; bead xq7v.22): every engine and proxy release that
+# the current release must work with. `scripts/skew.sh` builds each row's `maverick` and
+# `maverick-proxy` from its git ref and runs `crates/e2e/tests/skew.rs` twice: that
+# release's engine with the current proxy, and the current engine with that release's
+# proxy.
+#
+# One row per release: `<name> <git ref>`. At each release, add the release's tag. Remove
+# a row once that release is more than 12 months older than the current one: that pair
+# is not supported any more (self-hosted plan §7.6).
+#
+# `pre-release` stands in until the first release. It is 3dce8a4, the last commit before
+# the engine first advertised an optional request feature (`affinity`, 096d8a2). So the
+# matrix already checks the feature gate: the current proxy must not send `affinity` to
+# an engine that does not advertise it, and an older proxy must work with an engine that
+# does.
+pre-release 3dce8a426caa26d1f99ea5a4321055455cf1ac0e

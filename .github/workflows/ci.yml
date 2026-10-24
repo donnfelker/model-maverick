@@ -58,6 +58,7 @@ jobs:
           - db
           - parity
           - e2e
+          - skew
     steps:
       - name: Free runner disk space
         # The runner image ships about 45 GB of SDKs and Docker images this project never

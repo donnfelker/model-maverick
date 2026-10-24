@@ -562,6 +562,30 @@ release, write that release's two dumps and add its row to `RELEASES`; the READM
 that directory has the command. The first dumps, `pre-release.sql` and
 `pre-release.replica.sql`, are the schema at migration 0012.
 
+### The skew matrix
+
+`crates/e2e/skew-releases.txt` lists every engine and proxy release that the current one
+must work with, one `<name> <git ref>` row each. The CI tier `skew` (`scripts/skew.sh`)
+builds each row's `maverick` and `maverick-proxy` from its ref and runs
+`crates/e2e/tests/skew.rs` twice: that release's engine with the current proxy, and the
+current engine with that release's proxy. Each run is a real engine and a real proxy on
+Postgres, against the fake provider. It checks that:
+
+- every request through the proxy is served, with no fail-open fallback;
+- telemetry arrives;
+- the engine never rejects the proxy's recommend request;
+- the proxy sends `affinity` exactly when the engine advertises it;
+- the engine accepts a direct `affinity` probe exactly when it advertises it.
+
+The engine decodes strictly, so a proxy that sends a field the engine did not advertise
+fails the run.
+
+At each release, add a row with the release's tag. Remove a row once its release is more
+than 12 months older than the current one. Until the first release, the only row is
+`pre-release`: commit 3dce8a4, the last one before the engine advertised `affinity`. To
+run it locally: `scripts/skew.sh`, or `CARGO=mm-cargo scripts/skew.sh` on the shared host.
+It needs Docker.
+
 ## Jobs and schedules
 
 The jobs run on graphile_worker, in Postgres (no Redis). The periodic jobs use five-field

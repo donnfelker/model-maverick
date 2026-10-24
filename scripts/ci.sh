@@ -6,7 +6,7 @@ cd "$ROOT_DIR"
 
 usage() {
     cat <<'USAGE'
-Usage: scripts/ci.sh [all|fast|boundary|db|parity|e2e]
+Usage: scripts/ci.sh [all|fast|boundary|db|parity|e2e|skew]
        scripts/ci.sh mutants [k/n]          full run, or shard k of n (0-based)
        scripts/ci.sh mutants-diff <base>    only mutants on lines changed since <base>
 
@@ -195,6 +195,13 @@ run_e2e() {
     run_logged e2e full-stack scripts/e2e.sh
 }
 
+run_skew() {
+    # The skew matrix (D50, bead xq7v.22): each release in crates/e2e/skew-releases.txt,
+    # built from its git ref, with the current engine and proxy both ways: its engine with
+    # the current proxy, and the current engine with its proxy. Needs Docker.
+    run_logged skew matrix scripts/skew.sh
+}
+
 # The full maverick-domain run is about 1,900 mutants: hours on a CI runner, so CI
 # splits it into shards (`--shard k/n`) on a schedule, and checks each push with
 # `mutants-diff` (only the mutants on changed lines).
@@ -227,6 +234,7 @@ case "$TIER" in
         run_db
         run_parity
         run_e2e
+        run_skew
         ;;
     fast)
         run_fast
@@ -244,6 +252,9 @@ case "$TIER" in
         ;;
     e2e)
         run_e2e
+        ;;
+    skew)
+        run_skew
         ;;
     mutants)
         run_mutants "${2:-}"
