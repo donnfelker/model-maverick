@@ -1,9 +1,10 @@
 //! Config-write validation (reference Part 4 §1.4). Pure functions the store and API layer
 //! (bead 5.3) run inside the config-write transaction before a full replace. No SQL here.
 //!
-//! `validate_weights`, `validate_constraint_values`, and `validate_pool_shapes` each return the
-//! violations they find, in order; the caller concatenates them (weights, then constraints,
-//! then pools) and, when the shape is valid, runs [`simulate`](super::simulate).
+//! `validate_weights`, `validate_constraint_values`, `validate_pool_shapes`, and
+//! `validate_pool_names` each return the violations they find, in order; the caller
+//! concatenates them (weights, then constraints, then pools) and, when the shape is valid,
+//! runs [`simulate`](super::simulate).
 
 use std::collections::HashSet;
 
@@ -11,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value as JsonValue, json};
 
 use super::{Pool, StandingConstraints};
+use crate::gofmt::quote;
 use crate::tasks::CAPABILITIES;
 
 /// The largest deviation from a weight sum of 1 that still validates.
@@ -203,9 +205,98 @@ pub fn validate_pool_shapes(pools: &[Pool]) -> Vec<ConfigError> {
     errors
 }
 
+/// Pool names that the model grammar cannot route to (D45, spec §9.7): `auto` is the
+/// default-pool route `maverick/auto`, and a `:` would start a variant. Checks each pool in
+/// order. The caller runs it after [`validate_pool_shapes`] and before the catalog and G4
+/// checks, so a request that Go also rejects keeps Go's error.
+#[must_use]
+pub fn validate_pool_names(pools: &[Pool]) -> Vec<ConfigError> {
+    pools
+        .iter()
+        .filter_map(|pool| {
+            let name = pool.name.as_str();
+            let message = if name == "auto" {
+                format!("pool name {} is reserved", quote(name))
+            } else if name.contains(':') {
+                format!("pool name {} must not contain ':'", quote(name))
+            } else {
+                return None;
+            };
+            Some(ConfigError::invalid(message, json!({ "pool": name })))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn named(name: &str) -> Pool {
+        Pool {
+            name: name.to_owned(),
+            model_column_ids: vec!["col_a".to_owned()],
+            is_default: false,
+        }
+    }
+
+    /// DIVERGENCE D45: `auto` and names with `:` are refused, in pool order; Go accepts both.
+    #[test]
+    fn pool_names_the_grammar_cannot_route_are_refused() {
+        let pools = [
+            named("team/a"),
+            named("Auto"),
+            named("a:b"),
+            named("auto"),
+            named(":"),
+        ];
+        let errors = validate_pool_names(&pools);
+        let got: Vec<(&str, &JsonValue)> = errors
+            .iter()
+            .map(|error| (error.message.as_str(), &error.details))
+            .collect();
+        assert_eq!(
+            got,
+            [
+                (
+                    "pool name \"a:b\" must not contain ':'",
+                    &json!({"pool": "a:b"})
+                ),
+                ("pool name \"auto\" is reserved", &json!({"pool": "auto"})),
+                (
+                    "pool name \":\" must not contain ':'",
+                    &json!({"pool": ":"})
+                ),
+            ]
+        );
+        assert!(
+            errors
+                .iter()
+                .all(|error| error.code == ConfigErrorCode::InvalidRequest)
+        );
+    }
+
+    /// D45: names with `/`, other case, and `auto` inside a longer name stay valid.
+    #[test]
+    fn pool_names_the_grammar_can_route_are_accepted() {
+        let pools = [
+            named("default"),
+            named("team/a"),
+            named("AUTO"),
+            named("auto-pool"),
+            named("my auto"),
+        ];
+        assert_eq!(validate_pool_names(&pools), []);
+    }
+
+    /// D45: the name is quoted as Go `%q` quotes it.
+    #[test]
+    fn pool_name_messages_quote_like_go() {
+        let errors = validate_pool_names(&[named("a:\"b\"\n")]);
+        assert_eq!(
+            errors[0].message,
+            "pool name \"a:\\\"b\\\"\\n\" must not contain ':'"
+        );
+    }
 
     #[test]
     fn weight_sum_tolerance_boundary_is_inclusive() {

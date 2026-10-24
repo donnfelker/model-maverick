@@ -290,6 +290,57 @@ async fn pools_shape_rules() {
     db.close().await;
 }
 
+/// DIVERGENCE D45 (spec §9.7): the model grammar reserves the pool name `auto` and the `:`
+/// character. The check runs after the shape rules and before the catalog and G4 checks, and
+/// nothing is written. Go accepted both names.
+#[tokio::test]
+async fn pools_named_auto_or_with_a_colon_are_refused() {
+    let Some((db, pool)) = database().await else {
+        return;
+    };
+    column(&pool, "col_a", "active").await;
+    assert_422(
+        put(
+            &pool,
+            POOLS,
+            r#"{"pools":[{"name":"team/a","model_column_ids":["col_a"],"is_default":true},{"name":"auto","model_column_ids":["col_a"]}]}"#,
+        )
+        .await,
+        "invalid_request",
+        "pool name \"auto\" is reserved",
+        json!({"pool": "auto"}),
+    );
+    // The first offending pool in request order is named; a missing column is not reached.
+    assert_422(
+        put(
+            &pool,
+            POOLS,
+            r#"{"pools":[{"name":"prod:cost","model_column_ids":["col_missing"],"is_default":true},{"name":"auto","model_column_ids":["col_a"]}]}"#,
+        )
+        .await,
+        "invalid_request",
+        "pool name \"prod:cost\" must not contain ':'",
+        json!({"pool": "prod:cost"}),
+    );
+    // A shape error still comes first, as in Go.
+    assert_422(
+        put(
+            &pool,
+            POOLS,
+            r#"{"pools":[{"name":"auto","model_column_ids":["col_a"]}]}"#,
+        )
+        .await,
+        "invalid_request",
+        "exactly one pool must be is_default: true (got 0)",
+        json!({"default_count": 0}),
+    );
+    assert_eq!(get(&pool, POOLS).await.1, "{\"pools\":[]}\n");
+    // Names with `/` and other case are routable, so they are stored.
+    let body = r#"{"pools":[{"name":"AUTO","model_column_ids":["col_a"]},{"name":"team/a","model_column_ids":["col_a"],"is_default":true}]}"#;
+    assert_eq!(put(&pool, POOLS, body).await.0, StatusCode::OK);
+    db.close().await;
+}
+
 // parity: api.TestConfigPoolsAllRetired
 #[tokio::test]
 async fn pools_of_only_retired_columns_would_be_empty() {

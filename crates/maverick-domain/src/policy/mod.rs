@@ -14,8 +14,8 @@ pub use simulate::{
     CellEwma, ColumnRetention, PoolFloor, SimCell, SimulationState, pool_floor, simulate,
 };
 pub use validate::{
-    ConfigError, ConfigErrorCode, WeightRow, validate_constraint_values, validate_pool_shapes,
-    validate_weights,
+    ConfigError, ConfigErrorCode, WeightRow, validate_constraint_values, validate_pool_names,
+    validate_pool_shapes, validate_weights,
 };
 
 use std::collections::HashMap;

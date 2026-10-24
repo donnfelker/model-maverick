@@ -650,6 +650,11 @@ async fn config_g4_parity_is_byte_exact() {
             "pools",
             r#"{"pools":[{"name":"default","model_column_ids":["col_one"],"is_default":false}]}"#,
         ),
+        // D45: both seams refuse a pool name that the model grammar reserves.
+        (
+            "pools",
+            r#"{"pools":[{"name":"auto","model_column_ids":["col_one"],"is_default":true}]}"#,
+        ),
         (
             "weights",
             r#"{"weights":[{"capability":"factual_qa","w_quality":0.5,"w_cost":0.5,"w_latency":0.5,"quality_bar":0.8}]}"#,

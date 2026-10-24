@@ -429,13 +429,18 @@ pub fn decode_constraints(body: &[u8]) -> Result<ConstraintsInput, ApiError> {
 // ---- replace ----
 
 /// Validates pools against the stored constraints and replaces them (reference Part 4
-/// §1.4): shapes, then unknown columns, then G4.
+/// §1.4): shapes, then the names the model grammar reserves (D45), then unknown columns,
+/// then G4.
 pub async fn replace_pools(
     db: &PgPool,
     tenant_id: &str,
     pools: &[Pool],
 ) -> Result<Replaced, ConfigFailure> {
-    if let Some(first) = policy::validate_pool_shapes(pools).into_iter().next() {
+    if let Some(first) = policy::validate_pool_shapes(pools)
+        .into_iter()
+        .chain(policy::validate_pool_names(pools))
+        .next()
+    {
         return Err(config_error(first).into());
     }
     let mut tx = db.begin().await?;
