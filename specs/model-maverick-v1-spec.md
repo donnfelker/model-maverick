@@ -24,7 +24,7 @@ These invariants hold everywhere; any implementation that violates one is wrong 
 - **G2 — Pools are hard boundaries.** A request can narrow its candidate set (allowlist) but can never widen it beyond its pool. Escalation chains are pool-constrained by construction.
 - **G3 — Loud caller bugs.** An `allowed_models` entry unknown to the system, or outside the caller's pool, is a hard error naming the entry. No silent dropping, no silent widening.
 - **G4 — No empty configurations.** Configuration writes that would leave any pool with zero usable columns under standing constraints are rejected at write time. A model retirement that would do the same raises an operator alert instead of silently shrinking the pool.
-- **G5 — Prompts are never stored by default.** Only the per-tenant HMAC fingerprint is persisted. Storage of prompt content happens only inside an explicitly enabled, time-boxed, encrypted debug-capture window, and never for zero-retention tenants. A zero-retention tenant's prompt is never sent to a classifier column, and its pick never points at a column, that lacks valid zero-retention evidence (§4.5, §7.1, §8.3). Prompt text, completions, request bodies, and credentials never appear in spans, log fields, or metric labels (§14.3). (changed 2026-09-28 for the Rust port; the Go engine implements the prior rule)
+- **G5 — Prompts are never stored by default.** Only the per-tenant HMAC fingerprint is persisted. Storage of prompt content happens only inside an explicitly enabled, time-boxed, encrypted debug-capture window, and never for zero-retention tenants. A zero-retention tenant's prompt is never sent to a classifier column, and its pick never points at a column, that lacks valid zero-retention evidence (§4.5, §7.1, §8.3). Prompt text, completions, request bodies, and credentials never appear in spans, log fields, or metric labels (§14.3). (changed 2026-09-28 for the Rust port; the Go engine implements the prior rule) A conversation affinity key (§7.6) is handled like prompt text: only its per-tenant HMAC is stored, and the key itself never appears in the stored request, a span, a log field, or a metric label (added 2026-09-30 for the Rust port; D44)
 - **G6 — Every decision is auditable.** Every response carries `recommendation_id` and `matrix_version`. The full decision trace (classification, survivors with scores, exclusions with reasons, flags) is retrievable by id for as long as the tenant retains history.
 - **G7 — The corpus is private.** Task prompts, golden answers, hidden rubrics, and grader internals never leave the engine through any public API and never enter a benchmarked model's prompt beyond the task prompt itself.
 - **G8 — Spend is capped.** Every benchmark job computes projected cost before starting and refuses to run past its configured ceiling. Request-time classifier spend is capped too: a per-tenant daily classification quota and a global daily classifier spend cap; past either limit a prompt-form request degrades to `fallback_default` instead of spending (§8.3). (changed 2026-09-28 for the Rust port; the Go engine implements the prior rule)
@@ -153,7 +153,9 @@ create table model_columns (
                             check (status in ('cold_start','active','deprecated','retired')),
   pricing                   jsonb not null default '{}',
   -- pricing: {"input_per_mtok": 3.00, "output_per_mtok": 15.00,
+  --           "cache_read_per_mtok": 0.30, "cache_write_per_mtok": 3.75,
   --           "currency": "USD", "as_of": "2026-07-01", "source": "list"}
+  -- the two cache prices are optional (§4.3, D44)
   quality_source_column_id  text references model_columns(id),
   -- set on latency/cost-only columns: quality transfers from the primary
   -- endpoint column; price and latency do not (plan §Model columns)
@@ -280,6 +282,7 @@ create table tenant_constraints (
   max_latency_ms   int,
   zero_retention   boolean not null default false,
   telemetry_opt_out boolean not null default false,  -- D39, §9.10
+  affinity_cost_aware boolean not null default false,  -- D44, §7.6
   updated_at       timestamptz not null default now()
 );
 
@@ -288,10 +291,11 @@ create table recommendations (
   tenant_id       text not null references tenants(id),
   api_key_id      text not null references api_keys(id),
   prompt_hash     text,                         -- null on declared-only requests
-  request         jsonb not null,               -- verbatim request, prompt text EXCLUDED
+  request         jsonb not null,               -- verbatim request, prompt text and affinity.key EXCLUDED
   classification  jsonb not null,
   candidates      jsonb not null,               -- survivors + exclusions, §10.2
   response        jsonb not null,               -- the response body as returned
+  affinity        jsonb,                        -- affinity block (§10.2, D44); null without affinity
   matrix_version  text not null,
   created_at      timestamptz not null default now()
 );
@@ -425,9 +429,23 @@ create table batches (
   updated_at        timestamptz not null default now(),
   unique (kind, batch_window)
 );
+
+-- The last pick per conversation (§7.6, D44). The raw affinity key is never
+-- stored. A row is live while expires_at is in the future; the hourly
+-- affinity_prune job deletes the others. New 2026-09-30 for the Rust port.
+create table conversation_affinity (
+  tenant_id          text not null references tenants(id),
+  affinity_hash      text not null,             -- §7.6, hashed with tenants.prompt_hmac_key
+  column_id          text not null references model_columns(id),
+  recommendation_id  text not null,             -- the recommendation that last wrote this row
+  last_used_at       timestamptz not null,
+  expires_at         timestamptz not null,      -- last_used_at + affinity.ttl
+  primary key (tenant_id, affinity_hash)
+);
+create index conversation_affinity_expires_at on conversation_affinity (expires_at);
 ```
 
-The engine has 22 tables. The Go engine has twenty. The Rust port adds `batches` (the Go engine relies on River unique jobs) and `classifier_usage` (the Go engine has no classifier budget), both on 2026-09-28. The window column is named `batch_window` because `window` is a reserved word in Postgres.
+The engine has 23 tables. The Go engine has twenty. The Rust port adds `batches` (the Go engine relies on River unique jobs) and `classifier_usage` (the Go engine has no classifier budget), both on 2026-09-28, and `conversation_affinity` (the Go engine has no affinity, D44) on 2026-09-30. The window column is named `batch_window` because `window` is a reserved word in Postgres.
 
 Raw values live in `scores` and `aggregates`. Normalized scores are computed per query and never stored (plan §Data model). The `recommendations.response` jsonb is the exception by design: it snapshots what the caller actually saw.
 
@@ -453,6 +471,8 @@ V1 measures quality on one primary endpoint per model. Secondary-endpoint column
 ### 4.3 Pricing and catalog sync
 
 `pricing` snapshots list price per million tokens. `price_sync` and `catalog_sync` (§11) refresh pricing and statuses from provider data; both write data, never code. Price changes append to the audit trail via `updated_at` and a `catalog_changes` slog entry; historical run costs are never restated (runs store the cost computed at execution time). `price_sync` never adds a column. New models come from provider model discovery (§4.6) or an operator write.
+
+The snapshot can also carry `cache_read_per_mtok` and `cache_write_per_mtok` (added 2026-09-30 for the Rust port; D44). They parse like the other prices, and a negative one is `pricing snapshot has a negative price`. `price_sync` fills them from the models.dev `cache_read` and `cache_write` fields, and `GET /v1/models` shows them in the snapshot. Only cost-aware conversation affinity reads them (§7.6). Benchmark run cost does not change, because benchmark runs do not use provider caching.
 
 ### 4.4 Seed catalog
 
@@ -717,6 +737,8 @@ V_i  = w_q·nQ_i + w_c·nC_i + w_l·nL_i # tenant weights for this capability
 
 Tenant weights default per mode when the tenant has no `tenant_weights` row for the capability: quality (0.8/0.1/0.1), balanced (0.5/0.35/0.15), cost (0.25/0.6/0.15).
 
+When cost-aware conversation affinity is on for a request, §7.6 adjusts `C` and the pinned column's `Q` inside the steps below. Otherwise they run as written (added 2026-09-30 for the Rust port; D44).
+
 1. **Band.** `band` by mode: quality 0.0, balanced 1.5, cost 5.5 (quality points; config `ranking.band.<mode>`). Leaders = candidates with `Q ≥ max(Q) − band` (within the preference-satisfying partition first).
 2. **Order leaders** by `V` descending.
 3. **Append non-leaders** by `Q` descending — the tail of the escalation chain stays quality-ordered.
@@ -736,6 +758,45 @@ Index 0 is the pick; the array is the pool-constrained fallback chain (G2).
 - `low_availability` per entry: the column's trailing 7-night availability is below the floor (§7.4 step 6).
 - `zero_retention` on the response: true when the tenant's zero-retention constraint is set. SDK cores switch to declared mode on seeing it (§9.2).
 - `classification_quota_exceeded` on the response: true when the classifier was skipped because a quota or spend cap was reached (§8.3).
+- `affinity` on the response: the conversation affinity decision, present only when the request sent `affinity` (§7.6, D44).
+
+### 7.6 Conversation affinity
+
+(added 2026-09-30 for the Rust port; `parity/DIVERGENCES.md` D44; `plans/conversation-affinity-plan.md`; owner decision 2026-09-30, open questions answered 2026-10-24)
+
+A multi-turn conversation calls `POST /v1/recommend` once per turn. Affinity ties those turns together. The request sends `affinity.key`, an opaque string that the caller chooses (§9.2), and the engine keeps the last pick for that key. By default, affinity only reports whether the pick stayed or moved. A tenant or a request can turn on cost-aware affinity. The ranking then weighs the cost of a cold provider cache and keeps a conversation on one column unless a switch is worth it.
+
+**The key and the row.** The engine never stores the key. The `conversation_affinity` row (§3) is keyed by `affinity_hash = "hmac_sha256:" + lowercase_hex(HMAC-SHA256(tenants.prompt_hmac_key, "affinity:" + key))`. The `affinity:` prefix keeps it apart from a prompt hash (§10.1). A row is live while `expires_at` is in the future. An expired row reads as missing. Zero-retention tenants can use affinity, because the row holds no prompt and no completion.
+
+**The setting.** `tenant_constraints.affinity_cost_aware` (default `false`, §9.7) turns on cost-aware affinity for the tenant. A request's `affinity.cost_aware` overrides it for that request. The response reports the effective value.
+
+**Cost-aware off (the default).** The ranking is exactly §7.4, with no affinity input. The pick is the best column for this turn under the request's mode. The engine still reads and writes the row, so the response can report `kept` or `switched`.
+
+**Cost-aware on.** §7.1 and §7.3 are unchanged. They use the unadjusted benchmark cost, so the G4 simulations stay valid. Inside §7.4, let P be the row's column and n be `affinity.context_tokens`. P's cache is **warm** when `now - last_used_at <= affinity.cache_warm_seconds` (default 300 s, the Anthropic default cache TTL).
+
+1. **Turn cost.** When n is present and every survivor has an `input_per_mtok` price, each survivor ranks on `C'_i = C_i + n * r_i / 1e6`. For P with a warm cache and a `cache_read_per_mtok` price, `r_P` is that price. In every other case, `r_i` is the column's `cache_write_per_mtok` when it has one, else its `input_per_mtok`. `C'` replaces `C` in `nC` and in the noise-band rule (§7.4 step 4), and nowhere else. When any survivor has no input price, this step is skipped for every survivor, so a column with no price is never favored.
+2. **Incumbent bonus.** When P is a survivor, the ranking uses `Q_P + b` for P, where `b` is `affinity.incumbent_bonus` (default 1.5 quality points). The bonus applies to the band test, `nQ`, and the noise-band test. The displayed `score` stays P's real quality.
+3. **Escalation.** The bonus is withheld when P has `clears_difficulty: false` and at least one other survivor has `clears_difficulty: true`. A conversation that gets harder moves to a column that clears the new tier. The turn cost still applies.
+4. **Partitions still win.** §7.4 step 5 (preference violators last) and step 6 (availability floor) are unchanged. A pinned column that violates a preference, or is under the availability floor, loses to a column that does not.
+
+Index 0 is the pick, as in §7.4. The chain after it follows the same rules.
+
+**Decision status.** The response (§9.2) and the trace (§10.2) report one status:
+
+| `status` | When | `reason` |
+|---|---|---|
+| `new` | No live row for the key, or `affinity.enabled` is false | `null` |
+| `kept` | The pick is P | `null` |
+| `switched` | P is a survivor and the pick is another column | Cost-aware off: `best_model`. Cost-aware on, the first that applies: `low_availability` (P is under the floor and the pick is not), `preference` (P violates a request preference and the pick does not), `escalation` (step 3 withheld the bonus), else `outranked` |
+| `broken` | P did not survive §7.1 or §7.3 | P's exclusion reason (§10.2): `not_in_pool`, `not_in_allowlist`, `standing_constraint:<name>`, `status_retired`, or `no_data` |
+
+`outranked` covers both a quality gap larger than the bonus and a cost gap larger than the cache saving. The trace has the numbers. A P that is no longer in the pool is `broken` with `not_in_pool`. A zero-retention tenant whose P lost its evidence gets `broken` with `standing_constraint:zero_retention`. `cache_warm` is true when a live row exists and P's cache is warm, whatever the status. The pick entry's `reason` text says why it was kept or switched, for example `kept for conversation continuity; warm cache saves an estimated $1.49 this turn`. Like every `reason`, it is informative, not contractual.
+
+**Writing the row.** Every successful recommend with `affinity` upserts the row: `column_id` is the pick, `recommendation_id` is this recommendation, `last_used_at` is now, and `expires_at` is now plus `affinity.ttl` (default 24 h). The upsert commits atomically with the `recommendations` insert. When two turns of one conversation race, the last write wins, because both picks are valid. A request that fails writes nothing. Telemetry can move the row to the chain entry that served the turn (§9.10).
+
+**Turning it off.** With `affinity.enabled` false (`MAVERICK_AFFINITY_ENABLED`, §14.1), the engine still accepts and validates `affinity`, reads and writes no row, and answers `status: "new"` with the normal ranking. A bonus of `0` turns off the bonus and keeps the turn cost. `affinity.cache_warm_seconds` and `affinity.incumbent_bonus` matter only when cost-aware affinity is on.
+
+**Observability.** The counter `maverick_affinity_decisions_total` counts decisions by `status` and `cost_aware`. No key, hash, or column id is a label. The request log line gains no field. The declared-path latency target stays p95 under 50 ms: the row read runs at the same time as the aggregates read.
 
 ---
 
@@ -766,6 +827,15 @@ Both present or both absent → `422 invalid_request`.
 
 **Declared-workload header.** Callers of the proxy and SDK cores MAY send `X-Maverick-Workload: <capability>[:<tier>]`; the component then sends the declared form instead of a projection. This is the recommended form for production routes. The engine itself only ever sees the declared or prompt form. The value splits at the first `:`. The capability is non-empty; the tier, when present, is ASCII digits. The engine validates both. A present but malformed header never falls back to the projection, because the caller asked that the prompt not leave the process.
 
+**Conversation header** (added 2026-09-30 for the Rust port; D44). The proxy and the SDK cores pass a conversation to the engine as `affinity` (§7.6, §9.2):
+
+- A proxy caller MAY send `X-Maverick-Conversation: <id>`. The value is 1 to 256 printable ASCII characters (0x20 to 0x7E). A present but malformed value is `400 invalid_request`, message `X-Maverick-Conversation must be 1 to 256 printable ASCII characters`, and the engine is not called.
+- The proxy sends `affinity.key` = the header value and `affinity.context_tokens` = the request body's length in bytes divided by 4, rounded up. Base64 images make this estimate high, which v1 accepts. The proxy sends no `affinity.cost_aware`, so the tenant setting applies.
+- The proxy strips `X-Maverick-Conversation` from every upstream request, like `X-Maverick-API-Key` (D30).
+- When the engine answered, the proxy sets `X-Maverick-Affinity: <status>` on the response, next to `X-Maverick-Recommendation-Id`.
+- Without the header there is no affinity, and the proxy behaves as before.
+- The shared SDK core takes a per-call `conversation_id`, which becomes `affinity.key`, and an optional `affinity_cost_aware`, which becomes `affinity.cost_aware`. It estimates `context_tokens` the same way, from the serialized request body. The conformance vectors are `crates/sdk-conformance/vectors/affinity.v1.json`.
+
 **Proxy behavior** (adopted 2026-09-28 by owner approval for the Rust port; `parity/DIVERGENCES.md` D26 to D31; the Go proxy implements the prior rules in `reference/engine-reference.md` Part 6):
 
 - The chain executor obeys `Retry-After` on a 429 before it advances to the next entry (D26).
@@ -779,7 +849,7 @@ Both present or both absent → `422 invalid_request`.
 - The proxy relays the engine's terminal privacy errors with their status and code, `422 zero_retention_requires_declared` and `409 no_compliant_columns`, with the engine's message, and purges that tenant's last good lists (D46). An engine failure (a timeout, a connect error, a 5xx, or a malformed response) enters the fail-open ladder below (D46). Any other engine status is `502 engine_error` (D17).
 - A present `X-Maverick-Workload` value that is not `<capability>[:<tier>]` is `400 invalid_request`, message `X-Maverick-Workload must be <capability>[:<tier>]`. The engine is not called, and the proxy never falls back to the projection (D5).
 - `X-Maverick-Settings: caller` tells the proxy to leave the caller's settings alone instead of applying the entry's `settings` (§7.4, D14). Any other value is `400 invalid_request`, message `X-Maverick-Settings must be caller`, and the engine is not called (D45).
-- The proxy strips `X-Maverick-API-Key` (D30) and `X-Maverick-Settings` (D45) from every upstream request. The tenant's Maverick key never reaches a provider.
+- The proxy strips `X-Maverick-API-Key` (D30), `X-Maverick-Settings` (D45), and `X-Maverick-Conversation` (D44) from every upstream request. The tenant's Maverick key never reaches a provider.
 - OTel export uses `tracing-opentelemetry` and `opentelemetry-otlp` with W3C trace context. The content stays the same (one `maverick.recommendation` log record per settled request, and the counter `maverick_proxy_recommendations_total` by `measured` and `classification_method`). The payload bytes are not reproduced. The §14.3 redaction rules apply (D31).
 
 **Model names** (changed 2026-10-24 for the Rust port; `parity/DIVERGENCES.md` D45; owner decision 2026-09-30; the Go proxy implements the prior grammar in `reference/engine-reference.md` Part 6 §5). The proxy and the SDK cores read the request's `model` with one grammar: `maverick-core` module `alias`, conformance vectors `crates/sdk-conformance/vectors/alias.v2.json`. It follows OpenRouter's own model ids (`<author>/<slug>` with an optional `:variant`).
@@ -914,6 +984,22 @@ Response `200`:
 
 `score` is the absolute displayed quality (§6.7). `prompt_hash` present only on prompt-form requests. Every entry carries its column's `settings`, its `param_constraints` after `settings` (§3, D29; the stored value verbatim, `{}` when none), and effective `retention_mode` (§4.5, §7.4), and `low_availability` (§7.4 step 6). `zero_retention` is always present; when true, SDK cores switch to declared mode and treat the tenant as zero-retention for their fail-open ladder (G14). `telemetry` follows it and is always present: `false` when the tenant has opted out of telemetry, else `true` (§9.10, D39). `classification_quota_exceeded: true` appears only when the classifier budget was hit (§8.3), as the last key of the response. The prompt form also accepts `workload.projection_version` (string, §8.1). (changed 2026-09-28 for the Rust port; the Go engine implements the prior rule: entries carry no `settings`, `param_constraints`, `retention_mode`, or `low_availability`, and responses carry no `zero_retention`) `violations` entries: `{"constraint": "max_latency_ms", "limit": 2000, "estimated": 3400}`.
 
+**Conversation affinity** (added 2026-09-30 for the Rust port; D44). The request MAY carry `"affinity": {"key": "conv_8f2a41", "context_tokens": 120000, "cost_aware": true}`, with either workload form (§7.6):
+
+- `affinity.key` is required when `affinity` is present: a string of 1 to 256 characters, opaque to the engine.
+- `affinity.context_tokens` is optional: an integer from 0 to 10,000,000, the caller's estimate of the input tokens that this turn resends. Without it, the turn cost (§7.6 step 1) is skipped.
+- `affinity.cost_aware` is optional: a boolean that overrides the tenant setting for this request.
+- A bad value is `422 invalid_request` with `details: {"field": "affinity.key"}`, `{"field": "affinity.context_tokens"}`, or `{"field": "affinity.cost_aware"}`. An unknown field inside `affinity` is `422 invalid_request` (strict decoding).
+
+The response then carries `affinity` after `telemetry` and before `classification_quota_exceeded`, which stays the last key:
+
+```json
+"affinity": { "status": "kept", "previous_column_id": "col_01J...", "reason": null,
+              "cache_warm": true, "cost_aware": true }
+```
+
+`status` and `reason` follow §7.6. `previous_column_id` is the stored column, or `null` for `new`. `cost_aware` is the effective setting. A request without `affinity` gets no `affinity` key and is otherwise unchanged.
+
 ### 9.3 GET /v1/policies
 
 `GET /v1/policies?capability=structured_extraction&pool=vertex-only` (capability optional — absent returns all ten).
@@ -974,6 +1060,8 @@ Reads mirror writes: `GET/PUT /v1/config/pools`, `GET/PUT /v1/config/weights`, `
 
 Exactly one pool must be `is_default: true`. A pool cannot be named `auto`, and a pool name cannot contain `:`, because the model grammar reserves both (§8.1; added 2026-10-24 for the Rust port, D45). The check runs after the body decodes and before the catalog and G4 checks. The first such pool in request order is `422 invalid_request` with `details: {"pool": <name>}` and message `pool name %q is reserved` or `pool name %q must not contain ':'`. Nothing is written. A pool name may contain `/`. Columns are referenced by `column_id` (config is precise; request-time `allowed_models` accepts model names for ergonomics).
 
+**Affinity setting** (added 2026-09-30 for the Rust port; D44). The constraints payload of `PUT /v1/config/constraints` and `PUT /internal/v1/tenants/{id}/constraints` carries `affinity_cost_aware` (boolean, default `false`), and the reads echo it. The PUT is a full replace, so a missing key is `false`. `true` turns on cost-aware conversation affinity for the tenant (§7.6). The setting filters no column, so it never causes `pool_would_be_empty`.
+
 ### 9.8 Debug capture (tenant-facing)
 
 - `POST /v1/debug/capture-windows` — body `{api_key_id?, confidence_below?, duration_minutes}` (≤ `capture.max_window_minutes`, default 1440). Refused `409 zero_retention_conflict` for zero-retention tenants (G5). Returns the window with `ends_at`.
@@ -1005,6 +1093,8 @@ The automatic outcome producer that replaced `POST /v1/outcomes` (G13). It is pl
 
 **Tenant telemetry opt-out** (added 2026-09-28 by owner decision, `parity/DIVERGENCES.md` D39). `tenant_constraints` gains `telemetry_opt_out` (boolean, default false), written through the constraints payload of `PUT /v1/config/constraints` and `PUT /internal/v1/tenants/{id}/constraints`. When it is true: every recommend response for the tenant carries `"telemetry": false` (otherwise `"telemetry": true`); the proxy and every SDK core send no telemetry for that tenant; and the engine accepts but drops every telemetry item from that tenant (counted as dropped, no `outcomes` row written). The proxy still routes the request (G13 holds even where MM is in the request path). The proxy also exports no OTel record for that tenant's requests: no `maverick.recommendation` log record, and the request is not counted in `maverick_proxy_recommendations_total` (added 2026-09-29 by owner decision, D43). A request that fails before the engine answers has no opt-out flag and is recorded. The global component switches (`MAVERICK_PROXY_TELEMETRY=off`, `MODELMAVERICK_TELEMETRY=off`) still mean zero bytes regardless of the tenant setting.
 
+**Following the served column** (added 2026-09-30 for the Rust port; D44). When index 0 fails with a 429 or a 5xx, the chain executor serves the turn from a later entry, so the provider cache is warm on that entry's column, not on the pick. When the engine accepts a 2xx item for recommendation R and R stored an affinity decision, it looks for the item's entry in R's chain. An entry matches when `model_used` and `endpoint_used` (absent means `direct`) equal its `model` and `endpoint`, or when `endpoint_used` names a key of its `execution_aliases` and `model_used` is that alias's value (D15). When index 0 matches, or no entry matches, nothing changes. Otherwise the first matching entry after index 0 wins: the engine sets the row's `column_id` to that entry's column, but only while the row's `recommendation_id` is still R (compare and set). A later turn is never overwritten. A tenant with telemetry opt-out (D39) sends no telemetry, so its row follows the engine's pick only. With `affinity.enabled` false, nothing changes.
+
 ---
 
 ## 10. Tracing, audit, and debug capture
@@ -1033,7 +1123,21 @@ Exact bytes, no normalization — a one-character edit produces an unrelated has
 ]
 ```
 
-Exclusion reasons (closed enum): `not_in_pool`, `not_in_allowlist`, `standing_constraint:max_cost_per_run`, `standing_constraint:max_latency_ms`, `standing_constraint:zero_retention` (added 2026-09-28, §7.1 step 3), `status_retired`, `no_data`. Survivors also record `availability` and `low_availability`. The trace plus `classification`, `request` (prompt excluded: every key of `workload` that names the prompt, in any letter case, is deleted), tenant weights used, mode, and band settle Haiku-instead-of-Opus directly: Opus is either a ranked survivor with the numbers that placed it behind, or in the exclusion list with the reason it never competed.
+Exclusion reasons (closed enum): `not_in_pool`, `not_in_allowlist`, `standing_constraint:max_cost_per_run`, `standing_constraint:max_latency_ms`, `standing_constraint:zero_retention` (added 2026-09-28, §7.1 step 3), `status_retired`, `no_data`. Survivors also record `availability` and `low_availability`. The trace plus `classification`, `request` (prompt excluded: every key of `workload` that names the prompt, in any letter case, is deleted; every key of `affinity` that names `key`, in any letter case, is deleted too, D44), tenant weights used, mode, and band settle Haiku-instead-of-Opus directly: Opus is either a ranked survivor with the numbers that placed it behind, or in the exclusion list with the reason it never competed.
+
+**Affinity block** (added 2026-09-30 for the Rust port; D44). A request with `affinity` stores its decision in `recommendations.affinity`, which is `null` otherwise. History reads return it.
+
+```json
+{ "affinity_hash": "hmac_sha256:b92e...", "previous_column_id": "col_01J...",
+  "status": "switched", "reason": "outranked", "cache_warm": true,
+  "context_tokens": 120000, "cost_aware": true, "cost_aware_source": "tenant",
+  "bonus": 1.5, "bonus_withheld": null, "turn_cost_skipped": null,
+  "ranking_costs": { "col_01J...": 0.10, "col_01K...": 1.59 } }
+```
+
+- `context_tokens` is `null` when the request sent none. `cost_aware_source` is `request` when the request set `affinity.cost_aware`, else `tenant`.
+- `bonus` is the bonus that the ranking added to P (§7.6 step 2), `0` when it added none. `bonus_withheld` is `escalation` when step 3 withheld it, else `null`.
+- `ranking_costs` maps each survivor's `column_id` to its `C'` when the turn cost applied (§7.6 step 1). Otherwise it is `null`, and `turn_cost_skipped` says why: `cost_aware_off`, `no_context_tokens`, or `missing_input_price`.
 
 ### 10.3 Retention
 
@@ -1071,6 +1175,7 @@ River (Postgres-backed; no Redis). All periodic jobs use River's periodic-jobs w
 | `catalog_sync` | 06:10 daily | Refresh model statuses/deprecations; runs the pool-drift check (§7.2), including retention expiry; raises `retention_expiring` 14 days before any `retention_valid_until` (§4.5). |
 | `model_discovery` | 06:20 daily | List the text models of every provider with an operator key and compare them with the catalog; raise `new_model_available` and `model_withdrawn` (§4.6, D51). List calls cost nothing; the catalog does not change. |
 | `capture_expiry` | hourly | Hard-delete expired `debug_captures`. |
+| `affinity_prune` | hourly | Delete `conversation_affinity` rows whose `expires_at` has passed (§7.6, D44). |
 | `history_prune` | 05:00 daily | Enforce `history.retention_days` (§10.3). |
 
 **Chaining:** `nightly_smoke` and `weekly_sweep` enqueue `aggregate_rebuild` on completion, which enqueues `regression_scan` + `calibration_score`. A batch that partially fails (some runs errored) still rebuilds from what completed; the job records completion percentage and alerts (`job_failure`, warning) under 90%. The failure tail (alert row plus the follow-up rebuild job) is written in the same transaction that records the batch outcome, before the handler returns; no detached task carries durable work.
@@ -1116,13 +1221,15 @@ Three tools, thin wrappers over the same internal services as REST (same auth, s
 
 | Tool | Input schema (JSON) | Returns |
 |---|---|---|
-| `recommend_model` | `{workload: {prompt?} \| {capability?, difficulty?, domain_tags?}, pool?, allowed_models?, mode?, constraints?}` — mirrors §9.2 | The §9.2 response object |
+| `recommend_model` | `{workload: {prompt?} \| {capability?, difficulty?, domain_tags?}, pool?, allowed_models?, mode?, constraints?, affinity?}`, mirroring §9.2 | The §9.2 response object |
 | `get_policy` | `{capability?, pool?}` | The §9.3 response object |
 | `list_models` | `{}` | The §9.4 response object |
 
 The `recommend_model` schema describes `mode` as `quality, balanced, or cost; default quality` (changed 2026-10-24 for the Rust port, D47; Go says `default balanced`).
 
 Tool descriptions instruct agents to prefer declared workloads when they already know the capability (faster, nothing leaves the session).
+
+`recommend_model` takes the optional §9.2 `affinity` object (added 2026-09-30 for the Rust port; D44). That schema is the one place where `tools/list` differs from the Go server's list.
 
 ---
 
@@ -1176,6 +1283,10 @@ Env vars, prefix `MAVERICK_`, parsed and validated at boot (fail fast, print the
 | `MAVERICK_SCORING_LAMBDA_VAR` / `..._LAMBDA_AMB` | `0.5` / `0.25` | Penalties |
 | `MAVERICK_RANKING_BAND_QUALITY/BALANCED/COST` | `0/1.5/5.5` | Mode bands |
 | `MAVERICK_RANKING_NOISE_BAND` | `0.75` | Tie threshold |
+| `MAVERICK_AFFINITY_ENABLED` | `true` | §7.6 conversation affinity (D44); `false` reads and writes no row |
+| `MAVERICK_AFFINITY_TTL` | `24h` | §7.6 row lifetime after its last use |
+| `MAVERICK_AFFINITY_CACHE_WARM_SECONDS` | `300` | §7.6 warm-cache window |
+| `MAVERICK_AFFINITY_INCUMBENT_BONUS` | `1.5` | §7.6 bonus in quality points; `0` turns it off |
 | `MAVERICK_CEILING_BUFFER` | `0.05` | §6.6 β |
 | `MAVERICK_SCORING_MIN_NIGHTS` | `3` | measured flag |
 | `MAVERICK_CATALOG_COLD_START_NIGHTS` | `5` | §4.1 |
@@ -1196,7 +1307,7 @@ Multi-stage Docker build → distroless static image (CGO off). Kamal to Hetzner
 
 slog JSON to stdout. Every request logs: method, path, status, ms, tenant_id, key_id, recommendation_id (when created). Every batch logs: batch_id, projected vs actual spend, runs ok/error counts, duration. Metrics endpoints: deferred (plan: "metrics can wait"). The alerts table plus logs are v1's operational surface. The engine and the proxy MAY export OTel traces, logs, and metrics to the ops-box Collector over the private network (never a public metrics endpoint), with W3C trace context propagated from proxy or SDK through the engine to the provider call; export is best-effort and fail-open. The proxy exports only its `maverick.recommendation` log record and the `maverick_proxy_recommendations_total` counter, and neither for a tenant that opted out of telemetry (§9.10, D43).
 
-**Telemetry redaction (a G5 control).** Prompt text, completions, request bodies, and credential headers (`Authorization`, `x-api-key`, `X-Maverick-API-Key`) are never span attributes, log fields, or metric labels; fingerprints only. Instrumentation records an explicit allowlist of fields, never every argument. Engine and proxy spans go to a Collector pipeline that does not export GenAI content to Langfuse. Acceptance: a prompt-form recommend and a proxy request each carrying a canary string, after which the canary appears in no exported span, log line, or metric label. (changed 2026-09-28 for the Rust port; the Go engine exports no OTel)
+**Telemetry redaction (a G5 control).** Prompt text, completions, request bodies, and credential headers (`Authorization`, `x-api-key`, `X-Maverick-API-Key`) are never span attributes, log fields, or metric labels; fingerprints only. The same holds for the affinity key and the `X-Maverick-Conversation` value, and the affinity hash is not logged either (§7.6, D44). Instrumentation records an explicit allowlist of fields, never every argument. Engine and proxy spans go to a Collector pipeline that does not export GenAI content to Langfuse. Acceptance: a prompt-form recommend and a proxy request each carrying a canary string, after which the canary appears in no exported span, log line, or metric label. (changed 2026-09-28 for the Rust port; the Go engine exports no OTel)
 
 ---
 
@@ -1271,7 +1382,7 @@ The proxy (§8.1) uses the same envelope, without `details`. Its own codes:
 
 | HTTP | code | Meaning |
 |---|---|---|
-| 400 | `invalid_request` | Unreadable body, bad `X-Maverick-Workload` or `X-Maverick-Settings`, or a direct model from another author |
+| 400 | `invalid_request` | Unreadable body, bad `X-Maverick-Workload`, `X-Maverick-Settings`, or `X-Maverick-Conversation` (D44), or a direct model from another author |
 | 400 | `invalid_model_alias` | Malformed `maverick/*` route, or no `model` (D45) |
 | 401 | `unauthorized` | Hosted mode: missing or invalid `X-Maverick-API-Key` (D13) |
 | 413 | `payload_too_large` | Body larger than the proxy cap (D38) |

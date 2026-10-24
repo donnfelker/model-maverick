@@ -1,6 +1,6 @@
-# Conversation affinity (proposed D44)
+# Conversation affinity (D44)
 
-Status: proposed 2026-09-30. The owner asked for this plan. Revised 2026-09-30 by owner direction: the default is the best model for the turn, and cost-aware affinity is an opt-in setting (§4.3). The owner confirms the open questions in §9 before the spec and `parity/DIVERGENCES.md` change. The beads for this work are under the epic "Conversation affinity (D44)".
+Status: adopted 2026-10-24 into `specs/model-maverick-v1-spec.md` §7.6 and `parity/DIVERGENCES.md` D44 (bead gcd2.2). Where the spec is more exact than this plan, the spec wins: the trace block lives in `recommendations.affinity` (§3, §10.2), the `switched` reasons have a fixed order (§7.6), and the telemetry follow rule matches execution aliases and leaves the row alone when index 0 matches (§9.10). Proposed 2026-09-30. The owner asked for this plan. Revised 2026-09-30 by owner direction: the default is the best model for the turn, and cost-aware affinity is an opt-in setting (§4.3). The owner answered the open questions in §9 on 2026-10-24. The beads for this work are under the epic "Conversation affinity (D44)".
 
 ## 1. The problem
 

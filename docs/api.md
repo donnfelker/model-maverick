@@ -249,6 +249,71 @@ Errors: `409 no_compliant_columns`, `422 invalid_request | unknown_model |
 model_not_in_pool | unknown_pool | zero_retention_requires_declared`, `413`,
 `429`.
 
+### Conversation affinity (`affinity`)
+
+Status: specified (D44, spec §7.6). The engine does not accept it yet (beads
+gcd2.3 to gcd2.7). Until then a body with `affinity` is `422 invalid_request`,
+because the field is unknown.
+
+A multi-turn conversation calls `/v1/recommend` once per turn. `affinity` ties
+the turns together, so the engine can report whether the pick stayed on one
+column or moved. It works with both workload forms:
+
+```json
+{
+  "workload": { "capability": "code_generation", "difficulty": 3 },
+  "affinity": { "key": "conv_8f2a41", "context_tokens": 120000, "cost_aware": true }
+}
+```
+
+- `key`: required when `affinity` is present. A string of 1 to 256
+  characters that the caller chooses. It is opaque to the engine. The engine
+  stores only its per-tenant HMAC, never the key, and the key never appears in
+  the stored request, a log line, a span, or a metric label. A key can hold a
+  user id, so treat it like a prompt.
+- `context_tokens`: optional. An integer from 0 to 10,000,000: the caller's
+  estimate of the input tokens that this turn resends. Without it, the
+  engine skips the turn cost and applies only the incumbent bonus.
+- `cost_aware`: optional boolean. It overrides the tenant's
+  `affinity_cost_aware` setting for this request.
+
+Errors: `422 invalid_request` with `details: {"field": "affinity.key"}`,
+`{"field": "affinity.context_tokens"}`, or `{"field": "affinity.cost_aware"}`.
+An unknown field inside `affinity` is `422 invalid_request`. A request that
+fails writes no affinity state.
+
+**Cost-aware off (the default).** The ranking is unchanged: the pick is the
+best column for this turn under the request's mode. The response only reports
+whether the pick stayed (`kept`) or moved (`switched`, reason `best_model`).
+
+**Cost-aware on.** The ranking adds this turn's context cost to each
+candidate: the cache-read price for the pinned column when its cache is warm
+(by default, used within the last 300 s), else the cache-write or input
+price. The pinned column also gets an incumbent bonus (1.5 quality points by
+default), withheld when it does not clear the turn's difficulty and another
+candidate does. Pools, allowlists, standing constraints, zero retention, and
+retirement always win.
+
+The response carries `affinity` after `telemetry` and before
+`classification_quota_exceeded`. A request without `affinity` gets no
+`affinity` key.
+
+```json
+"affinity": { "status": "kept", "previous_column_id": "col_01J...", "reason": null,
+              "cache_warm": true, "cost_aware": true }
+```
+
+| `status` | When | `reason` |
+|---|---|---|
+| `new` | No live state for the key (the first turn, or no turn for 24 h, the default lifetime) | `null` |
+| `kept` | The pick is the stored column | `null` |
+| `switched` | The stored column is still a candidate, and the pick is another column | `best_model` (cost-aware off), else `low_availability`, `preference`, `escalation`, or `outranked` |
+| `broken` | The stored column did not survive policy | Its exclusion reason, for example `not_in_allowlist` or `standing_constraint:zero_retention` |
+
+`previous_column_id` is the stored column, or `null` for `new`. `cost_aware`
+is the effective setting. The full decision, including the cost that ranked
+each candidate, is in the trace (`GET /v1/history/recommendations/{id}`).
+
 ## GET /v1/policies
 
 `GET /v1/policies?capability=structured_extraction&pool=default`: both
@@ -416,6 +481,15 @@ set, every item is dropped and counted, and no outcome row is written. The
 response has the same shape. Recommend responses carry `"telemetry": false`
 for such a tenant, so MM components send nothing for it in the first place.
 
+**Conversation affinity (D44, not served yet):** when a 2xx item shows that a
+later chain entry served the turn, the engine moves the conversation's
+affinity state to that entry's column, so the next turn finds the warm cache.
+An entry matches when `model_used` and `endpoint_used` are its `model` and
+`endpoint`, or when `endpoint_used` names one of its `execution_aliases` and
+`model_used` is that alias's value. An item that matches index 0 changes
+nothing, and a later turn's state is never overwritten. An opted-out tenant
+sends no telemetry, so its state follows the engine's pick only.
+
 **Outcome derivation** (server side; the first matching rule wins):
 
 1. `error_class == "timeout"` → `latency_exceeded`
@@ -537,6 +611,13 @@ Exclusion reasons (a closed enum): `not_in_pool`, `not_in_allowlist`,
 Survivors carry `availability` and `low_availability` (D8). Another tenant's
 id is the same `404` as a missing one.
 
+A recommendation made with `affinity` will also carry an `affinity` block:
+the affinity hash, the stored column, the status and reason, `cache_warm`,
+`context_tokens`, `cost_aware` and its source, the bonus applied or withheld,
+and each survivor's ranking cost (spec §10.2, D44). It is `null` otherwise.
+The request snapshot never holds `affinity.key`. Not served yet (beads gcd2.3
+to gcd2.7).
+
 ### GET /v1/history/outcomes
 
 `?recommendation_id=&outcome=&since=&limit=&cursor=` → `{"outcomes": [...],
@@ -652,6 +733,13 @@ says `telemetry: false`: no log record, and no count in
 `maverick_proxy_recommendations_total` (D43). A request that fails before the
 engine answers has no flag, so it is still recorded. The constraint filters no
 model column, so it never causes `pool_would_be_empty`.
+
+`affinity_cost_aware` (D44, boolean, default `false`) turns on cost-aware
+conversation affinity for the tenant (see
+[Conversation affinity](#conversation-affinity-affinity)). A request's
+`affinity.cost_aware` overrides it. It filters no column either. Status:
+specified, not accepted yet (beads gcd2.4 and gcd2.6). Until then the key is
+an unknown field, so a PUT that sends it is `422 invalid_request`.
 
 ## Debug capture
 
@@ -819,6 +907,10 @@ the three tools sorted by name.
 The tool descriptions ask agents to prefer the declared form when they know
 the capability: it is faster, and nothing leaves the session.
 
+`recommend_model` will also take the optional `affinity` object of
+`POST /v1/recommend` (D44, spec §12). That schema is then the one place where
+`tools/list` differs from the Go server's list. Not served yet (bead gcd2.6).
+
 A successful result carries the REST body twice: as one text content item and
 as `structuredContent`. A failed call is a result with `isError: true` and one
 text item. An API error reads `<code>: <message>`, with the HTTP route's code
@@ -884,6 +976,16 @@ not part of the engine's own wire contract.
   executed) on the response. A caller can then tie a provider response to its
   recommendation without parsing a body. The engine does not set these
   headers: `POST /v1/recommend` returns `recommendation_id` in the body.
+- **Conversation header** (D44, not served yet; beads gcd2.9 and gcd2.10). A
+  proxy caller MAY send `X-Maverick-Conversation: <id>`, 1 to 256 printable
+  ASCII characters. The proxy sends it to the engine as `affinity.key`, with
+  `affinity.context_tokens` estimated as the body's length in bytes divided by
+  4, rounded up. It strips the header from every upstream request and sets
+  `X-Maverick-Affinity: <status>` on the response. A present but malformed
+  value is `400 invalid_request` (`X-Maverick-Conversation must be 1 to 256
+  printable ASCII characters`), and the engine is not called. The SDK cores
+  take a per-call `conversation_id` and an optional `affinity_cost_aware`
+  instead.
 
 ---
 

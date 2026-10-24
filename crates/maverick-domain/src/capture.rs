@@ -1,5 +1,5 @@
-//! Prompt fingerprint, debug-capture crypto (with the D18 key ring), and the pure
-//! capture decision.
+//! Prompt fingerprint, the conversation affinity hash (D44), debug-capture crypto (with
+//! the D18 key ring), and the pure capture decision.
 //!
 //! This module is pure. The DB-backed capture flow (insert, replay, reads, access log)
 //! lives in the API package. Reference Part 4 §4.1, §4.2, §4.4, §4.5; spec §10.1 and
@@ -41,6 +41,20 @@ pub fn fingerprint(prompt_hmac_key: &[u8], prompt: &[u8]) -> String {
     out.push_str(FINGERPRINT_PREFIX);
     out.push_str(&lower_hex(&code));
     out
+}
+
+/// Prefix on the HMAC message of a conversation affinity hash. It keeps the hash of an
+/// affinity key apart from the fingerprint of a prompt with the same text.
+pub const AFFINITY_MESSAGE_PREFIX: &str = "affinity:";
+
+/// The conversation affinity hash (D44, spec §7.6):
+/// `"hmac_sha256:" + lowercase_hex(HMAC-SHA256(key, "affinity:" + affinity_key))`.
+///
+/// The key is the tenant's prompt HMAC key. The caller may put a user id in its
+/// affinity key, so only this hash is stored, never the key itself (G5).
+pub fn affinity_hash(prompt_hmac_key: &[u8], affinity_key: &str) -> String {
+    let message = [AFFINITY_MESSAGE_PREFIX.as_bytes(), affinity_key.as_bytes()].concat();
+    fingerprint(prompt_hmac_key, &message)
 }
 
 /// Why parsing `MAVERICK_CAPTURE_MASTER_KEY` failed. The config loader maps these to its
@@ -370,6 +384,27 @@ mod tests {
             let got = fingerprint(&key, &prompt);
             assert_eq!(got, case["expected"].as_str().unwrap(), "case {id}");
         }
+    }
+
+    /// DIVERGENCE: D44. The affinity hash is HMAC-SHA256 over `affinity:` plus the key,
+    /// under the tenant's prompt key. The expected hex was computed with Python's `hmac`.
+    /// It differs from the prompt fingerprint of the same text.
+    #[test]
+    fn affinity_hash_matches_golden_vector() {
+        let _ = parity_support::divergence!("D44");
+        let key: Vec<u8> = (0u8..32).collect();
+        assert_eq!(
+            affinity_hash(&key, "conv_8f2a41"),
+            "hmac_sha256:b92e993712d7b4efa47d74dade3450c1f966f89ff4d3146e3719ddd3c43210f1"
+        );
+        assert_eq!(
+            fingerprint(&key, b"conv_8f2a41"),
+            "hmac_sha256:618f46bdcfe9b61a3de1010c916494501ed4f462ecf0b25e9494c2214eacd79a"
+        );
+        assert_eq!(
+            affinity_hash(&key, "conv_8f2a41"),
+            fingerprint(&key, b"affinity:conv_8f2a41")
+        );
     }
 
     // parity: tracing.TestSealOpenRoundTrip
