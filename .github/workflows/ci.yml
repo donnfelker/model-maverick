@@ -103,6 +103,16 @@ jobs:
             cargo install sqlx-cli --version 0.9.0 --locked --force --no-default-features --features rustls,postgres
           fi
 
+      - name: Install strace
+        # The sealed-environment test in the e2e tier traces the replica's syscalls.
+        if: matrix.tier == 'e2e'
+        run: |
+          if ! command -v strace > /dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --no-install-recommends strace
+          fi
+          strace -V | head -n 1
+
       - name: Run tier
         run: scripts/ci.sh "${{ matrix.tier }}"
 

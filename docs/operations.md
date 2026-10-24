@@ -76,6 +76,35 @@ replaces suspension: to cut off one app, revoke its key; to stop all traffic, st
 Pools, constraints, weights, and zero retention are set through `PUT /v1/config/...`
 with one of the tenant's keys, as on the hosted deployment.
 
+### The sealed-environment test
+
+A replica with every outbound setting at its default makes no outbound connection
+(spec §14.4). The `e2e` CI tier checks this with `scripts/sealed.sh`:
+
+- The script starts Postgres in Docker with no published port. Postgres listens on a unix
+  socket in a shared directory.
+- It runs `crates/e2e/tests/sealed.rs` in a new network namespace that has only loopback
+  (`sudo unshare --net`). The test runs as the calling user.
+- The test runs `maverick upgrade --yes` and a first `serve`, which bootstraps the tenant
+  and its key. Then `maverick matrix import` loads the format fixture
+  `crates/maverick-bundle/tests/data/mmbundle1/current-and-standby.tar`, and the import
+  completes the tenant's default pool. The test sends a declared recommend with the
+  bootstrap key and expects a measured pick from the bundle. Last, it fires each cron
+  trigger the replica registered once.
+- `maverick upgrade`, `serve`, and the import run under strace. The test fails when one
+  of them connects or sends to any socket address other than the Postgres socket or
+  netlink. There is one exception: a connect to an nscd socket that does not exist. sqlx
+  looks up the process's user name when it reads the database URL, and glibc tries nscd
+  first.
+
+The fixture is signed by the test keys, so the script builds a debug `maverick` with the
+`test-keys` feature (docs/matrix-bundles.md). The traces and process logs are in
+`target/sealed/<timestamp>/`. The traces hold no payload bytes (`strace -s 0`).
+
+To run it locally: `scripts/sealed.sh`, or `CARGO=mm-cargo scripts/sealed.sh` on the shared
+host. It needs Docker, strace, and sudo. A unix socket path has at most 107 bytes, so the
+socket directory goes under a short `TMPDIR` (default `/tmp`).
+
 ## Bundle signing keys (D49)
 
 The origin signs every matrix bundle with Ed25519 (`docs/matrix-bundles.md`). A replica

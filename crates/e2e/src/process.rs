@@ -136,6 +136,12 @@ impl Process {
         &self.name
     }
 
+    /// The OS process id.
+    #[must_use]
+    pub fn id(&self) -> u32 {
+        self.child.id()
+    }
+
     /// Its log so far.
     #[must_use]
     pub fn log(&self) -> String {

@@ -6,7 +6,7 @@ cd "$ROOT_DIR"
 
 usage() {
     cat <<'USAGE'
-Usage: scripts/ci.sh [all|fast|boundary|db|parity|e2e|skew]
+Usage: scripts/ci.sh [all|fast|boundary|db|parity|e2e|sealed|skew]
        scripts/ci.sh mutants [k/n]          full run, or shard k of n (0-based)
        scripts/ci.sh mutants-diff <base>    only mutants on lines changed since <base>
 
@@ -219,6 +219,14 @@ run_e2e() {
     # Needs Docker. Process logs and the fake provider's request log land in
     # target/e2e/<timestamp>/; a failure prints every process log's tail.
     run_logged e2e full-stack scripts/e2e.sh
+    run_sealed
+}
+
+run_sealed() {
+    # The sealed-environment test (D49, bead xq7v.12): a replica with default outbound
+    # settings, in a network namespace with only loopback, under strace, makes no outbound
+    # connection. Needs Docker, strace, and sudo for `unshare --net`.
+    run_logged e2e sealed scripts/sealed.sh
 }
 
 run_skew() {
@@ -279,6 +287,9 @@ case "$TIER" in
         ;;
     e2e)
         run_e2e
+        ;;
+    sealed)
+        run_sealed
         ;;
     skew)
         run_skew
