@@ -17,7 +17,8 @@ Set `MAVERICK_ROLE=origin` for the hosted deployment and `MAVERICK_ROLE=replica`
 for a customer install. There is no default. Startup refuses an unset or unknown role.
 
 An origin keeps the corpus and runs the benchmark and discovery jobs. A replica
-registers `catalog_sync`, `latency_probes`, `capture_expiry`, and `history_prune`.
+registers `catalog_sync`, `latency_probes`, `capture_expiry`, `affinity_prune`, and
+`history_prune`.
 Its `price_sync` is off unless `MAVERICK_CRON_PRICE_SYNC` has a schedule. Corpus
 commands refuse on a replica. Judge pool and corpus spend caps are unused there.
 
@@ -514,6 +515,7 @@ with `--api-only`, or run them alone with `--worker-only` (exactly one such proc
 | `catalog_sync` | `10 6 * * *` | `MAVERICK_CRON_CATALOG_SYNC` | The lifecycle transitions, the pool-drift check, and `retention_expiring`. |
 | `model_discovery` | `20 6 * * *` | `MAVERICK_CRON_MODEL_DISCOVERY` | Lists the text models of each provider with an operator key and raises `new_model_available` and `model_withdrawn` (see "New models"). It never changes the catalog. |
 | `capture_expiry` | `0 * * * *` | `MAVERICK_CRON_CAPTURE_EXPIRY` | Hard-deletes expired captures. |
+| `affinity_prune` | `5 * * * *` | `MAVERICK_CRON_AFFINITY_PRUNE` | Deletes expired conversation affinity rows (D44). |
 | `history_prune` | `0 5 * * *` | `MAVERICK_CRON_HISTORY_PRUNE` | Enforces the history retention. |
 
 - **Chaining:** `nightly_smoke` and `weekly_sweep` enqueue `aggregate_rebuild`, which
@@ -652,8 +654,9 @@ for `conversation_id`, but only to an engine that lists `affinity` in
 - **Telemetry follow.** A 2xx telemetry item from a chain entry after the pick moves the
   row to that entry's column (spec §9.10). A failed move is a WARN line,
   `telemetry: following the served column failed`, with the recommendation id only.
-- **Expired rows** read as missing. The hourly `affinity_prune` job that deletes them is
-  bead gcd2.8 and does not run yet; until it does, expired rows stay in the table.
+- **Expired rows** read as missing. The hourly `affinity_prune` job
+  (`MAVERICK_CRON_AFFINITY_PRUNE`, default `5 * * * *`) deletes them and logs one INFO
+  line with the count, `affinity_prune: expired conversation rows deleted`.
 
 ## Hot-path latency
 

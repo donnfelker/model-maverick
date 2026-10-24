@@ -63,11 +63,13 @@ pub enum JobKind {
     CatalogSync,
     ModelDiscovery,
     CaptureExpiry,
+    /// D44: deletes expired conversation affinity rows, hourly.
+    AffinityPrune,
     HistoryPrune,
 }
 
 impl JobKind {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::PredictionLock,
         Self::NightlySmoke,
         Self::WeeklySweep,
@@ -79,6 +81,7 @@ impl JobKind {
         Self::CatalogSync,
         Self::ModelDiscovery,
         Self::CaptureExpiry,
+        Self::AffinityPrune,
         Self::HistoryPrune,
     ];
 
@@ -95,6 +98,7 @@ impl JobKind {
             Self::CatalogSync => "catalog_sync",
             Self::ModelDiscovery => "model_discovery",
             Self::CaptureExpiry => "capture_expiry",
+            Self::AffinityPrune => "affinity_prune",
             Self::HistoryPrune => "history_prune",
         }
     }
@@ -192,6 +196,7 @@ pub enum JobArgs {
     CatalogSync(DayArgs),
     ModelDiscovery(DayArgs),
     CaptureExpiry(HourArgs),
+    AffinityPrune(HourArgs),
     HistoryPrune(DayArgs),
 }
 
@@ -209,6 +214,7 @@ impl JobArgs {
             Self::CatalogSync(_) => JobKind::CatalogSync,
             Self::ModelDiscovery(_) => JobKind::ModelDiscovery,
             Self::CaptureExpiry(_) => JobKind::CaptureExpiry,
+            Self::AffinityPrune(_) => JobKind::AffinityPrune,
             Self::HistoryPrune(_) => JobKind::HistoryPrune,
         }
     }
@@ -223,7 +229,7 @@ impl JobArgs {
             | Self::CalibrationScore(args) => {
                 json!({ "night": args.night, "batch_id": args.batch_id })
             }
-            Self::LatencyProbes(args) | Self::CaptureExpiry(args) => {
+            Self::LatencyProbes(args) | Self::CaptureExpiry(args) | Self::AffinityPrune(args) => {
                 json!({ "hour": args.hour })
             }
             Self::PriceSync(args)
@@ -256,7 +262,7 @@ impl JobArgs {
                 parse_night(self.kind(), &args.night)?;
                 Ok(args.batch_id.clone())
             }
-            Self::LatencyProbes(args) | Self::CaptureExpiry(args) => {
+            Self::LatencyProbes(args) | Self::CaptureExpiry(args) | Self::AffinityPrune(args) => {
                 parse_hour(self.kind(), &args.hour)?;
                 Ok(args.hour.clone())
             }
@@ -334,6 +340,8 @@ pub struct JobClientConfig {
     pub cron_catalog_sync: String,
     pub cron_model_discovery: String,
     pub cron_capture_expiry: String,
+    /// `MAVERICK_CRON_AFFINITY_PRUNE` (D44).
+    pub cron_affinity_prune: String,
     pub cron_history_prune: String,
     pub recovery_sweep_threshold: Duration,
 }
@@ -354,6 +362,7 @@ impl Default for JobClientConfig {
             cron_catalog_sync: "10 6 * * *".to_string(),
             cron_model_discovery: "20 6 * * *".to_string(),
             cron_capture_expiry: "0 * * * *".to_string(),
+            cron_affinity_prune: "5 * * * *".to_string(),
             cron_history_prune: "0 5 * * *".to_string(),
             recovery_sweep_threshold: GRAPHILE_RECOVERY_SWEEP_THRESHOLD,
         }
@@ -376,6 +385,7 @@ impl From<&maverick_config::Config> for JobClientConfig {
             cron_catalog_sync: config.cron_catalog_sync.clone(),
             cron_model_discovery: config.cron_model_discovery.clone(),
             cron_capture_expiry: config.cron_capture_expiry.clone(),
+            cron_affinity_prune: config.cron_affinity_prune.clone(),
             cron_history_prune: config.cron_history_prune.clone(),
             recovery_sweep_threshold: GRAPHILE_RECOVERY_SWEEP_THRESHOLD,
         }
@@ -399,6 +409,7 @@ impl JobClientConfig {
             JobKind::LatencyProbes
             | JobKind::CatalogSync
             | JobKind::CaptureExpiry
+            | JobKind::AffinityPrune
             | JobKind::HistoryPrune => true,
         }
     }
@@ -1057,6 +1068,11 @@ fn validate_schedules(config: &JobClientConfig) -> Result<Vec<SchedulePlan>, Job
             config.cron_capture_expiry.as_str(),
         ),
         (
+            "MAVERICK_CRON_AFFINITY_PRUNE",
+            JobKind::AffinityPrune,
+            config.cron_affinity_prune.as_str(),
+        ),
+        (
             "MAVERICK_CRON_HISTORY_PRUNE",
             JobKind::HistoryPrune,
             config.cron_history_prune.as_str(),
@@ -1103,6 +1119,7 @@ fn scheduled_args(kind: JobKind, at: DateTime<Utc>) -> JobArgs {
         JobKind::CatalogSync => JobArgs::CatalogSync(DayArgs { day: night }),
         JobKind::ModelDiscovery => JobArgs::ModelDiscovery(DayArgs { day: night }),
         JobKind::CaptureExpiry => JobArgs::CaptureExpiry(HourArgs { hour }),
+        JobKind::AffinityPrune => JobArgs::AffinityPrune(HourArgs { hour }),
         JobKind::HistoryPrune => JobArgs::HistoryPrune(DayArgs { day: night }),
         JobKind::AggregateRebuild | JobKind::RegressionScan | JobKind::CalibrationScore => {
             unreachable!("chained jobs are enqueued by handlers, not by cron")
@@ -1493,6 +1510,7 @@ mod tests {
         assert_eq!(JobKind::CatalogSync.as_str(), "catalog_sync");
         assert_eq!(JobKind::ModelDiscovery.as_str(), "model_discovery");
         assert_eq!(JobKind::CaptureExpiry.as_str(), "capture_expiry");
+        assert_eq!(JobKind::AffinityPrune.as_str(), "affinity_prune");
         assert_eq!(JobKind::HistoryPrune.as_str(), "history_prune");
 
         assert_eq!(JobKind::NightlySmoke.max_attempts(), 3);
@@ -1519,6 +1537,7 @@ mod tests {
         );
         assert_eq!(JobKind::PredictionLock.timeout(&config), FAST_JOB_TIMEOUT);
         assert_eq!(JobKind::HistoryPrune.timeout(&config), FAST_JOB_TIMEOUT);
+        assert_eq!(JobKind::AffinityPrune.timeout(&config), FAST_JOB_TIMEOUT);
         assert_eq!(JobKind::ModelDiscovery.timeout(&config), FAST_JOB_TIMEOUT);
     }
 
@@ -1577,7 +1596,7 @@ mod tests {
     #[test]
     fn job_client_validates_all_crons_and_lease_ttl() {
         let client = JobClient::new(JobClientConfig::default()).expect("default config is valid");
-        assert_eq!(client.schedules().len(), 9);
+        assert_eq!(client.schedules().len(), 10);
 
         let mut config = JobClientConfig {
             cron_nightly: "99 99 * * *".to_string(),

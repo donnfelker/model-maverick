@@ -43,7 +43,7 @@ use crate::{
 /// The kinds that get a cron trigger, in schedule order: every scheduled kind. The
 /// chained kinds (aggregate_rebuild, regression_scan, calibration_score) are enqueued by
 /// the jobs before them.
-pub const SCHEDULED: [JobKind; 9] = [
+pub const SCHEDULED: [JobKind; 10] = [
     JobKind::PredictionLock,
     JobKind::NightlySmoke,
     JobKind::WeeklySweep,
@@ -52,6 +52,7 @@ pub const SCHEDULED: [JobKind; 9] = [
     JobKind::CatalogSync,
     JobKind::ModelDiscovery,
     JobKind::CaptureExpiry,
+    JobKind::AffinityPrune,
     JobKind::HistoryPrune,
 ];
 
@@ -208,10 +209,12 @@ pub fn worker_options(
         .define_job::<LatencyProbesJob>()
         .define_job::<CatalogSyncJob>()
         .define_job::<CaptureExpiryJob>()
+        .define_job::<AffinityPruneJob>()
         .define_job::<HistoryPruneJob>()
         .define_job::<CronLatencyProbes>()
         .define_job::<CronCatalogSync>()
         .define_job::<CronCaptureExpiry>()
+        .define_job::<CronAffinityPrune>()
         .define_job::<CronHistoryPrune>();
     let options = if config.role == maverick_config::Role::Origin {
         options
@@ -364,6 +367,11 @@ cron_trigger!(
     "cron.capture_expiry"
 );
 cron_trigger!(
+    CronAffinityPrune,
+    JobKind::AffinityPrune,
+    "cron.affinity_prune"
+);
+cron_trigger!(
     CronHistoryPrune,
     JobKind::HistoryPrune,
     "cron.history_prune"
@@ -472,6 +480,27 @@ impl TaskHandler for CaptureExpiryJob {
         };
         with_job_timeout(&ctx, JobKind::CaptureExpiry, async {
             retention::run_capture_expiry(&retention_deps(&ctx, config), &self.0, Utc::now())
+                .await
+                .map(|_| ())
+        })
+        .await
+    }
+}
+
+/// The `affinity_prune` task (D44).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct AffinityPruneJob(pub HourArgs);
+
+impl TaskHandler for AffinityPruneJob {
+    const IDENTIFIER: &'static str = "affinity_prune";
+
+    async fn run(self, ctx: WorkerContext) -> impl IntoTaskHandlerResult {
+        let Some(config) = ctx.extensions().get::<RetentionConfig>() else {
+            return Err(missing(JobKind::AffinityPrune, "RetentionConfig"));
+        };
+        with_job_timeout(&ctx, JobKind::AffinityPrune, async {
+            retention::run_affinity_prune(&retention_deps(&ctx, config), &self.0, Utc::now())
                 .await
                 .map(|_| ())
         })

@@ -1,4 +1,5 @@
-//! The retention jobs: `capture_expiry` (hourly) and `history_prune` (daily).
+//! The retention jobs: `capture_expiry` (hourly), `affinity_prune` (hourly, D44), and
+//! `history_prune` (daily).
 //!
 //! Spec §10.3 and §10.4; reference Part 3 §2.14, Part 4 §4.7, Part 1 §3. Each job runs
 //! in one transaction. Aggregates, calibration, and the capture access log are never
@@ -10,7 +11,7 @@ use std::time::Duration;
 use chrono::{DateTime, Days, SecondsFormat, Utc};
 use maverick_alerts::{AlertKind, AlertNotifier, Severity, insert_alert};
 use maverick_domain::ids;
-use maverick_store::{capture, decisions};
+use maverick_store::{affinity, capture, decisions};
 use serde::Serialize;
 use sqlx::{PgConnection, PgPool};
 
@@ -26,6 +27,12 @@ pub const HISTORY_PRUNE_ACTOR: &str = "history_prune";
 pub struct CaptureExpiryOutput {
     pub deleted_captures: u64,
     pub deleted_windows: u64,
+}
+
+/// The output of `affinity_prune`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AffinityPruneOutput {
+    pub deleted_rows: u64,
 }
 
 /// The output of `history_prune`. `cutoff` is RFC 3339.
@@ -93,6 +100,23 @@ pub async fn capture_expiry(
         deleted_captures: deleted.len() as u64,
         deleted_windows,
     })
+}
+
+/// Deletes every conversation affinity row whose `expires_at` is before `now` (spec §7.6,
+/// D44). An expired row already reads as missing, so this only reclaims space. One
+/// statement.
+pub async fn affinity_prune(
+    pool: &PgPool,
+    now: DateTime<Utc>,
+) -> Result<AffinityPruneOutput, RetentionError> {
+    let deleted_rows = affinity::prune_affinity(pool, now)
+        .await
+        .map_err(|source| RetentionError::Store {
+            job: JobKind::AffinityPrune,
+            step: "deleting expired affinity rows",
+            source,
+        })?;
+    Ok(AffinityPruneOutput { deleted_rows })
 }
 
 /// Deletes the recommendations created before `now - retention_days` (calendar days),
@@ -165,6 +189,30 @@ pub async fn run_capture_expiry(
     if let Err(error) = &result {
         let subject = serde_json::json!({"error": error.to_string(), "job": "capture_expiry", "hour": args.hour});
         report_failure(deps, JobKind::CaptureExpiry, &subject, error).await;
+    }
+    result
+}
+
+/// The `affinity_prune` job: validates the hour argument, runs [`affinity_prune`] at
+/// `now`, logs the deleted count, and on failure writes a `job_failure` warning before
+/// returning the error (the queue retries).
+pub async fn run_affinity_prune(
+    deps: &RetentionDeps<'_>,
+    args: &HourArgs,
+    now: DateTime<Utc>,
+) -> Result<AffinityPruneOutput, RetentionError> {
+    JobArgs::AffinityPrune(args.clone()).window()?;
+    let result = affinity_prune(deps.pool, now).await;
+    match &result {
+        Ok(output) => tracing::info!(
+            hour = %args.hour,
+            deleted_rows = output.deleted_rows,
+            "affinity_prune: expired conversation rows deleted"
+        ),
+        Err(error) => {
+            let subject = serde_json::json!({"error": error.to_string(), "job": "affinity_prune", "hour": args.hour});
+            report_failure(deps, JobKind::AffinityPrune, &subject, error).await;
+        }
     }
     result
 }

@@ -1342,7 +1342,7 @@ Env vars, prefix `MAVERICK_`, parsed and validated at boot (fail fast, print the
 | `MAVERICK_PROXY_DEFAULT_MODEL_ZERO_RETENTION` | `false` | §8.1 proxy fail-open: `true` marks the default models as verified zero retention (D46) |
 | `MAVERICK_HISTORY_RETENTION_DAYS` | `365` | §10.3 |
 | `MAVERICK_SMTP_URL`, `MAVERICK_ALERTS_WEBHOOK_URL`, `MAVERICK_ALERTS_WEBHOOK_SECRET` | — | §11.1 |
-| `MAVERICK_CRON_NIGHTLY`, `MAVERICK_CRON_WEEKLY`, `MAVERICK_CRON_MODEL_DISCOVERY` (D51), ... | §11 defaults | Schedules |
+| `MAVERICK_CRON_NIGHTLY`, `MAVERICK_CRON_WEEKLY`, `MAVERICK_CRON_MODEL_DISCOVERY` (D51), `MAVERICK_CRON_AFFINITY_PRUNE` (D44, default `5 * * * *`), ... | §11 defaults | Schedules |
 | `MAVERICK_ROLE` | — (required) | `origin` or `replica` (§14.4, D49) |
 | `MAVERICK_TENANT_NAME` | `default` | Replica: the bootstrapped tenant's name, read only at bootstrap (§14.4) |
 | `MAVERICK_BOOTSTRAP_KEY_FILE` | unset | Replica: the file that receives the bootstrapped API key, mode 0600 (§14.4) |
@@ -1376,7 +1376,7 @@ Added 2026-10-24 by owner decision (D49; design in `plans/self-hosted-engine-pla
 | `maverick matrix status` | yes | yes |
 | `price_sync` | registered | registered only when `MAVERICK_CRON_PRICE_SYNC` is set; otherwise prices come from bundles and local overrides |
 | `catalog_sync` | registered | registered; skips the lifecycle transitions (bundles set column status) and raises `matrix_stale` |
-| `latency_probes`, `capture_expiry`, `history_prune` | registered | registered |
+| `latency_probes`, `capture_expiry`, `affinity_prune` (D44), `history_prune` | registered | registered |
 
 The judge pool and the corpus spend caps are not used on a replica and need no configuration there. A replica's spend is its classifier (capped, §8.3) and its latency probes (G8).
 

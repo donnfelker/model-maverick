@@ -251,6 +251,8 @@ async fn deployment_role_limits_registered_jobs_and_crons() {
             "latency_probes",
             "catalog_sync",
             "capture_expiry",
+            // D44: both roles prune expired conversation affinity rows.
+            "affinity_prune",
             "history_prune",
         ];
         if role == Role::Origin {

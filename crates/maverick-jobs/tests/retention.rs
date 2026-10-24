@@ -1,5 +1,5 @@
-//! capture_expiry and history_prune on real Postgres (reference Part 3 §6 retention
-//! cases, Part 4 §4.7).
+//! capture_expiry, affinity_prune (D44), and history_prune on real Postgres (reference
+//! Part 3 §6 retention cases, Part 4 §4.7; spec §7.6).
 
 use std::sync::LazyLock;
 use std::time::Duration;
@@ -9,6 +9,7 @@ use maverick_jobs::retention::{
     self, CAPTURE_EXPIRY_ACTOR, HISTORY_PRUNE_ACTOR, RetentionDeps, RetentionError,
 };
 use maverick_jobs::{DayArgs, HourArgs, JobClient, JobClientConfig, JobKind, JobsError};
+use maverick_store::affinity::{self, AffinityRow};
 use maverick_store::capture::{self, NewDebugCapture};
 use maverick_store::decisions::{self, NewRecommendation};
 use maverick_store::{JsonRawValue, MIGRATOR, tenancy};
@@ -554,4 +555,82 @@ async fn no_capture_sealed_with_a_retired_key_outlives_the_key_drop() {
     assert_eq!(new_key, 1);
     pool.close().await;
     db.close().await;
+}
+
+/// DIVERGENCE: D44. `affinity_prune` deletes only the rows whose `expires_at` has passed,
+/// and a rerun deletes nothing.
+#[tokio::test]
+async fn affinity_prune_deletes_only_expired_rows() {
+    let Some(db) = maverick_testdb::database(&SCHEMA).await else {
+        return;
+    };
+    let pool = db.pool().await;
+    seed_tenant(&pool).await;
+    sqlx::query(
+        "INSERT INTO model_columns (id, provider, model_id, endpoint)
+         VALUES ('col_1', 'anthropic', 'm', 'direct')",
+    )
+    .execute(&pool)
+    .await
+    .expect("column");
+    for (hash, expires_at) in [
+        ("h_expired", now() - hours(1)),
+        ("h_live", now() + hours(1)),
+    ] {
+        affinity::upsert_affinity(
+            &pool,
+            &AffinityRow {
+                tenant_id: "ten_1".to_owned(),
+                affinity_hash: hash.to_owned(),
+                column_id: "col_1".to_owned(),
+                recommendation_id: "rec_1".to_owned(),
+                last_used_at: expires_at - hours(24),
+                expires_at,
+            },
+        )
+        .await
+        .expect("row");
+    }
+
+    let first = retention::run_affinity_prune(&deps(&pool), &hour_args(), now())
+        .await
+        .expect("prune");
+    assert_eq!(first.deleted_rows, 1);
+    let second = retention::run_affinity_prune(&deps(&pool), &hour_args(), now())
+        .await
+        .expect("rerun");
+    assert_eq!(second.deleted_rows, 0);
+    let left: Vec<String> =
+        sqlx::query_scalar("SELECT affinity_hash FROM conversation_affinity ORDER BY 1")
+            .fetch_all(&pool)
+            .await
+            .expect("rows");
+    assert_eq!(left, ["h_live"]);
+
+    let bad = HourArgs {
+        hour: "2026-09-28".to_owned(),
+    };
+    assert!(matches!(
+        retention::run_affinity_prune(&deps(&pool), &bad, now()).await,
+        Err(RetentionError::InvalidArgument(_))
+    ));
+    db.close().await;
+}
+
+/// DIVERGENCE: D44. A bad `MAVERICK_CRON_AFFINITY_PRUNE` is refused like the others.
+#[test]
+fn the_job_client_rejects_a_bad_affinity_prune_cron() {
+    let mut config = valid_client_config();
+    config.cron_affinity_prune = "99 99 * * *".to_owned();
+    let err = JobClient::new(config).expect_err("rejected");
+    assert!(
+        matches!(
+            err,
+            JobsError::InvalidCron {
+                env_var: "MAVERICK_CRON_AFFINITY_PRUNE",
+                ..
+            }
+        ),
+        "{err:?}"
+    );
 }

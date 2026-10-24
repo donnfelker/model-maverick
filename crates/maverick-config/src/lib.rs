@@ -179,6 +179,8 @@ pub struct Config {
     /// `MAVERICK_CRON_MODEL_DISCOVERY` (spec §4.6, §11; D51, Rust-only).
     pub cron_model_discovery: String,
     pub cron_capture_expiry: String,
+    /// `MAVERICK_CRON_AFFINITY_PRUNE` (spec §11; D44, Rust-only).
+    pub cron_affinity_prune: String,
     pub cron_history_prune: String,
     pub models_dev_price_url: String,
     pub models_dev_price_map: Vec<ModelsDevPriceMapEntry>,
@@ -336,6 +338,7 @@ impl fmt::Debug for Config {
             .field("cron_catalog_sync", &self.cron_catalog_sync)
             .field("cron_model_discovery", &self.cron_model_discovery)
             .field("cron_capture_expiry", &self.cron_capture_expiry)
+            .field("cron_affinity_prune", &self.cron_affinity_prune)
             .field("cron_history_prune", &self.cron_history_prune)
             .field("models_dev_price_url", &self.models_dev_price_url)
             .field("models_dev_price_map", &self.models_dev_price_map)
@@ -557,6 +560,12 @@ where
         "0 * * * *",
         &mut issues,
     );
+    let cron_affinity_prune = cron(
+        &lookup,
+        "MAVERICK_CRON_AFFINITY_PRUNE",
+        "5 * * * *",
+        &mut issues,
+    );
     let cron_history_prune = cron(
         &lookup,
         "MAVERICK_CRON_HISTORY_PRUNE",
@@ -718,6 +727,7 @@ where
             cron_catalog_sync,
             cron_model_discovery,
             cron_capture_expiry,
+            cron_affinity_prune,
             cron_history_prune,
             models_dev_price_url,
             models_dev_price_map,
