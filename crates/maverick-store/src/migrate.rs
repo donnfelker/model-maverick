@@ -4,6 +4,10 @@
 //! (D21, D37), then graphile_worker's own schema migrations (D22), on the same database.
 //! The engine migrations run one at a time on one connection, so each applied file is
 //! logged with its duration, as goose did. A second run applies nothing.
+//!
+//! Before it applies anything, a run makes the shared schema checks (spec §14.5, D50): it
+//! refuses a database newer than this binary and one older than the 12-month upgrade
+//! window ([`crate::schema::check`]).
 
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
@@ -15,6 +19,7 @@ use sqlx::{AssertSqlSafe, Connection};
 
 use crate::MIGRATOR;
 use crate::health::GRAPHILE_WORKER_SCHEMA;
+use crate::schema::{self, SafetyError};
 
 /// Why a migration run failed. The text names the step, like Go's
 /// `goose migrations: <err>` and `river migrations: <err>`.
@@ -29,6 +34,12 @@ pub enum MigrateError {
     /// graphile_worker's migrations failed.
     #[error("graphile_worker migrations: {0}")]
     Queue(Box<dyn StdError + Send + Sync>),
+    /// The schema checks refused the database (D50); nothing was applied.
+    #[error("schema migrations: {0}")]
+    Safety(SafetyError),
+    /// The schema status could not be read.
+    #[error("schema migrations: reading the schema status: {0}")]
+    Status(sqlx::Error),
 }
 
 /// What one run applied.
@@ -50,6 +61,14 @@ pub async fn migrate(database_url: &str) -> Result<Applied, MigrateError> {
     let mut conn = PgConnection::connect(database_url)
         .await
         .map_err(MigrateError::Connect)?;
+    let checked = match schema::status(&mut conn).await {
+        Ok(status) => schema::check(&status).map_err(MigrateError::Safety),
+        Err(error) => Err(MigrateError::Status(error)),
+    };
+    if let Err(error) = checked {
+        let _ = conn.close().await;
+        return Err(error);
+    }
     let schema = apply_schema(&mut conn).await;
     let _ = conn.close().await;
     let schema = schema.map_err(MigrateError::Schema)?;

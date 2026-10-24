@@ -25,6 +25,7 @@ pub mod health;
 pub mod matrix;
 pub mod measurement;
 pub mod migrate;
+pub mod schema;
 pub mod simulation;
 pub mod tenancy;
 

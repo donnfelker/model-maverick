@@ -25,6 +25,8 @@ chrono = { workspace = true }
 rust_decimal = { workspace = true }
 # `migrate` applies graphile_worker's own schema after the engine migrations.
 graphile_worker = { workspace = true }
+# The queue's migration list, for the schema status (spec §14.5, D50).
+graphile_worker_migrations = { workspace = true }
 
 [dev-dependencies]
 maverick-testdb = { workspace = true }

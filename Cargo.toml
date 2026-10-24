@@ -78,6 +78,13 @@ graphile_worker = { version = "0.13.5", default-features = false, features = [
     "tls-rustls",
     "driver-sqlx",
 ] }
+# Its migration list, so the engine can tell pending queue migrations (spec §14.5, D50).
+# Same version and features as graphile_worker's own dependency on it.
+graphile_worker_migrations = { version = "0.4.21", default-features = false, features = [
+    "runtime-tokio",
+    "tls-rustls",
+    "driver-sqlx",
+] }
 
 # --- serialization and schema ---
 serde = { version = "1", features = ["derive"] }

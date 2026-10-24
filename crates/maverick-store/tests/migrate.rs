@@ -14,6 +14,7 @@ use std::sync::LazyLock;
 use maverick_store::MIGRATOR;
 use maverick_store::health::{self, GRAPHILE_WORKER_SCHEMA};
 use maverick_store::migrate::{Applied, MigrateError, migrate};
+use maverick_store::schema::{SafetyError, binary_schema_version};
 use maverick_testdb::Schema;
 use serde_json::Value;
 use sqlx::migrate::MigrateError as SqlxMigrateError;
@@ -180,7 +181,9 @@ async fn a_changed_history_is_refused() {
     ))
     .await;
 
-    // An applied version that `migrations/` does not have.
+    // An applied version that `migrations/` does not have. DIVERGENCE: D50. The shared
+    // schema check refuses this newer database before sqlx's own check, and names both
+    // schema versions (spec §14.5).
     exec(
         "INSERT INTO _sqlx_migrations (version, description, success, checksum, execution_time) \
          VALUES (9999, 'unknown', true, '\\x00', 0)"
@@ -189,13 +192,16 @@ async fn a_changed_history_is_refused() {
     .await;
     let error = refused().await;
     assert!(matches!(
-        error,
-        MigrateError::Schema(SqlxMigrateError::VersionMissing(9999))
+        &error,
+        MigrateError::Safety(SafetyError::Newer { database: 9999, .. })
     ));
     assert_eq!(
         error.to_string(),
-        "schema migrations: migration 9999 was previously applied but is missing in the \
-         resolved migrations"
+        format!(
+            "schema migrations: the database schema is 9999, newer than this release's {} \
+             (unknown migrations: 9999); run a release that knows them, or restore a backup",
+            binary_schema_version()
+        )
     );
     exec("DELETE FROM _sqlx_migrations WHERE version = 9999".to_owned()).await;
 

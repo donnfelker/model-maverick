@@ -393,6 +393,45 @@ other secrets: `MAVERICK_CAPTURE_MASTER_KEY` (and the previous key during a rota
 without them captured prompts cannot be read) and `MAVERICK_INTERNAL_TOKENS`. Raw tenant API
 keys are stored nowhere: reissue a lost key.
 
+## Schema changes and upgrades (D50)
+
+Migrations are up only and additive (D37). A change that removes or renames uses expand
+and contract across two minor releases: release N adds the new shape and writes both,
+release N+1 stops reading the old shape, and a later release drops it only after the
+12-month upgrade window has passed N.
+
+Every migration from 0012 on starts with two header lines:
+
+```sql
+-- class: online-safe
+-- tables: upgrades, serve_heartbeats
+```
+
+- `online-safe`: the previous release keeps working against the new schema. New tables,
+  new nullable or defaulted columns, new indexes built concurrently, and widened checks
+  are online-safe.
+- `needs-downtime`: the previous release can fail against the new schema, so every
+  `serve` stops before it is applied.
+- `tables`: every table the migration creates or alters. `maverick upgrade` reads one row
+  of each after it applies them (bead xq7v.16).
+
+The test `every_migration_declares_its_class_and_tables` in `maverick-store` refuses a
+migration without them. Migrations 0001 to 0011 predate the header and are never edited,
+because a changed file changes its sqlx checksum. Their class and tables are in `LEGACY`
+in `crates/maverick-store/src/schema.rs`. All of them are online-safe except 0005, which
+adds a `not null` column with no default to `debug_captures`.
+
+`maverick migrate` checks the database before it applies anything:
+
+- **Newer database.** A database with migrations this binary does not know, engine or
+  job queue, is refused, and the message names both schema versions. Run a release that
+  knows them, or restore a backup. Rollback is always a restore (D37).
+- **Upgrade window.** Any release from the last 12 months upgrades directly. An older
+  database is refused, and the message names the release to run first. The window is
+  data: `RELEASES` in the same file lists each release's name, date, and newest migration,
+  and the release pipeline appends one row per release. A fresh database is always
+  accepted, and the table is empty until the first release.
+
 ## Jobs and schedules
 
 The jobs run on graphile_worker, in Postgres (no Redis). The periodic jobs use five-field

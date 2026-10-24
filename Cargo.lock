@@ -2550,6 +2550,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "graphile_worker",
+ "graphile_worker_migrations",
  "insta",
  "maverick-domain",
  "maverick-testdb",
