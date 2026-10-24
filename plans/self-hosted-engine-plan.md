@@ -270,6 +270,8 @@ The hosted deployment is an ordinary install with `MAVERICK_ROLE=origin` and a M
 
 ## 11. Open questions for the owner
 
+Decided 2026-10-24 by the owner (bead xq7v.1): the engine is open source and has **no license**. D48 is dropped, so questions 1 and 5 and the 30-day grace period no longer apply. The origin publishes signed matrix bundles **publicly and for free**; revenue comes from the hosted service. Accepted as recommended: the 12-month upgrade window, the 12-month skew window, the 30-night bundle window, question 3 (replicas never run corpus benchmarks), and question 4 (`MAVERICK_MATRIX_PULL_URL`, off by default). Bundle signing stays. Sections 1, 3, 4, 5.2, 6, 7, 9, 10, and 12 still describe the license; bead xq7v.15 removes it.
+
 1. **Lapsed behavior.** Recommendation: `lapsed` returns `503 license_lapsed` on recommend only (clients fail open; audit stays readable). Alternative: never stop recommend; a lapsed install keeps serving on its last matrix, and only releases and bundles are gated. The alternative is gentler but gives no reason to renew beyond freshness.
 2. **Grace and window lengths.** Recommendation: 30 days grace, 12-month upgrade window, 12-month skew window, 30-night bundle window.
 3. **Replica benchmarking.** Recommendation: replicas never run corpus benchmarks (the corpus never leaves Maverick). Customer-run benchmarks on their own tasks stay a v2 item.
