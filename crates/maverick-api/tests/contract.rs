@@ -634,6 +634,22 @@ const REQUIRED: &[(&str, u16, &str)] = &[
     ("GET /internal/v1/tenants/{id}", 404, "not_found"),
     ("POST /internal/v1/tenants/{id}/suspend", 404, "not_found"),
     ("POST /internal/v1/tenants/{id}/activate", 404, "not_found"),
+    ("POST /internal/v1/tenants", 409, "single_tenant_install"),
+    (
+        "POST /internal/v1/tenants/{id}/suspend",
+        409,
+        "single_tenant_install",
+    ),
+    (
+        "POST /internal/v1/tenants/{id}/activate",
+        409,
+        "single_tenant_install",
+    ),
+    (
+        "PUT /internal/v1/tenants/{id}/limits",
+        409,
+        "single_tenant_install",
+    ),
     ("POST /internal/v1/tenants/{id}/api-keys", 404, "not_found"),
     (
         "POST /internal/v1/tenants/{id}/api-keys",
@@ -826,6 +842,34 @@ const RUST: &[(&str, u16, &str, &str, &str)] = &[
         "invalid_request",
         "contract.rs",
         "the_seam_config_writes_answer_the_policy_codes",
+    ),
+    (
+        "POST /internal/v1/tenants",
+        409,
+        "single_tenant_install",
+        "single_tenant.rs",
+        "replica_refuses_tenant_administration",
+    ),
+    (
+        "POST /internal/v1/tenants/{id}/suspend",
+        409,
+        "single_tenant_install",
+        "single_tenant.rs",
+        "replica_refuses_tenant_administration",
+    ),
+    (
+        "POST /internal/v1/tenants/{id}/activate",
+        409,
+        "single_tenant_install",
+        "single_tenant.rs",
+        "replica_refuses_tenant_administration",
+    ),
+    (
+        "PUT /internal/v1/tenants/{id}/limits",
+        409,
+        "single_tenant_install",
+        "single_tenant.rs",
+        "replica_refuses_tenant_administration",
     ),
 ];
 

@@ -13,13 +13,13 @@ use axum::extract::{Extension, Path, Request, State};
 use axum::http::{Method, Response, StatusCode};
 use chrono::{DateTime, Duration, NaiveDate, NaiveTime, Utc};
 use maverick_alerts::{AlertKind, Severity, insert_alert};
-use maverick_config::Config;
+use maverick_config::{Config, Role};
 use maverick_domain::catalog::{RetirementBlocked, retention_window_error};
 use maverick_domain::gofmt::quote;
 use maverick_domain::gojson::{self, JsonValue, match_field};
+use maverick_domain::ids;
 use maverick_domain::pricing::parse_pricing;
 use maverick_domain::spend::SpendCaps;
-use maverick_domain::{ids, keys};
 use maverick_jobs::{JobClient, JobClientConfig};
 use maverick_providers::models::ModelLister;
 use maverick_store::catalog::{
@@ -34,7 +34,7 @@ pub(crate) mod refresh;
 use crate::strict::{self, invalid, malformed, required_field};
 use crate::{
     ApiError, ApiState, ErrorCode, InternalActor, audit, classifier_evidence, escape_go_json,
-    internal_error, not_found, read_body, response_with_json,
+    internal_error, not_found, provision, read_body, response_with_json,
 };
 
 /// The providers a column may name.
@@ -54,6 +54,9 @@ const MAX_ALIAS_RUNES: usize = 200;
 /// What the seam needs besides the pool.
 #[derive(Clone)]
 pub struct InternalSettings {
+    /// `MAVERICK_ROLE`. A replica refuses tenant create, suspend, activate, and limit
+    /// overrides with `409 single_tenant_install` (spec §14.4, D49).
+    pub role: Role,
     /// `catalog.cold_start_nights`: a new column's dense-run window.
     pub cold_start_nights: u32,
     /// `classifier.daily_quota`, the effective quota without a tenant override (D4).
@@ -73,6 +76,7 @@ pub struct InternalSettings {
 impl InternalSettings {
     pub fn from_config(config: &Config) -> Self {
         InternalSettings {
+            role: config.role,
             cold_start_nights: config.catalog_cold_start_nights,
             default_classification_quota: config.classifier_daily_quota,
             runner_repeats: config.runner_repeats,
@@ -93,6 +97,7 @@ impl InternalSettings {
 impl Default for InternalSettings {
     fn default() -> Self {
         InternalSettings {
+            role: Role::Origin,
             cold_start_nights: 5,
             default_classification_quota: 1000,
             clock: Arc::new(Utc::now),
@@ -107,6 +112,7 @@ impl Default for InternalSettings {
 impl fmt::Debug for InternalSettings {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("InternalSettings")
+            .field("role", &self.role)
             .field("cold_start_nights", &self.cold_start_nights)
             .field(
                 "default_classification_quota",
@@ -234,6 +240,22 @@ fn pool_of(api: &ApiState) -> Result<&PgPool, Failure> {
 
 // ---- tenants ----
 
+/// The `409 single_tenant_install` message (spec §14.4, D49).
+const SINGLE_TENANT_MESSAGE: &str = "this install has a single tenant (MAVERICK_ROLE=replica)";
+
+/// D49: a replica has one tenant, so tenant create, suspend, activate, and limit
+/// overrides answer `409 single_tenant_install`, before any lookup or body read.
+fn refused_on_replica(api: &ApiState) -> Option<Response<Body>> {
+    (api.internal().role == Role::Replica).then(|| {
+        ApiError::new(
+            StatusCode::CONFLICT,
+            ErrorCode::SingleTenantInstall,
+            SINGLE_TENANT_MESSAGE,
+        )
+        .into_response()
+    })
+}
+
 fn tenant_missing(id: &str) -> ApiError {
     ApiError::new(
         StatusCode::NOT_FOUND,
@@ -252,7 +274,7 @@ async fn tenant_or_404(db: &PgPool, id: &str) -> Result<tenancy::Tenant, Failure
     }
 }
 
-fn api_key_json(key: &tenancy::ApiKey) -> JsonValue {
+pub(crate) fn api_key_json(key: &tenancy::ApiKey) -> JsonValue {
     object(vec![
         ("id", string(&key.id)),
         ("name", string(&key.name)),
@@ -324,6 +346,9 @@ pub(crate) async fn tenants(
     if request.method() != Method::POST {
         return not_found();
     }
+    if let Some(refused) = refused_on_replica(&api) {
+        return refused;
+    }
     respond("create tenant", create_tenant(&api, &actor, request).await)
 }
 
@@ -333,21 +358,7 @@ async fn create_tenant(api: &ApiState, actor: &InternalActor, request: Request) 
         .map_err(|response| Failure::Response(Box::new(response)))?;
     let name = decode_name(&body, "createTenantRequest", "name")?;
     let db = pool_of(api)?;
-    let active: Vec<String> = catalog::list_model_columns_by_statuses(db, &["active".to_owned()])
-        .await?
-        .into_iter()
-        .map(|column| column.id)
-        .collect();
-    let hmac_key: [u8; 32] = rand::random();
-    let id = ids::new(ids::prefix::TENANT);
-    let mut tx = db.begin().await?;
-    let tenant = tenancy::create_tenant(&mut *tx, &id, &name, &hmac_key).await?;
-    if !active.is_empty() {
-        let pool_id = ids::new(ids::prefix::POOL);
-        tenancy::create_pool(&mut *tx, &pool_id, &id, "default", &active, true).await?;
-    }
-    tx.commit().await?;
-    audit::tenant_create(&actor.0, &id, &name, active.len());
+    let tenant = provision::create_tenant(db, &actor.0, &name).await?;
     Ok(json(StatusCode::CREATED, &summary(db, &tenant).await?))
 }
 
@@ -399,6 +410,9 @@ async fn set_status(
     if method != Method::POST {
         return not_found();
     }
+    if let Some(refused) = refused_on_replica(api) {
+        return refused;
+    }
     respond("tenant status", change_status(api, actor, id, status).await)
 }
 
@@ -435,17 +449,8 @@ async fn mint(api: &ApiState, actor: &InternalActor, id: &str, request: Request)
         .await
         .map_err(|response| Failure::Response(Box::new(response)))?;
     let name = decode_name(&body, "issueKeyRequest", "name")?;
-    let minted = keys::mint_key();
-    let key_id = ids::new(ids::prefix::API_KEY);
-    tenancy::create_api_key(db, &key_id, id, &minted.key_hash, &minted.last4, &name).await?;
-    audit::api_key_issue(&actor.0, id, &key_id, &name, &minted.last4);
-    Ok(json(
-        StatusCode::CREATED,
-        &object(vec![
-            ("id", string(&key_id)),
-            ("key", string(&minted.raw_key)),
-        ]),
-    ))
+    let key = provision::issue_key(db, &actor.0, id, &name).await?;
+    Ok(json(StatusCode::CREATED, &provision::issued_json(&key)))
 }
 
 /// `DELETE /internal/v1/api-keys/{id}` (§7.5): idempotent.
@@ -476,12 +481,7 @@ async fn revoke(api: &ApiState, actor: &InternalActor, id: &str) -> Handled {
         }
         Err(error) => return Err(error.into()),
     };
-    let key = if key.status == "revoked" {
-        key
-    } else {
-        tenancy::revoke_api_key(db, id).await?
-    };
-    audit::api_key_revoke(&actor.0, &key.tenant_id, &key.id);
+    let key = provision::revoke_key(db, &actor.0, key).await?;
     Ok(json(StatusCode::OK, &api_key_json(&key)))
 }
 
@@ -570,6 +570,9 @@ pub(crate) async fn limits(
 ) -> Response<Body> {
     if request.method() != Method::PUT {
         return not_found();
+    }
+    if let Some(refused) = refused_on_replica(&api) {
+        return refused;
     }
     respond(
         "tenant limits",

@@ -27,6 +27,51 @@ when the active bundle is absent or more than seven days old. Health detail repo
 `role` and the active bundle version, or `""` before the first import. Probe clients
 use the configured provider endpoints on both roles.
 
+## Single-tenant replica (D49)
+
+A replica serves one organization. It has one tenant, and nobody creates or manages
+tenants on it.
+
+**First start.** When `serve` starts on a replica and the database has no tenant, it
+creates one. The tenant is named by `MAVERICK_TENANT_NAME` (default `default`), and it
+gets the default pool (every active column) and the default constraints, as
+`POST /internal/v1/tenants` does. It also gets one API key, named `bootstrap`. Run
+`maverick upgrade` first, because `serve` refuses pending migrations.
+
+- The raw key is printed once, as one plain line on stderr:
+  `maverick: created tenant "<name>" (<id>) and its first API key, shown only once: mk_live_...`.
+  It is never in a log line.
+- When `MAVERICK_BOOTSTRAP_KEY_FILE` is set, the key is also written there, with mode
+  0600, and the log line `bootstrap key written` names the path.
+- The audit lines are `tenant.create` and `api_key.issue`, with actor `bootstrap`.
+- Later starts create nothing, and concurrent first starts create one tenant (an
+  advisory lock). `MAVERICK_TENANT_NAME` is read only at that first start.
+- When the database is not reachable yet, the bootstrap retries every 5 seconds in the
+  background, and serving goes on.
+
+A lost bootstrap key is not a problem: `maverick key create` issues another.
+
+**Keys.** `maverick key` manages the tenant's keys with the internal API's code and audit
+lines, with actor `cli:<os user>`. No command takes a tenant id. The result is JSON on
+stdout, and logs go to stderr.
+
+```sh
+maverick key create --name billing-app   # {"id":"key_...","key":"mk_live_..."}, shown once
+maverick key list                        # [{"id":...,"name":...,"last4":...,"status":...}]
+maverick key revoke --id key_...         # the revoked key; a second revoke changes nothing
+```
+
+An origin refuses these commands with `key commands need MAVERICK_ROLE=replica`.
+
+**Refused.** On a replica, `POST /internal/v1/tenants`, tenant suspend and activate, and
+`PUT /internal/v1/tenants/{id}/limits` answer `409 single_tenant_install`. Every other
+internal route works, health detail and column administration included. Nothing
+replaces suspension: to cut off one app, revoke its key; to stop all traffic, stop
+`serve`.
+
+Pools, constraints, weights, and zero retention are set through `PUT /v1/config/...`
+with one of the tenant's keys, as on the hosted deployment.
+
 ## Configuration compatibility (D50)
 
 A new release must start with an older environment file. Three rules make sure it does:

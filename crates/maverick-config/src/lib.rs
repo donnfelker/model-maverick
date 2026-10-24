@@ -159,6 +159,12 @@ pub struct Config {
     pub affinity_cache_warm_seconds: u32,
     /// `MAVERICK_AFFINITY_INCUMBENT_BONUS`, in quality points.
     pub affinity_incumbent_bonus: f64,
+    /// `MAVERICK_TENANT_NAME` (spec §14.4, D49): the name of the one tenant a replica
+    /// creates at bootstrap. Read only then.
+    pub tenant_name: String,
+    /// `MAVERICK_BOOTSTRAP_KEY_FILE`: where a replica's bootstrap writes its API key (mode
+    /// 0600). Empty: the key is only printed.
+    pub bootstrap_key_file: String,
     pub ceiling_buffer: f64,
     pub catalog_cold_start_nights: u32,
     pub ratelimit_rpm: u32,
@@ -310,6 +316,8 @@ impl fmt::Debug for Config {
                 &self.affinity_cache_warm_seconds,
             )
             .field("affinity_incumbent_bonus", &self.affinity_incumbent_bonus)
+            .field("tenant_name", &self.tenant_name)
+            .field("bootstrap_key_file", &self.bootstrap_key_file)
             .field("ceiling_buffer", &self.ceiling_buffer)
             .field("catalog_cold_start_nights", &self.catalog_cold_start_nights)
             .field("ratelimit_rpm", &self.ratelimit_rpm)
@@ -628,6 +636,8 @@ where
         1.5,
         &mut issues,
     );
+    let tenant_name = optional(&lookup, "MAVERICK_TENANT_NAME", "default");
+    let bootstrap_key_file = optional(&lookup, "MAVERICK_BOOTSTRAP_KEY_FILE", "");
     let batch_lease_ttl = duration(
         &lookup,
         "MAVERICK_BATCH_LEASE_TTL",
@@ -708,6 +718,8 @@ where
             affinity_ttl,
             affinity_cache_warm_seconds,
             affinity_incumbent_bonus,
+            tenant_name,
+            bootstrap_key_file,
             ceiling_buffer,
             catalog_cold_start_nights,
             ratelimit_rpm,
@@ -1434,6 +1446,42 @@ mod tests {
                 "{bad}: {error}"
             );
         }
+    }
+
+    /// D49: the replica bootstrap's tenant name defaults to `default`, and its key file
+    /// is unset; both read as given.
+    #[test]
+    fn bootstrap_settings_parse_and_default() {
+        let load = |extra: &[(&'static str, &'static str)]| {
+            let extra = extra.to_vec();
+            load_with(move |name| {
+                extra
+                    .iter()
+                    .chain(&[
+                        ("MAVERICK_ROLE", "replica"),
+                        ("MAVERICK_DATABASE_URL", "postgres://db"),
+                        ("MAVERICK_INTERNAL_TOKENS", "ops:alpha"),
+                        ("MAVERICK_CAPTURE_MASTER_KEY", "ab".repeat(32).leak()),
+                    ])
+                    .find(|(key, _)| *key == name)
+                    .map(|(_, value)| (*value).to_owned())
+            })
+            .expect("loads")
+        };
+        let config = load(&[]);
+        assert_eq!(config.tenant_name, "default");
+        assert_eq!(config.bootstrap_key_file, "");
+        let config = load(&[
+            ("MAVERICK_TENANT_NAME", ""),
+            ("MAVERICK_BOOTSTRAP_KEY_FILE", ""),
+        ]);
+        assert_eq!(config.tenant_name, "default");
+        let config = load(&[
+            ("MAVERICK_TENANT_NAME", "Acme Corp"),
+            ("MAVERICK_BOOTSTRAP_KEY_FILE", "/run/secrets/maverick-key"),
+        ]);
+        assert_eq!(config.tenant_name, "Acme Corp");
+        assert_eq!(config.bootstrap_key_file, "/run/secrets/maverick-key");
     }
 
     /// D44: the four affinity settings, their defaults, and their startup errors.

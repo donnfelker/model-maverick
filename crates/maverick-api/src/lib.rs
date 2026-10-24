@@ -17,6 +17,7 @@ mod metrics;
 mod models;
 pub mod observe;
 mod policies;
+pub mod provision;
 mod query;
 mod recommend;
 mod strict;
@@ -197,6 +198,8 @@ pub enum ErrorCode {
     ZeroRetentionRequiresDeclared,
     GraderUnsupported,
     RateLimited,
+    /// A replica's tenant administration (spec §14.4, D49).
+    SingleTenantInstall,
     InternalError,
 }
 
@@ -218,6 +221,7 @@ impl ErrorCode {
             Self::ZeroRetentionRequiresDeclared => "zero_retention_requires_declared",
             Self::GraderUnsupported => "grader_unsupported",
             Self::RateLimited => "rate_limited",
+            Self::SingleTenantInstall => "single_tenant_install",
             Self::InternalError => "internal_error",
         }
     }

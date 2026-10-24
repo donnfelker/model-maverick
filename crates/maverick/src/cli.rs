@@ -20,6 +20,7 @@ Commands:
   corpus      load, activate, and inspect corpus versions, and print the tier
               calibration report (load | activate | status | calibrate)
   mcp-stdio   stdio MCP transport for local development (--api-key mk_live_...)
+  key         the API keys of a single-tenant replica (create | list | revoke)
 
 Flags:
   --version   print the release, build, schema, and bundle formats
@@ -40,6 +41,19 @@ Subcommands:
             per-capability, per-column tier pass rates from the latest
             measured aggregates, with monotonicity inversions and >15-point
             tier-trend outliers; a report, never a gate
+";
+
+/// The `key` usage text (spec §14.4, D49).
+pub const KEY_USAGE: &str = "Usage: maverick key <subcommand> [flags]
+
+Manages the API keys of this install's one tenant (MAVERICK_ROLE=replica).
+
+Subcommands:
+  create  --name <name>
+          issue a key and print {\"id\", \"key\"}; the raw key is shown only once
+  list    print the tenant's keys as a JSON array (never a raw key)
+  revoke  --id <key id>
+          revoke a key; revoking a revoked key changes nothing
 ";
 
 /// The `spend` usage text (bead 9.15). The command is hidden: [`MAIN_USAGE`] is Go's
@@ -99,6 +113,7 @@ pub fn run(
         "upgrade" => upgrade(rest, lookup, stdout, stderr),
         "demo-run" => demo_run(rest, lookup, stdout, stderr),
         "corpus" => corpus(rest, lookup, stdout, stderr),
+        "key" => key(rest, lookup, stdout, stderr),
         "spend" => spend(rest, lookup, stdout, stderr),
         "mcp-stdio" => mcp_stdio(rest, lookup, stderr),
         "--version" => version(rest, stdout, stderr),
@@ -196,7 +211,7 @@ fn serve(
         load_config(lookup).map_err(|_| EXIT_FAILURE)
     });
     match loaded {
-        Ok(config) => crate::serve::serve(config, api_only, worker_only, stdout),
+        Ok(config) => crate::serve::serve(config, api_only, worker_only, stdout, stderr),
         Err(code) => code,
     }
 }
@@ -262,12 +277,7 @@ fn upgrade(
         json: flags.bool("json"),
         interactive: std::io::stdin().is_terminal(),
     };
-    let operator = format!(
-        "cli:{}",
-        lookup("USER")
-            .filter(|user| !user.is_empty())
-            .unwrap_or_else(|| "unknown".to_owned())
-    );
+    let operator = cli_actor(lookup);
     let mut prompt = stderr.clone();
     with_logger(stderr, || {
         let Ok(config) = load_config(lookup) else {
@@ -288,6 +298,69 @@ fn upgrade(
             EXIT_FAILURE
         })
     })
+}
+
+/// The audit actor of a CLI write: `cli:<os user>` (`USER`, else `unknown`).
+pub(crate) fn cli_actor(lookup: &dyn Fn(&str) -> Option<String>) -> String {
+    format!(
+        "cli:{}",
+        lookup("USER")
+            .filter(|user| !user.is_empty())
+            .unwrap_or_else(|| "unknown".to_owned())
+    )
+}
+
+/// `key create --name <n> | list | revoke --id <id>` (spec §14.4, D49).
+fn key(
+    args: &[String],
+    lookup: &dyn Fn(&str) -> Option<String>,
+    stdout: Output,
+    mut stderr: Output,
+) -> i32 {
+    use crate::key::KeyCommand;
+    let Some(sub) = args.first() else {
+        let _ = stderr.write_all(KEY_USAGE.as_bytes());
+        return EXIT_USAGE;
+    };
+    let rest = &args[1..];
+    let (set, required) = match sub.as_str() {
+        "create" => (
+            FlagSet::new("key create").string("name", "", "what the key is for"),
+            Some("name"),
+        ),
+        "list" => (FlagSet::new("key list"), None),
+        "revoke" => (
+            FlagSet::new("key revoke").string("id", "", "the key to revoke"),
+            Some("id"),
+        ),
+        other => {
+            let _ = write!(
+                stderr,
+                "maverick key: unknown subcommand {}\n\n{KEY_USAGE}",
+                quote(other)
+            );
+            return EXIT_USAGE;
+        }
+    };
+    let Some(flags) = parse_flags(&set, rest, &mut stderr) else {
+        return EXIT_USAGE;
+    };
+    if let Some(flag) = required
+        && flags.string(flag).is_empty()
+    {
+        let _ = writeln!(stderr, "maverick key {sub}: --{flag} is required");
+        return EXIT_USAGE;
+    }
+    let command = match sub.as_str() {
+        "create" => KeyCommand::Create {
+            name: flags.string("name"),
+        },
+        "revoke" => KeyCommand::Revoke {
+            id: flags.string("id"),
+        },
+        _ => KeyCommand::List,
+    };
+    crate::key::run(&command, lookup, stdout, stderr)
 }
 
 /// Runs `future` to completion on a runtime for this thread only, so its log events

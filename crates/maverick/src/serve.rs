@@ -13,6 +13,7 @@
 //! refreshes a `serve_heartbeats` row every 30 s and removes the row on a clean shutdown.
 
 use std::collections::HashMap;
+use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -23,11 +24,13 @@ use hyper_util::service::TowerToHyperService;
 use maverick_alerts::{AlertNotifier, Fanout};
 use maverick_api::audit::JsonField;
 use maverick_api::classify::{Resolver, ResolverSettings};
+use maverick_api::provision::{self, Bootstrapped};
 use maverick_api::{
     ApiState, AuthState, PgAuthBackend, PublicAuthBackend, PublicAuthDecision, RecommendConfig,
     internal_router_with, mcp, public_router_with,
 };
-use maverick_config::Config;
+use maverick_config::{Config, Role};
+use maverick_domain::gofmt::quote;
 use maverick_domain::graders::judge_rubric::{FamilyResolver, JudgeClient, JudgeRequest};
 use maverick_domain::graders::{
     BoxError, BoxFuture, GoldenAnswer, JsonSchema, KeyFacts, Registry, RuleScan,
@@ -172,7 +175,14 @@ const MAX_HEADER_BYTES: usize = (1 << 20) + 4096;
 const EXIT_FAILURE: i32 = 1;
 
 /// Runs `serve` with a loaded config and returns the exit code.
-pub fn serve(config: Config, api_only: bool, worker_only: bool, stdout: Output) -> i32 {
+/// `stderr` gets one plain line, never a log line: a replica's bootstrap API key (D49).
+pub fn serve(
+    config: Config,
+    api_only: bool,
+    worker_only: bool,
+    stdout: Output,
+    stderr: Output,
+) -> i32 {
     let runtime = match tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -194,7 +204,7 @@ pub fn serve(config: Config, api_only: bool, worker_only: bool, stdout: Output) 
         // set one (a test harness) keeps it, and this thread still logs through ours.
         let _ = tracing::dispatcher::set_global_default(dispatch.clone());
         let _guard = tracing::dispatcher::set_default(&dispatch);
-        let code = run(&config, api_only, worker_only).await;
+        let code = run(&config, api_only, worker_only, stderr).await;
         if let Some(otel) = &otel {
             otel.shutdown();
         }
@@ -237,7 +247,7 @@ impl ShutdownSignal {
     }
 }
 
-async fn run(config: &Config, api_only: bool, worker_only: bool) -> i32 {
+async fn run(config: &Config, api_only: bool, worker_only: bool, stderr: Output) -> i32 {
     tracing::info!(
         public_addr = config.public_addr.as_str(),
         internal_addr = config.internal_addr.as_str(),
@@ -296,6 +306,18 @@ async fn run(config: &Config, api_only: bool, worker_only: bool) -> i32 {
         process_id.clone(),
         host_label(),
     )));
+    // D49: a replica's first start creates its one tenant and API key.
+    if config.role == Role::Replica {
+        let mut bootstrap = Bootstrap {
+            pool: pool.clone(),
+            name: config.tenant_name.clone(),
+            key_file: config.bootstrap_key_file.clone(),
+            out: stderr,
+        };
+        if !bootstrap.attempt().await {
+            watchers.push(tokio::spawn(bootstrap.retry()));
+        }
+    }
     if !api_only {
         let graders = if config.role == maverick_config::Role::Origin {
             let graders = grader_registry(config, &pool, &providers).await;
@@ -453,6 +475,99 @@ async fn schema_gate(database_url: &str) -> Option<String> {
         status.pending.len(),
         status.queue_pending.len()
     ))
+}
+
+/// How long a bootstrap attempt waits for a connection, and the pause before a retry.
+const BOOTSTRAP_WAIT: Duration = Duration::from_secs(5);
+
+/// A replica's first start (spec §14.4, D49): one tenant named `MAVERICK_TENANT_NAME`
+/// and one API key, created once across every process (`provision::bootstrap`). The raw
+/// key is printed once on `out` as a plain line, never a log line (G5), and written to
+/// `MAVERICK_BOOTSTRAP_KEY_FILE` (mode 0600) when that is set.
+struct Bootstrap {
+    pool: PgPool,
+    name: String,
+    key_file: String,
+    out: Output,
+}
+
+impl Bootstrap {
+    /// One attempt. False when the database failed it (logged), so a retry follows. Only
+    /// the wait for a connection is bounded, so a commit is never cut off.
+    async fn attempt(&mut self) -> bool {
+        let mut conn = match tokio::time::timeout(BOOTSTRAP_WAIT, self.pool.acquire()).await {
+            Ok(Ok(conn)) => conn,
+            Ok(Err(error)) => {
+                tracing::warn!(error = %error, "single-tenant bootstrap waiting for the database");
+                return false;
+            }
+            Err(_) => {
+                tracing::warn!("single-tenant bootstrap waiting for the database");
+                return false;
+            }
+        };
+        match provision::bootstrap(&mut conn, &self.name).await {
+            Ok(Some(created)) => {
+                self.deliver(&created);
+                true
+            }
+            Ok(None) => true,
+            Err(error) => {
+                tracing::warn!(error = %error, "single-tenant bootstrap failed; retrying");
+                false
+            }
+        }
+    }
+
+    /// Retries every [`BOOTSTRAP_WAIT`] until an attempt reaches the database.
+    async fn retry(mut self) {
+        loop {
+            tokio::time::sleep(BOOTSTRAP_WAIT).await;
+            if self.attempt().await {
+                return;
+            }
+        }
+    }
+
+    fn deliver(&mut self, created: &Bootstrapped) {
+        if !self.key_file.is_empty() {
+            match write_key_file(&self.key_file, &created.key.raw_key) {
+                Ok(()) => tracing::info!(path = self.key_file.as_str(), "bootstrap key written"),
+                Err(error) => tracing::error!(
+                    path = self.key_file.as_str(),
+                    error = %error,
+                    "writing the bootstrap key file"
+                ),
+            }
+        }
+        let _ = writeln!(
+            self.out,
+            "maverick: created tenant {} ({}) and its first API key, shown only once: {}",
+            quote(&created.tenant.name),
+            created.tenant.id,
+            created.key.raw_key
+        );
+    }
+}
+
+/// Writes `key` and a newline to `path`, readable and writable by its owner only (mode
+/// 0600), replacing what was there.
+fn write_key_file(path: &str, key: &str) -> std::io::Result<()> {
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(path)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+    }
+    file.write_all(format!("{key}\n").as_bytes())?;
+    file.sync_all()
 }
 
 /// D50: refreshes this process's heartbeat every 30 s. A failed write is logged at debug

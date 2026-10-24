@@ -84,7 +84,7 @@ The code list is closed. No response carries a code outside this table:
 | 404 | `not_found` | Resource absent **or** owned by another tenant (no existence oracle) |
 | 409 | `zero_retention_conflict` | Capture window requested by a zero-retention tenant |
 | 409 | `no_compliant_columns` | Zero-retention tenant, and no pool column has valid zero-retention evidence (D1, D17) |
-| 409 | `single_tenant_install` | Self-hosted replica: tenant create, suspend, activate, or a limit override (D49; specified, not served yet) |
+| 409 | `single_tenant_install` | Self-hosted replica: tenant create, suspend, activate, or a limit override (D49) |
 | 410 | `capture_expired` | Replay or read of an expired or hard-deleted capture |
 | 413 | `payload_too_large` | Body over 2 MiB |
 | 422 | `invalid_request` | Malformed body, unknown fields or params, bad enums, bad values |
@@ -1030,11 +1030,15 @@ write"`, `audit=true`, `actor=<label>`, `action=<dotted.action>` (for example
 A route with a tenant `{id}` looks the tenant up before it reads the body. An
 unknown tenant is `404 not_found` (`tenant <id> does not exist`).
 
-On a self-hosted replica (spec §14.4, D49; specified, not served yet), tenant
-create, suspend, activate, and `PUT /internal/v1/tenants/{id}/limits` answer
-`409 single_tenant_install` (`this install has a single tenant
-(MAVERICK_ROLE=replica)`). A pricing snapshot written through the column PUT on
-a replica is local (`"source": "local"`), and bundle imports never overwrite it.
+On a self-hosted replica (spec §14.4, D49), tenant create, suspend, activate,
+and `PUT /internal/v1/tenants/{id}/limits` answer `409 single_tenant_install`
+(`this install has a single tenant (MAVERICK_ROLE=replica)`). The refusal comes
+after the method check and before any tenant lookup or body read. Every other
+internal route works on a replica. The replica's one tenant and first key come
+from its first `serve` start, and `maverick key` manages its keys
+(`docs/operations.md`, "Single-tenant replica"). A pricing snapshot written
+through the column PUT on a replica is local (`"source": "local"`), and bundle
+imports never overwrite it (specified, not served yet).
 
 All 17 routes:
 
