@@ -9,6 +9,7 @@ use axum::Router;
 use axum::body::Bytes;
 use axum::http::StatusCode;
 use axum::routing::post;
+use maverick_core::affinity::AffinityRequest;
 use maverick_core::alias::Mode;
 use maverick_core::recommend::{
     RecommendClient, RecommendClientConfig, RecommendRequest, TenantKey, Workload,
@@ -91,10 +92,13 @@ async fn the_core_never_gets_a_422_from_a_first_release_engine() {
         for mode in [Mode::Quality, Mode::Balanced, Mode::Cost] {
             for pool in [None, Some("eu".to_owned())] {
                 for workload in &workloads {
+                    // D44: the conversation never reaches an engine that did not
+                    // advertise `affinity`, so this strict engine accepts the request.
                     let request = RecommendRequest {
                         mode,
                         pool: pool.clone(),
                         workload: workload.clone(),
+                        affinity: Some(AffinityRequest::for_turn("conv_skew", 400)),
                     };
                     let outcome = client.recommend(&key, &request).await;
                     assert!(outcome.is_ok(), "round {round}: {request:?}: {outcome:?}");

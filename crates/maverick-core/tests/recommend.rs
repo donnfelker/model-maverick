@@ -454,6 +454,7 @@ async fn rust_response_fields_decode() {
             zero_retention: true,
             classification_quota_exceeded: true,
             telemetry_opt_out: false,
+            affinity: None,
         }
     );
 }

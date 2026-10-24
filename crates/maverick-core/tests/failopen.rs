@@ -30,6 +30,7 @@ fn recommendation(zero_retention: bool, chain: Vec<ChainEntry>) -> Recommendatio
         zero_retention,
         classification_quota_exceeded: false,
         telemetry_opt_out: false,
+        affinity: None,
     }
 }
 

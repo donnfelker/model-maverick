@@ -251,6 +251,7 @@ async fn trace_context_reaches_the_engine() {
     let request = RecommendRequest {
         mode: maverick_core::alias::Mode::Balanced,
         pool: None,
+        affinity: None,
         workload: Workload::Declared {
             capability: "factual_qa".into(),
             difficulty: None,

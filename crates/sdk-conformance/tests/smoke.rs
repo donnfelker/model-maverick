@@ -51,6 +51,7 @@ async fn smoke_drives_one_scenario_through_both_servers() {
         mode: Mode::Balanced,
         pool: None,
         workload: Workload::declared_fallback(),
+        affinity: None,
     };
     let recommendation = client
         .recommend(&TenantKey::new("mk_live_smoke"), &request)

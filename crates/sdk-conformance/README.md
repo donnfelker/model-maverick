@@ -292,6 +292,10 @@ states its rules, and every expectation is hand-checked.
 - `features.v1.json`: the `X-Maverick-API-Features` parse, the rule that an optional request
   field is sent only when its feature is advertised, and how a core remembers the list across
   responses (spec §14.5, D50).
+- `affinity.v1.json`: conversation affinity (spec §8.1, §9.2, D44). It covers the
+  conversation id check, the `context_tokens` estimate, the exact request body with and
+  without the `affinity` feature, and how a response's `affinity` block reads. Contract
+  version 4 adds it.
 
 ## Tests in this crate
 

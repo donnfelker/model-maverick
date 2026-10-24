@@ -33,6 +33,7 @@ use std::time::{Duration, Instant};
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
 use serde_json::{Map, Value};
 
+use crate::affinity::{Affinity, AffinityRequest};
 use crate::alias::{Alias, Mode};
 use crate::projection::{self, PROJECTION_VERSION, Projection, WorkloadHeaderError};
 
@@ -175,6 +176,9 @@ pub struct RecommendRequest {
     pub pool: Option<String>,
     /// The workload.
     pub workload: Workload,
+    /// Conversation affinity (D44). Written only when the engine advertised the `affinity`
+    /// feature (D50).
+    pub affinity: Option<AffinityRequest>,
 }
 
 impl RecommendRequest {
@@ -185,6 +189,7 @@ impl RecommendRequest {
             mode: alias.mode,
             pool: alias.pool.clone(),
             workload,
+            affinity: None,
         }
     }
 
@@ -330,6 +335,18 @@ pub struct Recommendation {
     /// `telemetry: false` (D39): the tenant opted out, so no MM component sends telemetry
     /// for this request. An absent or `null` member (a Go-era engine) leaves it `false`.
     pub telemetry_opt_out: bool,
+    /// `affinity`: the conversation affinity decision, present only when the request sent
+    /// `affinity` (D44).
+    pub affinity: Option<Affinity>,
+}
+
+impl Recommendation {
+    /// Decode a 2xx `POST /v1/recommend` body with the rules the client applies to every
+    /// response (Go's decoding, reference part 6 §7, plus the Rust-only members). The
+    /// conformance vectors replay it.
+    pub fn decode(body: &[u8]) -> Result<Self, String> {
+        wire::decode_response(body)
+    }
 }
 
 /// Why a recommend call produced no recommendation.
@@ -621,6 +638,7 @@ mod tests {
                 prompt: "x".to_owned(),
                 projection_version: None,
             },
+            affinity: None,
         };
         assert_eq!(
             request.to_body(),
@@ -656,6 +674,47 @@ mod tests {
         );
     }
 
+    /// D44, D50: `affinity` is written only when the engine advertised it, before `mode`,
+    /// with its set members in order.
+    #[test]
+    fn affinity_is_written_only_when_advertised() {
+        let mut request = RecommendRequest::for_alias(
+            &Alias {
+                pool: None,
+                mode: Mode::Quality,
+            },
+            Workload::declared_fallback(),
+        );
+        request.affinity = Some(AffinityRequest {
+            key: "conv<1>".to_owned(),
+            context_tokens: Some(30),
+            cost_aware: Some(true),
+        });
+        let plain =
+            r#"{"mode":"quality","workload":{"capability":"multi_step_reasoning","difficulty":3}}"#;
+        assert_eq!(request.to_body(), plain);
+        assert_eq!(
+            request.to_body_for(&EngineFeatures::parse(Some("other"))),
+            plain
+        );
+        let advertised = EngineFeatures::parse(Some("affinity"));
+        assert_eq!(
+            request.to_body_for(&advertised),
+            r#"{"affinity":{"context_tokens":30,"cost_aware":true,"key":"conv\u003c1\u003e"},"mode":"quality","workload":{"capability":"multi_step_reasoning","difficulty":3}}"#
+        );
+        request.affinity = Some(AffinityRequest {
+            key: "k".to_owned(),
+            context_tokens: None,
+            cost_aware: Some(false),
+        });
+        assert_eq!(
+            request.to_body_for(&advertised),
+            r#"{"affinity":{"cost_aware":false,"key":"k"},"mode":"quality","workload":{"capability":"multi_step_reasoning","difficulty":3}}"#
+        );
+        request.affinity = None;
+        assert_eq!(request.to_body_for(&advertised), plain);
+    }
+
     #[test]
     fn debug_output_redacts_prompts_and_keys() {
         let workload = Workload::Prompt {
@@ -666,9 +725,14 @@ mod tests {
             mode: Mode::Cost,
             pool: None,
             workload,
+            affinity: Some(crate::affinity::AffinityRequest::for_turn(
+                "conv-secret-key",
+                8,
+            )),
         };
         let shown = format!("{request:?}");
         assert!(!shown.contains("secret prompt text"), "{shown}");
+        assert!(!shown.contains("conv-secret-key"), "{shown}");
         assert!(shown.contains("<redacted, 18 chars>"), "{shown}");
         let key = format!("{:?}", TenantKey::new("mk_live_abc"));
         assert_eq!(key, "TenantKey(<redacted>)");

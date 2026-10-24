@@ -10,6 +10,7 @@ use super::{
     ChainEntry, EngineFailure, EngineFeatures, RecommendError, RecommendRequest, Recommendation,
     RetentionMode, Workload,
 };
+use crate::affinity::{AFFINITY_FEATURE, Affinity};
 use crate::alias::Mode;
 use crate::gojson::{apply_bool, apply_string, members, type_error, write_string};
 
@@ -19,12 +20,27 @@ use crate::gojson::{apply_bool, apply_string, members, type_error, write_string}
 /// The request body: compact JSON, members in lexicographic order, strings escaped as Go's
 /// `json.Marshal` escapes them (HTML-safe). `pool` is omitted when empty.
 ///
-/// Every member written today is a first-release field. An optional field added later is
-/// written only when `features.allows(<its feature>)` (spec §14.5, D50); conversation
-/// affinity (D44) adds the first, `affinity`, which sorts before `mode`.
+/// Every member but one is a first-release field. The optional one, conversation affinity
+/// (D44), is written only when `features.allows("affinity")` (spec §14.5, D50). It sorts
+/// before `mode`, and its own members are `context_tokens`, `cost_aware`, and `key`, each
+/// when set.
 pub(super) fn encode_request(request: &RecommendRequest, features: &EngineFeatures) -> String {
-    let _ = features;
-    let mut out = String::from("{\"mode\":");
+    let mut out = String::from("{");
+    if let Some(affinity) = &request.affinity
+        && features.allows(AFFINITY_FEATURE)
+    {
+        out.push_str("\"affinity\":{");
+        if let Some(tokens) = affinity.context_tokens {
+            let _ = write!(out, "\"context_tokens\":{tokens},");
+        }
+        if let Some(cost_aware) = affinity.cost_aware {
+            let _ = write!(out, "\"cost_aware\":{cost_aware},");
+        }
+        out.push_str("\"key\":");
+        write_string(&mut out, &affinity.key);
+        out.push_str("},");
+    }
+    out.push_str("\"mode\":");
     write_string(&mut out, engine_mode(request.mode));
     if let Some(pool) = request.pool.as_deref().filter(|pool| !pool.is_empty()) {
         out.push_str(",\"pool\":");
@@ -165,7 +181,24 @@ pub(super) fn decode_response(body: &[u8]) -> Result<Recommendation, String> {
             other => return Err(type_error("recommendations", other, "array")),
         }
     }
+    // D44 is Rust-only: an `affinity` block that is not an object is ignored instead of
+    // failing the decode, and a member of another type reads as unset.
+    for value in members(object, "affinity") {
+        out.affinity = value.as_object().map(affinity);
+    }
     Ok(out)
+}
+
+fn affinity(object: &Map<String, Value>) -> Affinity {
+    let text = |name: &str| object.get(name).and_then(Value::as_str).map(str::to_owned);
+    let flag = |name: &str| object.get(name).and_then(Value::as_bool);
+    Affinity {
+        status: text("status").unwrap_or_default(),
+        previous_column_id: text("previous_column_id"),
+        reason: text("reason"),
+        cache_warm: flag("cache_warm"),
+        cost_aware: flag("cost_aware"),
+    }
 }
 
 fn chain_entry(value: &Value) -> Result<ChainEntry, String> {

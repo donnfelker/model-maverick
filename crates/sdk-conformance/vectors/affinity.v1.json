@@ -1,0 +1,309 @@
+{
+  "vector_set": "affinity",
+  "version": "v1",
+  "source": "spec v1 §8.1 \"Conversation header\" and §9.2 (D44, D50); crates/maverick-core/src/affinity.rs and recommend/wire.rs. Hand-written.",
+  "rules": {
+    "header": [
+      "X-Maverick-Conversation names the conversation. A valid value is 1 to 256 bytes, each printable ASCII (0x20 to 0x7E).",
+      "The proxy answers a present but invalid value with 400 invalid_request, message \"X-Maverick-Conversation must be 1 to 256 printable ASCII characters\", and does not call the engine. An SDK core rejects an invalid conversation_id the same way, before any call."
+    ],
+    "context_tokens": [
+      "context_tokens is the serialized request body's length in UTF-8 bytes divided by 4, rounded up. Base64 images make the estimate high, which v1 accepts."
+    ],
+    "request": [
+      "affinity is written only when the engine's last response advertised the affinity feature (features.v1.json). Otherwise the request body is exactly the first-release body.",
+      "affinity sorts before mode. Its members, each only when set, are context_tokens, cost_aware, and key, in that order. key is a JSON string escaped like every other string (HTML-safe)."
+    ],
+    "response": [
+      "A response affinity object gives status, previous_column_id, reason, cache_warm, and cost_aware. A member that is missing, null, or of another type reads as unset (status as the empty string).",
+      "A status the client does not know is kept as it is. An affinity member that is not an object reads as no affinity, and the rest of the response still decodes."
+    ]
+  },
+  "header_cases": [
+    {
+      "id": "plain",
+      "value": "conv_8f2a41",
+      "valid": true
+    },
+    {
+      "id": "single_space",
+      "value": " ",
+      "valid": true
+    },
+    {
+      "id": "tilde",
+      "value": "~",
+      "valid": true
+    },
+    {
+      "id": "max_length",
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "valid": true
+    },
+    {
+      "id": "empty",
+      "value": "",
+      "valid": false
+    },
+    {
+      "id": "too_long",
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "valid": false
+    },
+    {
+      "id": "tab",
+      "value": "a\tb",
+      "valid": false
+    },
+    {
+      "id": "delete",
+      "value": "",
+      "valid": false
+    },
+    {
+      "id": "non_ascii",
+      "value": "café",
+      "valid": false
+    }
+  ],
+  "context_token_cases": [
+    {
+      "id": "empty",
+      "body": "",
+      "context_tokens": 0
+    },
+    {
+      "id": "four_ascii_bytes",
+      "body": "abcd",
+      "context_tokens": 1
+    },
+    {
+      "id": "five_ascii_bytes",
+      "body": "abcde",
+      "context_tokens": 2
+    },
+    {
+      "id": "two_byte_utf8",
+      "body": "é",
+      "context_tokens": 1
+    },
+    {
+      "id": "three_three_byte_utf8",
+      "body": "日本語",
+      "context_tokens": 3
+    },
+    {
+      "id": "chat_body",
+      "body": "{\"model\":\"maverick/auto\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}",
+      "context_tokens": 18
+    },
+    {
+      "id": "base64_image",
+      "body": "{\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"image_url\",\"image_url\":{\"url\":\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==\"}}]}]}",
+      "context_tokens": 51
+    }
+  ],
+  "request_cases": [
+    {
+      "id": "not_advertised",
+      "advertised": [],
+      "affinity": {
+        "key": "conv_8f2a41",
+        "context_tokens": 120000
+      },
+      "body": "{\"mode\":\"quality\",\"workload\":{\"capability\":\"multi_step_reasoning\",\"difficulty\":3}}"
+    },
+    {
+      "id": "other_feature_only",
+      "advertised": [
+        "something_else"
+      ],
+      "affinity": {
+        "key": "conv_8f2a41"
+      },
+      "body": "{\"mode\":\"quality\",\"workload\":{\"capability\":\"multi_step_reasoning\",\"difficulty\":3}}"
+    },
+    {
+      "id": "advertised_all_members",
+      "advertised": [
+        "affinity"
+      ],
+      "affinity": {
+        "key": "conv_8f2a41",
+        "context_tokens": 120000,
+        "cost_aware": true
+      },
+      "body": "{\"affinity\":{\"context_tokens\":120000,\"cost_aware\":true,\"key\":\"conv_8f2a41\"},\"mode\":\"quality\",\"workload\":{\"capability\":\"multi_step_reasoning\",\"difficulty\":3}}"
+    },
+    {
+      "id": "advertised_key_only",
+      "advertised": [
+        "affinity"
+      ],
+      "affinity": {
+        "key": "k"
+      },
+      "body": "{\"affinity\":{\"key\":\"k\"},\"mode\":\"quality\",\"workload\":{\"capability\":\"multi_step_reasoning\",\"difficulty\":3}}"
+    },
+    {
+      "id": "advertised_cost_aware_false",
+      "advertised": [
+        "affinity",
+        "zzz"
+      ],
+      "affinity": {
+        "key": "k",
+        "context_tokens": 0,
+        "cost_aware": false
+      },
+      "body": "{\"affinity\":{\"context_tokens\":0,\"cost_aware\":false,\"key\":\"k\"},\"mode\":\"quality\",\"workload\":{\"capability\":\"multi_step_reasoning\",\"difficulty\":3}}"
+    },
+    {
+      "id": "advertised_key_escaped",
+      "advertised": [
+        "affinity"
+      ],
+      "affinity": {
+        "key": "a<b&\"c"
+      },
+      "body": "{\"affinity\":{\"key\":\"a\\u003cb\\u0026\\\"c\"},\"mode\":\"quality\",\"workload\":{\"capability\":\"multi_step_reasoning\",\"difficulty\":3}}"
+    },
+    {
+      "id": "advertised_no_conversation",
+      "advertised": [
+        "affinity"
+      ],
+      "affinity": null,
+      "body": "{\"mode\":\"quality\",\"workload\":{\"capability\":\"multi_step_reasoning\",\"difficulty\":3}}"
+    }
+  ],
+  "response_cases": [
+    {
+      "id": "kept",
+      "response": {
+        "recommendation_id": "rec_1",
+        "recommendations": [],
+        "affinity": {
+          "status": "kept",
+          "previous_column_id": "col_a",
+          "reason": null,
+          "cache_warm": true,
+          "cost_aware": true
+        }
+      },
+      "affinity": {
+        "status": "kept",
+        "previous_column_id": "col_a",
+        "reason": null,
+        "cache_warm": true,
+        "cost_aware": true
+      }
+    },
+    {
+      "id": "new",
+      "response": {
+        "recommendation_id": "rec_1",
+        "recommendations": [],
+        "affinity": {
+          "status": "new",
+          "previous_column_id": null,
+          "reason": null,
+          "cache_warm": false,
+          "cost_aware": false
+        }
+      },
+      "affinity": {
+        "status": "new",
+        "previous_column_id": null,
+        "reason": null,
+        "cache_warm": false,
+        "cost_aware": false
+      }
+    },
+    {
+      "id": "switched_with_reason",
+      "response": {
+        "recommendation_id": "rec_1",
+        "recommendations": [],
+        "affinity": {
+          "status": "switched",
+          "previous_column_id": "col_a",
+          "reason": "best_model",
+          "cache_warm": false,
+          "cost_aware": false
+        }
+      },
+      "affinity": {
+        "status": "switched",
+        "previous_column_id": "col_a",
+        "reason": "best_model",
+        "cache_warm": false,
+        "cost_aware": false
+      }
+    },
+    {
+      "id": "unknown_status_kept",
+      "response": {
+        "recommendation_id": "rec_1",
+        "recommendations": [],
+        "affinity": {
+          "status": "pinned_later"
+        }
+      },
+      "affinity": {
+        "status": "pinned_later",
+        "previous_column_id": null,
+        "reason": null,
+        "cache_warm": null,
+        "cost_aware": null
+      }
+    },
+    {
+      "id": "absent",
+      "response": {
+        "recommendation_id": "rec_1",
+        "recommendations": []
+      },
+      "affinity": null
+    },
+    {
+      "id": "null",
+      "response": {
+        "recommendation_id": "rec_1",
+        "recommendations": [],
+        "affinity": null
+      },
+      "affinity": null
+    },
+    {
+      "id": "not_an_object",
+      "response": {
+        "recommendation_id": "rec_1",
+        "recommendations": [],
+        "affinity": "kept"
+      },
+      "affinity": null
+    },
+    {
+      "id": "members_of_other_types",
+      "response": {
+        "recommendation_id": "rec_1",
+        "recommendations": [],
+        "affinity": {
+          "status": 5,
+          "previous_column_id": 7,
+          "reason": [],
+          "cache_warm": "yes",
+          "cost_aware": 1
+        }
+      },
+      "affinity": {
+        "status": "",
+        "previous_column_id": null,
+        "reason": null,
+        "cache_warm": null,
+        "cost_aware": null
+      }
+    }
+  ]
+}

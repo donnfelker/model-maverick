@@ -5,6 +5,7 @@
 //! share; the proxy links it directly. It never executes inference on its own
 //! credentials. Packages 2a and 2d fill this in, one module at a time.
 
+pub mod affinity;
 pub mod alias;
 pub mod chain;
 pub mod failopen;

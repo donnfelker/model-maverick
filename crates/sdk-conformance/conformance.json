@@ -278,6 +278,12 @@
   ],
   "vectors": [
     {
+      "file": "vectors/affinity.v1.json",
+      "sha256": "7e729d237661ccd8bc2ba12ed61aeb56f188cdf1d8aed2a29e5952e7be6280f5",
+      "vector_set": "affinity",
+      "version": "v1"
+    },
+    {
       "file": "vectors/alias.v2.json",
       "sha256": "7e2d0940df8dfd794976748d04e12e69f11beba66a4a05def9469c27c8e56571",
       "vector_set": "alias",
@@ -314,5 +320,5 @@
       "version": "v1"
     }
   ],
-  "version": "3"
+  "version": "4"
 }

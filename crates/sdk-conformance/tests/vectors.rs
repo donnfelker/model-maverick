@@ -9,16 +9,20 @@
 //! DIVERGENCE: D50. `features.v1.json` (spec §14.5) is replayed here: the
 //! `X-Maverick-API-Features` parse, the send gate, and the remembered list against a scripted
 //! engine.
+//!
+//! DIVERGENCE: D44. `affinity.v1.json` (spec §8.1, §9.2) is replayed here: the conversation
+//! id check, the token estimate, the gated request body, and the response decoding.
 
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
+use maverick_core::affinity::{AffinityRequest, context_tokens, is_conversation_id};
 use maverick_core::alias::{AliasError, Mode, ParsedModel, parse_alias};
 use maverick_core::chain::{AttemptRecord, ErrorClass};
 use maverick_core::recommend::RetentionMode as WireRetention;
 use maverick_core::recommend::{
     EngineFailure, EngineFeatures, RecommendClient, RecommendClientConfig, RecommendError,
-    RecommendRequest, TenantKey, Workload,
+    RecommendRequest, Recommendation, TenantKey, Workload,
 };
 use maverick_core::telemetry::{UsageShape, parse_usage};
 use maverick_domain::policy::RetentionMode;
@@ -326,6 +330,7 @@ async fn features_sequence_vectors() {
         mode: Mode::Quality,
         pool: None,
         workload: Workload::declared_fallback(),
+        affinity: None,
     };
     let key = TenantKey::new("mk_test_conformance");
     for case in cases {
@@ -369,5 +374,90 @@ async fn features_sequence_vectors() {
                 _ => assert!(outcome.is_err(), "{at}: {outcome:?}"),
             }
         }
+    }
+}
+
+#[test]
+fn affinity_header_vectors() {
+    let doc = vectors("affinity.v1.json");
+    assert_eq!(doc["version"], "v1");
+    let cases = cases(&doc, "header_cases");
+    assert_eq!(cases.len(), 9);
+    for case in cases {
+        let id = case["id"].as_str().unwrap();
+        let value = case["value"].as_str().unwrap();
+        assert_eq!(
+            is_conversation_id(value.as_bytes()),
+            case["valid"].as_bool().unwrap(),
+            "{id}"
+        );
+    }
+}
+
+#[test]
+fn affinity_context_token_vectors() {
+    let doc = vectors("affinity.v1.json");
+    let cases = cases(&doc, "context_token_cases");
+    assert_eq!(cases.len(), 7);
+    for case in cases {
+        let id = case["id"].as_str().unwrap();
+        let body = case["body"].as_str().unwrap();
+        assert_eq!(
+            context_tokens(body.len()),
+            case["context_tokens"].as_u64().unwrap(),
+            "{id}"
+        );
+    }
+}
+
+#[test]
+fn affinity_request_vectors() {
+    let doc = vectors("affinity.v1.json");
+    let cases = cases(&doc, "request_cases");
+    assert_eq!(cases.len(), 7);
+    for case in cases {
+        let id = case["id"].as_str().unwrap();
+        let features = EngineFeatures::parse(Some(&names(&case["advertised"]).join(",")));
+        let affinity = case["affinity"]
+            .as_object()
+            .map(|affinity| AffinityRequest {
+                key: affinity["key"].as_str().unwrap().to_owned(),
+                context_tokens: affinity.get("context_tokens").and_then(Value::as_u64),
+                cost_aware: affinity.get("cost_aware").and_then(Value::as_bool),
+            });
+        let request = RecommendRequest {
+            mode: Mode::Quality,
+            pool: None,
+            workload: Workload::declared_fallback(),
+            affinity,
+        };
+        assert_eq!(
+            request.to_body_for(&features),
+            case["body"].as_str().unwrap(),
+            "{id}"
+        );
+    }
+}
+
+#[test]
+fn affinity_response_vectors() {
+    let doc = vectors("affinity.v1.json");
+    let cases = cases(&doc, "response_cases");
+    assert_eq!(cases.len(), 8);
+    for case in cases {
+        let id = case["id"].as_str().unwrap();
+        let decoded = Recommendation::decode(case["response"].to_string().as_bytes())
+            .unwrap_or_else(|error| panic!("{id}: {error}"));
+        assert_eq!(decoded.recommendation_id, "rec_1", "{id}");
+        let got = decoded.affinity.map_or(Value::Null, |affinity| {
+            json!({
+                "status": affinity.status,
+                "previous_column_id": affinity.previous_column_id,
+                "reason": affinity.reason,
+                "cache_warm": affinity.cache_warm,
+                "cost_aware": affinity.cost_aware,
+            })
+        });
+        assert_eq!(got, case["affinity"], "{id}");
     }
 }

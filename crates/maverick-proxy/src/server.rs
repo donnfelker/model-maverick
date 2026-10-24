@@ -17,7 +17,8 @@
 //! 2. Decode `{model: string}` with Go's rules: `400 invalid_request` on error.
 //! 3. Parse the model: `400 invalid_model_alias` on a malformed route or empty model.
 //!    A direct model calls its provider without entering steps 4 to 6 (D45).
-//! 4. Choose the workload (D5): a malformed `X-Maverick-Workload` is `400 invalid_request`.
+//! 4. Choose the workload (D5): a malformed `X-Maverick-Workload` is `400 invalid_request`,
+//!    and so is a malformed `X-Maverick-Conversation` (D44).
 //! 5. Recommend. Terminal privacy errors are relayed as `422`/`409` with their code and
 //!    purge the tenant key's last good lists (D17, D46). Hosted mode maps an engine 401 to
 //!    `401 unauthorized` and relays a 403 with its code (D13). An engine failure (a
@@ -48,6 +49,10 @@ use http_body_util::{BodyExt, LengthLimitError, Limited};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use hyper_util::server::graceful::GracefulShutdown;
 use hyper_util::service::TowerToHyperService;
+use maverick_core::affinity::{
+    AFFINITY_HEADER, AffinityRequest, CONVERSATION_HEADER, INVALID_CONVERSATION_MESSAGE,
+    is_conversation_id,
+};
 use maverick_core::alias::{Alias, Mode, ParsedModel, parse_alias};
 use maverick_core::failopen::{FailOpen, FailOpenConfig, Fallback};
 use maverick_core::gojson::{apply_string, type_error};
@@ -294,11 +299,27 @@ impl Proxy {
                 envelope::INVALID_WORKLOAD_HEADER_MESSAGE,
             );
         };
+        // D44: the conversation, for affinity. The core sends it only to an engine that
+        // advertised `affinity` (D50).
+        let conversation = match parts.headers.get(CONVERSATION_HEADER) {
+            None => None,
+            Some(value) if is_conversation_id(value.as_bytes()) => {
+                Some(String::from_utf8_lossy(value.as_bytes()).into_owned())
+            }
+            Some(_) => {
+                return envelope::error(
+                    StatusCode::BAD_REQUEST,
+                    envelope::INVALID_REQUEST,
+                    INVALID_CONVERSATION_MESSAGE,
+                );
+            }
+        };
 
         // 5. Recommend.
         let tenant = self.ladder_tenant(&tenant_key);
         let route = route_key(&alias);
-        let request = RecommendRequest::for_alias(&alias, workload);
+        let mut request = RecommendRequest::for_alias(&alias, workload);
+        request.affinity = conversation.map(|key| AffinityRequest::for_turn(key, body.len()));
         // D31: the caller's W3C trace context continues into the engine. Providers get it
         // too: tracing headers are among the inbound headers Go forwards upstream.
         let trace = TraceHeaders {
@@ -411,8 +432,17 @@ impl Proxy {
             }
         };
 
+        // D44: the engine's affinity status, only when the engine answered this request (a
+        // last good list's status is from an earlier turn).
+        let affinity = recommendation
+            .affinity
+            .as_ref()
+            .filter(|_| fallback.is_none())
+            .and_then(|affinity| HeaderValue::from_str(&affinity.status).ok())
+            .filter(|status| !status.is_empty());
+
         // 6. Chain walk, with the caller's credential and the upstream base headers (D12, D30).
-        let response = self
+        let mut response = self
             .chain
             .run(ChainRequest {
                 surface,
@@ -429,6 +459,11 @@ impl Proxy {
                 received_at,
             })
             .await;
+        if let Some(status) = affinity {
+            response
+                .headers_mut()
+                .insert(HeaderName::from_static(AFFINITY_HEADER), status);
+        }
         match fallback {
             Some(step) => with_fallback(response, step),
             None => response,
