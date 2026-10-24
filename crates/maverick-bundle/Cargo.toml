@@ -12,6 +12,11 @@ repository.workspace = true
 [lints]
 workspace = true
 
+[features]
+# Fixed test key pairs (`trust::test_keys`) for bundle tests in other crates. Enable it only
+# as a dev-dependency feature: a release build never trusts a test key.
+test-keys = []
+
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -40,8 +40,11 @@ It ignores unknown kids, then verifies all four hashes, the format, the schema
 range, and the typed payloads. It rejects unexpected paths, duplicate entries,
 links, metadata entries, and nonzero trailing data. Replica import must call
 `maverick_bundle::verify`; `inspect` checks hashes but does not authenticate an
-archive. The signing-key custody work supplies the compiled public trust set.
-Environment settings never add a reader trust key.
+archive. Replicas pass `maverick_bundle::trust::release_keys()`, the public keys
+compiled into the release (`TRUSTED_KEYS` in `crates/maverick-bundle/src/trust.rs`).
+Environment settings never add a reader trust key. Key custody, rotation, and
+compromise are in `docs/operations.md`, "Bundle signing keys". Tests use the fixed
+`trust::test_keys` (the `test-keys` feature), which no release trusts.
 
 An archive is named `mmbundle1-YYYYMMDDTHHMMSS.nnnnnnnnnZ.tar`. Its time is the
 rebuild completion time, in UTC. Publication uses an atomic hard link and never

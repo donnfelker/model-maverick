@@ -34,6 +34,14 @@ logs/
 .env.local
 .env.*.local
 
+# Private keys (bundle signing keys live in deploy secrets, never here; D49)
+*.key
+*.p8
+*.pk8
+*.seed
+*signing*.pem
+*private*.pem
+
 # Coverage
 coverage/
 *.lcov

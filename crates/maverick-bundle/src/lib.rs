@@ -83,6 +83,7 @@ pub struct Calibration {
 
 mod archive;
 mod publish;
+pub mod trust;
 
 pub use archive::{BundleError, SigningKeys, VerifiedBundle, build, inspect, sha256, verify};
 pub use publish::{IndexEntry, filename, publish};

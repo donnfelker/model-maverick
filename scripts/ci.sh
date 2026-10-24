@@ -107,10 +107,36 @@ check_label() {
     echo "Label check passed."
 }
 
+check_private_keys() {
+    # Bundle signing keys never enter the repository (D49, bead xq7v.5): no tracked file is
+    # a private-key file by name, and no tracked text holds a PEM private key. Public keys
+    # live in crates/maverick-bundle/src/trust.rs as hex. The PEM pattern ends in a
+    # character class, so this script never matches itself.
+    local named status=0
+    named="$(git ls-files -- '*.key' '*.p8' '*.pk8' '*.seed' '*signing*.pem' '*private*.pem')"
+    if [[ -n "$named" ]]; then
+        printf '%s\n' "$named"
+        echo "Private key files are tracked; remove them and rotate those keys."
+        return 1
+    fi
+    if git grep -n -I -e 'BEGIN [A-Z ]*PRIVATE KE[Y]' -- .; then
+        echo "A private key is tracked; remove it and rotate that key."
+        return 1
+    else
+        status=$?
+    fi
+    if [[ "$status" -ne 1 ]]; then
+        echo "Private key check failed: git grep exited $status." >&2
+        return "$status"
+    fi
+    echo "Private key check passed."
+}
+
 run_boundary() {
     run_logged fast engine-boundary-tests bash scripts/tests/ci-checks.sh
     run_logged fast engine-boundary check_engine_boundary
     run_logged fast label check_label
+    run_logged fast private-keys check_private_keys
 }
 
 run_fast() {
@@ -243,6 +269,7 @@ case "$TIER" in
         # This tier checks the repository only; it needs neither Cargo nor Postgres.
         run_logged fast engine-boundary check_engine_boundary
         run_logged fast label check_label
+        run_logged fast private-keys check_private_keys
         ;;
     db)
         run_db

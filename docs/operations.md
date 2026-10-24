@@ -76,6 +76,67 @@ replaces suspension: to cut off one app, revoke its key; to stop all traffic, st
 Pools, constraints, weights, and zero retention are set through `PUT /v1/config/...`
 with one of the tenant's keys, as on the hosted deployment.
 
+## Bundle signing keys (D49)
+
+The origin signs every matrix bundle with Ed25519 (`docs/matrix-bundles.md`). A replica
+trusts only the public keys compiled into its release: `TRUSTED_KEYS` in
+`crates/maverick-bundle/src/trust.rs`, one row per key with its kid, its raw public key
+as hex, the release that added it, the day it stops signing, and its status. No setting
+adds a trusted key. The table holds one `Current` key, one `Standby` key, and every
+`Retiring` key that signed a bundle in the last 12 months.
+
+**Custody.**
+
+- The current private key lives only in the origin's deploy secrets. `serve` reads it at
+  run time from the file that `MAVERICK_MATRIX_SIGNING_KEYS` names (`kid:path` pairs,
+  PKCS#8 PEM).
+- The standby private key stays offline, on no host and in no deploy secret.
+- No private key enters this repository. `.gitignore` covers the usual key file names,
+  and the `boundary` tier (`check_private_keys` in `scripts/ci.sh`) fails when a tracked
+  file is a key file by name or holds a PEM private key.
+- The owner makes the key pairs and keeps both private halves. Agents add only the public
+  keys the owner provides (bead model-maverick-tgm2). Until then the table is empty, a
+  replica imports no bundle, and `scripts/release-artifacts.sh` refuses to build a release.
+
+**Making a key pair.** Run this outside the checkout:
+
+```sh
+openssl genpkey -algorithm ed25519 -out mm-2026-10.pem
+chmod 600 mm-2026-10.pem
+# The raw public key as 64 hex digits, for the trust table:
+openssl pkey -in mm-2026-10.pem -pubout -outform DER | tail -c 32 | od -An -tx1 | tr -d ' \n'
+```
+
+The kid is the file name in `signatures/` (1 to 64 letters, digits, `_`, or `-`), for
+example `mm-2026-10`. A kid that starts with `test-` belongs to the test keys, and a
+release table refuses it.
+
+**Rotation.**
+
+1. Make a new key pair. A release adds the new public key as `Current` and marks the old
+   one `Retiring`.
+2. Once that release is out, set `MAVERICK_MATRIX_SIGNING_KEYS` to both keys. The origin
+   signs every bundle with both, so releases that know either key keep importing.
+3. When every release inside the 12-month window carries the new key, drop the old key
+   from the setting and record its last signing day in `signs_until`.
+4. A later release removes the old row, once no bundle in the window carries only its
+   signature.
+
+**Compromise.** If the current private key leaks:
+
+1. Sign with the standby key at once. Put the standby private key in the deploy secret
+   and remove the leaked key from `MAVERICK_MATRIX_SIGNING_KEYS`. Every release carries
+   the standby key, so replicas keep importing without an upgrade.
+2. The next release drops the leaked key, makes the standby key `Current`, and adds a new
+   `Standby` key.
+3. Publish a security notice. A replica that has not upgraded still trusts the leaked
+   key, which is the cost of offline verification, and the notice says so.
+
+**Release check.** `scripts/release-artifacts.sh` runs the trust table test with
+`MAVERICK_RELEASE_BUILD=1`, which requires exactly one `Current` and one `Standby` key
+and no test key. A fork that runs its own origin changes the table in source and builds
+its own release.
+
 ## Configuration compatibility (D50)
 
 A new release must start with an older environment file. Three rules make sure it does:

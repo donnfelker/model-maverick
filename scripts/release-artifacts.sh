@@ -77,6 +77,13 @@ else
     fi
     RELEASE_COMMIT=$(git rev-parse HEAD)
 fi
+
+# A release trusts exactly one current and one standby bundle signing key, and no test key
+# (D49, bead xq7v.5; crates/maverick-bundle/src/trust.rs; docs/operations.md "Bundle
+# signing keys"). Until the owner's public keys are in the table, no release builds.
+log "checking the bundle trust table"
+MAVERICK_RELEASE_BUILD=1 cargo test -p maverick-bundle --lib --locked -q -- trust::
+
 # One fixed time for every archive member, so the same inputs give the same bytes.
 EPOCH=$(date -u -d "$RELEASE_DATE" +%s)
 

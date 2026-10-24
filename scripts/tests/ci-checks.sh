@@ -42,6 +42,21 @@ expect() {
 repo="$(new_repo clean)"
 expect "clean engine passes" 0 "$repo"
 
+repo="$(new_repo private-key-pem)"
+# The header is split in this source, so the check never matches this file itself.
+plant "$repo" deploy/origin.txt "$(printf '%s\n%s\n%s' '-----BEGIN PRIV''ATE KEY-----' \
+    'placeholder-not-a-key' '-----END PRIV''ATE KEY-----')"
+expect "a tracked PEM private key is rejected" 1 "$repo"
+
+repo="$(new_repo private-key-name)"
+plant "$repo" config/matrix-signing.key 'not a real key'
+expect "a tracked private-key file name is rejected" 1 "$repo"
+
+repo="$(new_repo public-key)"
+plant "$repo" docs/key.txt "$(printf '%s\n%s\n%s' '-----BEGIN PUBLIC KEY-----' \
+    'placeholder-not-a-key' '-----END PUBLIC KEY-----')"
+expect "a tracked public key is allowed" 0 "$repo"
+
 repo="$(new_repo source)"
 plant "$repo" crates/core/src/lib.rs '// StRiPe webhook'
 expect "source match is rejected regardless of case" 1 "$repo"
