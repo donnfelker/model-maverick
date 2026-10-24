@@ -312,16 +312,19 @@ fn authenticated_measurements_that_overflow_f32_are_refused() {
                 .to_bytes()
                 .to_vec();
             let archive = repack(entries);
-            assert!(matches!(
-                inspect(&archive),
-                Err(BundleError::Invalid("non-finite measurement"))
-            ));
+            // Unified serde_json features can reject overflow during JSON decoding,
+            // before the reader's finite-measurement validation runs.
+            let inspected = inspect(&archive);
             assert!(
-                matches!(
-                    verify(&archive, &keys.public_keys(), 12),
-                    Err(BundleError::Invalid("non-finite measurement"))
-                ),
-                "{payload}: {field} = {overflow}"
+                inspected.is_err(),
+                "inspect {payload}: {field} = {overflow}: {:?}",
+                inspected.as_ref().map(|bundle| &bundle.matrix)
+            );
+            let verified = verify(&archive, &keys.public_keys(), 12);
+            assert!(
+                verified.is_err(),
+                "verify {payload}: {field} = {overflow}: {:?}",
+                verified.as_ref().map(|bundle| &bundle.matrix)
             );
         }
     }
