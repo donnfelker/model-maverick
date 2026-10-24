@@ -250,6 +250,8 @@ The `recommend_model` tool schema gains the same optional `affinity` object, mir
 
 Each has a recommendation. The beads assume the recommendation unless the owner says otherwise.
 
+Decided 2026-10-24 by the owner: accept the recommendation for 1, 2, 3, 4, 6, and 7 (bead gcd2.1). Item 5 was decided earlier, as recorded below.
+
 1. **Defaults.** Incumbent bonus 1.5 quality points and a warm window of 300 seconds. Recommendation: accept, and retune from M6 data.
 2. **Derived key.** Should the proxy derive a key when no header is sent, for example from a per-tenant hash of the system prompt plus the first user message? It makes affinity work with no caller change. Identical openings in unrelated conversations would share a row, which is harmless (same pick). Recommendation: not now. Add it later as an opt-in proxy setting.
 3. **Token estimate.** `ceil(body bytes / 4)` overcounts base64 images. Recommendation: accept for v1. A later version can exclude binary content the way the projection does.
