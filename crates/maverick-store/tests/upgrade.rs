@@ -129,9 +129,22 @@ async fn one_upgrade_holds_the_lock_at_a_time() {
         .await
         .expect("unlock");
     assert!(upgrade::try_upgrade_lock(&mut second).await.expect("lock"));
-    // Closing the holder's connection releases the lock too.
+    // Closing the holder's connection releases the lock too. The server frees a session
+    // lock when the backend exits, a moment after `close` returns, so wait for that
+    // (bead xq7v.20; it failed on CI when the retry came first).
     second.close().await.expect("close");
-    assert!(upgrade::try_upgrade_lock(&mut first).await.expect("lock"));
+    let mut taken = false;
+    for _ in 0..100 {
+        if upgrade::try_upgrade_lock(&mut first).await.expect("lock") {
+            taken = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    assert!(
+        taken,
+        "closing the holder's connection never released the lock"
+    );
     first.close().await.expect("close");
     db.close().await;
 }
