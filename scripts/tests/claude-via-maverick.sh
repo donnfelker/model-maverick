@@ -35,6 +35,7 @@ hosted="$(
 )"
 
 contains "$hosted" "mode=hosted"
+contains "$hosted" "model=maverick/auto fast_model=maverick/auto:cost"
 contains "$hosted" "proxy_url=http://proxy.test"
 contains "$hosted" "tenant_header=present"
 contains "$hosted" "anthropic_provider_key=present"
@@ -53,6 +54,7 @@ self_hosted="$(
 )"
 
 contains "$self_hosted" "mode=self-hosted"
+contains "$self_hosted" "model=maverick/auto fast_model=maverick/auto:cost"
 contains "$self_hosted" "tenant_header=not-used"
 contains "$self_hosted" "anthropic_provider_key=absent"
 contains "$self_hosted" "command=claude <0 arg(s)>"

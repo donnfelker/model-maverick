@@ -18,6 +18,7 @@ use maverick_core::recommend::{Recommendation, TenantKey};
 use maverick_core::settings::SettingsMode;
 
 use crate::credentials::{CallerCredential, EnvKeys};
+use crate::direct::DirectRequest;
 use crate::envelope;
 
 /// A boxed, sendable future.
@@ -103,6 +104,11 @@ impl fmt::Debug for ChainRequest {
 pub trait ChainRunner: Send + Sync + 'static {
     /// Run the chain for one request.
     fn run(&self, request: ChainRequest) -> BoxFuture<'_, Response>;
+
+    /// Call an explicit model without recommending, normalizing, or reporting (D45).
+    fn run_direct(&self, request: DirectRequest) -> BoxFuture<'_, Response> {
+        Box::pin(async move { exhausted(request.surface, "") })
+    }
 }
 
 /// A runner that attempts nothing: every chain is treated as exhausted.

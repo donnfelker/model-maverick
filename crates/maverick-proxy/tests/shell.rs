@@ -436,6 +436,16 @@ async fn scenario_rows() {
         let response = exchange(&proxy.addr, &request).await;
 
         let mut expected = scenario["expected"]["response"].clone();
+        // D45 accepts this explicit model. This shell-only runner has no executor.
+        if id == "x_messages_concrete_model_400" {
+            let body = envelope_body(
+                "no_executable_candidates",
+                maverick_proxy::envelope::NO_EXECUTABLE_CANDIDATES_MESSAGES,
+            );
+            expected["status"] = 502.into();
+            expected["headers"]["Content-Length"] = serde_json::json!([body.len().to_string()]);
+            expected["body"] = body.into();
+        }
         // D45 replaces the grammar message while preserving the status and code.
         if expected["body"]
             .as_str()
@@ -537,12 +547,12 @@ async fn body_cap_rejects_declared_and_chunked_bodies() {
     let response = exchange(&proxy.addr, &request).await;
     assert_response("chunked over the cap", &response, 413, &too_large);
 
-    // Exactly the cap passes the cap (and then fails the alias check).
+    // D45: exactly the cap reaches the direct runner, which this shell mock omits.
     let exact = format!("{{\"model\":\"gpt-4o\"{}}}", " ".repeat(64 - 18));
     assert_eq!(exact.len(), 64);
     let response = post(&proxy.addr, "/v1/chat/completions", &[], &exact).await;
-    assert_eq!(response.status(), 400, "{}", response.body_text());
-    assert!(response.body_text().contains("invalid_model_alias"));
+    assert_eq!(response.status(), 502, "{}", response.body_text());
+    assert!(response.body_text().contains("no_executable_candidates"));
 
     assert!(engine.requests().is_empty(), "the engine is never called");
     proxy.stop().await.expect("clean shutdown");

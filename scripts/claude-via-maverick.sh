@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Launch Claude Code through the Model Maverick proxy.
+# The default maverick/auto model requests ranking. Leaving Claude Code's own
+# default model (without this launcher) sends that model directly, with no ranking.
 #
 # Put local secrets in .env.maverick.local next to the repo root. That file is
 # gitignored. Example for hosted mode:
@@ -36,7 +38,7 @@ engine_url="${MAVERICK_ENGINE_URL:-${ENGINE_URL:-http://localhost:8080}}"
 grafana_url="${MAVERICK_GRAFANA_URL:-${GRAFANA_URL:-http://localhost:3001}}"
 otlp_endpoint="${MAVERICK_OTLP_ENDPOINT:-${OTLP_ENDPOINT:-http://127.0.0.1:4318}}"
 main_model="${MAVERICK_CLAUDE_MODEL:-${MAIN_MODEL:-maverick/auto}}"
-fast_model="${MAVERICK_CLAUDE_FAST_MODEL:-${FAST_MODEL:-maverick/cost}}"
+fast_model="${MAVERICK_CLAUDE_FAST_MODEL:-${FAST_MODEL:-maverick/auto:cost}}"
 metric_interval_ms="${MAVERICK_OTEL_METRIC_INTERVAL_MS:-${METRIC_INTERVAL_MS:-10000}}"
 
 log() {

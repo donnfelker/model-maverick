@@ -207,6 +207,14 @@ impl ExecutorRunner {
 }
 
 impl ChainRunner for ExecutorRunner {
+    fn run_direct(&self, request: crate::direct::DirectRequest) -> BoxFuture<'_, Response> {
+        Box::pin(crate::direct::execute(
+            &self.executor,
+            &self.upstreams,
+            request,
+        ))
+    }
+
     fn run(&self, request: ChainRequest) -> BoxFuture<'_, Response> {
         let surface = request.surface;
         let recommendation_id = request.recommendation.recommendation_id.clone();

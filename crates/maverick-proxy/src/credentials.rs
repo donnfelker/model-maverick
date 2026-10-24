@@ -19,7 +19,8 @@
 //!
 //! Start from every client header, then drop the headers the client's `Connection` header
 //! names, the hop-by-hop set, `Host`, `Content-Length`, `Authorization`, `X-Api-Key`, and
-//! (D30) `X-Maverick-API-Key`, and (D45) `X-Maverick-Settings`. Every other header
+//! (D30) `X-Maverick-API-Key`, (D45) `X-Maverick-Settings`, and (D44)
+//! `X-Maverick-Conversation`. Every other header
 //! keeps all its values in order.
 //! `Content-Type` defaults to `application/json`. Each attempt then sets its credential:
 //! chat `Authorization: Bearer <key>`; messages `X-Api-Key: <key>` and a default
@@ -64,13 +65,14 @@ pub(crate) fn is_hop_by_hop(name: &HeaderName) -> bool {
 }
 
 /// Headers never forwarded: framing, credentials, the tenant key (D30), and settings (D45).
-const NEVER_FORWARDED: [&str; 6] = [
+const NEVER_FORWARDED: [&str; 7] = [
     "host",
     "content-length",
     "authorization",
     "x-api-key",
     "x-maverick-api-key",
     "x-maverick-settings",
+    "x-maverick-conversation",
 ];
 
 /// Go `bearerToken`: `""` when the value is 7 bytes or shorter or does not start with

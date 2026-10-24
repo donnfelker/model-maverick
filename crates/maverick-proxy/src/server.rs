@@ -14,7 +14,8 @@
 //! 1. Read the body. Over the D38 cap (declared `Content-Length`, or bytes read): `413
 //!    payload_too_large`. Read error: `400 invalid_request`.
 //! 2. Decode `{model: string}` with Go's rules: `400 invalid_request` on error.
-//! 3. Parse the alias: `400 invalid_model_alias` on any error. The engine is not called.
+//! 3. Parse the model: `400 invalid_model_alias` on a malformed route or empty model.
+//!    A direct model calls its provider without entering steps 4 to 6 (D45).
 //! 4. Choose the workload (D5): a malformed `X-Maverick-Workload` is `400 invalid_request`.
 //! 5. Recommend. Terminal privacy errors are relayed as `422`/`409` with their code (D17).
 //!    Hosted mode maps an engine 401 to `401 unauthorized` and relays a 403 with its code
@@ -52,6 +53,7 @@ use tokio::net::TcpListener;
 use crate::chain::{ChainRequest, ChainRunner, Surface};
 use crate::config::{Config, DeploymentMode};
 use crate::credentials::{self, CallerCredential, EnvKeys};
+use crate::direct::DirectRequest;
 use crate::envelope;
 use crate::ratelimit::{self, RateLimiter};
 
@@ -186,8 +188,13 @@ impl Proxy {
             );
         };
 
-        // 3. Alias.
-        let Ok(ParsedModel::Route(alias)) = parse_alias(&model) else {
+        // 3. D45 model grammar. Missing or empty models remain invalid aliases.
+        let parsed = if model.is_empty() {
+            None
+        } else {
+            parse_alias(&model).ok()
+        };
+        let Some(parsed) = parsed else {
             return envelope::error(
                 StatusCode::BAD_REQUEST,
                 envelope::INVALID_MODEL_ALIAS,
@@ -198,16 +205,38 @@ impl Proxy {
         // D14, D45: settings are a request option, separate from the model grammar.
         let settings_mode = parts
             .headers
-            .get("x-maverick-settings")
-            .map(|value| value.to_str().map_err(|_| ()))
-            .transpose()
-            .and_then(|value| SettingsMode::from_header(value).map_err(|_| ()));
+            .get_all("x-maverick-settings")
+            .iter()
+            .try_fold(SettingsMode::Apply, |_, value| {
+                let value = value.to_str().map_err(|_| ())?;
+                SettingsMode::from_header(Some(value)).map_err(|_| ())
+            });
         let Ok(settings_mode) = settings_mode else {
             return envelope::error(
                 StatusCode::BAD_REQUEST,
                 envelope::INVALID_REQUEST,
                 "X-Maverick-Settings must be caller",
             );
+        };
+
+        let credential = CallerCredential::from_headers(surface, &parts.headers, self.config.mode);
+        let upstream_headers = credentials::upstream_base_headers(&parts.headers);
+        let alias = match parsed {
+            ParsedModel::Route(alias) => alias,
+            ParsedModel::Direct { .. } => {
+                return self
+                    .chain
+                    .run_direct(DirectRequest {
+                        surface,
+                        model,
+                        credential,
+                        upstream_headers,
+                        env_keys: EnvKeys::from_config(&self.config),
+                        body,
+                        raw_query: parts.uri.query().unwrap_or_default().to_owned(),
+                    })
+                    .await;
+            }
         };
 
         // 4. Workload (D5).
@@ -282,8 +311,6 @@ impl Proxy {
         };
 
         // 6. Chain walk, with the caller's credential and the upstream base headers (D12, D30).
-        let credential = CallerCredential::from_headers(surface, &parts.headers, self.config.mode);
-        let upstream_headers = credentials::upstream_base_headers(&parts.headers);
         self.chain
             .run(ChainRequest {
                 surface,

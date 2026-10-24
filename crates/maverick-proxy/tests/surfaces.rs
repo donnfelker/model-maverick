@@ -587,6 +587,23 @@ async fn replay(id: &str) -> Vec<ChainReport> {
 /// [`replay`], adding the D-rows a caller's own checks rely on (such as D26).
 async fn replay_noting(id: &str, extra: &[&'static str]) -> Vec<ChainReport> {
     let mut scenario = scenario(id);
+    // D45 accepts direct models. These two Go rejection fixtures have no credential,
+    // so direct preparation stops before any engine/provider call with the usual 502.
+    if matches!(
+        id,
+        "chat_concrete_model_rejected" | "x_messages_concrete_model_400"
+    ) {
+        let message = if id == "chat_concrete_model_rejected" {
+            maverick_proxy::envelope::NO_EXECUTABLE_CANDIDATES_CHAT
+        } else {
+            maverick_proxy::envelope::NO_EXECUTABLE_CANDIDATES_MESSAGES
+        };
+        let body = maverick_proxy::envelope::envelope_body("no_executable_candidates", message);
+        scenario["expected"]["response"]["status"] = 502.into();
+        scenario["expected"]["response"]["headers"]["Content-Length"] =
+            serde_json::json!([body.len().to_string()]);
+        scenario["expected"]["response"]["body"] = body.into();
+    }
     let alias_error = scenario["expected"]["response"]["body"]
         .as_str()
         .is_some_and(|body| body.contains("invalid_model_alias"));
@@ -601,7 +618,12 @@ async fn replay_noting(id: &str, extra: &[&'static str]) -> Vec<ChainReport> {
     }
     let expected = &scenario["expected"];
     let mut used: BTreeSet<&'static str> = extra.iter().copied().collect();
-    if alias_error {
+    if alias_error
+        || matches!(
+            id,
+            "chat_concrete_model_rejected" | "x_messages_concrete_model_400"
+        )
+    {
         used.insert("D45");
     }
     let (collector_url, collected) = otlp::collector().await;

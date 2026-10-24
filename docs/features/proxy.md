@@ -77,6 +77,10 @@ Claude Code uses the Anthropic Messages surface. The launcher is:
 ./scripts/claude-via-maverick.sh
 ```
 
+The launcher selects `maverick/auto` for the main model and `maverick/auto:cost`
+for the fast model. Leaving Claude Code's default bare model id sends that model
+directly to Anthropic, with no engine call or recommendation telemetry.
+
 For hosted mode, put this in `.env.maverick.local`:
 
 ```bash

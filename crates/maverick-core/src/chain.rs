@@ -185,6 +185,20 @@ impl ChainExecutor {
         self
     }
 
+    /// Send one explicit provider request, without retries or chain records (D45).
+    /// All HTTP statuses are returned unchanged. Only receiving the headers has a timeout.
+    pub async fn send_one(
+        &self,
+        request: reqwest::Request,
+    ) -> Result<reqwest::Response, ErrorClass> {
+        match tokio::time::timeout(self.header_timeout, self.http.execute(request)).await {
+            Err(_) => Err(ErrorClass::Timeout),
+            Ok(Err(error)) if error.is_timeout() => Err(ErrorClass::Timeout),
+            Ok(Err(_)) => Err(ErrorClass::ConnectError),
+            Ok(Ok(response)) => Ok(response),
+        }
+    }
+
     /// Walk `chain`. `prepare` returns `None` to skip an entry. `deadline` bounds D26 waits.
     /// `cancelled` resolves when the caller has gone away.
     pub async fn execute<P, C>(
@@ -237,14 +251,7 @@ impl ChainExecutor {
                         is_cancelled = true;
                         Err(ErrorClass::ConnectError)
                     }
-                    sent = tokio::time::timeout(self.header_timeout, self.http.execute(prepared.request)) => {
-                        match sent {
-                            Err(_) => Err(ErrorClass::Timeout),
-                            Ok(Err(error)) if error.is_timeout() => Err(ErrorClass::Timeout),
-                            Ok(Err(_)) => Err(ErrorClass::ConnectError),
-                            Ok(Ok(response)) => Ok(response),
-                        }
-                    }
+                    sent = self.send_one(prepared.request) => sent,
                 }
             };
             record.latency_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);

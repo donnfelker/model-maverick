@@ -24,10 +24,8 @@
 //!   proxy recognizes only in hosted mode. Hosted mode reads the tenant key from
 //!   `X-Maverick-API-Key`, which must start with `mk_live_`, but these scenarios expect the
 //!   tenant key `mk_test_conformance`. Core only.
-//! - S09a (`concrete_model_passes_through`): the SDK core sends a concrete model straight to
-//!   the provider without contacting MM. The proxy routes only `maverick/*` aliases and
-//!   answers `400 invalid_model_alias` for a concrete model, so this one scenario in group 9
-//!   is core only.
+//!
+//! D45 also runs S09a through the proxy: explicit models never contact the engine.
 //!
 //! The covered groups are 1, 2, 3, 4, 7, 8, and 9: declared and projected workloads, the
 //! advance rules (429 with Retry-After, timeouts, connection refused), settings and
@@ -60,10 +58,6 @@ const CALLER_KEY: &str = "sk-caller-openai";
 
 /// The groups this proxy runner serves. The rest are core only (see the module docs).
 const PROXY_GROUPS: [u64; 7] = [1, 2, 3, 4, 7, 8, 9];
-
-/// Scenarios inside a covered group that are still core only. S09a is a concrete-model
-/// passthrough, which the proxy answers with `400 invalid_model_alias` by design.
-const CORE_ONLY: [&str; 1] = ["S09a"];
 
 /// Run one scenario through the proxy. Returns the first assertion failure, if any.
 async fn run_scenario(loaded: &Loaded) -> Result<(), String> {
@@ -339,7 +333,7 @@ async fn proxy_conformance_scenarios() {
     let mut skipped = Vec::new();
 
     for loaded in &scenarios {
-        if !covered.contains(&loaded.group) || CORE_ONLY.contains(&loaded.id.as_str()) {
+        if !covered.contains(&loaded.group) {
             skipped.push((loaded.id.clone(), loaded.group));
             continue;
         }
