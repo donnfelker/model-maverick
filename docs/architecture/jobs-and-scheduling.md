@@ -4,7 +4,7 @@
 
 ## The job kinds
 
-There are eleven kinds (`JobKind`).
+Each kind is one `JobKind` variant, and each has a row here (`crates/maverick-jobs/tests/job_docs.rs` checks it).
 
 | Kind | Purpose |
 |---|---|
@@ -14,17 +14,28 @@ There are eleven kinds (`JobKind`).
 | `aggregate_rebuild` | Fold a batch's runs and scores into the cell aggregates. The choke point that chains the follow-ups. |
 | `regression_scan` | Detect quality regressions on folded cells, plus the parse-failure watch. |
 | `calibration_score` | Compare the locked predictions with the observed outcomes (Brier, overconfidence). |
+| `matrix_export` | On an origin that exports, write the signed public matrix bundle after each rebuild (D49). |
+| `matrix_pull` | On a replica with a pull URL, import the newest readable bundle each hour (D49). |
 | `latency_probes` | Hourly thin latency pings for secondary-endpoint columns. |
 | `price_sync` | Refresh each runnable column's pricing snapshot from the price source. |
-| `catalog_sync` | Lifecycle transitions, the pool-drift check, and retention-expiry alerts. |
+| `catalog_sync` | Lifecycle transitions, the pool-drift check, and retention-expiry alerts. On a replica, `matrix_stale` instead of the transitions. |
+| `model_discovery` | Daily comparison of each provider's text models with the catalog (D51). It never changes the catalog. |
 | `capture_expiry` | Hourly hard-delete of expired debug captures and windows. |
+| `affinity_prune` | Hourly delete of expired conversation affinity rows (D44). |
 | `history_prune` | Daily prune of aged history. Aggregates, calibration, and audit rows are never pruned. |
 
-The batch kinds (`nightly_smoke`, `weekly_sweep`) get three attempts and a batch timeout. The chained and hourly kinds (`aggregate_rebuild`, `regression_scan`, `calibration_score`, `latency_probes`) get an analytics timeout. The rest are fast, with five attempts and a 60 s timeout.
+The role decides which kinds a worker registers (D49). A replica registers no corpus kind
+(`prediction_lock`, the two batches, the three rebuild follow-ups, `model_discovery`), and
+never claims one that is already queued. `matrix_export` registers only on an origin with
+`MAVERICK_MATRIX_EXPORT_DIR`, `matrix_pull` only on a replica with
+`MAVERICK_MATRIX_PULL_URL`, and a replica's `price_sync` only with
+`MAVERICK_CRON_PRICE_SYNC`.
+
+The batch kinds (`nightly_smoke`, `weekly_sweep`) get three attempts and a batch timeout. The chained and hourly kinds (`aggregate_rebuild`, `regression_scan`, `calibration_score`, `matrix_export`, `matrix_pull`, `latency_probes`) get an analytics timeout. The rest are fast, with five attempts and a 60 s timeout.
 
 ## Cron
 
-Eight kinds are scheduled by cron. The defaults are defined identically in `maverick-config` and `maverick-jobs`.
+These kinds are scheduled by a configurable cron. The defaults are defined identically in `maverick-config` and `maverick-jobs`. `matrix_pull` also runs from cron, at the fixed `0 * * * *`, when its URL is set.
 
 | Variable | Default | Kind |
 |---|---|---|
@@ -34,10 +45,12 @@ Eight kinds are scheduled by cron. The defaults are defined identically in `mave
 | `MAVERICK_CRON_LATENCY_PROBES` | `0 * * * *` | latency probes, hourly |
 | `MAVERICK_CRON_PRICE_SYNC` | `0 6 * * *` | price sync, 06:00 |
 | `MAVERICK_CRON_CATALOG_SYNC` | `10 6 * * *` | catalog sync, 06:10 |
+| `MAVERICK_CRON_MODEL_DISCOVERY` | `20 6 * * *` | model discovery, 06:20 |
 | `MAVERICK_CRON_CAPTURE_EXPIRY` | `0 * * * *` | capture expiry, hourly |
+| `MAVERICK_CRON_AFFINITY_PRUNE` | `5 * * * *` | affinity prune, hourly at :05 |
 | `MAVERICK_CRON_HISTORY_PRUNE` | `0 5 * * *` | history prune, 05:00 |
 
-The chained kinds (`aggregate_rebuild`, `regression_scan`, `calibration_score`) have no cron. A preceding job enqueues them. Because `graphile_worker` keeps a crontab payload fixed, each scheduled kind gets a small trigger task that, on firing, reads the scheduled time and enqueues the real job for that window under the kind's job key.
+The chained kinds (`aggregate_rebuild`, `regression_scan`, `calibration_score`, `matrix_export`) have no cron. A preceding job enqueues them. Because `graphile_worker` keeps a crontab payload fixed, each scheduled kind gets a small trigger task that, on firing, reads the scheduled time and enqueues the real job for that window under the kind's job key.
 
 ## The batches lease
 

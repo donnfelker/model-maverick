@@ -16,9 +16,10 @@ and deployment.
 Set `MAVERICK_ROLE=origin` for the hosted deployment and `MAVERICK_ROLE=replica`
 for a customer install. There is no default. Startup refuses an unset or unknown role.
 
-An origin keeps the corpus and runs the benchmark and discovery jobs. A replica
-registers `catalog_sync`, `latency_probes`, `capture_expiry`, `affinity_prune`, and
-`history_prune`.
+An origin keeps the corpus and runs the benchmark and discovery jobs, and
+`matrix_export` when `MAVERICK_MATRIX_EXPORT_DIR` is set. A replica registers
+`catalog_sync`, `latency_probes`, `capture_expiry`, `affinity_prune`, and
+`history_prune`, and `matrix_pull` when `MAVERICK_MATRIX_PULL_URL` is set.
 Its `price_sync` is off unless `MAVERICK_CRON_PRICE_SYNC` has a schedule. Corpus
 commands refuse on a replica. Judge pool and corpus spend caps are unused there.
 
@@ -692,6 +693,8 @@ with `--api-only`, or run them alone with `--worker-only` (exactly one such proc
 | `aggregate_rebuild` | chained | | After each batch: recompute the cells, fold the EWMAs, append aggregates, update `measured`. |
 | `regression_scan` | chained | | After each rebuild: the spec §6.5 regressions and the parse-failure watch. |
 | `calibration_score` | chained | | After each rebuild: Brier score and overconfidence against the locked predictions. |
+| `matrix_export` | chained | `MAVERICK_MATRIX_EXPORT_DIR` | Origin only, when the export directory is set: after each rebuild, writes the signed matrix bundle and rewrites `index.json` (`docs/matrix-bundles.md`). |
+| `matrix_pull` | `0 * * * *` | `MAVERICK_MATRIX_PULL_URL` | Replica only, when the pull URL is set: imports the newest readable bundle from the public location or a mirror. The schedule is fixed. |
 | `price_sync` | `0 6 * * *` | `MAVERICK_CRON_PRICE_SYNC` | Refreshes the pricing snapshots (see Pricing). |
 | `catalog_sync` | `10 6 * * *` | `MAVERICK_CRON_CATALOG_SYNC` | The lifecycle transitions, the pool-drift check, and `retention_expiring`. |
 | `model_discovery` | `20 6 * * *` | `MAVERICK_CRON_MODEL_DISCOVERY` | Lists the text models of each provider with an operator key and raises `new_model_available` and `model_withdrawn` (see "New models"). It never changes the catalog. |
@@ -699,8 +702,11 @@ with `--api-only`, or run them alone with `--worker-only` (exactly one such proc
 | `affinity_prune` | `5 * * * *` | `MAVERICK_CRON_AFFINITY_PRUNE` | Deletes expired conversation affinity rows (D44). |
 | `history_prune` | `0 5 * * *` | `MAVERICK_CRON_HISTORY_PRUNE` | Enforces the history retention. |
 
+- **Roles (D49):** a replica registers only the jobs listed in "Deployment role". The
+  other kinds are never claimed there, even when one is already queued.
 - **Chaining:** `nightly_smoke` and `weekly_sweep` enqueue `aggregate_rebuild`, which
-  enqueues `regression_scan` and `calibration_score`. A partly failed batch still rebuilds
+  enqueues `regression_scan` and `calibration_score`, and `matrix_export` on an origin
+  that exports. A partly failed batch still rebuilds
   from what completed, and a completion below 90% raises `job_failure`. Keep
   `prediction_lock` before the nightly batch: both key the same UTC date.
 - **One execution per window (D10):** the engine owns the uniqueness, not the queue. Each
