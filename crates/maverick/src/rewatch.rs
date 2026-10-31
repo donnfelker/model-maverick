@@ -495,8 +495,9 @@ mod tests {
             resolver.connection().complete()
         })
         .await;
-        until("the resolved alert", || async {
-            degraded(&pool).await.len() == 2
+        // The watcher commits the row and then notifies, so wait for both (0rut).
+        until("the resolved alert and its notification", || async {
+            degraded(&pool).await.len() == 2 && counter.0.load(Ordering::SeqCst) >= 2
         })
         .await;
         assert_eq!(
@@ -566,8 +567,9 @@ mod tests {
         .execute(&pool)
         .await
         .expect("evidence");
-        until("the restored alert", || async {
-            degraded(&pool).await.len() == 2
+        // The watcher commits the row and then notifies, so wait for both (0rut).
+        until("the restored alert and its notification", || async {
+            degraded(&pool).await.len() == 2 && counter.0.load(Ordering::SeqCst) >= 2
         })
         .await;
         assert_eq!(
